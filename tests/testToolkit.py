@@ -265,11 +265,16 @@ def testPlaceOnSurfaceAndScatter(stageBlenderServer):
 def testKitAssetsLinkAsRelativeLibraries(stageBlenderServer, tmp_path):
   kitPath = tmp_path / "kits" / "rocks.blend"
   kitPath.parent.mkdir()
-  zonePath = tmp_path / "zone.blend"
+  (tmp_path / "textures").mkdir()
+  rockTexture = writePNG(tmp_path / "textures" / "rock.png", 8, 8, (100, 96, 90, 255))
+  zonePath = tmp_path / "zones" / "zone.blend"
+  zonePath.parent.mkdir()
 
   async def steps(session):
     await freshScene(session)
     await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "boulder", "size": [4, 4, 3], "location": [0, 0, 0]})
+    await session.expectSuccess("createMaterial", {"name": "rockMaterial", "diffuseTexture": str(rockTexture)})
+    await session.expectSuccess("assignMaterial", {"objectName": "boulder", "materialName": "rockMaterial"})
     await session.expectSuccess("organize", {"collections": {"boulder": "boulderKit"}})
     marked = await session.expectSuccess("markAsset", {"collectionName": "boulderKit"})
     await session.expectSuccess("saveFile", {"path": str(kitPath)})
@@ -288,7 +293,9 @@ def testKitAssetsLinkAsRelativeLibraries(stageBlenderServer, tmp_path):
   assert "'cliffKit' is not a collection marked as an asset" in unknown
   assert "['boulderKit']" in unknown
   assert instance["instanceCollection"] == "boulderKit"
-  assert summary["libraries"] == [{"name": "rocks.blend", "filePath": "//kits\\rocks.blend"}]
+  assert summary["libraries"] == [{"name": "rocks.blend", "filePath": "//..\\kits\\rocks.blend"}]
+  linkedImages = [image for image in summary["images"] if image["name"] == "rock.png"]
+  assert [image["filePath"] for image in linkedImages] == ["//..\\textures\\rock.png"]
 
 
 def testRunPythonCallsAreCounted(stageBlenderServer):

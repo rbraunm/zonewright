@@ -65,6 +65,12 @@ def externalFileProblems(targetPath):
       continue
     if image.source not in fileImageSources:
       continue
+    if image.library is not None:
+      # A linked image's path is relative to its own library and saved there, not in this file.
+      linkedPath = os.path.abspath(bpy.path.abspath(image.filepath, library=image.library))
+      if not os.path.isfile(linkedPath):
+        problems.append(f"image '{image.name}' linked from '{image.library.name}' file '{linkedPath}' does not exist")
+      continue
     imagePath = os.path.abspath(bpy.path.abspath(image.filepath))
     if not os.path.isfile(imagePath):
       problems.append(f"image '{image.name}' file '{imagePath}' does not exist")
@@ -91,7 +97,7 @@ def saveFile(path):
   bpy.ops.wm.save_as_mainfile(filepath=targetPath, relative_remap=True)
   bpy.ops.file.make_paths_relative()
   bpy.ops.wm.save_mainfile()
-  absolutePaths = [image.filepath for image in bpy.data.images if image.source in fileImageSources and not image.filepath.startswith("//")]
+  absolutePaths = [image.filepath for image in bpy.data.images if image.source in fileImageSources and image.library is None and not image.filepath.startswith("//")]
   if absolutePaths:
     raise RuntimeError(f"Saved, but these image paths are still absolute: {absolutePaths}")
   state.unsavedChanges = False
