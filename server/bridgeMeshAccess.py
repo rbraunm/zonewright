@@ -7,7 +7,7 @@ import bpy
 import mathutils
 import numpy
 
-selectorKeys = ("all", "sphere", "box", "cylinder", "facing", "material", "vertexGroup", "and", "or", "not")
+selectorKeys = ("all", "sphere", "box", "cylinder", "facing", "material", "vertexGroup", "insideObject", "and", "or", "not")
 
 
 def requireObject(name):
@@ -136,6 +136,8 @@ def evaluateSelector(selector, sceneObject, elementKind):
     for faceVertices in numpy.array(faceVertexIndices(sceneObject), dtype=object)[faceMask]:
       vertexMask[faceVertices] = True
     return vertexMask
+  if key == "insideObject":
+    return insideMask(requireMeshObject(value), positions)
   if key == "vertexGroup":
     groupMask = vertexGroupMask(sceneObject, value)
     if elementKind == "vertices":
@@ -216,6 +218,28 @@ def hiddenObjects(names):
   finally:
     for sceneObject, wasHidden in zip(hidden, previous):
       sceneObject.hide_viewport = wasHidden
+
+
+def closestOnObject(container, worldPoint, depsgraph):
+  """Distance from a world point to a mesh's surface, and whether the point is inside it (behind the nearest face)."""
+  inverse = container.matrix_world.inverted()
+  localPoint = inverse @ mathutils.Vector(worldPoint)
+  found, location, normal, _ = container.closest_point_on_mesh(localPoint, depsgraph=depsgraph)
+  if not found:
+    raise ValueError(f"'{container.name}' has no surface to measure against")
+  worldLocation = container.matrix_world @ location
+  return (worldLocation - mathutils.Vector(worldPoint)).length, (localPoint - location).dot(normal) < 0
+
+
+def insideMask(container, worldPoints):
+  """Which points lie inside a closed mesh; only points within its bounding box are tested."""
+  corners = numpy.array([list(container.matrix_world @ mathutils.Vector(corner)) for corner in container.bound_box])
+  candidates = numpy.flatnonzero(((worldPoints >= corners.min(0)) & (worldPoints <= corners.max(0))).all(axis=1))
+  depsgraph = bpy.context.evaluated_depsgraph_get()
+  mask = numpy.zeros(len(worldPoints), dtype=bool)
+  for index in candidates:
+    mask[index] = closestOnObject(container, worldPoints[index], depsgraph)[1]
+  return mask
 
 
 def sceneTopHeight():

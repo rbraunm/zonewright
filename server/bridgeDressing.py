@@ -97,8 +97,11 @@ def spacedPoints(region, targetCount, minimumSpacing, generator):
   return accepted
 
 
-def scatterInRegion(sourceObject, region, density, minimumSpacing, yawRangeDegrees, scaleRange, alignToNormal, maximumSlopeDegrees, surfaceObjects, castFromHeight, seed, collection):
+def scatterInRegion(sourceObject, region, density, minimumSpacing, yawRangeDegrees, scaleRange, alignToNormal, maximumSlopeDegrees, surfaceObjects, castFromHeight, seed, collection, avoidObjects, avoidClearance):
   source = bridgeMeshAccess.requireObject(sourceObject)
+  if avoidClearance < 0:
+    raise ValueError(f"avoidClearance must be non-negative, got {avoidClearance}")
+  avoided = [bridgeMeshAccess.requireMeshObject(name) for name in avoidObjects or []]
   area = regionSampler(region)[0]
   targetCount = round(density * area / densityArea)
   if targetCount < 1:
@@ -109,8 +112,9 @@ def scatterInRegion(sourceObject, region, density, minimumSpacing, yawRangeDegre
   candidates = spacedPoints(region, targetCount, minimumSpacing, generator)
   destination = bridgeObjects.targetCollection(collection)
   castHeight = castFromHeight if castFromHeight is not None else bridgeMeshAccess.sceneTopHeight() + castLift
-  rejected = {"noSurface": 0, "tooSteep": 0}
+  rejected = {"noSurface": 0, "tooSteep": 0, "nearAvoidedObject": 0}
   landings = []
+  depsgraph = bpy.context.evaluated_depsgraph_get()
   with bridgeMeshAccess.hiddenObjects([source.name]):
     for point in candidates:
       hit = castDown((point[0], point[1], castHeight), surfaceObjects)
@@ -118,6 +122,8 @@ def scatterInRegion(sourceObject, region, density, minimumSpacing, yawRangeDegre
         rejected["noSurface"] += 1
       elif slopeDegrees(hit[1]) > maximumSlopeDegrees:
         rejected["tooSteep"] += 1
+      elif any(distance <= avoidClearance or inside for distance, inside in (bridgeMeshAccess.closestOnObject(container, hit[0], depsgraph) for container in avoided)):
+        rejected["nearAvoidedObject"] += 1
       else:
         landings.append(hit[:2])
   placed = []

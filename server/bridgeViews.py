@@ -2,9 +2,10 @@
 import math
 import time
 
-import bmesh
 import bpy
 import mathutils
+
+import bridgeModels
 
 requiredZoneKeys = ("fogColor", "fogStart", "fogEnd", "sunAzimuthDegrees", "sunElevationDegrees", "sunColor", "sunStrength", "ambientColor")
 previewName = "zonewrightPreview"
@@ -16,15 +17,14 @@ verticalFieldOfViewDegrees = 52.0
 eyeHeight = 5.5
 cameraClipStart = 0.5
 groundSearchDistance = 50.0
-figureHeight = 6.0
 figureDistance = 15.0
-figureClearance = 2.0
+figureStep = 1.0
+figureClearance = 1.5
+figureStepClimb = 2.0
+figureStepDrop = 4.0
 figureMinimumDistance = 3.0
 figureSideOffset = 1.5
-figureColor = (0.75, 0.2, 0.55, 1.0)
-figureFootRadius = 0.45
-figureShoulderRadius = 0.7
-figureHeadRadius = 0.45
+
 
 
 def requireZone(zone):
@@ -130,27 +130,11 @@ class PreviewScene:
     hit, location, normal, faceIndex, hitObject, _ = self.scene.ray_cast(self.depsgraph(), origin, direction, distance=distance)
     return (location, normal, faceIndex, hitObject) if hit else None
 
-  def addFigure(self, groundPoint):
-    mesh = bpy.data.meshes.new(previewName + "Figure")
-    figureMesh = bmesh.new()
-    bodyHeight = figureHeight - 2 * figureHeadRadius + 0.2
-    bmesh.ops.create_cone(figureMesh, cap_ends=True, segments=12, radius1=figureFootRadius, radius2=figureShoulderRadius, depth=bodyHeight, matrix=mathutils.Matrix.Translation((0, 0, bodyHeight / 2)))
-    bmesh.ops.create_uvsphere(figureMesh, u_segments=12, v_segments=8, radius=figureHeadRadius, matrix=mathutils.Matrix.Translation((0, 0, figureHeight - figureHeadRadius)))
-    figureMesh.to_mesh(mesh)
-    figureMesh.free()
-    material = bpy.data.materials.new(previewName + "Figure")
-    material.use_nodes = True
-    shader = material.node_tree.nodes["Principled BSDF"]
-    shader.inputs["Base Color"].default_value = figureColor
-    shader.inputs["Roughness"].default_value = 1.0
-    shader.inputs["Specular IOR Level"].default_value = 0.0
-    mesh.materials.append(material)
-    figure = self.addObject(bpy.data.objects.new(previewName + "Figure", mesh))
-    figure.location = groundPoint
-    return figure
+  def addFigure(self, groundPoint, figureModel, facingHeadingDegrees):
+    figure = bridgeModels.modelObject(figureModel["folder"], previewName + "Figure", figureModel["scale"], figureModel["footHeight"], groundPoint, facingHeadingDegrees)
+    return self.addObject(figure)
 
   def remove(self):
-    figureMaterial = bpy.data.materials.get(previewName + "Figure")
     for createdObject in self.createdObjects:
       data = createdObject.data
       bpy.data.objects.remove(createdObject)
@@ -160,8 +144,6 @@ class PreviewScene:
         bpy.data.lights.remove(data)
       elif isinstance(data, bpy.types.Mesh):
         bpy.data.meshes.remove(data)
-    if figureMaterial is not None:
-      bpy.data.materials.remove(figureMaterial)
     bpy.data.worlds.remove(self.scene.world)
     bpy.data.node_groups.remove(self.scene.compositing_node_group)
     bpy.data.scenes.remove(self.scene)
@@ -179,7 +161,7 @@ def headingPitchForward(headingDegrees, pitchDegrees):
   return mathutils.Vector((math.sin(heading) * math.cos(pitch), math.cos(heading) * math.cos(pitch), math.sin(pitch)))
 
 
-def placeCamera(preview, view, placeFigure):
+def placeCamera(preview, view, figureModel):
   """Position the preview camera from a view; returns a description, including the scale figure when one is placed."""
   viewKeys = set(view)
   camera = preview.camera
@@ -204,35 +186,45 @@ def placeCamera(preview, view, placeFigure):
     forward = headingPitchForward(view["headingDegrees"], view["pitchDegrees"])
     camera.location, camera.rotation_quaternion = eye, lookRotation(forward)
     description = {"eye": list(eye), "forward": list(forward), "ground": list(groundHit[0]), "figure": None}
-    if placeFigure:
-      description["figure"] = list(placeScaleFigure(preview, eye, view["headingDegrees"]))
+    if figureModel is not None:
+      description["figure"] = list(placeScaleFigure(preview, groundHit[0], view["headingDegrees"], figureModel))
     return description
   raise ValueError(f"A view is {{camera}}, {{eye, target}}, or {{standAt, headingDegrees, pitchDegrees}}; got keys {sorted(viewKeys)}")
 
 
-def placeScaleFigure(preview, eye, headingDegrees):
+def placeScaleFigure(preview, ground, headingDegrees, figureModel):
+  """Walk ahead along the ground, as a player would, until figureDistance or a wall, drop, or climb stops the walk; then stand the figure there."""
   heading = math.radians(headingDegrees)
   ahead = mathutils.Vector((math.sin(heading), math.cos(heading), 0))
   side = mathutils.Vector((math.cos(heading), -math.sin(heading), 0))
-  blocked = preview.rayCast(eye, ahead, figureDistance + figureClearance)
-  distance = min(figureDistance, (blocked[0] - eye).length - figureClearance) if blocked else figureDistance
-  if distance < figureMinimumDistance:
-    raise ValueError(f"No room for the scale figure: geometry {distance + figureClearance:.1f} units ahead of the eye")
-  groundHit = preview.rayCast(eye + ahead * distance + side * figureSideOffset, mathutils.Vector((0, 0, -1)), groundSearchDistance)
-  if groundHit is None:
-    raise ValueError("No ground under the scale figure's spot")
-  preview.addFigure(groundHit[0])
-  return groundHit[0]
+  position = ground.copy()
+  sideHit = preview.rayCast(position + side * figureSideOffset + mathutils.Vector((0, 0, figureStepClimb)), mathutils.Vector((0, 0, -1)), figureStepClimb + figureStepDrop)
+  if sideHit is not None:
+    position = sideHit[0]
+  walked = 0.0
+  while walked < figureDistance:
+    chest = position + mathutils.Vector((0, 0, figureModel["size"] / 2))
+    if preview.rayCast(chest, ahead, figureStep + figureClearance) is not None:
+      break
+    nextGround = preview.rayCast(position + ahead * figureStep + mathutils.Vector((0, 0, figureStepClimb)), mathutils.Vector((0, 0, -1)), figureStepClimb + figureStepDrop)
+    if nextGround is None:
+      break
+    position = nextGround[0]
+    walked += figureStep
+  if walked < figureMinimumDistance:
+    raise ValueError(f"No room for the scale figure: the ground ahead stops after {walked:.0f} units")
+  preview.addFigure(position, figureModel, headingDegrees + 180)
+  return position
 
 
 def roundVector(vector, digits=3):
   return [round(float(component), digits) for component in vector]
 
 
-def renderView(sourceScene, zone, view, outputPath):
+def renderView(sourceScene, zone, view, outputPath, figureModel):
   preview = PreviewScene(sourceScene, zone)
   try:
-    description = placeCamera(preview, view, placeFigure=True)
+    description = placeCamera(preview, view, figureModel)
     preview.scene.render.filepath = outputPath
     start = time.perf_counter()
     bpy.ops.render.render(write_still=True, scene=preview.scene.name)
@@ -252,7 +244,7 @@ def pick(sourceScene, zone, view, pixel):
     raise ValueError(f"pixel {pixel} is outside the {renderWidth}x{renderHeight} render")
   preview = PreviewScene(sourceScene, zone)
   try:
-    placeCamera(preview, view, placeFigure=False)
+    placeCamera(preview, view, None)
     topRight, _, bottomLeft, topLeft = preview.camera.data.view_frame(scene=preview.scene)
     across = (pixel[0] + 0.5) / renderWidth
     down = (pixel[1] + 0.5) / renderHeight

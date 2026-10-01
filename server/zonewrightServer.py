@@ -12,6 +12,7 @@ from mcp.server.mcpserver import Context, Image
 from mcp.server.mcpserver.exceptions import ToolError
 
 import blenderBridge
+import eqCharacters
 import extensionCatalog
 import machineProfile
 import toolingLog
@@ -78,6 +79,22 @@ async def runSync(context):
 
 async def callBridge(context, command, arguments):
   return await anyio.to_thread.run_sync(bridge.call, command, arguments, progressReporter(context))
+
+
+# The live dumps record dark elf females at size 5, the race default; EQ draws a model `size` units tall.
+figureModelCode = "DAF"
+figureSize = 5.0
+
+
+def characterModel(modelCode, size):
+  """Build or reuse a character model's cache and the scale that makes it `size` units tall, as the client draws it."""
+  if size <= 0:
+    raise ToolError(f"size must be positive, got {size}")
+  try:
+    folder, details = eqCharacters.buildCharacter(zoneSources.resolveClientRoot(), modelCode, toolingRoot / "models" / "characters")
+  except ValueError as error:
+    raise ToolError(str(error)) from error
+  return {"folder": str(folder), "scale": size / details["height"], "footHeight": details["footHeight"], "size": size, "pose": details["pose"], "modelCode": details["modelCode"]}
 
 
 def newRenderPath():
@@ -240,10 +257,21 @@ async def setZoneProperties(
 
 @guardedTool()
 async def renderView(context: Context, view: dict):
-  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y,z], "headingDegrees": h, "pitchDegrees": p} (heading 0 = +Y, clockwise; eye 5.5 above the ground; adds a 6-unit scale figure)."""
+  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y,z], "headingDegrees": h, "pitchDegrees": p} (heading 0 = +Y, clockwise; eye 5.5 above the ground; adds a dark elf female at her normal size of 5 units, walked ahead along the ground and facing the camera)."""
   outputPath = newRenderPath()
-  description = await callBridge(context, "renderView", {"view": view, "outputPath": str(outputPath)})
+  figureModel = await anyio.to_thread.run_sync(characterModel, figureModelCode, figureSize)
+  description = await callBridge(context, "renderView", {"view": view, "outputPath": str(outputPath), "figureModel": figureModel})
   return [Image(data=outputPath.read_bytes(), format="png"), description]
+
+
+@guardedTool()
+async def placeSpawn(context: Context, modelCode: str, name: str, location: list[float], headingDegrees: float, size: float, snapToGround: bool = True, collection: str | None = None):
+  """Place an EverQuest character model (the actorDef code, such as DAF or HUF) drawn `size` units tall as the client does, feet at `location` (dropped to the ground below when snapToGround), facing headingDegrees (0 = +Y, clockwise)."""
+  model = await anyio.to_thread.run_sync(characterModel, modelCode, size)
+  return await callBridge(context, "placeSpawn", {
+    "modelFolder": model["folder"], "name": name, "location": location, "headingDegrees": headingDegrees, "scale": model["scale"],
+    "footHeight": model["footHeight"], "snapToGround": snapToGround, "collection": collection,
+  }) | {"pose": model["pose"]}
 
 
 @guardedTool()
@@ -255,7 +283,7 @@ async def pick(context: Context, view: dict, pixel: list[int]):
 selectorHelp = (
   " A selector picks part of a mesh by world position or surface: {\"all\": true}, {\"sphere\": {\"center\": [x,y,z], \"radius\": r}},"
   " {\"box\": {\"minimum\": [x,y,z], \"maximum\": [x,y,z]}}, {\"cylinder\": {\"center\": [x,y], \"radius\": r, \"bottom\": z, \"top\": z}},"
-  " {\"facing\": {\"direction\": [x,y,z], \"withinDegrees\": d}}, {\"material\": name}, {\"vertexGroup\": name},"
+  " {\"facing\": {\"direction\": [x,y,z], \"withinDegrees\": d}}, {\"material\": name}, {\"vertexGroup\": name}, {\"insideObject\": closedMeshName},"
   " {\"and\": [selectors]}, {\"or\": [selectors]}, {\"not\": selector}. Shapes test vertex positions, or face centers for face operations."
   " A selector that matches nothing is an error."
 )
@@ -290,6 +318,12 @@ async def transformObjects(
 async def duplicateObjects(context: Context, names: list[str], offset: list[float], linkData: bool = False):
   """Copy objects, offset from the originals; linkData shares the mesh instead of copying it. Returns original to copy names."""
   return await callBridge(context, "duplicateObjects", {"names": names, "offset": offset, "linkData": linkData})
+
+
+@guardedTool()
+async def joinObjects(context: Context, names: list[str], into: str):
+  """Merge meshes into one object, for example a trunk and canopy into one tree; `into` keeps its name, origin, and transform, and the others are removed."""
+  return await callBridge(context, "joinObjects", {"names": names, "into": into})
 
 
 @guardedTool()
@@ -333,10 +367,15 @@ async def sculptAtPoint(
 @guardedTool()
 async def sculptAlongPath(
   context: Context, objectName: str, mode: str, path: list[list[float]], radius: float, strength: float,
-  falloff: str = "smooth", direction: list[float] | None = None, iterations: int = 1, profile: list[list[float]] | None = None,
+  falloff: str = "smooth", direction: list[float] | None = None, iterations: int = 1, profile: list[list[float]] | None = None, conformRim: bool = True,
 ):
-  """Sculpt along a polyline path [[x,y,z], ...] within `radius`: raise, lower, crease, smooth, flatten as in sculptAtPoint, or carve, which cuts vertically down to the path's own heights shaped by `profile` [[lateralFraction, heightAboveFloor], ...] from 0 (center) to 1 (edge); carve strength is a fraction."""
-  return await callBridge(context, "sculptAlongPath", {"objectName": objectName, "mode": mode, "path": path, "radius": radius, "strength": strength, "falloff": falloff, "direction": direction, "iterations": iterations, "profile": profile})
+  """Sculpt along a polyline path [[x,y,z], ...] within `radius`: raise, lower, crease, smooth, flatten as in sculptAtPoint, or carve, which cuts vertically down to the path's own heights shaped by `profile` [[lateralFraction, heightAboveFloor], ...] from 0 (center) to 1 (edge); carve strength is a fraction. With conformRim (needs rising profile heights), vertices just outside the cut slide onto the rim contour so the edge follows the profile rather than the grid."""
+  return await callBridge(context, "sculptAlongPath", {"objectName": objectName, "mode": mode, "path": path, "radius": radius, "strength": strength, "falloff": falloff, "direction": direction, "iterations": iterations, "profile": profile, "conformRim": conformRim})
+
+
+@guardedTool(description="Delete the selected faces of a mesh, with edges and vertices left unused; for example the terrain inside a rock that should form its own cave floor ({\"insideObject\": \"rockName\"})." + selectorHelp)
+async def deleteFaces(context: Context, objectName: str, selector: dict):
+  return await callBridge(context, "deleteFaces", {"objectName": objectName, "selector": selector})
 
 
 @guardedTool(description="Extrude the selected faces of a mesh by `distance` units along their average normal, or along `direction`." + selectorHelp)
@@ -404,12 +443,13 @@ async def scatterInRegion(
   context: Context, sourceObject: str, region: dict, density: float, minimumSpacing: float, collection: str,
   yawRangeDegrees: list[float] = [0, 360], scaleRange: list[float] = [1, 1], alignToNormal: bool = False,
   maximumSlopeDegrees: float = 90, surfaceObjects: list[str] | None = None, castFromHeight: float | None = None, seed: int = 0,
+  avoidObjects: list[str] | None = None, avoidClearance: float = 0.0,
 ):
-  """Scatter linked copies of an object over a region ({"circle": {center, radius}} or {"polygon": [[x,y], ...]}): `density` per 10,000 square units, at least `minimumSpacing` apart, random yaw and scale within ranges, dropped onto surfaces from `castFromHeight` (default just above the scene) and skipped where steeper than maximumSlopeDegrees. Deterministic for a seed."""
+  """Scatter linked copies of an object over a region ({"circle": {center, radius}} or {"polygon": [[x,y], ...]}): `density` per 10,000 square units, at least `minimumSpacing` apart, random yaw and scale within ranges, dropped onto surfaces from `castFromHeight` (default just above the scene), skipped where steeper than maximumSlopeDegrees or inside or within avoidClearance of any avoidObjects. Deterministic for a seed."""
   return await callBridge(context, "scatterInRegion", {
     "sourceObject": sourceObject, "region": region, "density": density, "minimumSpacing": minimumSpacing, "yawRangeDegrees": yawRangeDegrees,
     "scaleRange": scaleRange, "alignToNormal": alignToNormal, "maximumSlopeDegrees": maximumSlopeDegrees, "surfaceObjects": surfaceObjects,
-    "castFromHeight": castFromHeight, "seed": seed, "collection": collection,
+    "castFromHeight": castFromHeight, "seed": seed, "collection": collection, "avoidObjects": avoidObjects, "avoidClearance": avoidClearance,
   })
 
 

@@ -135,6 +135,8 @@ image.file_format = 'PNG'
 image.save()
 image.source = 'FILE'
 image.pack()
+texture = bpy.data.materials['grass'].node_tree.nodes.new('ShaderNodeTexImage')
+texture.image = image
 """})
     return await session.expectError("saveFile", {"path": str(tmp_path / "packed.blend")})
 

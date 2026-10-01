@@ -48,7 +48,7 @@ def moveVertices(objectName, selector, offset, falloff):
 
 
 def distancesToPolyline(points, path, horizontal):
-  """Distance from each point to a polyline, and the interpolated path height at the nearest spot."""
+  """Distance from each point to a polyline, the interpolated path height at the nearest spot, and that nearest spot."""
   pathArray = bridgeMeshAccess.toArray(path)
   axes = slice(0, 2) if horizontal else slice(0, 3)
   starts, ends = pathArray[:-1], pathArray[1:]
@@ -61,7 +61,7 @@ def distancesToPolyline(points, path, horizontal):
   closest = distances.argmin(1)
   rows = numpy.arange(len(points))
   heights = starts[closest, 2] + along[rows, closest] * (ends[closest, 2] - starts[closest, 2])
-  return distances[rows, closest], heights
+  return distances[rows, closest], heights, nearest[rows, closest]
 
 
 def vertexNeighbourAverages(sceneObject, positions):
@@ -77,7 +77,7 @@ def vertexNeighbourAverages(sceneObject, positions):
   return numpy.divide(sums, counts[:, None], out=positions.copy(), where=counts[:, None] > 0)
 
 
-def sculpt(objectName, mode, distances, nearestPoints, radius, strength, curve, direction, iterations, carveTargets):
+def sculpt(objectName, mode, distances, nearestPoints, radius, strength, curve, direction, iterations, carve):
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   if mode not in sculptModes:
     raise ValueError(f"mode must be one of {list(sculptModes)}, got '{mode}'")
@@ -109,9 +109,7 @@ def sculpt(objectName, mode, distances, nearestPoints, radius, strength, curve, 
     heights = (positions - centroid) @ pushDirection
     updated -= strength * weights[:, None] * heights[:, None] * pushDirection
   else:
-    targets = carveTargets(positions)
-    above = affected & (positions[:, 2] > targets)
-    updated[above, 2] -= strength * (positions[above, 2] - targets[above])
+    updated = carve(sceneObject, positions, affected, strength)
   moved = numpy.linalg.norm(updated - positions, axis=1)
   writeWorldPositions(sceneObject, updated)
   return {"affectedVertices": int((moved > 1e-9).sum()), "largestMove": round(float(moved.max()), 3)}
@@ -129,33 +127,59 @@ def sculptAtPoint(objectName, mode, center, radius, strength, falloff, direction
   )
 
 
-def profileHeights(profile, fractions):
+def validatedProfile(profile, conformRim):
   profileArray = bridgeMeshAccess.toArray(profile)
   if profileArray.ndim != 2 or profileArray.shape[1] != 2 or profileArray[0, 0] != 0 or profileArray[-1, 0] != 1 or (numpy.diff(profileArray[:, 0]) <= 0).any():
     raise ValueError("profile is [[lateralFraction, heightAboveFloor], ...] with fractions rising from 0 (path center) to 1 (stroke edge)")
-  return numpy.interp(fractions, profileArray[:, 0], profileArray[:, 1])
+  if conformRim and (numpy.diff(profileArray[:, 1]) <= 0).any():
+    raise ValueError("conformRim needs profile heights that rise from the path center to the edge; pass conformRim false for this profile")
+  return profileArray
 
 
-def sculptAlongPath(objectName, mode, path, radius, strength, falloff, direction, iterations, profile):
+def medianEdgeLength(sceneObject, positions, vertexMask):
+  edges = numpy.empty(len(sceneObject.data.edges) * 2, dtype=numpy.int64)
+  sceneObject.data.edges.foreach_get("vertices", edges)
+  edges = edges.reshape(-1, 2)
+  edges = edges[vertexMask[edges].any(axis=1)]
+  return float(numpy.median(numpy.linalg.norm(positions[edges[:, 0]] - positions[edges[:, 1]], axis=1)))
+
+
+def carveAlongPath(sceneObject, positions, affected, strength, path, radius, profileArray, conformRim):
+  """Lower vertices to the path floor plus the profile height; with conformRim, untouched vertices just outside the cut slide sideways onto the rim contour so the edge follows the profile instead of the grid."""
+  lateral, floors, nearest = distancesToPolyline(positions, path, horizontal=True)
+  targets = floors + numpy.interp(numpy.clip(lateral / radius, 0, 1), profileArray[:, 0], profileArray[:, 1])
+  updated = positions.copy()
+  lowered = affected & (positions[:, 2] > targets)
+  updated[lowered, 2] -= strength * (positions[lowered, 2] - targets[lowered])
+  if conformRim:
+    heightsAboveFloor = positions[:, 2] - floors
+    contourLateral = numpy.interp(heightsAboveFloor, profileArray[:, 1], profileArray[:, 0]) * radius
+    slide = contourLateral - lateral
+    maximumSlide = 0.75 * medianEdgeLength(sceneObject, positions, lowered)
+    sliding = affected & ~lowered & (heightsAboveFloor > profileArray[0, 1]) & (heightsAboveFloor < profileArray[-1, 1]) & (slide < 0) & (-slide <= maximumSlide) & (lateral > 0)
+    outward = (positions[sliding, :2] - nearest[sliding]) / lateral[sliding, None]
+    updated[sliding, :2] += outward * slide[sliding, None]
+  return updated
+
+
+def sculptAlongPath(objectName, mode, path, radius, strength, falloff, direction, iterations, profile, conformRim):
   if len(path) < 2:
     raise ValueError("A path needs at least two points")
   if (mode == "carve") != (profile is not None):
     raise ValueError("carve needs a profile, and only carve takes one")
   horizontal = mode == "carve"
+  profileArray = validatedProfile(profile, conformRim) if mode == "carve" else None
 
   def nearestPoints(positions):
     pathArray = bridgeMeshAccess.toArray(path)
     densified = numpy.concatenate([numpy.linspace(start, end, 32, endpoint=False) for start, end in zip(pathArray[:-1], pathArray[1:])] + [pathArray[-1:]])
     return densified[numpy.linalg.norm(positions[:, None] - densified[None], axis=2).argmin(1)]
 
-  def carveTargets(positions):
-    lateral, floors = distancesToPolyline(positions, path, horizontal=True)
-    return floors + profileHeights(profile, numpy.clip(lateral / radius, 0, 1))
-
   return sculpt(
     objectName, mode,
     lambda positions: distancesToPolyline(positions, path, horizontal)[0],
-    nearestPoints, radius, strength, falloff, direction, iterations, carveTargets,
+    nearestPoints, radius, strength, falloff, direction, iterations,
+    lambda sceneObject, positions, affected, carveStrength: carveAlongPath(sceneObject, positions, affected, carveStrength, path, radius, profileArray, conformRim),
   )
 
 
@@ -163,6 +187,18 @@ def selectedFaces(meshEditor, sceneObject, selector):
   mask = bridgeMeshAccess.evaluateSelector(selector, sceneObject, "faces")
   bridgeMeshAccess.requireSelection(mask, selector, sceneObject, "faces")
   return [meshEditor.faces[index] for index in numpy.flatnonzero(mask)], mask
+
+
+def deleteFaces(objectName, selector):
+  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  meshEditor = bridgeMeshAccess.loadBMesh(sceneObject)
+  faces, _ = selectedFaces(meshEditor, sceneObject, selector)
+  if len(faces) == len(meshEditor.faces):
+    meshEditor.free()
+    raise ValueError(f"Selector {selector!r} matches every face of '{objectName}'; delete the object instead")
+  bmesh.ops.delete(meshEditor, geom=faces, context="FACES")
+  bridgeMeshAccess.storeBMesh(meshEditor, sceneObject)
+  return {"deletedFaces": len(faces)} | bridgeMeshAccess.meshCounts(sceneObject)
 
 
 def extrudeFaces(objectName, selector, distance, direction):
@@ -289,6 +325,7 @@ commands = {
   "moveVertices": (moveVertices, True),
   "sculptAtPoint": (sculptAtPoint, True),
   "sculptAlongPath": (sculptAlongPath, True),
+  "deleteFaces": (deleteFaces, True),
   "extrudeFaces": (extrudeFaces, True),
   "insetFaces": (insetFaces, True),
   "bevelEdges": (bevelEdges, True),

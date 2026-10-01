@@ -248,7 +248,7 @@ def testPlaceOnSurfaceAndScatter(stageBlenderServer):
   expectedCount = round(40 * math.pi * 30 * 30 / 10000)
   assert first["targetCount"] == expectedCount
   assert first["placed"] == expectedCount
-  assert first["rejected"] == {"noSurface": 0, "tooSteep": 0}
+  assert first["rejected"] == {"noSurface": 0, "tooSteep": 0, "nearAvoidedObject": 0}
   assert first["sharedMesh"] == "shrub"
   byCollection = {}
   for sceneObject in summary["objects"]:

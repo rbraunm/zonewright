@@ -7,6 +7,7 @@ import os
 import bpy
 
 import bridgeDressing
+import bridgeModels
 import bridgeObjects
 import bridgeShaping
 import bridgeSurfacing
@@ -57,6 +58,9 @@ def externalFileProblems(targetPath):
   targetDrive = os.path.splitdrive(os.path.abspath(targetPath))[0].lower()
   problems = []
   for image in bpy.data.images:
+    # Images nothing uses (such as the scale figure's textures between renders) are not written to the file.
+    if image.users == 0:
+      continue
     if image.packed_file is not None:
       problems.append(f"image '{image.name}' is packed into the .blend")
       continue
@@ -193,8 +197,8 @@ def setZoneProperties(updates):
   return readZoneProperties(bpy.context.scene)
 
 
-def renderView(view, outputPath):
-  return bridgeViews.renderView(bpy.context.scene, readZoneProperties(bpy.context.scene), view, outputPath)
+def renderView(view, outputPath, figureModel):
+  return bridgeViews.renderView(bpy.context.scene, readZoneProperties(bpy.context.scene), view, outputPath, figureModel)
 
 
 def pick(view, pixel):
@@ -211,7 +215,7 @@ commands = {
   "setZoneProperties": (setZoneProperties, True),
   "renderView": (renderView, False),
   "pick": (pick, False),
-} | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands
+} | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands | bridgeModels.commands
 
 
 def dispatch(command, arguments):

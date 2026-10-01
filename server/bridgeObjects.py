@@ -149,6 +149,25 @@ def duplicateObjects(names, offset, linkData):
   return duplicates
 
 
+def joinObjects(names, into):
+  """Merge meshes into one object; the `into` object keeps its name, origin, and transform, and the others are removed."""
+  if into not in names or len(set(names)) < 2:
+    raise ValueError(f"joinObjects needs at least two distinct meshes including '{into}', got {names}")
+  sceneObjects = [bridgeMeshAccess.requireMeshObject(name) for name in names]
+  target = bridgeMeshAccess.requireMeshObject(into)
+  if any(len(sceneObject.modifiers) for sceneObject in sceneObjects):
+    raise ValueError("Apply or remove modifiers before joining; join merges the base meshes")
+  for sceneObject in sceneObjects:
+    if sceneObject.data.users > 1:
+      sceneObject.data = sceneObject.data.copy()
+  with bpy.context.temp_override(active_object=target, object=target, selected_objects=sceneObjects, selected_editable_objects=sceneObjects):
+    result = bpy.ops.object.join()
+  if result != {"FINISHED"}:
+    raise RuntimeError(f"join returned {result}")
+  bpy.context.view_layer.update()
+  return describeTransform(target) | bridgeMeshAccess.meshCounts(target) | {"materials": [slot.material.name if slot.material else None for slot in target.material_slots]}
+
+
 def deleteObjects(names):
   sceneObjects = [bridgeMeshAccess.requireObject(name) for name in names]
   removedData = []
@@ -269,6 +288,7 @@ commands = {
   "createTerrainGrid": (createTerrainGrid, True),
   "transformObjects": (transformObjects, True),
   "duplicateObjects": (duplicateObjects, True),
+  "joinObjects": (joinObjects, True),
   "deleteObjects": (deleteObjects, True),
   "organize": (organize, True),
   "getObjectDetail": (getObjectDetail, False),

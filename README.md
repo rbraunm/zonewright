@@ -59,7 +59,7 @@ Nothing runs stale code. Every tool checks the server's own loaded source files 
 
 ### Artist toolkit
 
-Edits address parts of a mesh with selectors instead of an interactive selection: `{"all": true}`, `{"sphere": {center, radius}}`, `{"box": {minimum, maximum}}`, `{"cylinder": {center: [x, y], radius, bottom, top}}`, `{"facing": {direction, withinDegrees}}`, `{"material": name}`, `{"vertexGroup": name}`, and `{"and": [...]}`, `{"or": [...]}`, `{"not": selector}`. Shapes test vertex positions in world units, or face centers for face operations. A selector that matches nothing is an error.
+Edits address parts of a mesh with selectors instead of an interactive selection: `{"all": true}`, `{"sphere": {center, radius}}`, `{"box": {minimum, maximum}}`, `{"cylinder": {center: [x, y], radius, bottom, top}}`, `{"facing": {direction, withinDegrees}}`, `{"material": name}`, `{"vertexGroup": name}`, `{"insideObject": closedMeshName}`, and `{"and": [...]}`, `{"or": [...]}`, `{"not": selector}`. Shapes test vertex positions in world units, or face centers for face operations. A selector that matches nothing is an error.
 
 | Activity | Tool | Does |
 |---|---|---|
@@ -68,8 +68,10 @@ Edits address parts of a mesh with selectors instead of an interactive selection
 | | `transformObjects` | Relative or absolute location, rotation, and scale |
 | | `duplicateObjects` / `deleteObjects` | Copies (optionally sharing the mesh) and deletions |
 | | `organize` | Renames, parents (world transform kept), collections |
+| | `joinObjects` | Merges meshes into one object, such as a trunk and canopy into one tree |
 | Shaping | `moveVertices` | Moves selected vertices, optionally fading with distance from a center: the fine-detail edit |
-| | `sculptAtPoint` / `sculptAlongPath` | Raise, lower, crease, smooth, flatten around a point or along a path; carve cuts down to a path's heights through a cross-section profile |
+| | `sculptAtPoint` / `sculptAlongPath` | Raise, lower, crease, smooth, flatten around a point or along a path; carve cuts down to a path's heights through a cross-section profile, sliding the vertices just outside the cut onto the rim contour (`conformRim`) |
+| | `deleteFaces` | Removes selected faces, such as the terrain inside a rock that forms its own cave floor |
 | | `extrudeFaces`, `insetFaces`, `bevelEdges`, `subdivide` | Topology edits on selected faces or edges |
 | | `booleanCut` | Cuts openings with a cutter mesh; refuses a cut that would erase the mesh |
 | | `decimate` / `cleanupMesh` | Triangle reduction; merging, degenerate removal, and consistent normals |
@@ -77,12 +79,13 @@ Edits address parts of a mesh with selectors instead of an interactive selection
 | | `assignMaterial` | Material on selected faces |
 | | `projectUVs` | Planar or box projection at a set number of world units per texture repeat |
 | Dressing | `placeOnSurface` | Drops objects onto the surface below, optionally aligned to its normal |
-| | `scatterInRegion` | Spaced, linked copies over a circle or polygon by density, with yaw and scale ranges and a slope limit; deterministic per seed |
+| | `scatterInRegion` | Spaced, linked copies over a circle or polygon by density, with yaw and scale ranges, a slope limit, and objects to keep clear of; deterministic per seed |
+| | `placeSpawn` | An EverQuest character model drawn at its EQ size, feet on the ground; see the `render-spawn` skill |
 | | `markAsset` / `linkKitAsset` | Marks kit collections as assets; links and places them from a kit .blend |
 | Inspecting | `getObjectDetail` | Transform, bounds, counts, faces per material, UV density, modifiers, vertex groups |
 | | `measure` | Surface heights, distances, height changes, and slopes between points |
 
-A view is `{"camera": name}`, `{"eye": [x,y,z], "target": [x,y,z]}`, or `{"standAt": [x,y,z], "headingDegrees": h, "pitchDegrees": p}`. Heading 0 looks along +Y and turns clockwise seen from above; positive pitch looks up. `standAt` finds the ground by casting down from just above the point, so it works inside caves, puts the eye 5.5 units above it, and renders a 6-unit scale figure about 15 units ahead.
+A view is `{"camera": name}`, `{"eye": [x,y,z], "target": [x,y,z]}`, or `{"standAt": [x,y,z], "headingDegrees": h, "pitchDegrees": p}`. Heading 0 looks along +Y and turns clockwise seen from above; positive pitch looks up. `standAt` finds the ground by casting down from just above the point, so it works inside caves, puts the eye 5.5 units above it, and stands a scale figure ahead: the client's own dark elf female at her normal size of 5 units, walked up to 15 units along the ground like a player (walls, drops, and climbs stop her) and facing the camera.
 
 The EQ preview renders the open scene's objects (its own lights and cameras excluded) in a temporary scene: EEVEE without ray tracing, GI, or bloom; one shadowed sun and uniform ambient, both with no specular; linear distance fog composited from the mist pass, with the far clip at the fog end; 52 degree vertical field of view; 960 x 540. Output is byte-identical for identical input. These are starting values to calibrate against client screenshots.
 
