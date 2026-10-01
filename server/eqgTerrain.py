@@ -59,6 +59,7 @@ def parseTerrain(zonText, datBytes, sourceName):
   tileCount = reader.read("I")
   tiles = []
   placements = []
+  regionNames = []
   for _ in range(tileCount):
     longitude, latitude, _ = reader.read("iii")
     heights = reader.array("<f4", vertexSide * vertexSide).reshape(vertexSide, vertexSide)
@@ -70,15 +71,16 @@ def parseTerrain(zonText, datBytes, sourceName):
         reader.read("ffff")
       reader.read("f")
     layerCount = reader.read("I")
+    baseLayer = None
     if layerCount:
-      reader.string()
+      baseLayer = reader.string().lower()
       for _ in range(1, layerCount):
         reader.string()
         maskSide = reader.read("I")
         reader.array("u1", maskSide * maskSide)
     tileX = (longitude - tileCoordinateOrigin) * tileSize
     tileY = (latitude - tileCoordinateOrigin) * tileSize
-    tiles.append({"x": tileX, "y": tileY, "heights": heights})
+    tiles.append({"x": tileX, "y": tileY, "heights": heights, "baseLayer": baseLayer})
     for _ in range(reader.read("I")):
       # Placements name the model without its .mod extension.
       modelName = reader.string().lower()
@@ -90,7 +92,7 @@ def parseTerrain(zonText, datBytes, sourceName):
         reader.read("I")
       placements.append({"model": modelName + ".mod", "position": (tileX + x, tileY + y, z), "rotation": (rotationZ, rotationY, rotationX), "scale": scaleX})
     for _ in range(reader.read("I")):
-      reader.string()
+      regionNames.append(reader.string())
       reader.read("i")
       reader.string()
       reader.read("II")
@@ -107,7 +109,7 @@ def parseTerrain(zonText, datBytes, sourceName):
       reader.read("10f")
   if reader.position != len(datBytes):
     raise ValueError(f"{sourceName}: terrain data ends at {reader.position} of {len(datBytes)} bytes")
-  return {"header": header, "tileSize": tileSize, "tiles": tiles, "placements": placements}
+  return {"header": header, "tileSize": tileSize, "tiles": tiles, "placements": placements, "regionNames": regionNames}
 
 
 def terrainBounds(terrain):

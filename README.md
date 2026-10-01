@@ -38,11 +38,12 @@ EQGZI's Blender exporter (`xackery/eqgzi` `out/convert.py`) works at 1 Blender u
 
 ## EverQuest reference
 
-`EVERQUEST_CLIENT` in `.mcp.json` points at an EverQuest client install. Scale and layout come only from its actual zone files: classic WLD (`.s3d`), EQGZ (`.zon` with `.ter`/`.mod` models, including archives named in `<zone>_assets.txt`), and EQTZP terrain (`.zon`/`.dat`). Brewall map files (`maps\Brewall`) are not authoritative geometry; they serve only as place names for design notes.
+`EVERQUEST_CLIENT` in `.mcp.json` points at an EverQuest client install. The `zone-survey` skill (`.claude/skills/zone-survey`) describes how to answer zone questions from the survey. Scale and layout come only from the actual zone files: classic WLD (`.s3d`), EQGZ (`.zon` with `.ter`/`.mod` models, including archives named in `<zone>_assets.txt`), and EQTZP terrain (`.zon`/`.dat`). Brewall map files (`maps\Brewall`) are not authoritative geometry; they serve only as place names for design notes.
 
 | Tool | Does |
 |---|---|
-| `surveyZones` | Measures every zone variant (or the named zones) from its files: terrain size, all-geometry size (including backdrops and stray placements), triangles, textures, placements, Brewall label count. Largest terrain footprint first; cached under the tooling root and re-read only when files change. A variant whose files cannot be parsed is reported with its error |
+| `surveyZones` | Technical lane of the zone survey: measured groups (`dimensions`, `surfaces`, `verticality`, `content`, `regions`) for the named zones or all of them, sorted by any numeric field. Cached per variant by source-file SHA-256 and per-group version, so changing one group's method recomputes only that group. A variant whose files cannot be parsed is reported with its error |
+| `getZoneSurvey` | Every survey group for one zone, both lanes (measured and interpreted) |
 | `getZoneNotes` | Lists a zone's Brewall labels: text, map position, and layer file |
 
 ## eqzones

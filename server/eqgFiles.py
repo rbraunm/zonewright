@@ -95,10 +95,14 @@ def parseZone(zoneBytes, sourceName):
       "rotation": (heading, rotationY, rotationX),
       "scale": scale,
     })
-  position += regionCount * zoneRegionBytes + lightCount * zoneLightBytes
+  regionNames = []
+  for _ in range(regionCount):
+    regionNames.append(readString(stringTable, struct.unpack_from("<I", zoneBytes, position)[0]))
+    position += zoneRegionBytes
+  position += lightCount * zoneLightBytes
   if position != len(zoneBytes):
     raise ValueError(f"{sourceName}: zone data ends at {position} of {len(zoneBytes)} bytes")
-  return {"modelNames": modelNames, "placements": placements, "regionCount": regionCount, "lightCount": lightCount}
+  return {"modelNames": modelNames, "placements": placements, "regionNames": regionNames, "lightCount": lightCount}
 
 
 def placementMatrix(placement):

@@ -134,7 +134,8 @@ class WorldFile:
       "name": meshFragment.name,
       "vertices": vertices,
       "uvs": uvs if uvCount == vertexCount else None,
-      "triangles": polygons["indices"].astype(numpy.int64),
+      # WLD winds clockwise against its stored normals; reorder to counter-clockwise like EQG and Blender.
+      "triangles": polygons["indices"][:, [0, 2, 1]].astype(numpy.int64),
       "isPassable": (polygons["flags"] & passablePolygonFlag) != 0,
       "triangleMaterials": polygonMaterials.astype(numpy.int64),
       "materials": self.materialList(materialListReference) if materialListReference > 0 else [],

@@ -9,6 +9,8 @@ import toolingLog
 import toolingManifest
 import toolingStatus
 import toolingSync
+import surveyFields
+import zoneSources
 import zoneSurvey
 
 toolingRoot = toolingStatus.resolveToolingRoot()
@@ -30,23 +32,13 @@ async def runSync(context):
   return await anyio.to_thread.run_sync(toolingSync.syncTooling, toolingRoot, progressReporter(context))
 
 
-def surveyRow(survey):
-  row = {"zone": survey["zone"], "format": survey["format"], "brewallLabels": survey["brewallLabelCount"]}
-  if "error" in survey:
-    return row | {"error": survey["error"]}
-  terrainBounds = survey["terrainBounds"]
-  return row | {
-    "terrainSize": terrainBounds["size"] if terrainBounds else None,
-    "allGeometrySize": survey["allGeometryBounds"]["size"],
-    "triangles": survey["triangleCount"],
-    "textures": survey["textureCount"],
-    "placements": survey["placementCount"],
-  }
-
-
-def footprint(row):
-  size = row.get("terrainSize") or row.get("allGeometrySize")
-  return size[0] * size[1] if size else -1
+def sortValue(row, sortPath):
+  value = row
+  for key in sortPath.split("."):
+    if not isinstance(value, dict) or key not in value:
+      return None
+    value = value[key]
+  return value
 
 
 @server.tool()
@@ -85,22 +77,43 @@ async def removeExtension(extensionID: str, context: Context):
 
 
 @server.tool()
-async def surveyZones(context: Context, zones: list[str] | None = None):
-  """Measure EverQuest zones from the client's actual zone files, largest terrain footprint first; results are cached."""
-  clientRoot = zoneSurvey.resolveClientRoot()
-  surveys = await anyio.to_thread.run_sync(zoneSurvey.surveyZones, clientRoot, toolingRoot, zones, progressReporter(context))
-  rows = sorted((surveyRow(survey) for survey in surveys.values()), key=footprint, reverse=True)
+async def surveyZones(context: Context, zones: list[str] | None = None, groups: list[str] | None = None, sortBy: str = "dimensions.footprint", limit: int | None = None):
+  """Technical lane: measured field groups for the named zones (all when omitted), sorted descending by a dotted field path. Cached by file hash and group version."""
+  groupNames = groups if groups is not None else ["dimensions"]
+  zoneSurvey.validateMeasuredGroups(groupNames)
+  if sortBy.split(".")[0] not in groupNames:
+    raise ToolError(f"sortBy '{sortBy}' must start with one of the requested groups {groupNames}")
+  clientRoot = zoneSources.resolveClientRoot()
+  surveys = await anyio.to_thread.run_sync(zoneSurvey.surveyMeasured, clientRoot, toolingRoot, zones, groupNames, progressReporter(context))
+  rows = [{"variant": key} | survey for key, survey in surveys.items()]
+  sortable = sorted((row for row in rows if isinstance(sortValue(row, sortBy), (int, float))), key=lambda row: sortValue(row, sortBy), reverse=True)
+  unsortable = [row for row in rows if not isinstance(sortValue(row, sortBy), (int, float))]
+  ordered = sortable + unsortable
   return {
-    "units": "EQ units; terrainSize is the terrain model or grid, allGeometrySize includes backdrops and stray placements",
-    "cachePath": str(toolingRoot / "survey" / "zoneSurvey.json"),
-    "zones": rows,
+    "units": "EQ units, Blender 1:1",
+    "groups": {groupName: surveyFields.measuredGroups[groupName][0] for groupName in groupNames},
+    "variantCount": len(rows),
+    "rows": ordered[:limit] if limit is not None else ordered,
+  }
+
+
+@server.tool()
+async def getZoneSurvey(context: Context, zone: str):
+  """Everything surveyed for one zone, both lanes: every measured group brought up to date, plus cached interpretations."""
+  clientRoot = zoneSources.resolveClientRoot()
+  surveys = await anyio.to_thread.run_sync(zoneSurvey.surveyMeasured, clientRoot, toolingRoot, [zone.lower()], list(surveyFields.measuredGroups), progressReporter(context))
+  cached = zoneSurvey.readSurvey(toolingRoot, list(surveys))
+  return {
+    "zone": zone.lower(),
+    "brewallLabelCount": len(zoneSurvey.readBrewallLabels(clientRoot, zone.lower())),
+    "variants": {key: survey | {"interpreted": cached[key]["interpreted"] if cached[key] else {}} for key, survey in surveys.items()},
   }
 
 
 @server.tool()
 def getZoneNotes(zone: str):
   """Brewall map labels for a zone: place names for design notes, not geometry or scale."""
-  clientRoot = zoneSurvey.resolveClientRoot()
+  clientRoot = zoneSources.resolveClientRoot()
   if not zoneSurvey.brewallMapPaths(clientRoot, zone.lower()):
     raise ToolError(f"No Brewall map files for zone '{zone}' in {clientRoot / 'maps' / 'Brewall'}")
   return {"zone": zone, "labels": zoneSurvey.readBrewallLabels(clientRoot, zone.lower())}
