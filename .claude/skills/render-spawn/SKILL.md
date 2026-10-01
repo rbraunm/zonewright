@@ -87,6 +87,5 @@ Every eye-level `renderView` (`standAt`) stands a dark elf female of height 5, d
 
 ## Limits
 
-- **Not drawn.** Equipment, faces (`faceStyle`), and particle effects are not drawn. Legacy 0x2C meshes (IVM and a few others) are not read and fail as unsupported.
+- **Not drawn.** Equipment, faces (`faceStyle`), hair on Luclin WLD models, and particle effects are not drawn. Legacy 0x2C meshes (IVM and a few others) are not read and fail as unsupported.
 - **Drakkin pieces.** A Drakkin draws its base model (`dkf.mod`, `dkm.mod`) and its hair. Its armor pieces (`dkf_<material>_<variation>_<bone>`), facial attachments, tattoos, and face and texture-set layers are not drawn. How the client picks armor pieces for an unequipped spawn is not yet read, so `variation`, `headType`, and `textureSet` are errors on Drakkin.
-- **EQG facing.** `EQGraphicsDX9.dll` turns `ROOT_BONE` a quarter turn when it builds a skeleton and back when it sets up animation. EQG models are drawn facing their file's front (+X, as WLD models do); a client screenshot of an EQG character has yet to confirm this.
