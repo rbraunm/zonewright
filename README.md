@@ -45,17 +45,3 @@ EQGZI's Blender exporter (`xackery/eqgzi` `out/convert.py`) works at 1 Blender u
 | `surveyZones` | Technical lane of the zone survey: measured groups (`dimensions`, `surfaces`, `verticality`, `content`, `regions`) for the named zones or all of them, sorted by any numeric field. Cached per variant by source-file SHA-256 and per-group version, so changing one group's method recomputes only that group. A variant whose files cannot be parsed is reported with its error |
 | `getZoneSurvey` | Every survey group for one zone, both lanes (measured and interpreted) |
 | `getZoneNotes` | Lists a zone's Brewall labels: text, map position, and layer file |
-
-## eqzones
-
-Claude Code sessions started here also get `../eqzones` as a working directory (`.claude/settings.json`). eqzones holds only artist files:
-
-| Path | Holds |
-|---|---|
-| `zones/<zoneName>/<zoneName>.blend` | Zone work file |
-| `zones/<zoneName>/textures/` | Zone-only textures, on relative paths |
-| `library/kits/<kitName>.blend` | Kit libraries of marked assets, linked into zones |
-| `library/textures/<textureName>/` | Shared textures: `diffuse.png`, `normal.png`, `source.txt` (CC0 attribution) |
-| `ref/<zoneName>/concept/` | Concept art |
-| `ref/<zoneName>/screenshots/` | Reference screenshots |
-| `ref/common/` | References shared across zones |

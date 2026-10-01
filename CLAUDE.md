@@ -6,8 +6,8 @@ MCP server that gives Claude hands and eyes in Blender to build EverQuest zones 
 - Claude does all the work. The owner supplies concept art, references, and approvals; never ask the owner to edit anything in Blender.
 - The .blend is the source of truth. Python is how Claude's hands move, not a generator that rebuilds the scene. Any operation done by hand twice becomes an MCP tool.
 
-## eqzones
-`../eqzones` holds only what an artist would save: .blend work files with textures as separate files on relative paths, a kit library of .blend files with marked assets, and a ref folder of concept art and reference screenshots. No code or Claude config goes in eqzones; binaries follow its LFS rules.
+## Work files
+zonewright is a standalone MCP server; it is not tied to any particular work repository. Tools take full paths to .blend files wherever they live. A work file holds only what an artist would save: textures are separate files on paths relative to the .blend, never packed.
 
 ## Server rules
 - stdout is the MCP protocol channel; nothing else prints to it. Logs go to a rotating file under `%LOCALAPPDATA%\zonewright\logs`, per the global logging standard.
@@ -19,7 +19,7 @@ MCP server that gives Claude hands and eyes in Blender to build EverQuest zones 
 
 ## EverQuest reference
 - Scale and layout come only from the client's actual zone files. Brewall maps are design notes (place names), never geometry or scale.
-- Client content (extracted zones, models, textures) stays under the tooling root, never in eqzones or git.
+- Client content (extracted zones, models, textures) stays under the tooling root, never in a work repository or git.
 - Blender is 1 unit = 1 EQ unit, Z up; Phase 2 export converts to EQGZI's convention.
 
 ## Tests
