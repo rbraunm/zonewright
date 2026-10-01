@@ -11,12 +11,12 @@ description: Place and render EverQuest doors in a zonewright Blender scene from
 
 | Argument | Meaning |
 |---|---|
-| `zone` | The zone the door belongs to; its archives are searched first |
+| `zone` | The zone the door belongs to; the client loads its archives after its startup archives |
 | `model` | The door's name: `POKDOOR500`, `OBJ_TELEPADA`, `IT11202`, ... |
 | `location` + `headingDegrees` | Blender position of the model origin and turn (0 = +Y, clockwise from above) |
 | `eqLocation` + `eqHeading` | Or the server's values as the dumps give them; give one pair, not both |
 | `scalePercent` | The door's scale (default 100) |
-| `source` | `"archive"` or `"archive:entry"` when one link tier defines the model twice |
+| `source` | `"archive"` or `"archive:entry"` to take a definition other than the first the client loads |
 | `name`, `collection` | Object name and collection |
 
 Doors are not snapped to the ground: the server's z is the model origin, and measured doors sit on their floors at that z.
@@ -42,7 +42,7 @@ Door models resolve through the zone's links:
 - **EQG zones:** the zone `.eqg` and the archives in `<zone>_assets.txt`.
 - **PoK:** `poknowledge_obj3.eqg`, which `eqgame.exe` loads for that zone only.
 
-Failing those, a model may come from the global load list or `OnDemandResources.txt`. A name defined twice in one tier (IT67 is in both `equipment-01.eqg` and `gequip.s3d`) fails until `source` picks one.
+A model may also come from an archive the client loads at startup, which loads before the zone's and so wins a name both define; IT67 is in both `equipment-01.eqg` and `gequip.s3d`, and the client keeps `equipment-01.eqg`, loaded first. `OnDemandResources.txt` entries load last.
 
 ## Limits
 

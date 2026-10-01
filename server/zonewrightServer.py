@@ -88,23 +88,24 @@ figureSize = 5.0
 # kind of placement lands on the zone geometry only that way. Server headings run 512 to a turn, 0 facing server +y and 128 facing
 # server -x (the EQEmu heading formula); through the axis swap that is a turn of -heading about Z for a model whose front is +X.
 eqHeadingUnits = 512
+standPose = {"animation": None, "variant": None, "frame": 0}
 
 
-def eqModel(zone, model, source=None, appearance=None):
-  """Build or reuse the cache of a model the client links to the zone (or, with no zone, to every zone)."""
+def eqModel(zone, model, source=None, appearance=None, animation=None):
+  """Build or reuse the cache of a model the client loads in the zone (or, with no zone, at startup)."""
   try:
-    return eqModels.buildModel(zoneSources.resolveClientRoot(), toolingRoot / "models", model, zone, source, appearance)
+    return eqModels.buildModel(zoneSources.resolveClientRoot(), toolingRoot / "models", model, zone, source, appearance, animation)
   except ValueError as error:
     raise ToolError(str(error)) from error
 
 
-def spawnModel(zone, model, size, source=None, appearance=None):
-  """A character model and the scale that makes it `size` units tall, as the client draws it."""
+def spawnModel(zone, model, size, source=None, appearance=None, animation=None):
+  """A character model posed by an animation frame, and the scale that makes its bind pose `size` units tall, as the client draws it."""
   if size <= 0:
     raise ToolError(f"size must be positive, got {size}")
-  folder, details = eqModel(zone, model, source, appearance)
-  height = details["maximum"][2] - details["minimum"][2]
-  return {"folder": str(folder), "scale": size / height, "footHeight": details["minimum"][2], "size": size, "details": details}
+  folder, details = eqModel(zone, model, source, appearance, animation or standPose)
+  height = details["restMaximum"][2] - details["restMinimum"][2]
+  return {"folder": str(folder), "scale": size / height, "footHeight": details["restMinimum"][2], "size": size, "details": details}
 
 
 def placementFrame(location, headingDegrees, eqLocation, eqHeading):
@@ -313,14 +314,14 @@ placementHelp = (
   " exactly as the server and the live dumps give them; eqLocation maps to Blender (y, x, z) and eqHeading to a turn of -heading/512 of a"
   " circle (the turn's direction is still to be confirmed against client screenshots). zone names the zone whose archives the client"
   " loads (none searches only the global lists); the model is found through the client's own links (see findModel), never by name in an"
-  " unrelated archive. source (\"archive\" or \"archive:entry\") picks one definition when a link tier defines the model twice."
+  " unrelated archive. source (\"archive\" or \"archive:entry\") takes a definition other than the first the client loads."
   " The result's source lists the archive and link used and anything the client data lacks (missingTextures draw magenta)."
 )
 
 
 @guardedTool()
 async def findModel(model: str, zone: str | None = None):
-  """Where the client finds an EverQuest model (an actor code like DAF, a door like POKDOOR500, an object like IT10800_ACTORDEF): every definition by link tier (the zone's archives, then eqclient.ini player models, then Resources/GlobalLoad.txt, then Resources/OnDemandResources.txt), unlinked archives that also define it, and which definition placement uses."""
+  """Where the client finds an EverQuest model (an actor code like DAF, a door like POKDOOR500, an object like IT10800_ACTORDEF): every definition in the client's load order (its startup archives, then the zone's, then Resources/OnDemandResources.txt), unlinked archives that also define it, and which definition placement uses: the first loaded."""
   clientRoot = zoneSources.resolveClientRoot()
 
   def find():
@@ -340,16 +341,22 @@ async def findModel(model: str, zone: str | None = None):
 @guardedTool(description=(
   "Place an EverQuest character (its actorDef code, such as DAF, PMA, or SWB) drawn `size` units tall as the client draws it, feet on the"
   " ground below its position (unless snapToGround is false), front facing its heading. Appearance as the client applies it: variation"
-  " swaps the body piece, headType the head, textureSet the texture set (the dumps' textureType; -1 there means no override, so 0). WLD"
-  " characters stand with lowered arms; EQG characters stand in their bind pose." + placementHelp
+  " swaps the body piece, headType the head, textureSet the texture set (the dumps' textureType; -1 there means no override, so 0)."
+  " A WLD character is posed at animationFrame of animation (a code such as L01 or S03, or the client's label such as WALK or WAVE;"
+  " default P01, STAND STILL), found as the client finds it: the model's own animation, else the one it borrows (a dark elf the elf's);"
+  " animationVariant picks a lettered variant (A, B, ...) of a Luclin model's animation. The result's source.pose names the animation,"
+  " where it came from, and its frame count and milliseconds per frame. EQG characters stand in their bind pose." + placementHelp
 ))
 async def placeSpawn(
   context: Context, zone: str | None, model: str, name: str, size: float,
   location: list[float] | None = None, headingDegrees: float | None = None, eqLocation: list[float] | None = None, eqHeading: float | None = None,
-  variation: int = 0, headType: int = 0, textureSet: int = 0, source: str | None = None, snapToGround: bool = True, collection: str | None = None,
+  variation: int = 0, headType: int = 0, textureSet: int = 0, animation: str | None = None, animationVariant: str | None = None, animationFrame: int = 0,
+  source: str | None = None, snapToGround: bool = True, collection: str | None = None,
 ):
   frameLocation, rotation = placementFrame(location, headingDegrees, eqLocation, eqHeading)
-  spawn = await anyio.to_thread.run_sync(spawnModel, zone, model, size, source, {"variation": variation, "headType": headType, "textureSet": textureSet})
+  appearance = {"variation": variation, "headType": headType, "textureSet": textureSet}
+  pose = {"animation": animation, "variant": animationVariant.upper() if animationVariant else None, "frame": animationFrame}
+  spawn = await anyio.to_thread.run_sync(spawnModel, zone, model, size, source, appearance, pose)
   return await placeEQModel(context, spawn["folder"], name, frameLocation, rotation, spawn["scale"], spawn["footHeight"], snapToGround, collection, spawn["details"])
 
 

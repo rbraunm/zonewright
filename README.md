@@ -80,7 +80,7 @@ Edits address parts of a mesh with selectors instead of an interactive selection
 | | `projectUVs` | Planar or box projection at a set number of world units per texture repeat |
 | Dressing | `placeOnSurface` | Drops objects onto the surface below, optionally aligned to its normal |
 | | `scatterInRegion` | Spaced, linked copies over a circle or polygon by density, with yaw and scale ranges, a slope limit, and objects to keep clear of; deterministic per seed |
-| | `placeSpawn` | An EverQuest character drawn at its EQ size with the client's appearance rules, feet on the ground; see the `render-spawn` skill |
+| | `placeSpawn` | An EverQuest character drawn at its EQ size with the client's appearance rules, posed at any frame of the animations the client gives it, feet on the ground; see the `render-spawn` skill |
 | | `placeDoor` | An EverQuest door (any server-placed model: doors, lifts, teleport pads, books, furniture) at its position and scale; see the `render-door` skill |
 | | `placeObject` | An EverQuest ground object (kilns, looms, dropped items, housing pieces) at its position and scale; see the `render-object` skill |
 | | `markAsset` / `linkKitAsset` | Marks kit collections as assets; links and places them from a kit .blend |
@@ -104,33 +104,47 @@ The EQ preview renders the open scene's objects (its own lights and cameras excl
 
 ### Client models
 
-Spawns, doors, objects, and the scale figure come from the client's own models, found the way the client finds them: only through a file or rule of the client's that links an archive to the zone, never by matching a name in an unrelated archive. `findModel` shows the whole search for one model. The tiers, most specific first:
+Spawns, doors, objects, and the scale figure come from the client's own models and animations, found the way the client finds them: only in archives the client loads in the zone, never by matching a name in an unrelated archive. The client keeps the first definition of any name it registers (`EQGraphicsDX9.dll` skips a name already present), so the order in which it loads archives decides between archives that define the same name. `findModel` shows the whole search for one model. The order, read from `eqgame.exe`:
 
-1. **The zone's archives, in the client's load order** (read from `eqgame.exe`):
-   - `<zone>_pre_chr.txt` and `<zone>_chr.txt`. Each line is `code,source`: a source that starts with the code loads `source.eqg` (else `source.s3d`); any other source loads only that code's actor from `source.s3d`.
+1. **At startup** (`0x491c20`):
+   - `Resources\GlobalLoad.txt` phases 1 and 2.
+   - The Luclin player models, `global<code>_chr2` then `global<code>_chr`, for races 1-12, 128, and 130, male then female, when `eqclient.ini` turns that race's Luclin model on. The human and wood elf models also load when a race that borrows their animations (erudite; dark, half, and high elf) has its Luclin model on.
+   - `Global5_chr2`, `Global5_chr`, and `frog_mount_chr` while `UseLuclinElementals` is on.
+   - The Luclin equipment (`LGEquip_amr2`, `LGEquip_amr`, `LGEquip2`, `LGEquip`) once any Luclin model loaded.
+   - `VEquip` with the Luclin Vah Shir, or `GEquip6` and `Global7_chr` unless both Vah Shir settings are on.
+   - `GlobalLoad.txt` phases 3 and 4.
+   - `Resources\GlobalLoad_chr.txt`.
+2. **On entering the zone** (`0x49b200`):
+   - `<zone>_pre_chr.txt`, and `poknowledge_obj3.eqg` for the Plane of Knowledge only.
    - For classic zones, `<zone>_obj2`, `<zone>_obj`, the zone, `<zone>_2_obj`, `<zone>_chr2`, `<zone>2_chr` (only for the zones `eqgame.exe` names), and `<zone>_chr`.
-   - `poknowledge_obj3.eqg`, for the Plane of Knowledge only.
+   - `<zone>_chr.txt`. Each line is `code,source`: a source that starts with the code loads `source.eqg` (else `source.s3d`); any other source loads only that code's actor from `source.s3d`.
    - The `.eqg` archives in `<zone>_assets.txt`, and, for EQG zones, the zone `.eqg`.
-2. **The player models `eqclient.ini` enables:** `global<code>_chr2` and `global<code>_chr` while `UseLuclin<Race><Gender>` is on, so the Luclin dark elf wins over `global_chr.s3d`'s classic one.
-3. **`Resources\GlobalLoad.txt` and `Resources\GlobalLoad_chr.txt`:** equipment, `global*_chr`, shared object archives, and the characters every zone loads (the `_chr.txt` format).
-4. **`Resources\OnDemandResources.txt`:** EQG models (`EQGM`) and skinned models (`EQGS`) loaded when first needed.
+3. **When first needed:** `Resources\OnDemandResources.txt` EQG models (`EQGM`) and skinned models (`EQGS`).
 
-The first tier that defines the model wins. Two definitions in that tier (IT67 is in both `equipment-01.eqg` and `gequip.s3d`) are an error until `source` picks one. Textures come from the model's own archive or, for a zone's EQG model, from the zone's other EQG archives. A texture none of them holds is missing for the client too: its faces draw magenta and every placement lists it in `missingTextures`.
+The first definition in that order wins: IT67 is in both `equipment-01.eqg` and `gequip.s3d`, and the client uses `equipment-01.eqg`, which `GlobalLoad.txt` loads first. `source` picks a definition by archive instead. One archive, or the on-demand list, defining a model twice is an error, since which entry the client takes is not known. Textures come from the model's own archive or, for a zone's EQG model, from the zone's other EQG archives. A texture none of them holds is missing for the client too: its faces draw magenta and every placement lists it in `missingTextures`.
 
 Supported models:
 
-- EQG static (`.mod`) and skinned (`.mds`) models.
+- EQG static (`.mod`) and skinned (`.mds`) models; skinned models stand in their bind pose, since their animations (`.ani`) are not read yet.
 - WLD static actors.
-- WLD skeletal actors: skinned meshes and bone-attached meshes, posed at frame 0. Particle clouds are counted, not drawn.
+- WLD skeletal actors: skinned meshes and bone-attached meshes. Particle clouds are counted, not drawn.
 
 Characters take the client's appearance rules (from `EQGraphicsDX9.dll`):
 
 - **Pieces:** the body piece `<code><nn>` for `variation` and the head piece `<code>HE<nn>` for `headType`, keeping the default when the model lacks the piece.
 - **Texture sets:** `.lay` layers `C_<code>_S<set>_M<n>` for EQG models, and `<code><part><set><nn>_MDF` materials for WLD ones.
 
+A WLD character plays the client's animations (`eqAnimations.py`, transcribed from `eqgame.exe`):
+
+- **The animations:** the 78 the client loads per model (`C01`-`C11` combat, `D01`-`D05` damage, `L01`-`L12` movement, `O01`-`O03` idle, `P01`-`P09`, `S01`-`S29` social, `T01`-`T09`), with the client's own labels such as `WALK` and `WAVE`.
+- **Borrowing:** a model without an animation borrows another code's (`0x406a60`): dark, high, and half elves the wood elf's, Luclin erudites the human's, kobolds the werewolf's, and about a hundred more rules. The model's own animation comes first (`0x407800`).
+- **Variants:** a Luclin model (one with a `<code>TUNIC_POINT_DAG` bone) takes lettered variants such as `L01A` and `L01B`; it takes an unlettered animation only if it has at least 50 tracks.
+- **Frames:** each frame decodes as the client does (`0x1001b190`): rotation, translation over 256, and a uniform scale over 256. Bones without a track in the animation keep their bind transform.
+- **Stand and size:** a spawn stands at frame 0 of `P01` (STAND STILL) unless another animation is chosen. Its size and footing come from that stand, so a wave or a jump moves the body about the same origin without rescaling it. A model with no stand animation stands in its bind pose.
+
 All four placement paths (`placeSpawn`, `placeDoor`, `placeObject`, and the scale figure) build through the same code. A model is indexed and built once:
 
-- **Index:** `models\modelIndex.json` covers every archive, rebuilt when the client listing changes.
-- **Built models:** `models\built\<model>@<archive>[@appearance]`, rebuilt when a source archive changes.
+- **Index:** `models\modelIndex.json` lists every archive's models and animations, rebuilt when the client listing changes.
+- **Built models:** `models\built\<model>@<archive>[@appearance][@pose]`, rebuilt when the client's files change.
 
 Placements take Blender values (`location`, `headingDegrees`) or the server's (`eqLocation`, `eqHeading` in 512ths of a turn). The heading becomes a turn of -heading about Z, following the EQEmu heading formula through the axis swap. Measured doors confirm there is no quarter-turn offset; the turn direction is to be confirmed against client screenshots.

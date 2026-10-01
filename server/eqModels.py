@@ -7,6 +7,7 @@ import struct
 
 import numpy
 
+import eqAnimations
 import eqArchive
 import eqgFiles
 import eqLinks
@@ -16,8 +17,8 @@ import eqWorldFile
 import machineProfile
 import zoneSources
 
-indexFormat = 5
-modelCacheFormat = 2
+indexFormat = 8
+modelCacheFormat = 6
 actorTrailingBytes = 4
 staticKinds = ("eqgStatic", "wldStatic")
 
@@ -54,10 +55,26 @@ def actorKind(worldFile, actorFragment):
   return kind if not meshTypes else "wldUnsupported:mesh " + ",".join(f"{fragmentType:#x}" for fragmentType in meshTypes)
 
 
+def wldAnimations(worldFile):
+  """The animations a WLD registers, by resource name (<anim><code>) with their root track and track count; the client leaves
+  attachment point tracks out of the count."""
+  trackNames = sorted({fragment.name for fragment in worldFile.fragmentsOfType(0x13)})
+  animations = {}
+  for name in trackNames:
+    match = next((match for pattern in eqAnimations.rootTrackPatterns for match in [pattern.match(name)] if match), None)
+    if match is None:
+      continue
+    resource = match.group(1) + match.group(2)
+    if resource in animations:
+      raise ValueError(f"{worldFile.sourceName}: animation {resource} has root tracks {animations[resource]['root']} and {name}")
+    animations[resource] = {"root": name, "tracks": sum(1 for other in trackNames if other.startswith(resource) and "POINT" not in other)}
+  return animations
+
+
 def archiveModels(archivePath):
-  """Every model an archive defines, by model key; a key defined twice in one archive keeps both definitions."""
+  """Every model an archive defines, by model key (a key defined twice in one archive keeps both definitions), and the animations its WLDs register."""
   archive = eqArchive.EQArchive(archivePath)
-  models = {}
+  models, animations = {}, {}
   for entryName in archive.names():
     if entryName.endswith((".mod", ".mds")):
       models.setdefault(eqLinks.modelKey(entryName[:-4]), []).append({"kind": "eqgStatic" if entryName.endswith(".mod") else "eqgSkinned", "entry": entryName})
@@ -65,13 +82,18 @@ def archiveModels(archivePath):
     worldFile = eqWorldFile.WorldFile(archive.read(wldName), f"{archivePath.name}:{wldName}")
     for fragment in worldFile.fragmentsOfType(0x14):
       models.setdefault(eqLinks.modelKey(fragment.name), []).append({"kind": actorKind(worldFile, fragment), "wld": wldName, "actor": fragment.name})
-  return models
+    for resource, animation in wldAnimations(worldFile).items():
+      if resource in animations:
+        raise ValueError(f"{archivePath.name}: animation {resource} is in two of its WLDs")
+      animations[resource] = animation | {"wld": wldName}
+  return models, animations
 
 
 def indexedArchive(archivePath):
   """Runs in a worker process. An archive this parser cannot read is recorded with its error, so resolving through it fails loudly."""
   try:
-    return {"models": archiveModels(archivePath)}
+    models, animations = archiveModels(archivePath)
+    return {"models": models, "animations": animations}
   except (ValueError, KeyError, struct.error) as parseError:
     return {"error": f"{type(parseError).__name__}: {parseError}"}
 
@@ -104,48 +126,46 @@ def loadIndex(clientRoot, cacheRoot):
   return archives
 
 
-def linkTiers(clientRoot, zoneName):
-  """Where the client finds a model, most specific first: the zone's archives (when a zone is given), the player models eqclient.ini enables, the global load list."""
-  zone = eqLinks.zoneLinks(clientRoot, zoneName) if zoneName is not None else {"archives": [], "missing": []}
+def loadOrder(clientRoot, zoneName):
+  """Every archive the client has loaded in the zone, in the order it loads them: its startup archives, then the zone's (none when
+  no zone is given). Each archive appears once, at its first load."""
   globals_ = eqLinks.globalLinks(clientRoot)
-  return [
-    ("zone", zone["archives"]),
-    ("playerModels", [link for link in globals_["archives"] if link["via"] == "eqclient.ini"]),
-    ("global", [link for link in globals_["archives"] if link["via"] != "eqclient.ini"]),
-  ], zone["missing"] + globals_["missing"]
+  zone = eqLinks.zoneLinks(clientRoot, zoneName) if zoneName is not None else {"archives": [], "missing": []}
+  order = []
+  for tier, links in (("global", globals_["archives"]), ("zone", zone["archives"])):
+    for link in links:
+      if not any(earlier["archive"] == link["archive"] and earlier["codes"] is None for earlier in order):
+        order.append(link | {"tier": tier})
+  return order, globals_["missing"] + zone["missing"]
 
 
-def definitionsIn(index, link, key):
+def indexEntry(index, link):
   entry = index.get(link["archive"])
   if entry is None:
     raise ValueError(f"{link['archive']} (linked by {link['via']}) is not in the model index")
   if "error" in entry:
     raise ValueError(f"{link['archive']} (linked by {link['via']}) could not be read: {entry['error']}")
-  return [definition | {"archive": link["archive"], "via": link["via"]} for definition in entry["models"].get(key, [])]
+  return entry
+
+
+def definitionsIn(index, link, key):
+  return [definition | {"archive": link["archive"], "via": link["via"]} for definition in indexEntry(index, link)["models"].get(key, [])]
 
 
 def findModel(clientRoot, cacheRoot, modelName, zoneName):
-  """Every definition of a model the client could load in a zone, by link tier, plus on-demand entries and unlinked archives that also define it."""
+  """Every definition of a model the client could load in a zone, in its load order, plus on-demand entries and unlinked archives that also define it."""
   key = eqLinks.modelKey(modelName)
   index = loadIndex(clientRoot, cacheRoot)
-  tiers, missingLinks = linkTiers(clientRoot, zoneName)
-  linked = {}
-  linkedArchives = set()
-  for tierName, links in tiers:
-    seen = set()
-    # A character list can link one archive several times, each for one code; only links covering this model count.
-    for link in links:
-      if link["codes"] is not None and key not in link["codes"]:
-        continue
-      linkedArchives.add(link["archive"])
-      if link["archive"] in seen:
-        continue
-      seen.add(link["archive"])
-      definitions = definitionsIn(index, link, key)
-      if definitions:
-        linked.setdefault(tierName, []).extend(definitions)
-  onDemand = [entry | {"kind": "eqgStatic" if entry["entry"].endswith(".mod") else "eqgSkinned"} for entry in eqLinks.onDemandResources(clientRoot).get(key, [])]
-  unlinked = sorted(name for name, entry in index.items() if name not in linkedArchives and key in entry.get("models", {}) and name not in {item["archive"] for item in onDemand})
+  order, missingLinks = loadOrder(clientRoot, zoneName)
+  linked = []
+  # A character list can link one archive several times, each for one code; only links covering this model count.
+  covering = [link for link in order if link["codes"] is None or key in link["codes"]]
+  for link in covering:
+    if not any(definition["archive"] == link["archive"] for definition in linked):
+      linked += [definition | {"tier": link["tier"]} for definition in definitionsIn(index, link, key)]
+  onDemand = [entry | {"kind": "eqgStatic" if entry["entry"].endswith(".mod") else "eqgSkinned", "tier": "onDemand"} for entry in eqLinks.onDemandResources(clientRoot).get(key, [])]
+  coveredArchives = {link["archive"] for link in covering} | {entry["archive"] for entry in onDemand}
+  unlinked = sorted(name for name, entry in index.items() if name not in coveredArchives and key in entry.get("models", {}))
   return {"model": key, "linked": linked, "onDemand": onDemand, "unlinkedArchives": unlinked, "missingLinks": missingLinks}
 
 
@@ -154,23 +174,107 @@ def definitionSource(definition):
 
 
 def resolveModel(clientRoot, cacheRoot, modelName, zoneName, source=None):
-  """The one definition the client uses: the first link tier that defines the model, else its on-demand entry. Several definitions in one tier are ambiguous unless source ("archive" or "archive:entry") picks one of them."""
+  """The definition the client uses: the first it loads (startup archives, then the zone's, then on-demand entries, which load
+  when first needed). source ("archive" or "archive:entry") picks one definition instead. One archive, or the on-demand list,
+  defining the model twice is ambiguous."""
   found = findModel(clientRoot, cacheRoot, modelName, zoneName)
-  tiers = [(tierName, definitions) for tierName, definitions in found["linked"].items()] + ([("onDemand", found["onDemand"])] if found["onDemand"] else [])
+  candidates = found["linked"] + found["onDemand"]
   if source is not None:
-    tiers = [(tierName, [definition for definition in definitions if source.lower() in (definition["archive"], definitionSource(definition))]) for tierName, definitions in tiers]
-    tiers = [(tierName, definitions) for tierName, definitions in tiers if definitions]
-  if not tiers:
+    candidates = [definition for definition in candidates if source.lower() in (definition["archive"], definitionSource(definition))]
+  if not candidates:
     unlinkedNote = f"; unlinked archives define it: {found['unlinkedArchives']}" if found["unlinkedArchives"] else ""
-    linker = f"zone '{zoneName}'" if zoneName is not None else "the global lists (no zone given)"
-    raise ValueError(f"No archive {linker} links defines model '{found['model']}'{' as ' + source if source else ''}{unlinkedNote}")
-  tierName, definitions = tiers[0]
-  if len(definitions) > 1:
-    raise ValueError(f"Model '{found['model']}' is defined {len(definitions)} times in the {tierName} tier: {[definitionSource(definition) for definition in definitions]}; pass one as source to choose")
-  definition = definitions[0] | {"tier": tierName, "model": found["model"]}
+    linker = f"zone '{zoneName}'" if zoneName is not None else "the startup lists (no zone given)"
+    raise ValueError(f"No archive {linker} loads defines model '{found['model']}'{' as ' + source if source else ''}{unlinkedNote}")
+  first = candidates[0]
+  rivals = [definition for definition in candidates if definition["tier"] == first["tier"] and (first["tier"] == "onDemand" or definition["archive"] == first["archive"])]
+  if len(rivals) > 1:
+    raise ValueError(f"Model '{found['model']}' is defined {len(rivals)} times in {first['archive'] if first['tier'] != 'onDemand' else 'OnDemandResources.txt'}: {[definitionSource(definition) for definition in rivals]}; pass one as source to choose")
+  definition = first | {"model": found["model"]}
   if definition["kind"].startswith("wldUnsupported"):
     raise ValueError(f"Model '{found['model']}' in {definition['archive']} is an actor of unsupported fragment types ({definition['kind'].split(':')[1]})")
   return definition
+
+
+def animationHolder(index, order, resource):
+  """The archive whose definition of an animation the client keeps: the first it loads."""
+  for link in order:
+    if link["codes"] is not None and resource[-3:].lower() not in link["codes"]:
+      continue
+    if resource in indexEntry(index, link)["animations"]:
+      return link["archive"]
+  return None
+
+
+def findAnimation(index, links, code, isLuclin, request):
+  """The animation the client gives a model (eqgame.exe 0x407800): a lettered variant for a Luclin model, else the unlettered
+  animation, each under the model's own code before the code it borrows from. Returns the choice, or None with the reason."""
+  name = eqAnimations.animationName(request["animation"] or eqAnimations.standAnimation)
+  lettered, unlettered = eqAnimations.candidateResources(name, code, isLuclin)
+  variants = {}
+  for letter, resources in lettered:
+    for resource in resources:
+      holder = animationHolder(index, links, resource)
+      if holder:
+        variants[letter] = (resource, holder)
+        break
+  if variants:
+    letter = request["variant"] or next(letter for letter in eqAnimations.variantLetters if letter in variants)
+    if letter not in variants:
+      raise ValueError(f"Animation {name} of {code} has variants {sorted(variants)}, not {letter}")
+    resource, holder = variants[letter]
+  else:
+    if request["variant"] is not None:
+      raise ValueError(f"Animation {name} of {code} has no lettered variants")
+    letter = None
+    resource, holder = next(((resource, holder) for resource in unlettered for holder in [animationHolder(index, links, resource)] if holder), (None, None))
+    if resource is None:
+      return None, f"no linked archive has animation {name} for {code} or the code it borrows from ({unlettered[-1][len(name):]})"
+    trackCount = index[holder]["animations"][resource]["tracks"]
+    if isLuclin and trackCount < eqAnimations.fewestUnletteredTracks and not code.startswith("GP") and code != "KES":
+      return None, f"{resource} has {trackCount} tracks, fewer than the {eqAnimations.fewestUnletteredTracks} the client requires for a Luclin model"
+  return {
+    "animation": name, "label": eqAnimations.animationLabels.get(name), "variant": letter, "variants": sorted(variants),
+    "resource": resource, "archive": holder, "wld": index[holder]["animations"][resource]["wld"], "root": index[holder]["animations"][resource]["root"],
+    "borrowedFrom": resource[-3:] if resource[-3:] != code else None,
+  }, None
+
+
+def animationTransforms(clientRoot, found, dags, code, frame, bindLocals):
+  """Each bone's local transform at one frame of an animation: the track <resource><bone suffix>_TRACK (the root bone takes the
+  animation's root track), or the bone's bind transform when the animation has no track for it. An animation's moving tracks
+  share one frame count; its single-frame tracks hold still."""
+  archive = eqArchive.EQArchive(clientRoot / found["archive"])
+  worldFile = eqWorldFile.WorldFile(archive.read(found["wld"]), f"{found['archive']}:{found['wld']}")
+  instances = {}
+  for fragment in worldFile.fragmentsOfType(0x13):
+    instances.setdefault(fragment.name, []).append(fragment)
+  resource = found["resource"]
+  boneTracks = {}
+  for index, dag in enumerate(dags):
+    if not (dag["name"].startswith(code) and dag["name"].endswith("_DAG")):
+      raise ValueError(f"{found['archive']}: bone '{dag['name']}' of {code} is not named {code}<bone>_DAG")
+    suffix = dag["name"][len(code):-len("_DAG")]
+    trackName = f"{resource}{suffix}_TRACK" if suffix else found["root"]
+    sameName = instances.get(trackName, [])
+    # A few WLDs hold two different tracks under one name; which one the client uses is not known.
+    if len(sameName) > 1:
+      raise ValueError(f"{found['archive']}:{found['wld']} holds {len(sameName)} different tracks named {trackName}; which one the client uses is not known")
+    if sameName:
+      definition, millisecondsPerFrame = eqSkeletons.trackInstance(worldFile, sameName[0].index)
+      boneTracks[index] = (trackName, eqSkeletons.trackFrames(worldFile, definition), millisecondsPerFrame)
+  frameCount = max(len(frames) for _, frames, _ in boneTracks.values())
+  irregular = sorted({len(frames) for _, frames, _ in boneTracks.values()} - {1, frameCount})
+  if irregular:
+    raise ValueError(f"Animation {resource} has tracks of {irregular} frames besides {frameCount}")
+  if not 0 <= frame < frameCount:
+    raise ValueError(f"Animation {resource} has frames 0-{frameCount - 1}, not {frame}")
+  delays = sorted({delay for _, frames, delay in boneTracks.values() if len(frames) == frameCount and delay is not None})
+  if len(delays) > 1:
+    raise ValueError(f"Animation {resource} tracks give different frame delays {delays}")
+  localTransforms = list(bindLocals)
+  for index, (_, frames, _) in boneTracks.items():
+    localTransforms[index] = eqSkeletons.frameTransform(frames[frame if len(frames) == frameCount else 0])
+  return localTransforms, {"frame": frame, "frameCount": frameCount, "millisecondsPerFrame": delays[0] if delays else None, "bonesAnimated": len(boneTracks), "bones": len(dags)}
 
 
 def textureArchives(clientRoot, zoneName, definition):
@@ -196,6 +300,12 @@ def eqgMaterialTextures(materials, triangleMaterials, diffuseSwaps):
   return textures, cutouts
 
 
+def drawnExtent(parts):
+  """Lowest and highest corner of the vertices that drawn triangles use."""
+  drawn = numpy.concatenate([part["vertices"][numpy.unique(part["triangles"])] for part in parts if len(part["triangles"])])
+  return drawn.min(0), drawn.max(0)
+
+
 def meshPart(vertices, triangles, uvs, textures, cutouts):
   """Drawn triangles only; triangles with non-finite vertices are dropped and counted."""
   finite = triangleKeep(vertices, triangles)
@@ -203,9 +313,9 @@ def meshPart(vertices, triangles, uvs, textures, cutouts):
   return {"vertices": vertices, "triangles": triangles[keep], "uvs": uvs, "textures": [texture for texture, kept in zip(textures, keep) if kept], "cutouts": [cutout for cutout, kept in zip(cutouts, keep) if kept], "dropped": int((~finite).sum())}
 
 
-def eqgStaticParts(archive, definition, appearance):
+def eqgStaticParts(archive, definition, appearance, animator):
   model = eqgFiles.parseModel(archive.read(definition["entry"]), f"{definition['archive']}:{definition['entry']}")
-  return {"parts": [meshPart(model["vertices"], model["triangles"], model["uvs"], *eqgMaterialTextures(model["materials"], model["triangleMaterials"], {}))], "pose": "static"}
+  return {"parts": [meshPart(model["vertices"], model["triangles"], model["uvs"], *eqgMaterialTextures(model["materials"], model["triangleMaterials"], {}))], "pose": {"static": True}}
 
 
 def chosenPieces(pieceNames, code, appearance, sourceName):
@@ -243,8 +353,10 @@ def eqgLayerDiffuses(archive, code, materialCount, textureSet, sourceName):
   return swaps
 
 
-def eqgSkinnedParts(archive, definition, appearance):
-  """The pieces the client shows for this appearance, textured by its texture set, in bind pose."""
+def eqgSkinnedParts(archive, definition, appearance, animator):
+  """The pieces the client shows for this appearance, textured by its texture set, in bind pose: EQG animations (.ani) are not read yet."""
+  if animator is not None and animator.request["animation"] is not None:
+    raise ValueError(f"Model '{definition['model']}' is an EQG skinned model; its animations (.ani) are not read yet")
   sourceName = f"{definition['archive']}:{definition['entry']}"
   model = eqgFiles.parseSkinnedModel(archive.read(definition["entry"]), sourceName)
   code = definition["model"].upper()
@@ -252,7 +364,7 @@ def eqgSkinnedParts(archive, definition, appearance):
   chosen = chosenPieces(list(pieces), code, appearance, sourceName)
   swaps = eqgLayerDiffuses(archive, code, len(model["materials"]), appearance["textureSet"], sourceName)
   parts = [meshPart(pieces[name]["vertices"], pieces[name]["triangles"], pieces[name]["uvs"], *eqgMaterialTextures(model["materials"], pieces[name]["triangleMaterials"], swaps)) for name in chosen]
-  return {"parts": parts, "pose": "bind", "pieces": chosen, "swappedMaterials": len(swaps)}
+  return {"parts": parts, "pose": {"bind": "EQG animations (.ani) are not read yet"}, "pieces": chosen, "swappedMaterials": len(swaps)}
 
 
 def wldMeshPart(mesh, materialSwaps):
@@ -273,10 +385,10 @@ def wldActor(archive, definition):
   return worldFile, next(fragment for fragment in worldFile.fragmentsOfType(0x14) if fragment.name == definition["actor"])
 
 
-def wldStaticParts(archive, definition, appearance):
+def wldStaticParts(archive, definition, appearance, animator):
   worldFile, actor = wldActor(archive, definition)
   meshes = [worldFile.fragment(struct.unpack_from("<i", reference.body, 4)[0], 0x36) for reference in actorReferences(worldFile, actor)]
-  return {"parts": [wldMeshPart(worldFile.mesh(meshFragment), {}) for meshFragment in meshes], "pose": "static"}
+  return {"parts": [wldMeshPart(worldFile.mesh(meshFragment), {}) for meshFragment in meshes], "pose": {"static": True}}
 
 
 def wldTextureSetSwaps(worldFile, code, textureSet):
@@ -293,12 +405,19 @@ def wldTextureSetSwaps(worldFile, code, textureSet):
   return swaps
 
 
-def wldSkeletalParts(archive, definition, appearance):
-  """The skeleton's skins with the body and head swapped as the client does (EQGraphicsDX9.dll): <code><nn>_DMSPRITEDEF for a variation, <code>HE<nn>_DMSPRITEDEF for a head type, when the file has them."""
+def wldSkeletalParts(archive, definition, appearance, animator):
+  """The skeleton's skins with the body and head swapped as the client does (EQGraphicsDX9.dll): <code><nn>_DMSPRITEDEF for a
+  variation, <code>HE<nn>_DMSPRITEDEF for a head type, when the file has them; posed by the requested animation frame, or the bind pose."""
   worldFile, actor = wldActor(archive, definition)
   skeleton = worldFile.fragment(struct.unpack_from("<i", actorReferences(worldFile, actor)[0].body, 4)[0], 0x10)
-  meshes = eqSkeletons.skinMeshes(worldFile, eqSkeletons.readSkeleton(worldFile, skeleton)[1])
+  dags, skins = eqSkeletons.readSkeleton(worldFile, skeleton)
+  meshes = eqSkeletons.skinMeshes(worldFile, skins)
   code = definition["model"].upper()
+  localTransforms, pose, restTransforms, rest = None, {"bind": "no animation requested"}, None, "bind"
+  if animator is not None:
+    localTransforms, pose = animator.pose(worldFile, dags, code, animator.request)
+    restTransforms, restPose = animator.pose(worldFile, dags, code, animator.stand)
+    rest = "bind" if restTransforms is None else f"{restPose['resource']} frame 0"
   meshesByName = {fragment.name.upper(): fragment for fragment in worldFile.fragmentsOfType(0x36)}
   replacements = {}
   if appearance["variation"] != 0:
@@ -306,20 +425,55 @@ def wldSkeletalParts(archive, definition, appearance):
   replacements[f"{code}HE00_DMSPRITEDEF"] = f"{code}HE{appearance['headType']:02d}_DMSPRITEDEF"
   chosen = [meshesByName.get(replacements.get(mesh.name.upper()), mesh) for mesh in meshes]
   swaps = wldTextureSetSwaps(worldFile, code, appearance["textureSet"])
-  parts, pose, particleClouds = eqSkeletons.posedSkeleton(worldFile, skeleton, chosen, lambda mesh: wldMeshPart(mesh, swaps))
-  return {"parts": parts, "pose": pose, "pieces": [mesh.name for mesh in chosen], "swappedMaterials": len(swaps), "particleCloudsNotDrawn": particleClouds}
+  parts, particleClouds = eqSkeletons.posedSkeleton(worldFile, skeleton, chosen, lambda mesh: wldMeshPart(mesh, swaps), localTransforms)
+  # An animation moves bones about a fixed model origin, so size and footing come from the client's stand (else the bind pose) whatever the frame.
+  restParts = eqSkeletons.posedSkeleton(worldFile, skeleton, chosen, lambda mesh: wldMeshPart(mesh, swaps), restTransforms)[0]
+  return {
+    "parts": parts, "pose": pose, "pieces": [mesh.name for mesh in chosen], "swappedMaterials": len(swaps), "particleCloudsNotDrawn": particleClouds,
+    "restExtent": drawnExtent(restParts), "rest": rest,
+  }
 
 
 partBuilders = {"eqgStatic": eqgStaticParts, "eqgSkinned": eqgSkinnedParts, "wldStatic": wldStaticParts, "wldSkeletal": wldSkeletalParts}
+
+
+class Animator:
+  """Poses a spawn's skeleton by an animation frame, found as the client finds it through the archives linked to the zone."""
+
+  stand = {"animation": None, "variant": None, "frame": 0}
+
+  def __init__(self, clientRoot, cacheRoot, zoneName, request):
+    self.clientRoot = clientRoot
+    self.index = loadIndex(clientRoot, cacheRoot)
+    self.links = loadOrder(clientRoot, zoneName)[0]
+    self.request = request
+
+  def pose(self, worldFile, dags, code, request):
+    if dags[0]["name"] != f"{code}_DAG":
+      raise ValueError(f"{worldFile.sourceName}: the root bone of {code} is '{dags[0]['name']}', not {code}_DAG")
+    isLuclin = any(dag["name"] == f"{code}TUNIC_POINT_DAG" for dag in dags)
+    found, reason = findAnimation(self.index, self.links, code, isLuclin, request)
+    if found is None:
+      if request["animation"] is not None:
+        raise ValueError(f"Model {code} has no animation {request['animation']}: {reason}")
+      return None, {"bind": reason}
+    localTransforms, timing = animationTransforms(self.clientRoot, found, dags, code, request["frame"], eqSkeletons.bindTransforms(worldFile, dags))
+    return localTransforms, found | timing
 
 
 def archiveStamp(clientRoot, archiveNames):
   return {name: [(clientRoot / name).stat().st_size, (clientRoot / name).stat().st_mtime_ns] for name in archiveNames}
 
 
-def buildModel(clientRoot, cacheRoot, modelName, zoneName, source=None, appearance=None):
-  """Resolve a model through the zone's links, then write its geometry (model.npz) and textures into a cache folder, reusing one built from the same archives and appearance. Appearance (variation, headType, textureSet) applies to skinned and skeletal models only."""
+def buildModel(clientRoot, cacheRoot, modelName, zoneName, source=None, appearance=None, animation=None):
+  """Resolve a model through the zone's links, then write its geometry (model.npz) and textures into a cache folder, reusing one
+  built from the same client files, appearance, and animation. Appearance (variation, headType, textureSet) applies to skinned and
+  skeletal models only; animation ({animation, variant, frame}, animation None for the client's stand) poses a spawn's skeleton."""
   definition = resolveModel(clientRoot, cacheRoot, modelName, zoneName, source)
+  if animation is not None and definition["kind"] in staticKinds:
+    raise ValueError(f"Model '{definition['model']}' is static; it has no animations")
+  if animation is not None and animation["frame"] < 0:
+    raise ValueError(f"Animation frame must be 0 or more, got {animation['frame']}")
   if definition["kind"] in staticKinds:
     if any((appearance or {}).values()):
       raise ValueError(f"Model '{definition['model']}' is static; variation, headType, and textureSet do not apply, got {appearance}")
@@ -330,16 +484,22 @@ def buildModel(clientRoot, cacheRoot, modelName, zoneName, source=None, appearan
     if negative:
       raise ValueError(f"Appearance values must be 0 or more, got {negative}")
   searched = textureArchives(clientRoot, zoneName, definition)
-  folderName = f"{definition['model']}@{definition['archive']}" + "".join(f"@{key}{value}" for key, value in sorted(appearance.items()))
+  poseKey = "" if animation is None else f"@pose{animation['animation'] or 'stand'}{animation['variant'] or ''}f{animation['frame']}"
+  folderName = f"{definition['model']}@{definition['archive']}" + "".join(f"@{key}{value}" for key, value in sorted(appearance.items())) + poseKey
   modelFolder = cacheRoot / "built" / folderName
   stampPath = modelFolder / "source.json"
-  stamp = {"cacheFormat": modelCacheFormat, "definition": definition, "appearance": appearance, "archives": archiveStamp(clientRoot, searched), "armsDownDegrees": eqSkeletons.armsDownDegrees}
+  # The listing fingerprint covers the archives an animation may come from.
+  stamp = {
+    "cacheFormat": modelCacheFormat, "indexFormat": indexFormat, "definition": definition, "appearance": appearance, "animation": animation,
+    "archives": archiveStamp(clientRoot, searched), "listingFingerprint": zoneSources.clientListingFingerprint(clientRoot),
+  }
   if stampPath.is_file():
     stored = json.loads(stampPath.read_text(encoding="utf-8"))
     if {key: stored.get(key) for key in stamp} == json.loads(json.dumps(stamp)):
       return modelFolder, stored
   archive = eqArchive.EQArchive(clientRoot / definition["archive"])
-  built = partBuilders[definition["kind"]](archive, definition, appearance)
+  animator = None if animation is None else Animator(clientRoot, cacheRoot, zoneName, animation)
+  built = partBuilders[definition["kind"]](archive, definition, appearance, animator)
   parts = built["parts"]
   vertexChunks, triangleChunks, uvChunks, textures, cutouts = [], [], [], [], []
   offset = 0
@@ -371,6 +531,7 @@ def buildModel(clientRoot, cacheRoot, modelName, zoneName, source=None, appearan
     holder = next(candidate for candidate in textureHolders if candidate.archivePath.name.lower() == holderName)
     (modelFolder / textureName).write_bytes(eqTextures.readableTexture(textureName, holder.read(textureName)))
   numpy.savez(modelFolder / "model.npz", vertices=vertices, triangles=triangles, uvs=uvs, textureNames=numpy.array(textures), cutouts=numpy.array(cutouts), missingTextures=numpy.array(missingTextures, dtype=str))
+  restMinimum, restMaximum = built.get("restExtent") or (vertices.min(0), vertices.max(0))
   details = stamp | {
     "model": definition["model"],
     "pose": built["pose"],
@@ -381,8 +542,11 @@ def buildModel(clientRoot, cacheRoot, modelName, zoneName, source=None, appearan
     "missingTextures": missingTextures,
     "searchedArchives": searched,
     "droppedTriangles": sum(part["dropped"] for part in parts),
-    "minimum": [round(float(value), 3) for value in vertices.min(0)],
-    "maximum": [round(float(value), 3) for value in vertices.max(0)],
+    "minimum": [float(value) for value in vertices.min(0)],
+    "maximum": [float(value) for value in vertices.max(0)],
+    "rest": built.get("rest", "static"),
+    "restMinimum": [float(value) for value in restMinimum],
+    "restMaximum": [float(value) for value in restMaximum],
   }
   stampPath.write_text(json.dumps(details, indent=1), encoding="utf-8")
   return modelFolder, details

@@ -1,14 +1,17 @@
-"""WLD skeletal actors: bone transforms from each track's first frame, and skinned meshes placed by their bones."""
+"""WLD skeletal actors: bone transforms from track frames, and skinned or attached meshes placed by their bones."""
 import math
 import struct
 
 import numpy
 
-import eqWorldFile
-
-armsDownDegrees = 70.0
-upperArmMarkers = {"BIBICEPL": 1, "BIBICEPR": -1}
 skinListFlag = 0x200
+shortFrameFlag = 0x8
+frameBytes = 16
+frameDelayFlag = 0x1
+# EQGraphicsDX9.dll 0x1001b190 decodes a frame's eight shorts: rotation w, x, y, z over 16384 (normalized here), translation x, y, z
+# over 256, and an unsigned uniform scale over 256.
+translationUnits = 256.0
+scaleUnits = 256.0
 
 
 def quaternionMatrix(w, x, y, z):
@@ -21,17 +24,35 @@ def quaternionMatrix(w, x, y, z):
   ])
 
 
-def trackFirstFrame(worldFile, trackInstanceReference):
-  """A bone's local transform: frame 0 of its track, a quaternion and a translation in 1/256 units."""
-  trackDefinition = worldFile.fragment(struct.unpack_from("<i", worldFile.fragment(trackInstanceReference, 0x13).body, 4)[0], 0x12)
-  _, frameCount = struct.unpack_from("<II", trackDefinition.body, 4)
+def trackInstance(worldFile, reference):
+  """A track instance (0x13): its definition (0x12) and, when it sets one, its milliseconds per frame."""
+  instance = worldFile.fragment(reference, 0x13)
+  definitionReference, flags = struct.unpack_from("<iI", instance.body, 4)
+  millisecondsPerFrame = struct.unpack_from("<I", instance.body, 12)[0] if flags & frameDelayFlag else None
+  return worldFile.fragment(definitionReference, 0x12), millisecondsPerFrame
+
+
+def trackFrames(worldFile, definition):
+  """A track definition's frames as rows of eight shorts."""
+  flags, frameCount = struct.unpack_from("<II", definition.body, 4)
+  if not flags & shortFrameFlag or len(definition.body) != 12 + frameBytes * frameCount:
+    raise ValueError(f"{worldFile.sourceName}: track '{definition.name}' (flags {flags:#x}, {frameCount} frames) is not in the short frame layout")
   if frameCount < 1:
-    raise ValueError(f"{worldFile.sourceName}: track '{trackDefinition.name}' has no frames")
-  rotationW, rotationX, rotationY, rotationZ, shiftX, shiftY, shiftZ, _ = struct.unpack_from("<8h", trackDefinition.body, 12)
+    raise ValueError(f"{worldFile.sourceName}: track '{definition.name}' has no frames")
+  return numpy.frombuffer(definition.body, dtype="<i2", count=frameCount * 8, offset=12).reshape(frameCount, 8)
+
+
+def frameTransform(values):
   transform = numpy.eye(4)
-  transform[:3, :3] = quaternionMatrix(rotationW, rotationX, rotationY, rotationZ)
-  transform[:3, 3] = numpy.array([shiftX, shiftY, shiftZ]) / 256.0
+  scale = (int(values[7]) & 0xFFFF) / scaleUnits
+  transform[:3, :3] = quaternionMatrix(*(float(value) for value in values[:4])) * scale
+  transform[:3, 3] = values[4:7].astype(numpy.float64) / translationUnits
   return transform
+
+
+def bindTransforms(worldFile, dags):
+  """Each bone's local transform from frame 0 of its own track."""
+  return [frameTransform(trackFrames(worldFile, trackInstance(worldFile, dag["track"])[0])[0]) for dag in dags]
 
 
 def readSkeleton(worldFile, skeletonFragment):
@@ -76,37 +97,17 @@ def boneAttachments(worldFile, dags):
   return attached, particleClouds
 
 
-def subtree(dags, index):
-  indices = [index]
-  for child in dags[index]["children"]:
-    indices += subtree(dags, child)
-  return indices
-
-
-def poseSkeleton(worldFile, dags):
-  """World transform per bone from the bind pose, with Luclin upper arms lowered so a figure stands rather than T-poses."""
+def poseSkeleton(dags, localTransforms):
+  """World transform per bone: its local transform under its parent's."""
   worldTransforms = [None] * len(dags)
 
   def walk(index, parentTransform):
-    worldTransforms[index] = parentTransform @ trackFirstFrame(worldFile, dags[index]["track"])
+    worldTransforms[index] = parentTransform @ localTransforms[index]
     for child in dags[index]["children"]:
       walk(child, worldTransforms[index])
 
   walk(0, numpy.eye(4))
-  lowered = 0
-  for index, dag in enumerate(dags):
-    side = next((sign for marker, sign in upperArmMarkers.items() if marker in dag["name"]), None)
-    if side is None:
-      continue
-    joint = worldTransforms[index][:3, 3].copy()
-    angle = math.radians(-armsDownDegrees * side)
-    adjustment = numpy.eye(4)
-    adjustment[:3, :3] = numpy.array([[1, 0, 0], [0, math.cos(angle), -math.sin(angle)], [0, math.sin(angle), math.cos(angle)]])
-    adjustment[:3, 3] = joint - adjustment[:3, :3] @ joint
-    for descendant in subtree(dags, index):
-      worldTransforms[descendant] = adjustment @ worldTransforms[descendant]
-    lowered += 1
-  return worldTransforms, "armsLowered" if lowered == len(upperArmMarkers) else "bind"
+  return worldTransforms
 
 
 def meshVertexPieces(worldFile, meshFragment):
@@ -121,10 +122,10 @@ def skinMeshes(worldFile, skins):
   return [worldFile.fragments[struct.unpack_from("<i", worldFile.fragment(reference, 0x2D).body, 4)[0] - 1] for reference in skins]
 
 
-def posedSkeleton(worldFile, skeletonFragment, skinned, meshArrays):
-  """Skinned meshes (0x36 fragments rigged to this skeleton) and the meshes attached to its bones, posed by its bones; meshArrays turns one posed mesh into its part."""
+def posedSkeleton(worldFile, skeletonFragment, skinned, meshArrays, localTransforms=None):
+  """Skinned meshes (0x36 fragments rigged to this skeleton) and the meshes attached to its bones, posed by its bones at localTransforms (the bind pose when None); meshArrays turns one posed mesh into its part."""
   dags, _ = readSkeleton(worldFile, skeletonFragment)
-  worldTransforms, pose = poseSkeleton(worldFile, dags)
+  worldTransforms = poseSkeleton(dags, bindTransforms(worldFile, dags) if localTransforms is None else localTransforms)
   parts = []
   for meshFragment in skinned:
     mesh = worldFile.mesh(meshFragment)
@@ -144,4 +145,4 @@ def posedSkeleton(worldFile, skeletonFragment, skinned, meshArrays):
     mesh = worldFile.mesh(worldFile.fragment(meshFragment.index, 0x36))
     transform = worldTransforms[bone]
     parts.append(meshArrays(mesh | {"vertices": mesh["vertices"] @ transform[:3, :3].T + transform[:3, 3]}))
-  return parts, pose, particleClouds
+  return parts, particleClouds

@@ -11,12 +11,12 @@ description: Place and render EverQuest ground objects in a zonewright Blender s
 
 | Argument | Meaning |
 |---|---|
-| `zone` | The zone the object is in; its archives are searched first |
+| `zone` | The zone the object is in; the client loads its archives after its startup archives |
 | `model` | The object's actor: `IT10800_ACTORDEF` (with or without `_ACTORDEF`), ... |
 | `location` + `headingDegrees` | Blender position of the model origin and turn (0 = +Y, clockwise from above) |
 | `eqLocation` + `eqHeading` | Or the server's values as the dumps give them; give one pair, not both |
 | `scale` | The object's scale (default 1) |
-| `source` | `"archive"` or `"archive:entry"` when one link tier defines the model twice |
+| `source` | `"archive"` or `"archive:entry"` to take a definition other than the first the client loads |
 | `name`, `collection` | Object name and collection |
 
 Objects are not snapped to the ground: the server's z is the model origin.
@@ -36,11 +36,11 @@ Pitch and roll are 0 in every dumped row, so they are not taken. Housing items p
 
 ## Where object models come from
 
-Item models (`IT<number>`) resolve as follows:
+Item models (`IT<number>`) come from the first archive the client loads that defines them:
 
-- **Zone archives first:** the neighborhood's kilns and looms come from `tradeskill_objects.eqg`, which `neighborhood_assets.txt` names.
-- **Then global archives:** the `GEquip*` archives that `GlobalLoad.txt` loads.
-- **Then on-demand:** `OnDemandResources.txt` entries such as `phexterior1a.eqg^IT20026.MOD`.
+- **Startup archives:** the `GEquip*` and Luclin equipment archives load before any zone, so they win a name a zone's archive also defines.
+- **The zone's archives:** the neighborhood's kilns and looms come from `tradeskill_objects.eqg`, which `neighborhood_assets.txt` names.
+- **On demand, last:** `OnDemandResources.txt` entries such as `phexterior1a.eqg^IT20026.MOD`.
 
 ## Limits
 

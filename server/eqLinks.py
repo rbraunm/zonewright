@@ -1,4 +1,6 @@
-"""Which archives the client loads, read from its own lists and from the load order in eqgame.exe, so a model or texture is only ever taken from an archive the client links to the zone."""
+"""Which archives the client loads and in what order, read from its own lists and from eqgame.exe, so a model, animation, or
+texture is only ever taken from an archive the client loads in the zone. The client keeps the first definition of any name it
+registers (EQGraphicsDX9.dll 0x100c77a0), so load order decides between archives that define the same name."""
 import configparser
 
 import zoneSources
@@ -7,12 +9,17 @@ import zoneSources
 secondCharacterZones = {"nro", "oasis", "butcher", "timorous", "skyshrine", "necropolis", "mischiefplane", "growthplane", "sleeper", "thurgadinb"}
 hardcodedZoneArchives = {"poknowledge": ["poknowledge_obj3.eqg"]}
 
-# At login the client loads global<code>_chr2 and global<code>_chr for races 1-12, 128, and 130, both genders, unless eqclient.ini turns that race's Luclin model off.
-playerRaces = {
-  "hu": "Human", "ba": "Barbarian", "er": "Erudite", "el": "WoodElf", "hi": "HighElf", "da": "DarkElf", "ha": "HalfElf",
-  "dw": "Dwarf", "tr": "Troll", "og": "Ogre", "ho": "Halfling", "gn": "Gnome", "ik": "Iksar", "ke": "VahShir",
-}
-playerGenders = {"m": "Male", "f": "Female"}
+# At startup the client loads global<code>_chr2 and global<code>_chr for races 1-12, 128, and 130, male then female, when
+# eqgame.exe 0x48e510 allows it: the race's own UseLuclin setting, or for human and wood elf the setting of a race that borrows
+# their animations (erudite; dark, half, and high elf).
+playerRaces = (
+  ("hu", "Human"), ("ba", "Barbarian"), ("er", "Erudite"), ("el", "WoodElf"), ("hi", "HighElf"), ("da", "DarkElf"), ("ha", "HalfElf"),
+  ("dw", "Dwarf"), ("tr", "Troll"), ("og", "Ogre"), ("ho", "Halfling"), ("gn", "Gnome"), ("ik", "Iksar"), ("ke", "VahShir"),
+)
+playerGenders = (("m", "Male"), ("f", "Female"))
+luclinBorrowers = {"hu": ("er",), "el": ("da", "ha", "hi")}
+vahShir = "ke"
+startupList = "eqgame.exe startup"
 
 
 def clientFile(clientRoot, fileName):
@@ -101,36 +108,80 @@ def zoneLinks(clientRoot, zoneName):
   return {"zone": zoneName, "format": zoneKind, "archives": archives, "missing": missing}
 
 
-def luclinPlayerCodes(clientRoot):
-  """Player model codes whose Luclin model eqclient.ini leaves on (the client's default when a setting is absent)."""
+def clientSettings(clientRoot):
+  """eqclient.ini [Defaults]; absent when the client has none."""
   settings = configparser.ConfigParser(interpolation=None, strict=False)
   settings.optionxform = str
   iniPath = clientRoot / "eqclient.ini"
   if iniPath.is_file():
     settings.read_string(iniPath.read_text(encoding="latin1"))
-  defaults = settings["Defaults"] if settings.has_section("Defaults") else {}
-  if defaults.get("AllLuclinPcModelsOff", "FALSE").upper() == "TRUE":
-    return []
-  return [race + gender for race, raceName in playerRaces.items() for gender, genderName in playerGenders.items() if defaults.get(f"UseLuclin{raceName}{genderName}", "TRUE").upper() == "TRUE"]
+  return settings["Defaults"] if settings.has_section("Defaults") else {}
+
+
+def settingIsOn(defaults, name, absentIsOn):
+  """The client reads a setting as on when it starts T, t, or 1."""
+  value = defaults.get(name)
+  return absentIsOn if value is None else value[:1] in ("T", "t", "1")
+
+
+def globalLoadLines(clientRoot):
+  """Resources/GlobalLoad.txt as (phase, archive file name, line). The client reads it in runs of one phase at a time, so the phases must not go backwards."""
+  lines = []
+  for line in readListLines(clientRoot / "Resources" / "GlobalLoad.txt"):
+    fields = line.split(",")
+    if len(fields) != 5 or fields[0] not in ("1", "2", "3", "4"):
+      raise ValueError(f"GlobalLoad.txt line is not phase,flag,flags,name,description with phase 1-4: {line}")
+    lines.append((int(fields[0]), archiveFileName(fields[3]), line))
+  phases = [phase for phase, _, _ in lines]
+  if phases != sorted(phases):
+    raise ValueError("GlobalLoad.txt phases go backwards; the client reads the file in runs of one phase")
+  return lines
 
 
 def globalLinks(clientRoot):
-  """Archives loaded for every zone: the player models eqclient.ini enables, Resources/GlobalLoad.txt (phase,flag,flags,name,description), and Resources/GlobalLoad_chr.txt (read like a zone's _chr.txt)."""
+  """Archives the client loads once at startup (eqgame.exe 0x491c20), in its order: GlobalLoad.txt phases 1 and 2; the Luclin
+  player models; Global5 and frog mounts when UseLuclinElementals is on; Luclin equipment when any Luclin model loaded; classic
+  Vah Shir models and equipment unless both Vah Shir Luclin settings are on; GlobalLoad.txt phases 3 and 4; GlobalLoad_chr.txt."""
+  defaults = clientSettings(clientRoot)
   archives, missing = [], []
-  for code in luclinPlayerCodes(clientRoot):
-    for fileName in (f"global{code}_chr2.s3d", f"global{code}_chr.s3d"):
-      found = clientFile(clientRoot, fileName)
-      if found:
-        archives.append({"archive": found, "via": "eqclient.ini", "codes": None})
-  for line in readListLines(clientRoot / "Resources" / "GlobalLoad.txt"):
-    fields = line.split(",")
-    if len(fields) != 5:
-      raise ValueError(f"GlobalLoad.txt line has {len(fields)} fields: {line}")
-    fileName = archiveFileName(fields[3])
-    if clientFile(clientRoot, fileName):
-      archives.append({"archive": fileName, "via": "GlobalLoad.txt", "codes": None})
-    else:
-      missing.append({"list": "GlobalLoad.txt", "line": line})
+
+  def add(fileName, via, line=None):
+    found = clientFile(clientRoot, fileName)
+    if found:
+      archives.append({"archive": found, "via": via, "codes": None})
+    elif line is not None:
+      missing.append({"list": via, "line": line})
+
+  lines = globalLoadLines(clientRoot)
+  for phase, fileName, line in lines:
+    if phase in (1, 2):
+      add(fileName, "GlobalLoad.txt", line)
+  allOff = settingIsOn(defaults, "AllLuclinPcModelsOff", False)
+  luclinOn = {(race, gender): settingIsOn(defaults, f"UseLuclin{raceName}{genderName}", True) for race, raceName in playerRaces for gender, genderName in playerGenders}
+  anyLuclinLoaded = False
+  for race, _ in playerRaces:
+    for gender, _ in playerGenders:
+      loads = luclinOn[(race, gender)] if race == vahShir else not allOff and (luclinOn[(race, gender)] or any(luclinOn[(borrower, gender)] for borrower in luclinBorrowers.get(race, ())))
+      if not loads:
+        continue
+      add(f"global{race}{gender}_chr2.s3d", startupList)
+      add(f"global{race}{gender}_chr.s3d", startupList)
+      if race != vahShir:
+        anyLuclinLoaded = True
+      elif gender == "m" or not luclinOn[(vahShir, "m")]:
+        add("vequip.s3d", startupList)
+  if settingIsOn(defaults, "UseLuclinElementals", True):
+    for fileName in ("global5_chr2.s3d", "global5_chr.s3d", "frog_mount_chr.s3d"):
+      add(fileName, startupList)
+  if anyLuclinLoaded:
+    for fileName in ("lgequip_amr2.s3d", "lgequip_amr.s3d", "lgequip2.s3d", "lgequip.s3d"):
+      add(fileName, startupList)
+  if not (luclinOn[(vahShir, "m")] and luclinOn[(vahShir, "f")]):
+    for fileName in ("gequip6.s3d", "global7_chr.s3d"):
+      add(fileName, startupList)
+  for phase, fileName, line in lines:
+    if phase in (3, 4):
+      add(fileName, "GlobalLoad.txt", line)
   listed, listMissing = characterListArchives(clientRoot, "Resources/GlobalLoad_chr.txt")
   return {"archives": archives + listed, "missing": missing + listMissing}
 

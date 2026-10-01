@@ -17,11 +17,27 @@ description: Place and render EverQuest characters (NPCs, players, pets, the sca
 | `location` + `headingDegrees` | Blender position of the feet and facing (0 = +Y, clockwise from above) |
 | `eqLocation` + `eqHeading` | Or the server's values as the dumps give them; give one pair, not both |
 | `variation`, `headType`, `textureSet` | Appearance: body piece, head piece, texture set |
+| `animation`, `animationVariant`, `animationFrame` | Pose: an animation code (`L01`, `S03`) or the client's label (`WALK`, `WAVE`), a variant letter for a Luclin model (`A`, `B`, ...), and a frame; default `P01` (STAND STILL), first variant, frame 0 |
 | `snapToGround` | Drop the feet to the surface below (default true; the server's z sits a few units above the ground) |
-| `source` | `"archive"` or `"archive:entry"` when one link tier defines the model twice |
+| `source` | `"archive"` or `"archive:entry"` to take a definition other than the first the client loads |
 | `name`, `collection` | Object name and collection |
 
-The result's `source` names the archive and the link that chose it (`linkedBy`: the zone load order, `<zone>_chr.txt`, `eqclient.ini`, `GlobalLoad.txt`, or `OnDemandResources.txt`), the pieces drawn, how many materials the texture set swapped, the pose, and any `missingTextures`.
+The result's `source` names the archive and the link that chose it (`linkedBy`: `eqgame.exe startup`, `GlobalLoad.txt`, the zone load order, `<zone>_chr.txt`, or `OnDemandResources.txt`), the pieces drawn, how many materials the texture set swapped, and any `missingTextures`. Its `pose` names the animation resource drawn (such as `S03AELF`), the archive it came from, `borrowedFrom` when the model borrowed another code's animation, the variants available, and the frame, `frameCount`, and `millisecondsPerFrame`, so a render can pick a frame by time.
+
+## Animations
+
+The client's animations, with its labels where it has them:
+
+| Codes | Kind |
+|---|---|
+| `C01`-`C11` | Combat: KICK, STAB, IMPALE ATK, OVRHAND ATK, LEFT HND ATK, BASH, PUNCH, BOW, SWIM ATK, MONK RND KICK |
+| `D01`-`D05` | Damage: NORMAL DMG, FALL DMG, DEATH SHUDDER, FALL DOWN |
+| `L01`-`L12` | Movement: WALK, RUN, JUMP ACROSS, JUMP, FREE FALL, CROUCH WALK, CROUCH, TREAD WATER |
+| `O01`-`O03`, `P01`-`P09` | Idle and standing: IDLE, STAND STILL, TURN RIGHT, SWIM FORWD |
+| `S01`-`S29` | Social and emotes: OH YAH!, AGONY, WAVE, UP YOURS, and more without labels |
+| `T01`-`T09` | Instruments, spells, and kicks: PLAY DRUM, PLAY LUTE, PLAY HORN, DEFENSE SPELL, GENERAL SPELL, MISSILE SPELL, FLYING KICK, MONK HND ATK 2 |
+
+A model without an animation of its own borrows one, as the client does: a dark elf plays the wood elf's, a Luclin erudite the human's, a kobold the werewolf's. Not every model has every animation; asking for one it lacks is an error naming why.
 
 ## From a live dump
 
@@ -57,6 +73,6 @@ Every eye-level `renderView` (`standAt`) stands a dark elf female at size 5 abou
 
 ## Limits
 
-- **Pose.** WLD characters stand in their bind pose with the upper arms lowered 70 degrees (`pose: armsLowered`), when their arm bones carry the Luclin names. Others report `bind` (arms out). EQG characters stand in their bind pose. Animations are not applied yet.
+- **EQG characters.** EQG characters (Drakkin and later races) stand in their bind pose: their animations (`.ani`) are not read yet, so asking for one is an error.
 - **Not drawn.** Equipment, faces (`faceStyle`), and particle effects are not drawn. Legacy 0x2C meshes (IVM and a few others) are not read and fail as unsupported.
 - **Heading direction.** The heading's turn direction for `eqHeading` comes from the server's heading formula and has not yet been checked against a client screenshot.
