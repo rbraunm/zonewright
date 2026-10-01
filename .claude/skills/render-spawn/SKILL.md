@@ -17,12 +17,13 @@ description: Place and render EverQuest characters (NPCs, players, pets, the sca
 | `location` + `headingDegrees` | Blender position and facing (0 = +Y, clockwise from above) |
 | `x`, `y`, `z` + `heading` | Or EQ's values as the server and the dumps give them; give these or the Blender pair, not both |
 | `variation`, `headType`, `textureSet` | Appearance: body piece, head piece, texture set |
-| `animation`, `animationVariant`, `animationFrame` | Pose: an animation code (`L01`, `S03`) or the client's label (`WALK`, `WAVE`), a variant letter for a Luclin model (`A`, `B`, ...), and a frame; default `P01` (STAND STILL), first variant, frame 0 |
+| `hairStyle` | The hair piece `<code>_HAIR_<nn>` the client attaches where it defines one (Drakkin) |
+| `animation`, `animationVariant`, `animationFrame` | Pose: an animation code (`L01`, `S03`), the client's label (`WALK`, `WAVE`), or an EQG name (`STND`, `NRUN`); a variant letter for a Luclin model (`A`, `B`, ...); and a frame. The default is `P01` (STAND STILL), which EQG models play as `STND`, at the first variant and frame 0 |
 | `snapToGround` | Stand the model origin `avatarHeight` above the surface below, as the client does (default true); false puts the origin at the position |
 | `source` | `"archive"` or `"archive:entry"` to take a definition other than the first the client loads |
 | `name`, `collection` | Object name and collection |
 
-The result gives `height`, `scale`, and `avatarHeight` in the client's terms, so they compare with a dump row. Its `source` names the archive and the link that chose it (`linkedBy`: `eqgame.exe startup`, `GlobalLoad.txt`, the zone load order, `<zone>_chr.txt`, or `OnDemandResources.txt`), the pieces drawn, how many materials the texture set swapped, and any `missingTextures`. Its `pose` names the animation resource drawn (such as `S03AELF`), the archive it came from, `borrowedFrom` when the model borrowed another code's animation, the variants available, and the frame, `frameCount`, and `millisecondsPerFrame`, so a render can pick a frame by time.
+The result gives `height`, `scale`, and `avatarHeight` in the client's terms, so they compare with a dump row. Its `source` names the archive and the link that chose it (`linkedBy`: `eqgame.exe startup`, `GlobalLoad.txt`, the zone load order, `<zone>_chr.txt`, or `OnDemandResources.txt`), the pieces drawn, how many materials the texture set swapped, and any `missingTextures`. Its `pose` names the animation resource drawn (such as `S03AELF` or `WAVE_BA_1_DKF`) and the archive it came from. For a WLD model it also gives `borrowedFrom` (when the model borrowed another code's animation), the variants available, and `millisecondsPerFrame`. For an EQG model it gives `wldAnimation` and the frame's `frameMilliseconds` with the animation's `durationMilliseconds`. Both give the frame and `frameCount`, so a render can pick a frame by time.
 
 ## Animations
 
@@ -39,6 +40,8 @@ The client's animations, with its labels where it has them:
 
 A model without an animation of its own borrows one, as the client does: a dark elf plays the wood elf's, a Luclin erudite the human's, a kobold the werewolf's. Not every model has every animation; asking for one it lacks is an error naming why.
 
+EQG characters (Drakkin, the gnoll `GBN`, and later races) play the client's EQG animations, `<name>_BA_1_<code>`. The client maps each animation id to an EQG name and a WLD code: `/wave` is `WAVE` on an EQG model and `S03` on a WLD one; `STND` stands. Give a code or label and an EQG model plays the first EQG name mapped to it; give an EQG name and a WLD model plays its code. EQG animations have no lettered variants.
+
 ## From a live dump
 
 `master\spawns.tsv` columns map to arguments:
@@ -49,7 +52,7 @@ A model without an animation of its own borrows one, as the client does: a dark 
 | `height` | `height` (the dump's `avatarHeight` should match the result's) |
 | `positions` | `x,y,z,heading`, the first entry of a `|` list: `x`, `y`, `z`, `heading` |
 | `textureType` | `textureSet` (`-1` means no override, so 0) |
-| `headType`, `variation` | `headType`, `variation` |
+| `headType`, `variation`, `hairStyle` | `headType`, `variation`, `hairStyle` |
 
 The dumps come from live servers and our client is a modified RoF2, so many spawns name models this client lacks or does not link to that zone; those fail with an error listing any unlinked archives that define the model. Skip them; do not borrow a model from an unlinked archive.
 
@@ -84,5 +87,6 @@ Every eye-level `renderView` (`standAt`) stands a dark elf female of height 5, d
 
 ## Limits
 
-- **EQG characters.** EQG characters (Drakkin and later races) stand in their bind pose: their animations (`.ani`) are not read yet, so asking for one is an error.
 - **Not drawn.** Equipment, faces (`faceStyle`), and particle effects are not drawn. Legacy 0x2C meshes (IVM and a few others) are not read and fail as unsupported.
+- **Drakkin pieces.** A Drakkin draws its base model (`dkf.mod`, `dkm.mod`) and its hair. Its armor pieces (`dkf_<material>_<variation>_<bone>`), facial attachments, tattoos, and face and texture-set layers are not drawn. How the client picks armor pieces for an unequipped spawn is not yet read, so `variation`, `headType`, and `textureSet` are errors on Drakkin.
+- **EQG facing.** `EQGraphicsDX9.dll` turns `ROOT_BONE` a quarter turn when it builds a skeleton and back when it sets up animation. EQG models are drawn facing their file's front (+X, as WLD models do); a client screenshot of an EQG character has yet to confirm this.

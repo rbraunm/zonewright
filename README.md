@@ -121,18 +121,20 @@ Spawns, doors, objects, and the scale figure come from the client's own models a
    - The `.eqg` archives in `<zone>_assets.txt`, and, for EQG zones, the zone `.eqg`.
 3. **When first needed:** `Resources\OnDemandResources.txt` EQG models (`EQGM`) and skinned models (`EQGS`).
 
-The first definition in that order wins: IT67 is in both `equipment-01.eqg` and `gequip.s3d`, and the client uses `equipment-01.eqg`, which `GlobalLoad.txt` loads first. `source` picks a definition by archive instead. One archive, or the on-demand list, defining a model twice is an error, since which entry the client takes is not known. Textures come from the model's own archive or, for a zone's EQG model, from the zone's other EQG archives. A texture none of them holds is missing for the client too: its faces draw magenta and every placement lists it in `missingTextures`.
+The first definition in that order wins: IT67 is in both `equipment-01.eqg` and `gequip.s3d`, and the client uses `equipment-01.eqg`, which `GlobalLoad.txt` loads first. `source` picks a definition by archive instead. Of two `OnDemandResources.txt` lines naming one resource, the first registers: `EQGraphicsDX9.dll` skips a name already registered with the same type (`0x100c74f0`). One archive defining a model twice is an error, since which entry the client takes is not known. Textures come from the model's own archive or, for a zone's EQG model, from the zone's other EQG archives. A texture none of them holds is missing for the client too: its faces draw magenta and every placement lists it in `missingTextures`.
 
 Supported models:
 
-- EQG static (`.mod`) and skinned (`.mds`) models; skinned models stand in their bind pose, since their animations (`.ani`) are not read yet.
+- EQG models (`.mod`): static, or skinned when the file stores bones (Drakkin and many later creatures).
+- EQG skinned piece models (`.mds`).
 - WLD static actors.
 - WLD skeletal actors: skinned meshes and bone-attached meshes. Particle clouds are counted, not drawn.
 
 Characters take the client's appearance rules (from `EQGraphicsDX9.dll`):
 
 - **Pieces:** the body piece `<code><nn>` for `variation` and the head piece `<code>HE<nn>` for `headType`, keeping the default when the model lacks the piece.
-- **Texture sets:** `.lay` layers `C_<code>_S<set>_M<n>` for EQG models, and `<code><part><set><nn>_MDF` materials for WLD ones.
+- **Texture sets:** `.lay` layers `C_<code>_S<set>_M<n>` for `.mds` models, and `<code><part><set><nn>_MDF` materials for WLD ones.
+- **Hair:** `hairStyle` attaches `<code>_HAIR_<nn>` (`eqgame.exe` `0x40ac80`, called for the head slot when no helm is worn) where the client defines one, as for Drakkin.
 
 A WLD character plays the client's animations (`eqAnimations.py`, transcribed from `eqgame.exe`):
 
@@ -142,6 +144,16 @@ A WLD character plays the client's animations (`eqAnimations.py`, transcribed fr
 - **Frames:** each frame decodes as the client does (`0x1001b190`): rotation, translation over 256, and a uniform scale over 256. Bones without a track in the animation keep their bind transform.
 - **Duplicate tracks:** of two tracks with one name in a file, the first plays. `EQGraphicsDX9.dll` registers tracks in file order, and `d3dx9_30.dll`'s `RegisterAnimationSRTKeys` refuses a name already registered (the DLL logs the failure and goes on).
 - **Stand:** a spawn stands at frame 0 of `P01` (STAND STILL) unless another animation is chosen. A model with no stand animation stands in its bind pose.
+
+An EQG character plays the client's EQG animations:
+
+- **Animation ids:** `eqgame.exe` keeps one table of 104 animation ids (`0xaae3e8`). Each id has an EQG name and the WLD animation it plays on a WLD model (`0xaaf428`): `/wave` is id 75, `WAVE` on an EQG model and `S03` on a WLD one.
+- **Requests:** a request may give an EQG name (`STND`, `NRUN`), a WLD code, or a label. A code plays the first id mapped to it, so the default `P01` plays `STND`; an EQG name on a WLD model plays its id's code.
+- **Lookup:** an EQG model plays `<name>_BA_1_<code>` (`EQGraphicsDX9.dll` `PlayAnimation`, `"%s_BA_1_%s"`), from the first archive in the load order that defines it, else from the first `OnDemandResources.txt` line naming it.
+- **Files:** `.ani` animations hold, per bone, keys of time, translation, rotation, and scale. Skinned `.mod` and `.mds` files hold 56-byte bones (parent links and bind transform) and one 36-byte weight record per vertex (up to four bones). Every such file in the client parses exactly to its size.
+- **Bones:** the DLL transposes each quaternion's matrix (`0x1003efc8`), a convention under which weighted vertices sit beside their bones. A vertex moves by its weighted bones from bind to pose.
+- **Footing:** the DLL lowers `ROOT_BONE`'s keys by the model's `ROffset` (`0x1003cd5b`, every animation but `_MT_` ones). An animated EQG model's feet therefore sit `ROffset` below its origin, like a WLD model's.
+- **Attached pieces:** a piece such as hair carries a subset of the skeleton's bones. It takes the skeleton's pose by bone name; a weighted bone that binds elsewhere than the skeleton's is an error.
 
 ### Spawn size
 

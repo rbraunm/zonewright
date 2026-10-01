@@ -1,4 +1,4 @@
-"""How the client gives a WLD character its animations, transcribed from eqgame.exe: the animations it loads per model, and the code a model borrows animations from when it has none of its own."""
+"""How the client gives a character its animations, transcribed from eqgame.exe: the animations it loads per WLD model, the code a WLD model borrows animations from when it has none of its own, and the EQG animation each animation id plays."""
 import re
 
 # The animation table eqgame.exe fills at 0x408040 (0xb787a0, 20-byte entries) and walks at 0x407800, in table order.
@@ -28,6 +28,27 @@ standAnimation = "P01"
 fewestUnletteredTracks = 50
 # 0x407800 skips variant B of the animation in table entry 50 (S08) for the halfling female.
 skippedVariants = {("HOF", "S08", "B")}
+# eqgame.exe's animation ids in order (0xaae3e8, 40-byte rows), each with its EQG name and the animationNames code the id plays on a
+# WLD model (0xaaf428, 1-based, 0 for none). An EQG model plays <name>_BA_1_<code> (EQGraphicsDX9.dll PlayAnimation, "%s_BA_1_%s").
+eqgAnimationTable = (
+  ("XXXX", None), ("SLPR", "C05"), ("BLPR", "C05"), ("STPR", "C02"), ("SLSC", "C06"), ("BLSC", "C06"), ("STSC", "C06"),
+  ("SL2H", "C03"), ("BL2H", "C03"), ("ST2H", "C04"), ("BSTB", "C02"), ("TOSS", "C05"), ("BASH", "C07"), ("PATK", "C08"),
+  ("BATK", "C09"), ("WATK", "C10"), ("KICK", "C01"), ("RKCK", "C11"), ("SHTH", None), ("UNSH", None), ("SHTF", None),
+  ("UNSF", None), ("MKCK", "T07"), ("MHA1", "T08"), ("MHA2", "T09"), ("WALK", "L01"), ("BWLK", "L01"), ("NRUN", "L02"),
+  ("TURN", "P03"), ("LTRN", "P03"), ("KNEL", "P05"), ("STND", "P01"), ("IDLE", "O01"), ("STDA", "P01"), ("IDLA", "O01"),
+  ("STDB", "P01"), ("IDLB", "O01"), ("STDC", "P01"), ("IDLC", "O01"), ("NSIT", "P07"), ("SIDL", "O03"), ("STDG", "P02"),
+  ("STNG", "P02"), ("CRCH", "L08"), ("JMPA", "L03"), ("JMPU", "L04"), ("CWLK", "L06"), ("CLMB", "L07"), ("TWTR", "L09"),
+  ("SWIM", "P06"), ("STUN", None), ("DRUM", "T01"), ("LUTE", "T02"), ("HORN", "T03"), ("GCST", "T05"), ("DCST", "T04"),
+  ("MCST", "T06"), ("GAPO", "T04"), ("OFSM", "T05"), ("OFLG", "T05"), ("HESM", "T04"), ("HELG", "T04"), ("OFAE", "T06"),
+  ("OFPB", "T06"), ("FLCH", "D01"), ("MSHT", "D02"), ("SPAS", "D04"), ("CRMP", "D05"), ("DODG", "D01"), ("PRRY", "D01"),
+  ("RPST", "D01"), ("FLDM", "D03"), ("FALL", "L05"), ("NBOW", "S28"), ("SLTE", "S25"), ("WAVE", "S03"), ("HNOD", "S06"),
+  ("CLAP", "S09"), ("DOVR", "S10"), ("NPNT", "S22"), ("LAGH", "S12"), ("SHRG", "S23"), ("TRIU", "S01"), ("AGNY", "S02"),
+  ("NGTV", "S04"), ("BORD", "S05"), ("PRAY", "S08"), ("BLSH", "S23"), ("COGH", "S13"), ("CRNG", "S14"), ("DNCE", "S16"),
+  ("HSHK", "S17"), ("STRE", "S19"), ("SHVR", "S26"), ("HLGH", "S21"), ("IMPT", "S27"), ("SKNL", "S20"), ("CATK", "C09"),
+  ("HIPS", "S18"), ("RAIS", "S24"), ("SMLE", "S29"), ("TILT", "S15"), ("KBEG", "S20"), ("SATK", "C06"),
+)
+eqgAnimationCodes = dict(eqgAnimationTable)
+eqgAnimationPart = "BA_1"
 # An animation's root track: <anim><letter><code><anim><letter>_<code>_TRACK for Luclin models, <anim><code>_TRACK for classic ones.
 rootTrackPatterns = (re.compile(r"^([A-Z]\d\d[A-H]?)([A-Z0-9]{3})\1_\2_TRACK$"), re.compile(r"^([A-Z]\d\d)([A-Z0-9]{3})_TRACK$"))
 
@@ -100,14 +121,34 @@ def borrowedCode(code, isLuclin):
 
 
 def animationName(requested):
-  """An animation code (S03) or the client's label for it (WAVE)."""
+  """An animation code (S03), the client's label for it (WAVE), or the EQG name of an animation id (STND), which plays that id's code."""
   name = requested.upper()
   if name in animationNames:
     return name
   matches = [code for code, label in animationLabels.items() if label == name]
-  if len(matches) != 1:
-    raise ValueError(f"'{requested}' is neither an animation the client loads ({', '.join(animationNames)}) nor one of its labels ({', '.join(sorted(set(animationLabels.values())))})")
-  return matches[0]
+  if len(matches) == 1:
+    return matches[0]
+  if name in eqgAnimationCodes:
+    if eqgAnimationCodes[name] is None:
+      raise ValueError(f"EQG animation {name} plays no animation on a WLD model")
+    return eqgAnimationCodes[name]
+  raise ValueError(
+    f"'{requested}' is neither an animation the client loads ({', '.join(animationNames)}), one of its labels"
+    f" ({', '.join(sorted(set(animationLabels.values())))}), nor an EQG animation ({', '.join(eqgAnimationCodes)})"
+  )
+
+
+def eqgAnimationName(requested):
+  """The EQG animation a request plays on an EQG model: an EQG name (STND, WAVE) as given, or a code or label, which plays the first
+  animation id the client maps to that code (P01, the default stand, plays STND)."""
+  name = (requested or standAnimation).upper()
+  if name in eqgAnimationCodes:
+    return name
+  code = animationName(name)
+  eqgName = next((eqgName for eqgName, wldCode in eqgAnimationTable if wldCode == code), None)
+  if eqgName is None:
+    raise ValueError(f"No EQG animation plays {code}")
+  return eqgName
 
 
 def candidateResources(animation, code, isLuclin):

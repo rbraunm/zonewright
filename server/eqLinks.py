@@ -190,7 +190,8 @@ onDemandMemo = {}
 
 
 def onDemandResources(clientRoot):
-  """Resources/OnDemandResources.txt: archive^entry^actor^type, loaded when an actor is first needed. Model name to its static (EQGM) and skinned (EQGS) entries."""
+  """Resources/OnDemandResources.txt: archive^entry^resource^type, loaded when a resource is first needed. models maps a model name to its
+  model (EQGM) and skinned (EQGS) entries; animations maps an EQG animation resource (EQGA) to its entries."""
   listPath = clientRoot / "Resources" / "OnDemandResources.txt"
   status = listPath.stat()
   memoKey = (str(listPath), status.st_size, status.st_mtime_ns)
@@ -201,15 +202,18 @@ def onDemandResources(clientRoot):
 
 
 def readOnDemandResources(listPath):
-  models = {}
+  models, animations = {}, {}
   for line in readListLines(listPath):
     fields = line.split("^")
     if len(fields) != 4:
       raise ValueError(f"OnDemandResources.txt line has {len(fields)} fields: {line}")
-    archive, entry, actor, resourceType = (field.strip() for field in fields)
+    archive, entry, resource, resourceType = (field.strip() for field in fields)
+    found = {"archive": archive.lower(), "entry": entry.lower(), "via": "OnDemandResources.txt"}
     if resourceType in ("EQGM", "EQGS"):
-      models.setdefault(modelKey(actor), []).append({"archive": archive.lower(), "entry": entry.lower(), "via": "OnDemandResources.txt"})
-  return models
+      models.setdefault(modelKey(resource), []).append(found)
+    elif resourceType == "EQGA":
+      animations.setdefault(resource.upper(), []).append(found)
+  return {"models": models, "animations": animations}
 
 
 def modelKey(name):

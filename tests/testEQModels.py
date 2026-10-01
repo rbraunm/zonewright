@@ -72,7 +72,7 @@ def testPlaceSpawnDrawsTheClientsScaleForTheZone(stageBlenderServer):
   assert kobold["source"]["swappedMaterials"] == 12
   assert gnoll["source"]["pieces"] == ["GBN00", "GBNHE03"]
   assert gnoll["source"]["tier"] == "onDemand"
-  assert gnoll["source"]["pose"] == {"bind": "EQG animations (.ani) are not read yet"}
+  assert (gnoll["source"]["pose"]["animation"], gnoll["source"]["pose"]["wldAnimation"], gnoll["source"]["pose"]["resource"]) == ("STND", "P01", "STND_BA_1_GBN")
   # An EQG model outside a NewEngineZone zone draws at height * 1.3 / 6: the dumps' height-3 gnolls in poknowledge stand at 2.03124.
   assert abs(gnoll["avatarHeight"] - 2.03124) < 0.0001
   assert (gnoll["ground"], gnoll["location"]) == (None, [-10.0, 0.0, 0.0])
@@ -100,10 +100,10 @@ def testSpawnsPlayTheAnimationsTheClientGivesThem(stageBlenderServer):
     pastTheEnd = await session.expectError("placeSpawn", {"zone": "poknowledge", "model": "DAF", "name": "late", "height": 5, "location": [25, 0, 0], "headingDegrees": 0, "animation": "S03", "animationFrame": 27})
     noVariant = await session.expectError("placeSpawn", {"zone": "poknowledge", "model": "DAF", "name": "variant", "height": 5, "location": [25, 0, 0], "headingDegrees": 0, "animation": "S03", "animationVariant": "C"})
     unknown = await session.expectError("placeSpawn", {"zone": "poknowledge", "model": "DAF", "name": "dance", "height": 5, "location": [25, 0, 0], "headingDegrees": 0, "animation": "MOONWALK"})
-    eqgAnimation = await session.expectError("placeSpawn", {"zone": None, "model": "GBN", "name": "gnoll", "height": 6, "location": [25, 0, 0], "headingDegrees": 0, "animation": "L01"})
-    return stand, wave, walk, erudite, kobold, pastTheEnd, noVariant, unknown, eqgAnimation
+    eqgName = await session.expectSuccess("placeSpawn", {"zone": "poknowledge", "model": "DAF", "name": "run", "height": 5, "location": [30, 0, 0], "headingDegrees": 0, "animation": "NRUN"})
+    return stand, wave, walk, erudite, kobold, pastTheEnd, noVariant, unknown, eqgName
 
-  stand, wave, walk, erudite, kobold, pastTheEnd, noVariant, unknown, eqgAnimation = stageBlenderServer.session(steps)
+  stand, wave, walk, erudite, kobold, pastTheEnd, noVariant, unknown, eqgName = stageBlenderServer.session(steps)
   # eqgame.exe maps a dark elf (DA..) to the elf's animations (EL..) when it has none of its own.
   assert {key: stand["source"]["pose"][key] for key in ("animation", "resource", "archive", "borrowedFrom", "variant", "frame")} == {
     "animation": "P01", "resource": "P01AELF", "archive": "globalelf_chr.s3d", "borrowedFrom": "ELF", "variant": "A", "frame": 0,
@@ -118,7 +118,41 @@ def testSpawnsPlayTheAnimationsTheClientGivesThem(stageBlenderServer):
   assert "has frames 0-26, not 27" in pastTheEnd
   assert "has variants ['A', 'B'], not C" in noVariant
   assert "'MOONWALK' is neither an animation the client loads" in unknown
-  assert "its animations (.ani) are not read yet" in eqgAnimation
+  # An EQG animation name plays the WLD animation the client maps its id to: NRUN is id 27, L02 (RUN).
+  assert (eqgName["source"]["pose"]["animation"], eqgName["source"]["pose"]["resource"]) == ("L02", "L02AELF")
+
+
+def testEQGSpawnsPlayTheClientsEQGAnimations(stageBlenderServer):
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [100, 100], "spacing": 10, "location": [0, 0, 0]})
+    await session.expectSuccess("setZoneProperties", {"newEngineZone": False})
+    stand = await session.expectSuccess("placeSpawn", {"zone": "neighborhood", "model": "DKF", "name": "stand", "height": 5.7, "hairStyle": 2, "location": [0, 0, 0], "headingDegrees": 0})
+    wave = await session.expectSuccess("placeSpawn", {"zone": "neighborhood", "model": "DKF", "name": "wave", "height": 5.7, "animation": "S03", "animationFrame": 20, "location": [5, 0, 0], "headingDegrees": 0})
+    walk = await session.expectSuccess("placeSpawn", {"zone": None, "model": "GBN", "name": "walk", "height": 6, "animation": "walk", "location": [10, 0, 0], "headingDegrees": 0})
+    standDetail = await session.expectSuccess("getObjectDetail", {"name": "stand"})
+    lateFrame = await session.expectError("placeSpawn", {"zone": "neighborhood", "model": "DKF", "name": "late", "height": 5.7, "animation": "WAVE", "animationFrame": 44, "location": [15, 0, 0], "headingDegrees": 0})
+    lettered = await session.expectError("placeSpawn", {"zone": "neighborhood", "model": "DKF", "name": "lettered", "height": 5.7, "animation": "WAVE", "animationVariant": "B", "location": [15, 0, 0], "headingDegrees": 0})
+    armor = await session.expectError("placeSpawn", {"zone": "neighborhood", "model": "DKF", "name": "armored", "height": 5.7, "variation": 1, "location": [15, 0, 0], "headingDegrees": 0})
+    return stand, wave, walk, standDetail, lateFrame, lettered, armor
+
+  stand, wave, walk, standDetail, lateFrame, lettered, armor = stageBlenderServer.session(steps)
+  # /wave is the client's animation id 75: S03 on a WLD model, WAVE_BA_1_<code> on an EQG one. dkf.eqg's line precedes
+  # dkf_anims.eqg's in OnDemandResources.txt, and the client keeps the first.
+  wavePose = wave["source"]["pose"]
+  assert {key: wavePose[key] for key in ("animation", "wldAnimation", "resource", "archive", "frame", "frameCount", "frameMilliseconds")} == {
+    "animation": "WAVE", "wldAnimation": "S03", "resource": "WAVE_BA_1_DKF", "archive": "dkf.eqg", "frame": 20, "frameCount": 44, "frameMilliseconds": 1333,
+  }
+  assert wave["dimensions"][2] > stand["dimensions"][2] + 0.5
+  # The default stand is STND; hairStyle attaches the client's DKF_HAIR_<nn> piece.
+  assert (stand["source"]["pose"]["resource"], stand["source"]["pieces"]) == ("STND_BA_1_DKF", ["dkf.mod", "DKF_HAIR_02"])
+  # The DLL lowers the root by ROffset, so the feet meet the ground below an origin standing avatarHeight up.
+  assert stand["location"][2] == round(stand["avatarHeight"], 3)
+  assert 0 <= standDetail["worldMinimum"][2] < 0.1
+  assert (walk["source"]["pose"]["animation"], walk["source"]["pose"]["resource"]) == ("WALK", "WALK_BA_1_GBN")
+  assert "has frames 0-43, not 44" in lateFrame
+  assert "its animations have no lettered variants" in lettered
+  assert "variation, headType, and textureSet are not read yet" in armor
 
 
 def testDoorsAndObjectsComeFromTheZonesArchives(stageBlenderServer):

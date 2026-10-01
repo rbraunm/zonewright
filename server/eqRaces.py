@@ -892,6 +892,11 @@ def avatarOffsets(clientRoot):
   return {section.upper(): float(settings[section]["ROffset"]) for section in settings.sections() if "ROffset" in settings[section]}
 
 
+def avatarOffset(clientRoot, code):
+  """moddat.ini's ROffset for a model, else 3.125: how far above the ground the client stands its unscaled origin."""
+  return avatarOffsets(clientRoot).get(code, defaultAvatarOffset)
+
+
 def avatarHeight(clientRoot, code, scale):
-  """How high the client stands a spawn's model origin above the ground (0x5a3f40): moddat.ini's ROffset for the model, else 3.125, times its scale."""
-  return avatarOffsets(clientRoot).get(code, defaultAvatarOffset) * scale
+  """How high the client stands a spawn's model origin above the ground (0x5a3f40): the model's ROffset times its scale."""
+  return avatarOffset(clientRoot, code) * scale

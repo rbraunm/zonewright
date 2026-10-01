@@ -10,9 +10,15 @@ modelVertexTypes = {
   3: numpy.dtype([("position", "<f4", 3), ("normal", "<f4", 3), ("color", "<u4"), ("uv", "<f4", 2), ("secondUV", "<f4", 2)]),
 }
 modelTriangleType = numpy.dtype([("indices", "<u4", 3), ("material", "<i4"), ("flags", "<u4")])
+boneType = numpy.dtype([
+  ("name", "<u4"), ("next", "<i4"), ("childCount", "<u4"), ("firstChild", "<i4"),
+  ("position", "<f4", 3), ("rotation", "<f4", 4), ("scale", "<f4", 3),
+])
+weightType = numpy.dtype([("count", "<u4"), ("influences", [("bone", "<i4"), ("weight", "<f4")], 4)])
+animationFrameType = numpy.dtype([("time", "<u4"), ("position", "<f4", 3), ("rotation", "<f4", 4), ("scale", "<f4", 3)])
+animationHeaderBytes = {1: 16, 2: 20}
 zoneRegionBytes = 40
-skinnedBoneBytes = 56
-skinnedWeightBytes = 36
+skinnedWeightBytes = weightType.itemsize
 zoneLightBytes = 32
 layerRecordBytes = 32
 
@@ -21,14 +27,25 @@ def readString(stringTable, offset):
   return stringTable[offset:stringTable.index(b"\0", offset)].decode("latin1")
 
 
+def readBones(modelBytes, position, boneCount, stringTable):
+  """Bone records: name, next sibling, child count, first child, and the bind transform (position, rotation x y z w, scale)."""
+  records = numpy.frombuffer(modelBytes, dtype=boneType, count=boneCount, offset=position)
+  return {
+    "names": [readString(stringTable, offset).upper() for offset in records["name"]],
+    "next": records["next"].astype(numpy.int64), "childCount": records["childCount"].astype(numpy.int64), "firstChild": records["firstChild"].astype(numpy.int64),
+    "position": records["position"].astype(numpy.float64), "rotation": records["rotation"].astype(numpy.float64), "scale": records["scale"].astype(numpy.float64),
+  }
+
+
 def parseModel(modelBytes, sourceName):
-  """EQGM (.mod) or EQGT (.ter) versions 1-3: materials, vertices, triangles. Bones and later sections are skipped."""
+  """EQGM (.mod) or EQGT (.ter) versions 1-3: materials, vertices, triangles, and for a skinned EQGM its bones and one weight record per vertex."""
   magic = modelBytes[:4]
+  boneCount = 0
   if magic == b"EQGT":
     version, stringLength, materialCount, vertexCount, triangleCount = struct.unpack_from("<5I", modelBytes, 4)
     position = 24
   elif magic == b"EQGM":
-    version, stringLength, materialCount, vertexCount, triangleCount, _ = struct.unpack_from("<6I", modelBytes, 4)
+    version, stringLength, materialCount, vertexCount, triangleCount, boneCount = struct.unpack_from("<6I", modelBytes, 4)
     position = 28
   else:
     raise ValueError(f"{sourceName}: magic {magic!r} is not EQGM or EQGT")
@@ -55,8 +72,15 @@ def parseModel(modelBytes, sourceName):
   vertices = numpy.frombuffer(modelBytes, dtype=vertexType, count=vertexCount, offset=position)
   position += vertexCount * vertexType.itemsize
   triangles = numpy.frombuffer(modelBytes, dtype=modelTriangleType, count=triangleCount, offset=position)
+  position += triangleCount * modelTriangleType.itemsize
   if triangleCount and int(triangles["indices"].max()) >= vertexCount:
     raise ValueError(f"{sourceName}: triangle index {int(triangles['indices'].max())} exceeds {vertexCount} vertices")
+  bones = weights = None
+  if boneCount:
+    if position + boneCount * boneType.itemsize + vertexCount * weightType.itemsize != len(modelBytes):
+      raise ValueError(f"{sourceName}: {boneCount} bones and {vertexCount} weight records do not fill its {len(modelBytes) - position} remaining bytes")
+    bones = readBones(modelBytes, position, boneCount, stringTable)
+    weights = numpy.frombuffer(modelBytes, dtype=weightType, count=vertexCount, offset=position + boneCount * boneType.itemsize)
   # Material -1 marks triangles with no material.
   if triangleCount and not (-1 <= int(triangles["material"].min()) and int(triangles["material"].max()) < materialCount):
     raise ValueError(f"{sourceName}: triangle materials span {int(triangles['material'].min())}..{int(triangles['material'].max())} with {materialCount} materials")
@@ -67,6 +91,8 @@ def parseModel(modelBytes, sourceName):
     "triangleMaterials": triangles["material"].astype(numpy.int64),
     "triangleFlags": triangles["flags"],
     "materials": materials,
+    "bones": bones,
+    "weights": weights,
   }
 
 
@@ -126,7 +152,7 @@ def placeVertices(vertices, placement):
 
 
 def parseSkinnedModel(modelBytes, sourceName):
-  """EQGS (.mds): materials and named pieces (body, heads), each with bind-pose vertices and triangles. Bones and weights are skipped."""
+  """EQGS (.mds): materials, bones, and named pieces (body, heads), each with bind-pose vertices, triangles, and weight records (none in the few files that store none)."""
   if modelBytes[:4] != b"EQGS":
     raise ValueError(f"{sourceName}: magic {modelBytes[:4]!r} is not EQGS")
   version, stringLength, materialCount, boneCount, pieceCount = struct.unpack_from("<5I", modelBytes, 4)
@@ -146,7 +172,8 @@ def parseSkinnedModel(modelBytes, sourceName):
       if propertyType == 2:
         properties[readString(stringTable, propertyNameOffset)] = readString(stringTable, propertyValue)
     materials.append({"name": readString(stringTable, nameOffset), "shader": readString(stringTable, shaderOffset), "properties": properties})
-  position += boneCount * skinnedBoneBytes
+  bones = readBones(modelBytes, position, boneCount, stringTable)
+  position += boneCount * boneType.itemsize
   vertexType = modelVertexTypes[version]
   # Most files store one 36-byte weight record per vertex; a few store none despite the header count. Only the layout
   # that consumes the file exactly is accepted.
@@ -160,7 +187,11 @@ def parseSkinnedModel(modelBytes, sourceName):
     vertices = numpy.frombuffer(modelBytes, dtype=vertexType, count=vertexCount, offset=position)
     position += vertexCount * vertexType.itemsize
     triangles = numpy.frombuffer(modelBytes, dtype=modelTriangleType, count=triangleCount, offset=position)
-    position += triangleCount * modelTriangleType.itemsize + weightCount * weightBytes
+    position += triangleCount * modelTriangleType.itemsize
+    weights = numpy.frombuffer(modelBytes, dtype=weightType, count=weightCount, offset=position) if weightBytes else None
+    position += weightCount * weightBytes
+    if weights is not None and weightCount != vertexCount:
+      raise ValueError(f"{sourceName}: piece has {weightCount} weight records for {vertexCount} vertices")
     if triangleCount and int(triangles["indices"].max()) >= vertexCount:
       raise ValueError(f"{sourceName}: piece triangle index {int(triangles['indices'].max())} exceeds {vertexCount} vertices")
     pieces.append({
@@ -170,8 +201,9 @@ def parseSkinnedModel(modelBytes, sourceName):
       "uvs": vertices["uv"].astype(numpy.float64),
       "triangles": triangles["indices"].astype(numpy.int64),
       "triangleMaterials": triangles["material"].astype(numpy.int64),
+      "weights": weights,
     })
-  return {"materials": materials, "pieces": pieces}
+  return {"materials": materials, "bones": bones, "pieces": pieces}
 
 
 def skinnedLayoutEnd(modelBytes, position, pieceCount, vertexType, weightBytes):
@@ -181,6 +213,29 @@ def skinnedLayoutEnd(modelBytes, position, pieceCount, vertexType, weightBytes):
     _, _, vertexCount, triangleCount, weightCount = struct.unpack_from("<5I", modelBytes, position)
     position += 20 + vertexCount * vertexType.itemsize + triangleCount * modelTriangleType.itemsize + weightCount * weightBytes
   return position
+
+
+def parseAnimation(animationBytes, sourceName):
+  """EQGA (.ani) versions 1-2: each bone's keyframes (time in milliseconds, translation, rotation x y z w, scale), by bone name. Of two
+  tracks for one bone the first plays: the client registers them in file order and d3dx9 refuses a name already registered."""
+  if animationBytes[:4] != b"EQGA":
+    raise ValueError(f"{sourceName}: magic {animationBytes[:4]!r} is not EQGA")
+  version, stringLength, trackCount = struct.unpack_from("<3I", animationBytes, 4)
+  if version not in animationHeaderBytes:
+    raise ValueError(f"{sourceName}: animation version {version} is not supported (only {sorted(animationHeaderBytes)})")
+  position = animationHeaderBytes[version]
+  stringTable = animationBytes[position:position + stringLength]
+  position += stringLength
+  tracks = {}
+  for _ in range(trackCount):
+    frameCount, nameOffset = struct.unpack_from("<2I", animationBytes, position)
+    position += 8
+    frames = numpy.frombuffer(animationBytes, dtype=animationFrameType, count=frameCount, offset=position)
+    position += frameCount * animationFrameType.itemsize
+    tracks.setdefault(readString(stringTable, nameOffset).upper(), frames)
+  if position != len(animationBytes):
+    raise ValueError(f"{sourceName}: {trackCount} tracks end at byte {position} of {len(animationBytes)}")
+  return tracks
 
 
 def parseLayers(layerBytes, sourceName):
