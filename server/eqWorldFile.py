@@ -9,6 +9,8 @@ stringHashKey = bytes([0x95, 0x3A, 0xC5, 0x2A, 0x95, 0x7A, 0x95, 0x6A])
 passablePolygonFlag = 0x10
 invisibleRenderMethod = 0
 fragmentAlignment = 4
+# Measured: every mesh in the client with mesh operations fits only 6-byte records.
+meshOperationBytes = 6
 
 
 def decodeString(encodedBytes):
@@ -68,6 +70,18 @@ class WorldFile:
       raise ValueError(f"{self.sourceName}: fragment {reference} is type {referenced.fragmentType:#x}, expected {expectedType:#x}")
     return referenced
 
+  def referenced(self, reference):
+    """A fragment reference: positive is a 1-based index, negative names the fragment through the string hash."""
+    if reference > 0:
+      if reference > len(self.fragments):
+        raise ValueError(f"{self.sourceName}: fragment reference {reference} out of range")
+      return self.fragments[reference - 1]
+    name = self.lookupName(reference)
+    named = [fragment for fragment in self.fragments if fragment.name == name]
+    if len(named) != 1:
+      raise ValueError(f"{self.sourceName}: name reference '{name}' matches {len(named)} fragments")
+    return named[0]
+
   def fragmentsOfType(self, fragmentType):
     return [fragment for fragment in self.fragments if fragment.fragmentType == fragmentType]
 
@@ -124,7 +138,7 @@ class WorldFile:
     polygons = numpy.frombuffer(body, dtype=numpy.dtype([("flags", "<u2"), ("indices", "<u2", 3)]), count=polygonCount, offset=position)
     position += polygonCount * 8 + vertexPieceCount * 4
     polygonTextures = numpy.frombuffer(body, dtype="<u2", count=polygonTextureCount * 2, offset=position).reshape(polygonTextureCount, 2)
-    position += polygonTextureCount * 4 + vertexTextureCount * 4 + meshOperationCount * 12
+    position += polygonTextureCount * 4 + vertexTextureCount * 4 + meshOperationCount * meshOperationBytes
     if not 0 <= len(body) - position < fragmentAlignment:
       raise ValueError(f"{self.sourceName}: mesh fragment {meshFragment.index} '{meshFragment.name}' used {position} of {len(body)} bytes")
     if int(polygonTextures[:, 0].sum()) != polygonCount:

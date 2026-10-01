@@ -5,26 +5,6 @@ async def freshScene(session):
   await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
 
 
-def testPlaceSpawnDrawsModelsAtTheirEQSize(stageBlenderServer):
-  async def steps(session):
-    await freshScene(session)
-    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [100, 100], "spacing": 10, "location": [0, 0, 0]})
-    darkElf = await session.expectSuccess("placeSpawn", {"modelCode": "DAF", "name": "darkElf", "location": [0, 0, 20], "headingDegrees": 0, "size": 5})
-    human = await session.expectSuccess("placeSpawn", {"modelCode": "HUF", "name": "human", "location": [10, 0, 0], "headingDegrees": 90, "size": 6, "snapToGround": False})
-    missing = await session.expectError("placeSpawn", {"modelCode": "ZZZ", "name": "nobody", "location": [0, 0, 0], "headingDegrees": 0, "size": 5})
-    return darkElf, human, missing
-
-  darkElf, human, missing = stageBlenderServer.session(steps)
-  assert darkElf["height"] == 5.0
-  assert darkElf["feet"] == [0.0, 0.0, 0.0]
-  assert darkElf["pose"] == "armsLowered"
-  assert darkElf["rotationDegrees"][2] == 90.0
-  assert human["height"] == 6.0
-  assert human["feet"] == [10.0, 0.0, 0.0]
-  assert human["rotationDegrees"][2] == 0.0
-  assert "No character archive globalzzz_chr.s3d" in missing
-
-
 def testScaleFigureWalksAheadUntilAWall(stageBlenderServer):
   async def steps(session):
     await freshScene(session)

@@ -11,7 +11,10 @@ modelVertexTypes = {
 }
 modelTriangleType = numpy.dtype([("indices", "<u4", 3), ("material", "<i4"), ("flags", "<u4")])
 zoneRegionBytes = 40
+skinnedBoneBytes = 56
+skinnedWeightBytes = 36
 zoneLightBytes = 32
+layerRecordBytes = 32
 
 
 def readString(stringTable, offset):
@@ -120,3 +123,77 @@ def placementMatrix(placement):
 
 def placeVertices(vertices, placement):
   return vertices @ placementMatrix(placement).T + placement["position"]
+
+
+def parseSkinnedModel(modelBytes, sourceName):
+  """EQGS (.mds): materials and named pieces (body, heads), each with bind-pose vertices and triangles. Bones and weights are skipped."""
+  if modelBytes[:4] != b"EQGS":
+    raise ValueError(f"{sourceName}: magic {modelBytes[:4]!r} is not EQGS")
+  version, stringLength, materialCount, boneCount, pieceCount = struct.unpack_from("<5I", modelBytes, 4)
+  if version not in supportedModelVersions:
+    raise ValueError(f"{sourceName}: skinned model version {version} is not supported (only {supportedModelVersions})")
+  position = 24
+  stringTable = modelBytes[position:position + stringLength]
+  position += stringLength
+  materials = []
+  for _ in range(materialCount):
+    _, nameOffset, shaderOffset, propertyCount = struct.unpack_from("<4I", modelBytes, position)
+    position += 16
+    properties = {}
+    for _ in range(propertyCount):
+      propertyNameOffset, propertyType, propertyValue = struct.unpack_from("<III", modelBytes, position)
+      position += 12
+      if propertyType == 2:
+        properties[readString(stringTable, propertyNameOffset)] = readString(stringTable, propertyValue)
+    materials.append({"name": readString(stringTable, nameOffset), "shader": readString(stringTable, shaderOffset), "properties": properties})
+  position += boneCount * skinnedBoneBytes
+  vertexType = modelVertexTypes[version]
+  # Most files store one 36-byte weight record per vertex; a few store none despite the header count. Only the layout
+  # that consumes the file exactly is accepted.
+  weightBytes = next((candidate for candidate in (skinnedWeightBytes, 0) if skinnedLayoutEnd(modelBytes, position, pieceCount, vertexType, candidate) == len(modelBytes)), None)
+  if weightBytes is None:
+    raise ValueError(f"{sourceName}: no known skinned model layout matches its {len(modelBytes)} bytes")
+  pieces = []
+  for _ in range(pieceCount):
+    isMain, nameOffset, vertexCount, triangleCount, weightCount = struct.unpack_from("<5I", modelBytes, position)
+    position += 20
+    vertices = numpy.frombuffer(modelBytes, dtype=vertexType, count=vertexCount, offset=position)
+    position += vertexCount * vertexType.itemsize
+    triangles = numpy.frombuffer(modelBytes, dtype=modelTriangleType, count=triangleCount, offset=position)
+    position += triangleCount * modelTriangleType.itemsize + weightCount * weightBytes
+    if triangleCount and int(triangles["indices"].max()) >= vertexCount:
+      raise ValueError(f"{sourceName}: piece triangle index {int(triangles['indices'].max())} exceeds {vertexCount} vertices")
+    pieces.append({
+      "name": readString(stringTable, nameOffset),
+      "isMain": bool(isMain),
+      "vertices": vertices["position"].astype(numpy.float64),
+      "uvs": vertices["uv"].astype(numpy.float64),
+      "triangles": triangles["indices"].astype(numpy.int64),
+      "triangleMaterials": triangles["material"].astype(numpy.int64),
+    })
+  return {"materials": materials, "pieces": pieces}
+
+
+def skinnedLayoutEnd(modelBytes, position, pieceCount, vertexType, weightBytes):
+  for _ in range(pieceCount):
+    if position + 20 > len(modelBytes):
+      return None
+    _, _, vertexCount, triangleCount, weightCount = struct.unpack_from("<5I", modelBytes, position)
+    position += 20 + vertexCount * vertexType.itemsize + triangleCount * modelTriangleType.itemsize + weightCount * weightBytes
+  return position
+
+
+def parseLayers(layerBytes, sourceName):
+  """EQGL (.lay): named texture-set layers, each a 32-byte record (name, five texture slots, two more fields) after the string table."""
+  if layerBytes[:4] != b"EQGL":
+    raise ValueError(f"{sourceName}: magic {layerBytes[:4]!r} is not EQGL")
+  _, stringLength, layerCount = struct.unpack_from("<3I", layerBytes, 4)
+  stringTable = layerBytes[16:16 + stringLength]
+  position = 16 + stringLength
+  if len(layerBytes) - position != layerCount * layerRecordBytes:
+    raise ValueError(f"{sourceName}: {len(layerBytes) - position} bytes of layer records do not fit {layerCount} layers of {layerRecordBytes}")
+  layers = {}
+  for index in range(layerCount):
+    nameOffset, *textureOffsets = struct.unpack_from("<6I", layerBytes, position + index * layerRecordBytes)
+    layers[readString(stringTable, nameOffset).upper()] = [readString(stringTable, offset).lower() for offset in textureOffsets if offset != 0xFFFFFFFF]
+  return layers

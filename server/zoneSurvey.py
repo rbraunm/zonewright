@@ -3,7 +3,6 @@ import hashlib
 import json
 import logging
 import multiprocessing
-import os
 import struct
 from pathlib import Path
 
@@ -16,7 +15,6 @@ import zoneSources
 
 logger = logging.getLogger(__name__)
 cacheFormat = 2
-discoveryExtensions = (".s3d", ".eqg", ".zon")
 sourcePathKeys = ("archive", "zonPath")
 hashChunkBytes = 1024 * 1024
 
@@ -77,19 +75,8 @@ class SurveyCache:
     self.cachePath.write_text(json.dumps({"cacheFormat": cacheFormat, "variants": self.variants, "fileHashes": self.fileHashes, "discovery": self.discovery}, indent=1), encoding="utf-8")
 
 
-def clientListingFingerprint(clientRoot):
-  """Name, size, and modification time of every file zone discovery reads; any added, removed, or changed archive changes it."""
-  digest = hashlib.sha256()
-  for entry in sorted(os.scandir(clientRoot), key=lambda candidate: candidate.name.lower()):
-    name = entry.name.lower()
-    if entry.is_file() and (name.endswith(discoveryExtensions) or name.endswith("_assets.txt")):
-      status = entry.stat()
-      digest.update(f"{name}|{status.st_size}|{status.st_mtime_ns}\n".encode("utf-8"))
-  return digest.hexdigest()
-
-
 def discoveredVariants(clientRoot, cache):
-  fingerprint = clientListingFingerprint(clientRoot)
+  fingerprint = zoneSources.clientListingFingerprint(clientRoot)
   if cache.discovery is not None and cache.discovery["clientRoot"] == str(clientRoot) and cache.discovery["listingFingerprint"] == fingerprint:
     return {key: {name: Path(value) if name in sourcePathKeys else value for name, value in source.items()} for key, source in cache.discovery["variants"].items()}
   variants = zoneSources.discoverZones(clientRoot)

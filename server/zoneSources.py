@@ -1,3 +1,4 @@
+import hashlib
 import os
 from pathlib import Path
 
@@ -5,6 +6,8 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 import eqArchive
 import eqgFiles
+
+listingExtensions = (".s3d", ".eqg", ".zon")
 
 
 def resolveClientRoot():
@@ -17,38 +20,73 @@ def resolveClientRoot():
   return clientPath
 
 
+def clientListingFingerprint(clientRoot):
+  """Name, size, and modification time of every archive, zone file, and asset list; any added, removed, or changed file changes it."""
+  digest = hashlib.sha256()
+  for entry in sorted(os.scandir(clientRoot), key=lambda candidate: candidate.name.lower()):
+    name = entry.name.lower()
+    if entry.is_file() and (name.endswith(listingExtensions) or name.endswith("_assets.txt")):
+      status = entry.stat()
+      digest.update(f"{name}|{status.st_size}|{status.st_mtime_ns}\n".encode("utf-8"))
+  return digest.hexdigest()
+
+
+def wldVariants(archivePath):
+  zoneName = archivePath.stem.lower()
+  # Character, object, and light archives (name_chr.s3d and so on) never hold a zone; some have malformed directories.
+  if "_" in zoneName:
+    return {}
+  entries = eqArchive.EQArchive(archivePath).entries
+  # Equipment and sky archives also carry a same-named .wld; only zones pair it with objects.wld or lights.wld.
+  if f"{zoneName}.wld" in entries and ("objects.wld" in entries or "lights.wld" in entries):
+    return {f"{zoneName}:wld": {"zone": zoneName, "format": "wld", "archive": archivePath}}
+  return {}
+
+
+def eqgVariants(archivePath):
+  zoneName = archivePath.stem.lower()
+  archive = eqArchive.EQArchive(archivePath)
+  variants = {}
+  for entryName in archive.names():
+    if not entryName.endswith(".zon"):
+      continue
+    zonBytes = archive.read(entryName)
+    if zonBytes[:5] == b"EQTZP" and entryName[:-4] + ".dat" in archive.entries:
+      variants[f"{zoneName}:eqtzp"] = {"zone": zoneName, "format": "eqtzp", "archive": archivePath, "zon": entryName}
+    elif zonBytes[:4] == b"EQGZ":
+      variants[f"{zoneName}:eqgz"] = {"zone": zoneName, "format": "eqgz", "archive": archivePath, "zon": entryName}
+  return variants
+
+
+def looseVariants(clientRoot, zonPath):
+  zoneName = zonPath.stem.lower()
+  archivePath = clientRoot / f"{zonPath.stem}.eqg"
+  if zonPath.read_bytes()[:4] == b"EQGZ" and archivePath.is_file():
+    return {f"{zoneName}:eqgz:loose": {"zone": zoneName, "format": "eqgz", "archive": archivePath, "zonPath": zonPath}}
+  return {}
+
+
 def discoverZones(clientRoot):
   """Every zone variant in the client, keyed zone:format; a zone can ship both a classic and an EQG version."""
   variants = {}
-
-  def addVariant(zoneName, zoneFormat, source, keySuffix=""):
-    variants[f"{zoneName}:{zoneFormat}{keySuffix}"] = {"zone": zoneName, "format": zoneFormat} | source
-
   for archivePath in sorted(clientRoot.glob("*.s3d")):
-    zoneName = archivePath.stem.lower()
-    # Character, object, and light archives (name_chr.s3d and so on) never hold a zone; some have malformed directories.
-    if "_" in zoneName:
-      continue
-    entries = eqArchive.EQArchive(archivePath).entries
-    # Equipment and sky archives also carry a same-named .wld; only zones pair it with objects.wld or lights.wld.
-    if f"{zoneName}.wld" in entries and ("objects.wld" in entries or "lights.wld" in entries):
-      addVariant(zoneName, "wld", {"archive": archivePath})
+    variants |= wldVariants(archivePath)
   for archivePath in sorted(clientRoot.glob("*.eqg")):
-    zoneName = archivePath.stem.lower()
-    archive = eqArchive.EQArchive(archivePath)
-    for entryName in archive.names():
-      if not entryName.endswith(".zon"):
-        continue
-      zonBytes = archive.read(entryName)
-      if zonBytes[:5] == b"EQTZP" and entryName[:-4] + ".dat" in archive.entries:
-        addVariant(zoneName, "eqtzp", {"archive": archivePath, "zon": entryName})
-      elif zonBytes[:4] == b"EQGZ":
-        addVariant(zoneName, "eqgz", {"archive": archivePath, "zon": entryName})
+    variants |= eqgVariants(archivePath)
   for zonPath in sorted(clientRoot.glob("*.zon")):
-    zoneName = zonPath.stem.lower()
-    archivePath = clientRoot / f"{zonPath.stem}.eqg"
-    if zonPath.read_bytes()[:4] == b"EQGZ" and archivePath.is_file():
-      addVariant(zoneName, "eqgz", {"archive": archivePath, "zonPath": zonPath}, ":loose")
+    variants |= looseVariants(clientRoot, zonPath)
+  return variants
+
+
+def zoneVariants(clientRoot, zoneName):
+  """The variants of one zone, reading only its own files."""
+  variants = {}
+  for finder, path in ((wldVariants, clientRoot / f"{zoneName}.s3d"), (eqgVariants, clientRoot / f"{zoneName}.eqg")):
+    if path.is_file():
+      variants |= finder(path)
+  zonPath = clientRoot / f"{zoneName}.zon"
+  if zonPath.is_file():
+    variants |= looseVariants(clientRoot, zonPath)
   return variants
 
 

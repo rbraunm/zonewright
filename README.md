@@ -37,7 +37,7 @@ Performance settings are discovered per machine, never configured by hand. `sync
 
 ## Scale
 
-Blender scenes are authored at **1 Blender unit = 1 EQ unit**, Z up, so values in Blender match `/loc`, client models, and zone files directly. A player is about 6 units tall: the client's Drakkin male mesh (`dkm.mod`) stands 5.96 units, and EQEmu gives human males a default size of 6.0. Eye-level views put the eye 5.5 units above the ground.
+Blender scenes are authored at **1 Blender unit = 1 EQ unit**, Z up, in the zone files' own axes, so client models and zone files load unchanged. The server, and so the live dumps, give positions as (x, y, z) with x and y swapped against the zone files: Blender = (y, x, z), measured by every dumped door, ground object, and spawn landing on its zone's geometry only that way. `/loc` prints the server's y, x, z, which is Blender's x, y, z in order. A player is about 6 units tall: the client's Drakkin male mesh (`dkm.mod`) stands 5.96 units, and EQEmu gives human males a default size of 6.0. Eye-level views put the eye 5.5 units above the ground.
 
 EQGZI's Blender exporter (`xackery/eqgzi` `out/convert.py`) works at 1 Blender unit = 2 EQ units and writes placements as EQ = (-Blender.y, Blender.x, Blender.z) x 2. Phase 2 export applies that conversion; nothing in Phase 1 does.
 
@@ -80,7 +80,9 @@ Edits address parts of a mesh with selectors instead of an interactive selection
 | | `projectUVs` | Planar or box projection at a set number of world units per texture repeat |
 | Dressing | `placeOnSurface` | Drops objects onto the surface below, optionally aligned to its normal |
 | | `scatterInRegion` | Spaced, linked copies over a circle or polygon by density, with yaw and scale ranges, a slope limit, and objects to keep clear of; deterministic per seed |
-| | `placeSpawn` | An EverQuest character model drawn at its EQ size, feet on the ground; see the `render-spawn` skill |
+| | `placeSpawn` | An EverQuest character drawn at its EQ size with the client's appearance rules, feet on the ground; see the `render-spawn` skill |
+| | `placeDoor` | An EverQuest door (any server-placed model: doors, lifts, teleport pads, books, furniture) at its position and scale; see the `render-door` skill |
+| | `placeObject` | An EverQuest ground object (kilns, looms, dropped items, housing pieces) at its position and scale; see the `render-object` skill |
 | | `markAsset` / `linkKitAsset` | Marks kit collections as assets; links and places them from a kit .blend |
 | Inspecting | `getObjectDetail` | Transform, bounds, counts, faces per material, UV density, modifiers, vertex groups |
 | | `measure` | Surface heights, distances, height changes, and slopes between points |
@@ -98,3 +100,37 @@ The EQ preview renders the open scene's objects (its own lights and cameras excl
 | `surveyZones` | Technical lane of the zone survey: measured groups (`dimensions`, `surfaces`, `verticality`, `content`, `regions`) for the named zones or all of them, sorted by any numeric field. Cached per variant by source-file SHA-256 and per-group version, so changing one group's method recomputes only that group. As in git, a file is re-hashed only when its size or modification time changes (`verifyHashes` forces it), and zone discovery is reused until the client folder's listing changes. Stale zones are measured in parallel worker processes: a full cold survey takes about 80 s, a warm one 0.2 s. A variant whose files cannot be parsed is reported with its error |
 | `getZoneSurvey` | Every survey group for one zone, both lanes (measured and interpreted) |
 | `getZoneNotes` | Lists a zone's Brewall labels: text, map position, and layer file |
+| `findModel` | Where the client finds a model in a zone: every definition by link tier, unlinked archives that also define it, and the one placement uses (see Client models) |
+
+### Client models
+
+Spawns, doors, objects, and the scale figure come from the client's own models, found the way the client finds them: only through a file or rule of the client's that links an archive to the zone, never by matching a name in an unrelated archive. `findModel` shows the whole search for one model. The tiers, most specific first:
+
+1. **The zone's archives, in the client's load order** (read from `eqgame.exe`):
+   - `<zone>_pre_chr.txt` and `<zone>_chr.txt`. Each line is `code,source`: a source that starts with the code loads `source.eqg` (else `source.s3d`); any other source loads only that code's actor from `source.s3d`.
+   - For classic zones, `<zone>_obj2`, `<zone>_obj`, the zone, `<zone>_2_obj`, `<zone>_chr2`, `<zone>2_chr` (only for the zones `eqgame.exe` names), and `<zone>_chr`.
+   - `poknowledge_obj3.eqg`, for the Plane of Knowledge only.
+   - The `.eqg` archives in `<zone>_assets.txt`, and, for EQG zones, the zone `.eqg`.
+2. **The player models `eqclient.ini` enables:** `global<code>_chr2` and `global<code>_chr` while `UseLuclin<Race><Gender>` is on, so the Luclin dark elf wins over `global_chr.s3d`'s classic one.
+3. **`Resources\GlobalLoad.txt`:** equipment, `global*_chr`, and shared object archives.
+4. **`Resources\OnDemandResources.txt`:** EQG models (`EQGM`) and skinned models (`EQGS`) loaded when first needed.
+
+The first tier that defines the model wins. Two definitions in that tier (IT67 is in both `equipment-01.eqg` and `gequip.s3d`) are an error until `source` picks one. Textures come from the model's own archive or, for a zone's EQG model, from the zone's other EQG archives. A texture none of them holds is missing for the client too: its faces draw magenta and every placement lists it in `missingTextures`.
+
+Supported models:
+
+- EQG static (`.mod`) and skinned (`.mds`) models.
+- WLD static actors.
+- WLD skeletal actors: skinned meshes and bone-attached meshes, posed at frame 0. Particle clouds are counted, not drawn.
+
+Characters take the client's appearance rules (from `EQGraphicsDX9.dll`):
+
+- **Pieces:** the body piece `<code><nn>` for `variation` and the head piece `<code>HE<nn>` for `headType`, keeping the default when the model lacks the piece.
+- **Texture sets:** `.lay` layers `C_<code>_S<set>_M<n>` for EQG models, and `<code><part><set><nn>_MDF` materials for WLD ones.
+
+All four placement paths (`placeSpawn`, `placeDoor`, `placeObject`, and the scale figure) build through the same code. A model is indexed and built once:
+
+- **Index:** `models\modelIndex.json` covers every archive, rebuilt when the client listing changes.
+- **Built models:** `models\built\<model>@<archive>[@appearance]`, rebuilt when a source archive changes.
+
+Placements take Blender values (`location`, `headingDegrees`) or the server's (`eqLocation`, `eqHeading` in 512ths of a turn). The heading becomes a turn of -heading about Z, following the EQEmu heading formula through the axis swap. Measured doors confirm there is no quarter-turn offset; the turn direction is to be confirmed against client screenshots.

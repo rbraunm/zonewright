@@ -10,6 +10,21 @@ import bridgeMeshAccess
 import bridgeObjects
 
 alphaThreshold = 0.5
+missingTextureColor = (1.0, 0.0, 1.0, 1.0)
+
+
+def missingTextureMaterial(textureName):
+  """Faces whose texture no linked archive holds: flat magenta, so the gap is visible in every render."""
+  materialName = f"eq_missing_{textureName}"
+  material = bpy.data.materials.get(materialName)
+  if material is None:
+    material = bpy.data.materials.new(materialName)
+    material.use_nodes = True
+    shader = material.node_tree.nodes["Principled BSDF"]
+    shader.inputs["Base Color"].default_value = missingTextureColor
+    shader.inputs["Roughness"].default_value = 1.0
+    shader.inputs["Specular IOR Level"].default_value = 0.0
+  return material
 
 
 def modelMaterial(folder, textureName, cutout):
@@ -52,13 +67,14 @@ def buildModelMesh(folder, meshName):
   mesh.polygons.foreach_set("loop_total", numpy.full(len(triangles), 3, dtype=numpy.int32))
   uvLayer = mesh.uv_layers.new(name="UVMap")
   uvLayer.data.foreach_set("uv", uvs[triangles.ravel()].astype(numpy.float32).ravel())
+  missing = {str(name) for name in data["missingTextures"]}
   slots = {}
   materialIndices = numpy.empty(len(triangles), dtype=numpy.int32)
   for index, (textureName, cutout) in enumerate(zip(data["textureNames"], data["cutouts"])):
     key = (str(textureName), bool(cutout))
     if key not in slots:
       slots[key] = len(slots)
-      mesh.materials.append(modelMaterial(folder, *key))
+      mesh.materials.append(missingTextureMaterial(key[0]) if key[0] in missing else modelMaterial(folder, *key))
     materialIndices[index] = slots[key]
   mesh.polygons.foreach_set("material_index", materialIndices)
   mesh.update()
@@ -66,29 +82,30 @@ def buildModelMesh(folder, meshName):
   return mesh
 
 
-def modelObject(folder, name, scale, footHeight, location, headingDegrees):
-  """An object whose feet stand at `location`, turned so the model's front (+X) faces `headingDegrees` (0 = +Y, clockwise)."""
+def modelObject(folder, name, scale, location, rotationDegrees):
+  """An object built from a model cache, scaled, turned rotationDegrees about Z (counter-clockwise from above), its model origin at `location`."""
   modelObjectInstance = bpy.data.objects.new(name, buildModelMesh(folder, name))
   modelObjectInstance.scale = (scale, scale, scale)
-  modelObjectInstance.rotation_euler = (0, 0, math.radians(90 - headingDegrees))
-  modelObjectInstance.location = mathutils.Vector(location) - mathutils.Vector((0, 0, footHeight * scale))
+  modelObjectInstance.rotation_euler = (0, 0, math.radians(rotationDegrees))
+  modelObjectInstance.location = location
   return modelObjectInstance
 
 
-def placeSpawn(modelFolder, name, location, headingDegrees, scale, footHeight, snapToGround, collection):
+def placeModel(modelFolder, name, location, rotationDegrees, scale, footHeight, snapToGround, collection):
+  """Place a cached EQ model with its anchor at `location`: the feet (model height footHeight) for a spawn, the model origin (footHeight 0) for a door or object. snapToGround first drops the anchor to the surface below."""
   bridgeObjects.requireNewName(name)
-  standAt = mathutils.Vector(location)
+  anchor = mathutils.Vector(location)
   if snapToGround:
-    hit = bridgeMeshAccess.rayCast(standAt + mathutils.Vector((0, 0, 1)), (0, 0, -1), 1000)
+    hit = bridgeMeshAccess.rayCast(anchor + mathutils.Vector((0, 0, 1)), (0, 0, -1), 1000)
     if hit is None:
-      raise ValueError(f"No ground below {list(location)} for spawn '{name}'")
-    standAt = hit[0]
-  spawn = modelObject(modelFolder, name, scale, footHeight, standAt, headingDegrees)
-  bridgeObjects.targetCollection(collection).objects.link(spawn)
+      raise ValueError(f"No ground below {list(location)} for '{name}'")
+    anchor = hit[0]
+  placed = modelObject(modelFolder, name, scale, anchor - mathutils.Vector((0, 0, footHeight * scale)), rotationDegrees)
+  bridgeObjects.targetCollection(collection).objects.link(placed)
   bpy.context.view_layer.update()
-  return bridgeObjects.describeTransform(spawn) | {"feet": bridgeObjects.roundVector(standAt), "height": round(float(spawn.dimensions.z), 3)}
+  return bridgeObjects.describeTransform(placed) | {"anchor": bridgeObjects.roundVector(anchor), "dimensions": bridgeObjects.roundVector(placed.dimensions)}
 
 
 commands = {
-  "placeSpawn": (placeSpawn, True),
+  "placeModel": (placeModel, True),
 }

@@ -131,7 +131,9 @@ class PreviewScene:
     return (location, normal, faceIndex, hitObject) if hit else None
 
   def addFigure(self, groundPoint, figureModel, facingHeadingDegrees):
-    figure = bridgeModels.modelObject(figureModel["folder"], previewName + "Figure", figureModel["scale"], figureModel["footHeight"], groundPoint, facingHeadingDegrees)
+    """The figure model faces +X; facingHeadingDegrees is 0 = +Y, clockwise."""
+    feet = groundPoint - mathutils.Vector((0, 0, figureModel["footHeight"] * figureModel["scale"]))
+    figure = bridgeModels.modelObject(figureModel["folder"], previewName + "Figure", figureModel["scale"], feet, 90 - facingHeadingDegrees)
     return self.addObject(figure)
 
   def remove(self):
