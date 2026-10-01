@@ -13,6 +13,7 @@ def testMissingBlenderReportsMissing(stageServer):
       "state": "missing",
     },
     "extensions": {"pinned": {}, "unpinned": {}},
+    "bridge": {"state": "notStarted"},
   }
 
 

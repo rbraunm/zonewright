@@ -1,9 +1,13 @@
+import atexit
+import datetime
+
 import anyio.from_thread
 import anyio.to_thread
 from mcp.server import MCPServer
-from mcp.server.mcpserver import Context
+from mcp.server.mcpserver import Context, Image
 from mcp.server.mcpserver.exceptions import ToolError
 
+import blenderBridge
 import extensionCatalog
 import toolingLog
 import toolingManifest
@@ -15,10 +19,12 @@ import zoneSurvey
 
 toolingRoot = toolingStatus.resolveToolingRoot()
 toolingLog.configureLogging(toolingRoot)
+bridge = blenderBridge.BlenderBridge(toolingRoot)
+atexit.register(bridge.stop)
 
 server = MCPServer(
   "zonewright",
-  instructions="Manages the pinned Blender and extensions zonewright uses to build EverQuest zones.",
+  instructions="Hands and eyes in a headless Blender for building EverQuest zones, plus the pinned tooling and a survey of the client's zones.",
 )
 
 
@@ -29,7 +35,18 @@ def progressReporter(context):
 
 
 async def runSync(context):
+  await anyio.to_thread.run_sync(bridge.stopForSync)
   return await anyio.to_thread.run_sync(toolingSync.syncTooling, toolingRoot, progressReporter(context))
+
+
+async def callBridge(context, command, arguments):
+  return await anyio.to_thread.run_sync(bridge.call, command, arguments, progressReporter(context))
+
+
+def newRenderPath():
+  rendersPath = toolingRoot / "renders"
+  rendersPath.mkdir(parents=True, exist_ok=True)
+  return rendersPath / (datetime.datetime.now(datetime.UTC).strftime("%Y%m%d-%H%M%S-%f") + ".png")
 
 
 def sortValue(row, sortPath):
@@ -43,8 +60,8 @@ def sortValue(row, sortPath):
 
 @server.tool()
 def getToolingStatus():
-  """Compare installed Blender and extensions with the pins in toolingManifest.json."""
-  return toolingStatus.getToolingStatus(toolingRoot)
+  """Compare installed Blender and extensions with the pins in toolingManifest.json, and report the bridge."""
+  return toolingStatus.getToolingStatus(toolingRoot) | {"bridge": bridge.status()}
 
 
 @server.tool()
@@ -56,6 +73,7 @@ async def syncTooling(context: Context):
 @server.tool()
 async def addExtension(extensionID: str, context: Context, version: str | None = None):
   """Pin the newest extensions.blender.org release of an extension compatible with the pinned Blender, then sync."""
+  await anyio.to_thread.run_sync(bridge.stopForSync)
   manifest = toolingManifest.loadManifest()
   pin = extensionCatalog.resolveExtension(extensionID, manifest["blender"]["version"])
   if version is not None and version != pin["version"]:
@@ -68,6 +86,7 @@ async def addExtension(extensionID: str, context: Context, version: str | None =
 @server.tool()
 async def removeExtension(extensionID: str, context: Context):
   """Unpin an extension, then sync to uninstall it."""
+  await anyio.to_thread.run_sync(bridge.stopForSync)
   manifest = toolingManifest.loadManifest()
   if extensionID not in manifest["extensions"]:
     raise ToolError(f"Extension '{extensionID}' is not pinned; pinned: {sorted(manifest['extensions'])}")
@@ -117,6 +136,71 @@ def getZoneNotes(zone: str):
   if not zoneSurvey.brewallMapPaths(clientRoot, zone.lower()):
     raise ToolError(f"No Brewall map files for zone '{zone}' in {clientRoot / 'maps' / 'Brewall'}")
   return {"zone": zone, "labels": zoneSurvey.readBrewallLabels(clientRoot, zone.lower())}
+
+
+@server.tool()
+async def runPython(context: Context, code: str):
+  """Run Python in the headless Blender's persistent namespace (bpy, bmesh, mathutils, math). Set `result` to return a JSON value."""
+  return await callBridge(context, "runPython", {"code": code})
+
+
+@server.tool()
+async def newFile(context: Context, discardUnsavedChanges: bool = False):
+  """Start an empty scene. Refuses when the open file has unsaved changes unless they are explicitly discarded."""
+  return await callBridge(context, "newFile", {"discardUnsavedChanges": discardUnsavedChanges})
+
+
+@server.tool()
+async def openFile(context: Context, path: str, discardUnsavedChanges: bool = False):
+  """Open a .blend by absolute path. Refuses when the open file has unsaved changes unless they are explicitly discarded."""
+  return await callBridge(context, "openFile", {"path": path, "discardUnsavedChanges": discardUnsavedChanges})
+
+
+@server.tool()
+async def saveFile(context: Context, path: str | None = None):
+  """Save the open file, or save it as an absolute path. Textures and libraries become relative paths; packed or generated images are refused."""
+  return await callBridge(context, "saveFile", {"path": path})
+
+
+@server.tool()
+async def getSceneSummary(context: Context, objectLimit: int = 200):
+  """The open scene: file status, zone properties, objects (up to objectLimit), collections, cameras, materials, and images."""
+  return await callBridge(context, "getSceneSummary", {"objectLimit": objectLimit})
+
+
+@server.tool()
+async def setZoneProperties(
+  context: Context,
+  fogColor: list[float] | None = None,
+  fogStart: float | None = None,
+  fogEnd: float | None = None,
+  sunAzimuthDegrees: float | None = None,
+  sunElevationDegrees: float | None = None,
+  sunColor: list[float] | None = None,
+  sunStrength: float | None = None,
+  ambientColor: list[float] | None = None,
+):
+  """Set the zone's EQ preview properties stored in the .blend: fog color and distances (fogEnd is also the far clip), sun direction (azimuth 0 = +Y, clockwise), sun color and strength, ambient color."""
+  updates = {
+    "fogColor": fogColor, "fogStart": fogStart, "fogEnd": fogEnd,
+    "sunAzimuthDegrees": sunAzimuthDegrees, "sunElevationDegrees": sunElevationDegrees,
+    "sunColor": sunColor, "sunStrength": sunStrength, "ambientColor": ambientColor,
+  }
+  return await callBridge(context, "setZoneProperties", {"updates": {key: value for key, value in updates.items() if value is not None}})
+
+
+@server.tool()
+async def renderView(context: Context, view: dict):
+  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y,z], "headingDegrees": h, "pitchDegrees": p} (heading 0 = +Y, clockwise; eye 5.5 above the ground; adds a 6-unit scale figure)."""
+  outputPath = newRenderPath()
+  description = await callBridge(context, "renderView", {"view": view, "outputPath": str(outputPath)})
+  return [Image(data=outputPath.read_bytes(), format="png"), description]
+
+
+@server.tool()
+async def pick(context: Context, view: dict, pixel: list[int]):
+  """What is under a pixel ([x, y] from the top-left of the 960x540 render) of a view: object, world position, normal, material, distance."""
+  return await callBridge(context, "pick", {"view": view, "pixel": pixel})
 
 
 if __name__ == "__main__":
