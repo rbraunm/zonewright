@@ -1,43 +1,32 @@
-import json
-import sys
-from pathlib import Path
-
-import anyio
-from mcp import Client, StdioServerParameters
-
-repositoryRoot = Path(__file__).resolve().parent.parent
-serverPath = repositoryRoot / "server" / "zonewrightServer.py"
-pinnedBlenderVersion = json.loads((repositoryRoot / "toolingManifest.json").read_text(encoding="ascii"))["blender"]["version"]
+from conftest import pinnedBlender
 
 
-async def callGetToolingStatus(localAppData):
-  serverParameters = StdioServerParameters(
-    command=sys.executable,
-    args=[str(serverPath)],
-    env={"LOCALAPPDATA": str(localAppData)},
-  )
-  async with Client(serverParameters) as client:
-    result = await client.call_tool("getToolingStatus")
-  assert result.is_error is False
-  assert len(result.content) == 1
-  return json.loads(result.content[0].text)
-
-
-def testMissingBlenderReportsMissing(tmp_path):
-  toolingRoot = tmp_path / "zonewright"
-  assert anyio.run(callGetToolingStatus, tmp_path) == {
-    "toolingRoot": str(toolingRoot),
+def testMissingBlenderReportsMissing(stageServer):
+  server = stageServer({"blender": pinnedBlender, "extensions": {}})
+  status, _ = server.callToolExpectingSuccess("getToolingStatus")
+  assert status == {
+    "toolingRoot": str(server.toolingRoot),
     "blender": {
-      "pinnedVersion": pinnedBlenderVersion,
-      "executablePath": str(toolingRoot / "blender" / pinnedBlenderVersion / "blender.exe"),
+      "pinnedVersion": pinnedBlender["version"],
+      "executablePath": str(server.toolingRoot / "blender" / pinnedBlender["version"] / "blender.exe"),
       "installedVersions": [],
       "state": "missing",
     },
+    "extensions": {"pinned": {}, "unpinned": {}},
   }
 
 
-def testVersionFolderWithoutExecutableReportsBroken(tmp_path):
-  (tmp_path / "zonewright" / "blender" / pinnedBlenderVersion).mkdir(parents=True)
-  blenderStatus = anyio.run(callGetToolingStatus, tmp_path)["blender"]
+def testVersionFolderWithoutExecutableReportsBroken(stageServer):
+  server = stageServer({"blender": pinnedBlender, "extensions": {}})
+  (server.toolingRoot / "blender" / pinnedBlender["version"]).mkdir(parents=True)
+  blenderStatus = server.callToolExpectingSuccess("getToolingStatus")[0]["blender"]
   assert blenderStatus["state"] == "broken"
-  assert blenderStatus["installedVersions"] == [pinnedBlenderVersion]
+  assert blenderStatus["reason"] == "blender.exe is missing"
+  assert blenderStatus["installedVersions"] == [pinnedBlender["version"]]
+
+
+def testPinnedExtensionWithoutBlenderReportsMissing(stageServer, buildExtensionPin):
+  probePin = buildExtensionPin("zonewrightProbe", "1.0.0")
+  server = stageServer({"blender": pinnedBlender, "extensions": {"zonewrightProbe": probePin}})
+  extensionsStatus = server.callToolExpectingSuccess("getToolingStatus")[0]["extensions"]
+  assert extensionsStatus == {"pinned": {"zonewrightProbe": {"pinnedVersion": "1.0.0", "state": "missing"}}, "unpinned": {}}

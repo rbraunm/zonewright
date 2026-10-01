@@ -1,15 +1,9 @@
-import json
 import os
-import re
-import subprocess
+import tomllib
 from pathlib import Path
 
-repositoryRoot = Path(__file__).resolve().parent.parent
-manifestPath = repositoryRoot / "toolingManifest.json"
-versionPattern = re.compile(r"\d+\.\d+\.\d+")
-sha256Pattern = re.compile(r"[0-9a-f]{64}")
-blenderVersionLinePattern = re.compile(r"^Blender (\d+\.\d+\.\d+)", re.MULTILINE)
-blenderVersionTimeoutSeconds = 120
+import blenderProcess
+import toolingManifest
 
 
 def resolveToolingRoot():
@@ -19,39 +13,19 @@ def resolveToolingRoot():
   return Path(localAppData) / "zonewright"
 
 
-def loadManifest():
-  manifest = json.loads(manifestPath.read_text(encoding="ascii"))
-  blenderVersion = manifest["blender"]["version"]
-  if not versionPattern.fullmatch(blenderVersion):
-    raise ValueError(f"{manifestPath.name}: blender.version '{blenderVersion}' is not MAJOR.MINOR.PATCH")
-  blenderUrl = manifest["blender"]["url"]
-  if not isinstance(blenderUrl, str) or not blenderUrl:
-    raise ValueError(f"{manifestPath.name}: blender.url must be a non-empty string")
-  blenderSha256 = manifest["blender"]["sha256"]
-  if not sha256Pattern.fullmatch(blenderSha256):
-    raise ValueError(f"{manifestPath.name}: blender.sha256 '{blenderSha256}' is not 64 lowercase hex digits")
-  return manifest
+def blenderInstallPath(toolingRoot, version):
+  return toolingRoot / "blender" / version
 
 
-def readBlenderVersion(executablePath):
-  completed = subprocess.run(
-    [str(executablePath), "--version"],
-    capture_output=True,
-    encoding="utf-8",
-    timeout=blenderVersionTimeoutSeconds,
-  )
-  if completed.returncode != 0:
-    raise RuntimeError(f"{executablePath} --version exited {completed.returncode}: {completed.stderr.strip()}")
-  versionMatch = blenderVersionLinePattern.search(completed.stdout)
-  if versionMatch is None:
-    raise RuntimeError(f"{executablePath} --version printed no 'Blender X.Y.Z' line: {completed.stdout.strip()[:200]}")
-  return versionMatch.group(1)
+def extensionsPath(toolingRoot, blenderVersion):
+  return blenderInstallPath(toolingRoot, blenderVersion) / "portable" / "extensions" / "user_default"
 
 
 def getBlenderStatus(toolingRoot, pinnedVersion):
   blenderRoot = toolingRoot / "blender"
   installedVersions = sorted(entry.name for entry in blenderRoot.iterdir() if entry.is_dir()) if blenderRoot.is_dir() else []
-  executablePath = blenderRoot / pinnedVersion / "blender.exe"
+  installPath = blenderInstallPath(toolingRoot, pinnedVersion)
+  executablePath = installPath / "blender.exe"
   status = {
     "pinnedVersion": pinnedVersion,
     "executablePath": str(executablePath),
@@ -60,16 +34,52 @@ def getBlenderStatus(toolingRoot, pinnedVersion):
   if pinnedVersion not in installedVersions:
     return status | {"state": "missing"}
   if not executablePath.is_file():
-    return status | {"state": "broken"}
-  reportedVersion = readBlenderVersion(executablePath)
+    return status | {"state": "broken", "reason": "blender.exe is missing"}
+  if not (installPath / "portable").is_dir():
+    return status | {"state": "broken", "reason": "portable folder is missing, so Blender would use the user's own config"}
+  reportedVersion = blenderProcess.readBlenderVersion(executablePath)
   if reportedVersion != pinnedVersion:
     return status | {"state": "versionMismatch", "reportedVersion": reportedVersion}
   return status | {"state": "installed"}
 
 
+def readInstalledExtensions(toolingRoot, blenderVersion):
+  repositoryPath = extensionsPath(toolingRoot, blenderVersion)
+  if not repositoryPath.is_dir():
+    return {}
+  installedExtensions = {}
+  for entry in repositoryPath.iterdir():
+    if entry.name.startswith("."):
+      continue
+    extensionManifest = tomllib.loads((entry / "blender_manifest.toml").read_text(encoding="utf-8"))
+    if extensionManifest["id"] != entry.name:
+      raise RuntimeError(f"{entry}: folder name does not match manifest id '{extensionManifest['id']}'")
+    installedExtensions[entry.name] = extensionManifest["version"]
+  return installedExtensions
+
+
+def getExtensionsStatus(toolingRoot, blenderVersion, extensionPins):
+  installedExtensions = readInstalledExtensions(toolingRoot, blenderVersion)
+  pinnedStatus = {}
+  for extensionID, pin in sorted(extensionPins.items()):
+    status = {"pinnedVersion": pin["version"]}
+    if extensionID not in installedExtensions:
+      pinnedStatus[extensionID] = status | {"state": "missing"}
+    elif installedExtensions[extensionID] != pin["version"]:
+      pinnedStatus[extensionID] = status | {"state": "versionMismatch", "installedVersion": installedExtensions[extensionID]}
+    else:
+      pinnedStatus[extensionID] = status | {"state": "installed"}
+  return {
+    "pinned": pinnedStatus,
+    "unpinned": {extensionID: version for extensionID, version in sorted(installedExtensions.items()) if extensionID not in extensionPins},
+  }
+
+
 def getToolingStatus(toolingRoot):
-  manifest = loadManifest()
+  manifest = toolingManifest.loadManifest()
+  blenderVersion = manifest["blender"]["version"]
   return {
     "toolingRoot": str(toolingRoot),
-    "blender": getBlenderStatus(toolingRoot, manifest["blender"]["version"]),
+    "blender": getBlenderStatus(toolingRoot, blenderVersion),
+    "extensions": getExtensionsStatus(toolingRoot, blenderVersion, manifest["extensions"]),
   }
