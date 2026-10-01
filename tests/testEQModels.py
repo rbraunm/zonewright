@@ -20,6 +20,7 @@ def testFindModelFollowsTheClientsLinks(stageServer):
   kiln, _ = server.callToolExpectingSuccess("findModel", {"model": "IT10800_ACTORDEF", "zone": "neighborhood"})
   twice, _ = server.callToolExpectingSuccess("findModel", {"model": "IT67", "zone": "neighborhood"})
   darkElf, _ = server.callToolExpectingSuccess("findModel", {"model": "DAF"})
+  lizard, _ = server.callToolExpectingSuccess("findModel", {"model": "LIZ"})
   notAZone = server.callToolExpectingError("findModel", {"model": "DAF", "zone": "nowhere"})
 
   assert spider["resolves"]["archive"] == "gfaydark_chr.s3d" and spider["resolves"]["via"] == "guka_chr.txt"
@@ -33,6 +34,7 @@ def testFindModelFollowsTheClientsLinks(stageServer):
   # Luclin models are on in this client's eqclient.ini, so the player model wins over global_chr.s3d's classic one.
   assert (darkElf["resolves"]["tier"], darkElf["resolves"]["archive"], darkElf["resolves"]["via"]) == ("playerModels", "globaldaf_chr.s3d", "eqclient.ini")
   assert ("global_chr.s3d", "GlobalLoad.txt") in linkedArchives(darkElf, "global")
+  assert (lizard["resolves"]["tier"], lizard["resolves"]["archive"], lizard["resolves"]["via"]) == ("global", "liz_chr.s3d", "Resources/GlobalLoad_chr.txt")
   assert "'nowhere' is not a zone" in notAZone
 
 

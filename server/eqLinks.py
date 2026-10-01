@@ -115,7 +115,7 @@ def luclinPlayerCodes(clientRoot):
 
 
 def globalLinks(clientRoot):
-  """Archives loaded for every zone: the player models eqclient.ini enables, then Resources/GlobalLoad.txt (phase,flag,flags,name,description)."""
+  """Archives loaded for every zone: the player models eqclient.ini enables, Resources/GlobalLoad.txt (phase,flag,flags,name,description), and Resources/GlobalLoad_chr.txt (read like a zone's _chr.txt)."""
   archives, missing = [], []
   for code in luclinPlayerCodes(clientRoot):
     for fileName in (f"global{code}_chr2.s3d", f"global{code}_chr.s3d"):
@@ -131,7 +131,8 @@ def globalLinks(clientRoot):
       archives.append({"archive": fileName, "via": "GlobalLoad.txt", "codes": None})
     else:
       missing.append({"list": "GlobalLoad.txt", "line": line})
-  return {"archives": archives, "missing": missing}
+  listed, listMissing = characterListArchives(clientRoot, "Resources/GlobalLoad_chr.txt")
+  return {"archives": archives + listed, "missing": missing + listMissing}
 
 
 onDemandMemo = {}

@@ -112,7 +112,7 @@ Spawns, doors, objects, and the scale figure come from the client's own models, 
    - `poknowledge_obj3.eqg`, for the Plane of Knowledge only.
    - The `.eqg` archives in `<zone>_assets.txt`, and, for EQG zones, the zone `.eqg`.
 2. **The player models `eqclient.ini` enables:** `global<code>_chr2` and `global<code>_chr` while `UseLuclin<Race><Gender>` is on, so the Luclin dark elf wins over `global_chr.s3d`'s classic one.
-3. **`Resources\GlobalLoad.txt`:** equipment, `global*_chr`, and shared object archives.
+3. **`Resources\GlobalLoad.txt` and `Resources\GlobalLoad_chr.txt`:** equipment, `global*_chr`, shared object archives, and the characters every zone loads (the `_chr.txt` format).
 4. **`Resources\OnDemandResources.txt`:** EQG models (`EQGM`) and skinned models (`EQGS`) loaded when first needed.
 
 The first tier that defines the model wins. Two definitions in that tier (IT67 is in both `equipment-01.eqg` and `gequip.s3d`) are an error until `source` picks one. Textures come from the model's own archive or, for a zone's EQG model, from the zone's other EQG archives. A texture none of them holds is missing for the client too: its faces draw magenta and every placement lists it in `missingTextures`.
