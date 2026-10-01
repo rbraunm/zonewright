@@ -1,3 +1,6 @@
+import math
+import os
+
 from conftest import pinnedBlender
 
 
@@ -13,6 +16,7 @@ def testMissingBlenderReportsMissing(stageServer):
       "state": "missing",
     },
     "extensions": {"pinned": {}, "unpinned": {}},
+    "machineProfile": {"state": "missing", "problems": ["no machine profile"], "workers": max(1, math.floor(os.cpu_count() * 0.8))},
     "bridge": {"state": "notStarted"},
     "runPython": {"calls": 0, "logFiles": [str(server.toolingRoot / "logs" / "runPython.log")]},
   }

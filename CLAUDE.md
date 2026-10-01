@@ -16,6 +16,8 @@ zonewright is a standalone MCP server; it is not tied to any particular work rep
 - Expected tool failures raise `ToolError`; any other exception reaches the client as a bare "Error executing tool" with the reason hidden.
 - Blender 5.x changed parts of the Python API. Check the 5.2 API docs instead of relying on memory.
 - Keep the README tool table current as tools land.
+- Per-machine performance settings (GPU backend, worker counts) are discovered by tools during setup (`syncTooling` profiles the machine), never hard-coded or hand-configured.
+- No stale code: the server refuses tools once its own source changed (reconnect with /mcp); the bridge restarts Blender on changed bridge code when the open file is saved.
 
 ## EverQuest reference
 - Scale and layout come only from the client's actual zone files. Brewall maps are design notes (place names), never geometry or scale.

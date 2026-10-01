@@ -23,12 +23,17 @@ Run Claude Code from the repository root, since `.mcp.json` launches the server 
 
 To upgrade Blender, update the version, URL, and SHA-256 (from the release's published `.sha256` file) and run `syncTooling`.
 
+### Machine profile
+
+Performance settings are discovered per machine, never configured by hand. `syncTooling` ends by profiling the machine whenever `machineProfile.json` (under the tooling root) is missing or stale: it benchmarks a multi-material EEVEE render on each Blender GPU backend (Vulkan, OpenGL), rejects software renderers, and keeps the fastest hardware backend. Parallel CPU work uses 80% of the logical processors. The profile records the Blender version and a hardware fingerprint; when either changes, Blender tools fail until `syncTooling` re-profiles. `profileMachine` re-measures on demand. On the development machine (RTX 2080 Ti) Vulkan won: warm renders take about 0.1 s, and its shader cache survives Blender restarts, so a known scene's first render takes under a second instead of 18 s on OpenGL.
+
 | Tool | Does |
 |---|---|
 | `getToolingStatus` | Reports Blender (`missing`, `broken`, `versionMismatch`, `installed`), each pinned extension (`missing`, `versionMismatch`, `installed`), and installed extensions that are not pinned |
 | `syncTooling` | Installs the pinned Blender after verifying its SHA-256, removes other Blender versions, and installs, upgrades, or removes extensions to match the manifest. Fails if Blender is running from the tooling root, or if the pinned install is `broken` or `versionMismatch` (clear it by hand) |
 | `addExtension` | Pins the newest extensions.blender.org release of an extension compatible with the pinned Blender, then syncs. Fails if a different `version` is requested |
 | `removeExtension` | Unpins an extension, then syncs to uninstall it |
+| `profileMachine` | Re-measures the machine: CPU workers and the fastest hardware GPU backend for Blender |
 
 ## Scale
 
@@ -38,7 +43,9 @@ EQGZI's Blender exporter (`xackery/eqgzi` `out/convert.py`) works at 1 Blender u
 
 ## Blender bridge
 
-The first tool that needs Blender starts the pinned Blender headless (`--background --factory-startup`, portable config) running `server/bridgeMain.py`, which enables the pinned extensions and serves commands over 127.0.0.1 on a random port with a per-session token. Commands run one at a time on Blender's main thread; errors come back with their traceback. If Blender exits, the next call reports the exit code and Blender's last output, and the call after that starts a fresh Blender. `syncTooling`, `addExtension`, and `removeExtension` stop an idle bridge first and refuse while the open file has unsaved changes.
+The first tool that needs Blender starts the pinned Blender headless (`--background --factory-startup`, portable config) running `server/bridgeMain.py`, which enables the pinned extensions and serves commands over 127.0.0.1 on a random port with a per-session token. Commands run one at a time on Blender's main thread; errors come back with their traceback. If Blender exits, the next call reports the exit code and Blender's last output, and the call after that starts a fresh Blender. Blender launches with the profiled GPU backend and 80% of the CPU for its threads and shader compilation. `syncTooling`, `addExtension`, `removeExtension`, and `profileMachine` stop an idle bridge first and refuse while the open file has unsaved changes.
+
+Nothing runs stale code. Every tool checks the server's own loaded source files and fails with "reconnect with /mcp" once any has changed on disk. Every bridge call checks the Blender-side source files: when they have changed and the open file is saved, Blender restarts on the new code and reopens the file; with unsaved changes, only `saveFile`, `newFile`, `openFile`, and status calls run until the work is saved or discarded. Renders rebuild their preview scene each time, so they always reflect the current scene.
 
 | Tool | Does |
 |---|---|
@@ -85,6 +92,6 @@ The EQ preview renders the open scene's objects (its own lights and cameras excl
 
 | Tool | Does |
 |---|---|
-| `surveyZones` | Technical lane of the zone survey: measured groups (`dimensions`, `surfaces`, `verticality`, `content`, `regions`) for the named zones or all of them, sorted by any numeric field. Cached per variant by source-file SHA-256 and per-group version, so changing one group's method recomputes only that group. A variant whose files cannot be parsed is reported with its error |
+| `surveyZones` | Technical lane of the zone survey: measured groups (`dimensions`, `surfaces`, `verticality`, `content`, `regions`) for the named zones or all of them, sorted by any numeric field. Cached per variant by source-file SHA-256 and per-group version, so changing one group's method recomputes only that group. As in git, a file is re-hashed only when its size or modification time changes (`verifyHashes` forces it), and zone discovery is reused until the client folder's listing changes. Stale zones are measured in parallel worker processes: a full cold survey takes about 80 s, a warm one 0.2 s. A variant whose files cannot be parsed is reported with its error |
 | `getZoneSurvey` | Every survey group for one zone, both lanes (measured and interpreted) |
 | `getZoneNotes` | Lists a zone's Brewall labels: text, map position, and layer file |

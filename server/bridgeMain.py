@@ -8,6 +8,7 @@ import traceback
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import addon_utils
+import bpy
 
 import bridgeCommands
 import bridgeProtocol
@@ -47,6 +48,7 @@ def serve(connection, token):
 
 def main():
   token = os.environ[bridgeProtocol.tokenVariable]
+  bpy.context.preferences.system.gpu_shader_workers = int(os.environ[bridgeProtocol.shaderWorkersVariable])
   enableExtensions()
   listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
   listener.bind(("127.0.0.1", 0))

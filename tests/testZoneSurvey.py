@@ -31,7 +31,8 @@ def testTechnicalLaneMeasuresEachZoneFormat(stageServer):
   assert rows["gfaydark:wld"]["regions"] == {"regionCount": 9, "regionsByKind": {"zoneLine": 9}}
   assert rows["gfaydark:wld"]["content"]["topModels"][0] == {"model": "nekpine1_actordef", "count": 1247}
   assert rows["steamfontmts:eqtzp"]["content"]["topModels"][0] == {"model": "obp_stmfnt_pine.mod", "count": 194}
-  assert len(progressMessages) == 4
+  assert progressMessages[0] == "checking zone file hashes"
+  assert sorted(progressMessages[1:]) == ["measured arena2:eqgz:loose", "measured befallen:wld", "measured gfaydark:wld", "measured steamfontmts:eqtzp"]
 
 
 def testCacheRecomputesOnlyStaleGroups(stageServer):

@@ -7,6 +7,7 @@ maximumFrameBytes = 64 * 1024 * 1024
 portMarker = "ZONEWRIGHT_BRIDGE_PORT"
 tokenVariable = "ZONEWRIGHT_BRIDGE_TOKEN"
 extensionsVariable = "ZONEWRIGHT_EXTENSIONS"
+shaderWorkersVariable = "ZONEWRIGHT_SHADER_WORKERS"
 
 
 class ConnectionClosed(Exception):

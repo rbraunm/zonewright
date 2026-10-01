@@ -10,6 +10,7 @@ from pathlib import Path
 from mcp.server.mcpserver.exceptions import ToolError
 
 import blenderProcess
+import machineProfile
 import toolingManifest
 import toolingStatus
 
@@ -125,6 +126,10 @@ def syncTooling(toolingRoot, reportProgress):
     stagingPath = Path(stagingDirectory)
     actions = syncBlender(toolingRoot, manifest["blender"], stagingPath, reportProgress)
     actions += syncExtensions(toolingRoot, manifest["blender"]["version"], manifest["extensions"], stagingPath, reportProgress)
+  problems = machineProfile.profileProblems(toolingRoot)
+  if problems:
+    profile = machineProfile.profileMachine(toolingRoot, reportProgress)
+    actions.append({"tool": "machineProfile", "action": "profiled", "reasons": problems, "gpuBackend": profile["gpuBackend"], "gpu": profile["gpu"]})
   for action in actions:
     logger.info("sync %s", action)
   return {"actions": actions, "status": toolingStatus.getToolingStatus(toolingRoot)}

@@ -20,20 +20,26 @@ def testSyncInstallsUpgradesAndRemoves(stageServer, blenderArchivePin, buildExte
   (server.toolingRoot / "blender" / "0.0.1").mkdir(parents=True)
 
   result, progressMessages = server.callToolExpectingSuccess("syncTooling")
-  assert result["actions"] == [
+  assert result["actions"][:3] == [
     blenderAction("installed", version),
     blenderAction("removed", "0.0.1"),
     extensionAction("installed", "zonewrightProbe", "1.0.0"),
   ]
+  profiled = result["actions"][3]
+  assert len(result["actions"]) == 4
+  assert (profiled["tool"], profiled["action"], profiled["reasons"]) == ("machineProfile", "profiled", ["no machine profile"])
+  assert profiled["gpuBackend"] in ("vulkan", "opengl")
   assert f"downloading Blender {version}" in progressMessages
   assert f"extracting Blender {version}" in progressMessages
+  assert "benchmarking the vulkan GPU backend" in progressMessages
+  assert "benchmarking the opengl GPU backend" in progressMessages
   installPath = server.toolingRoot / "blender" / version
   assert (installPath / "portable").is_dir()
   assert (installPath / "portable" / "extensions" / "user_default" / "zonewrightProbe" / "blender_manifest.toml").is_file()
   assert result["status"]["blender"]["state"] == "installed"
   assert result["status"]["blender"]["installedVersions"] == [version]
   assert result["status"]["extensions"] == {"pinned": {"zonewrightProbe": {"pinnedVersion": "1.0.0", "state": "installed"}}, "unpinned": {}}
-  assert sorted(entry.name for entry in server.toolingRoot.iterdir()) == ["blender", "logs"]
+  assert sorted(entry.name for entry in server.toolingRoot.iterdir()) == ["blender", "logs", "machineProfile.json"]
 
   result, progressMessages = server.callToolExpectingSuccess("syncTooling")
   assert result["actions"] == []
@@ -80,7 +86,7 @@ def testAddExtensionPinsCatalogRelease(stageServer, blenderArchivePin):
   assert server.readManifest()["extensions"] == {
     extensionID: {"version": smallestAddon["version"], "url": smallestAddon["archive_url"], "sha256": smallestAddon["archive_hash"].removeprefix("sha256:")},
   }
-  assert result["actions"][-1] == extensionAction("installed", extensionID, smallestAddon["version"])
+  assert extensionAction("installed", extensionID, smallestAddon["version"]) in result["actions"]
   assert result["status"]["extensions"]["pinned"] == {extensionID: {"pinnedVersion": smallestAddon["version"], "state": "installed"}}
 
   errorText = server.callToolExpectingError("addExtension", {"extensionID": extensionID, "version": "0.0.0"})

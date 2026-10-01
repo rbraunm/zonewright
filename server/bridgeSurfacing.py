@@ -103,16 +103,18 @@ def projectUVs(objectName, method, worldUnitsPerRepeat, selector, direction):
   uvs = uvs.reshape(-1, 2)
   loopVertices = numpy.empty(len(mesh.loops), dtype=numpy.int64)
   mesh.loops.foreach_get("vertex_index", loopVertices)
-  boxAxes = {axis: planarAxes(numpy.eye(3)[axis]) for axis in range(3)}
-  fixedAxes = planarAxes(direction) if method == "planar" else None
-  for polygon in mesh.polygons:
-    if not faceMask[polygon.index]:
-      continue
-    across, up = fixedAxes if fixedAxes is not None else boxAxes[int(numpy.abs(faceNormals[polygon.index]).argmax())]
-    loops = numpy.arange(polygon.loop_start, polygon.loop_start + polygon.loop_total)
-    points = vertexPositions[loopVertices[loops]]
-    uvs[loops, 0] = points @ across / worldUnitsPerRepeat
-    uvs[loops, 1] = points @ up / worldUnitsPerRepeat
+  loopTotals = numpy.empty(len(mesh.polygons), dtype=numpy.int64)
+  mesh.polygons.foreach_get("loop_total", loopTotals)
+  loopFaces = numpy.repeat(numpy.arange(len(mesh.polygons)), loopTotals)
+  selectedLoops = faceMask[loopFaces]
+  if method == "planar":
+    loopAxes = numpy.broadcast_to(numpy.array(planarAxes(direction)), (len(mesh.loops), 2, 3))
+  else:
+    boxAxes = numpy.array([planarAxes(numpy.eye(3)[axis]) for axis in range(3)])
+    loopAxes = boxAxes[numpy.abs(faceNormals).argmax(axis=1)[loopFaces]]
+  points = vertexPositions[loopVertices]
+  projected = numpy.einsum("lj,laj->la", points, loopAxes) / worldUnitsPerRepeat
+  uvs[selectedLoops] = projected[selectedLoops]
   uvLayer.data.foreach_set("uv", uvs.ravel())
   mesh.update()
   return {"object": objectName, "method": method, "faces": int(faceMask.sum()), "worldUnitsPerRepeat": worldUnitsPerRepeat}
