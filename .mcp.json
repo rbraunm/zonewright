@@ -3,7 +3,10 @@
     "zonewright": {
       "type": "stdio",
       "command": ".venv/Scripts/python.exe",
-      "args": ["server/zonewrightServer.py"]
+      "args": ["server/zonewrightServer.py"],
+      "env": {
+        "EVERQUEST_CLIENT": "C:/Games/EverQuest - Peridot"
+      }
     }
   }
 }

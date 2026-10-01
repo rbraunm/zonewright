@@ -17,6 +17,11 @@ MCP server that gives Claude hands and eyes in Blender to build EverQuest zones 
 - Blender 5.x changed parts of the Python API. Check the 5.2 API docs instead of relying on memory.
 - Keep the README tool table current as tools land.
 
+## EverQuest reference
+- Scale and layout come only from the client's actual zone files. Brewall maps are design notes (place names), never geometry or scale.
+- Client content (extracted zones, models, textures) stays under the tooling root, never in eqzones or git.
+- Blender is 1 unit = 1 EQ unit, Z up; Phase 2 export converts to EQGZI's convention.
+
 ## Tests
 Tests exercise the real pinned Blender through the real bridge. No mocking the code path under test.
 

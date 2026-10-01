@@ -30,6 +30,21 @@ To upgrade Blender, update the version, URL, and SHA-256 (from the release's pub
 | `addExtension` | Pins the newest extensions.blender.org release of an extension compatible with the pinned Blender, then syncs. Fails if a different `version` is requested |
 | `removeExtension` | Unpins an extension, then syncs to uninstall it |
 
+## Scale
+
+Blender scenes are authored at **1 Blender unit = 1 EQ unit**, Z up, so values in Blender match `/loc`, client models, and zone files directly. A player is about 6 units tall: the client's Drakkin male mesh (`dkm.mod`) stands 5.96 units, and EQEmu gives human males a default size of 6.0.
+
+EQGZI's Blender exporter (`xackery/eqgzi` `out/convert.py`) works at 1 Blender unit = 2 EQ units and writes placements as EQ = (-Blender.y, Blender.x, Blender.z) x 2. Phase 2 export applies that conversion; nothing in Phase 1 does.
+
+## EverQuest reference
+
+`EVERQUEST_CLIENT` in `.mcp.json` points at an EverQuest client install. Scale and layout come only from its actual zone files: classic WLD (`.s3d`), EQGZ (`.zon` with `.ter`/`.mod` models, including archives named in `<zone>_assets.txt`), and EQTZP terrain (`.zon`/`.dat`). Brewall map files (`maps\Brewall`) are not authoritative geometry; they serve only as place names for design notes.
+
+| Tool | Does |
+|---|---|
+| `surveyZones` | Measures every zone variant (or the named zones) from its files: terrain size, all-geometry size (including backdrops and stray placements), triangles, textures, placements, Brewall label count. Largest terrain footprint first; cached under the tooling root and re-read only when files change. A variant whose files cannot be parsed is reported with its error |
+| `getZoneNotes` | Lists a zone's Brewall labels: text, map position, and layer file |
+
 ## eqzones
 
 Claude Code sessions started here also get `../eqzones` as a working directory (`.claude/settings.json`). eqzones holds only artist files:

@@ -14,6 +14,7 @@ repositoryRoot = Path(__file__).resolve().parent.parent
 downloadCachePath = repositoryRoot / "tests" / ".cache"
 repositoryManifest = json.loads((repositoryRoot / "toolingManifest.json").read_text(encoding="ascii"))
 pinnedBlender = repositoryManifest["blender"]
+everquestClient = json.loads((repositoryRoot / ".mcp.json").read_text(encoding="utf-8"))["mcpServers"]["zonewright"]["env"]["EVERQUEST_CLIENT"]
 
 
 class StagedServer:
@@ -34,7 +35,7 @@ class StagedServer:
   def readManifest(self):
     return json.loads(self.manifestPath.read_text(encoding="ascii"))
 
-  def callTool(self, toolName, arguments=None):
+  def callTool(self, toolName, arguments=None, environment=None):
     progressMessages = []
 
     async def recordProgress(progress, total, message):
@@ -44,7 +45,7 @@ class StagedServer:
       serverParameters = StdioServerParameters(
         command=sys.executable,
         args=[str(self.repositoryPath / "server" / "zonewrightServer.py")],
-        env={"LOCALAPPDATA": str(self.localAppData)},
+        env={"LOCALAPPDATA": str(self.localAppData), "EVERQUEST_CLIENT": everquestClient} if environment is None else environment,
       )
       async with Client(serverParameters) as client:
         return await client.call_tool(toolName, arguments, progress_callback=recordProgress)
@@ -58,8 +59,8 @@ class StagedServer:
     assert result.is_error is False, result.content[0].text
     return json.loads(result.content[0].text), progressMessages
 
-  def callToolExpectingError(self, toolName, arguments=None):
-    result, _ = self.callTool(toolName, arguments)
+  def callToolExpectingError(self, toolName, arguments=None, environment=None):
+    result, _ = self.callTool(toolName, arguments, environment)
     assert result.is_error is True
     return result.content[0].text
 
