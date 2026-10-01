@@ -15,7 +15,7 @@ import bridgeViews
 from bridgeState import requireNoUnsavedChanges, state
 
 zonePropertyName = "zonewrightZone"
-zonePropertyKeys = ("fogColor", "fogStart", "fogEnd", "sunAzimuthDegrees", "sunElevationDegrees", "sunColor", "sunStrength", "ambientColor")
+zonePropertyKeys = ("fogColor", "fogStart", "fogEnd", "sunAzimuthDegrees", "sunElevationDegrees", "sunColor", "sunStrength", "ambientColor", "newEngineZone")
 fileImageSources = ("FILE", "SEQUENCE", "TILED")
 
 
@@ -193,7 +193,13 @@ def setZoneProperties(updates):
     raise ValueError(f"sunElevationDegrees must be in (0, 90], got {zone['sunElevationDegrees']}")
   if "sunStrength" in zone and zone["sunStrength"] <= 0:
     raise ValueError(f"sunStrength must be positive, got {zone['sunStrength']}")
+  if "newEngineZone" in zone and not isinstance(zone["newEngineZone"], bool):
+    raise ValueError(f"newEngineZone must be true or false, got {zone['newEngineZone']!r}")
   bpy.context.scene[zonePropertyName] = zone
+  return readZoneProperties(bpy.context.scene)
+
+
+def getZoneProperties():
   return readZoneProperties(bpy.context.scene)
 
 
@@ -213,6 +219,7 @@ commands = {
   "getStatus": (getStatus, False),
   "getSceneSummary": (getSceneSummary, False),
   "setZoneProperties": (setZoneProperties, True),
+  "getZoneProperties": (getZoneProperties, False),
   "renderView": (renderView, False),
   "pick": (pick, False),
 } | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands | bridgeModels.commands

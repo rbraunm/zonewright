@@ -37,7 +37,7 @@ Performance settings are discovered per machine, never configured by hand. `sync
 
 ## Scale
 
-Blender scenes are authored at **1 Blender unit = 1 EQ unit**, Z up, in the zone files' own axes, so client models and zone files load unchanged. The server, and so the live dumps, give positions as (x, y, z) with x and y swapped against the zone files: Blender = (y, x, z), measured by every dumped door, ground object, and spawn landing on its zone's geometry only that way. `/loc` prints the server's y, x, z, which is Blender's x, y, z in order. A player is about 6 units tall: the client's Drakkin male mesh (`dkm.mod`) stands 5.96 units, and EQEmu gives human males a default size of 6.0. Eye-level views put the eye 5.5 units above the ground.
+Blender scenes are authored at **1 Blender unit = 1 EQ unit**, Z up, in the zone files' own axes, so client models and zone files load unchanged. The server, and so the live dumps, give positions as (x, y, z) with x and y swapped against the zone files: Blender = (y, x, z), measured by every dumped door, ground object, and spawn landing on its zone's geometry only that way. `/loc` prints the server's y, x, z, which is Blender's x, y, z in order. Spawns draw at the client's scale for their height (see "Spawn size" under Client models): a dark elf female of the race-default height 5 stands about 6.5 units tall in a zone without `NewEngineZone` and about 5 in one with it. Eye-level views put the eye 5.5 units above the ground.
 
 EQGZI's Blender exporter (`xackery/eqgzi` `out/convert.py`) works at 1 Blender unit = 2 EQ units and writes placements as EQ = (-Blender.y, Blender.x, Blender.z) x 2. Phase 2 export applies that conversion; nothing in Phase 1 does.
 
@@ -53,7 +53,7 @@ Nothing runs stale code. Every tool checks the server's own loaded source files 
 | `newFile` / `openFile` | Start an empty scene or open a .blend by absolute path; refused while the open file has unsaved changes unless `discardUnsavedChanges` |
 | `saveFile` | Saves, or saves as an absolute path; textures and linked libraries become paths relative to the .blend; packed, generated, missing, or other-drive images are refused |
 | `getSceneSummary` | File status, zone properties, objects (type, location, dimensions, triangles, materials), collections, cameras, materials with their textures, images |
-| `setZoneProperties` | Stores the zone's EQ preview properties in the .blend: fog color, fog start and end (the end is also the far clip), sun azimuth and elevation, sun color and strength, ambient color |
+| `setZoneProperties` | Stores the zone's EQ properties in the .blend, all required to render: fog color, fog start and end (the end is also the far clip), sun azimuth and elevation, sun color and strength, ambient color, and `newEngineZone` (the zone header's `NewEngineZone`, which sets the scale spawns draw at) |
 | `renderView` | Renders the EQ preview of a view and returns the PNG inline; the file is kept under `%LOCALAPPDATA%\zonewright\renders` |
 | `pick` | For a pixel of a view, the object hit, world position, surface normal, material, and distance |
 
@@ -80,14 +80,14 @@ Edits address parts of a mesh with selectors instead of an interactive selection
 | | `projectUVs` | Planar or box projection at a set number of world units per texture repeat |
 | Dressing | `placeOnSurface` | Drops objects onto the surface below, optionally aligned to its normal |
 | | `scatterInRegion` | Spaced, linked copies over a circle or polygon by density, with yaw and scale ranges, a slope limit, and objects to keep clear of; deterministic per seed |
-| | `placeSpawn` | An EverQuest character drawn at its EQ size with the client's appearance rules, posed at any frame of the animations the client gives it, feet on the ground; see the `render-spawn` skill |
+| | `placeSpawn` | An EverQuest character drawn at the client's scale for its height in the zone with the client's appearance rules, posed at any frame of the animations the client gives it, its origin `avatarHeight` above the ground; see the `render-spawn` skill |
 | | `placeDoor` | An EverQuest door (any server-placed model: doors, lifts, teleport pads, books, furniture) at its position and scale; see the `render-door` skill |
 | | `placeObject` | An EverQuest ground object (kilns, looms, dropped items, housing pieces) at its position and scale; see the `render-object` skill |
 | | `markAsset` / `linkKitAsset` | Marks kit collections as assets; links and places them from a kit .blend |
 | Inspecting | `getObjectDetail` | Transform, bounds, counts, faces per material, UV density, modifiers, vertex groups |
 | | `measure` | Surface heights, distances, height changes, and slopes between points |
 
-A view is `{"camera": name}`, `{"eye": [x,y,z], "target": [x,y,z]}`, or `{"standAt": [x,y,z], "headingDegrees": h, "pitchDegrees": p}`. Heading 0 looks along +Y and turns clockwise seen from above; positive pitch looks up. `standAt` finds the ground by casting down from just above the point, so it works inside caves, puts the eye 5.5 units above it, and stands a scale figure ahead: the client's own dark elf female at her normal size of 5 units, walked up to 15 units along the ground like a player (walls, drops, and climbs stop her) and facing the camera.
+A view is `{"camera": name}`, `{"eye": [x,y,z], "target": [x,y,z]}`, or `{"standAt": [x,y,z], "headingDegrees": h, "pitchDegrees": p}`. Heading 0 looks along +Y and turns clockwise seen from above; positive pitch looks up. `standAt` finds the ground by casting down from just above the point, so it works inside caves, puts the eye 5.5 units above it, and stands a scale figure ahead: the client's own dark elf female at the race-default height 5, drawn at the client's scale for the zone's `newEngineZone`, walked up to 15 units along the ground like a player (walls, drops, and climbs stop her) and facing the camera.
 
 The EQ preview renders the open scene's objects (its own lights and cameras excluded) in a temporary scene: EEVEE without ray tracing, GI, or bloom; one shadowed sun and uniform ambient, both with no specular; linear distance fog composited from the mist pass, with the far clip at the fog end; 52 degree vertical field of view; 960 x 540. Output is byte-identical for identical input. These are starting values to calibrate against client screenshots.
 
@@ -140,11 +140,27 @@ A WLD character plays the client's animations (`eqAnimations.py`, transcribed fr
 - **Borrowing:** a model without an animation borrows another code's (`0x406a60`): dark, high, and half elves the wood elf's, Luclin erudites the human's, kobolds the werewolf's, and about a hundred more rules. The model's own animation comes first (`0x407800`).
 - **Variants:** a Luclin model (one with a `<code>TUNIC_POINT_DAG` bone) takes lettered variants such as `L01A` and `L01B`; it takes an unlettered animation only if it has at least 50 tracks.
 - **Frames:** each frame decodes as the client does (`0x1001b190`): rotation, translation over 256, and a uniform scale over 256. Bones without a track in the animation keep their bind transform.
-- **Stand and size:** a spawn stands at frame 0 of `P01` (STAND STILL) unless another animation is chosen. Its size and footing come from that stand, so a wave or a jump moves the body about the same origin without rescaling it. A model with no stand animation stands in its bind pose.
+- **Duplicate tracks:** of two tracks with one name in a file, the first plays. `EQGraphicsDX9.dll` registers tracks in file order, and `d3dx9_30.dll`'s `RegisterAnimationSRTKeys` refuses a name already registered (the DLL logs the failure and goes on).
+- **Stand:** a spawn stands at frame 0 of `P01` (STAND STILL) unless another animation is chosen. A model with no stand animation stands in its bind pose.
+
+### Spawn size
+
+Spawns take the dumps' and the server's terms: `height` (EQEmu's size), `avatarHeight`, and `heading`. `eqgame.exe` `0x5a3f40` turns a spawn's height into the scale it draws the model at:
+
+| Model | Zone without `NewEngineZone` | Zone with `NewEngineZone` |
+|---|---|---|
+| WLD | height / 5 | height / 6.5 |
+| EQG | height * 1.3 / 6 | height / 6 |
+
+- **EQG models:** the codes whose race `eqgame.exe` registers with flag 8. `eqRaces.py` holds all 859 of its race registrations (`0x50a440`).
+- **`NewEngineZone`:** the zone header's flag (offset 692 of the RoF2 zone packet). The live dumps' `zoneHeaders` give it per zone; EQEmu sends false for every zone. `setZoneProperties` stores it with the zone.
+- **`avatarHeight`:** how high the client stands the model origin above the ground: `Resources\moddat.ini`'s `ROffset` for the model (3.125 when it has none) times the scale. Luclin models' standing feet sit about 3 units below their origin.
+
+The formula reproduces the `avatarHeight` of 16,926 of the 17,291 live-dump spawns whose model this client registers. The other 365 are races RoF2 registers as EQG models and live draws at WLD scale (`CAT`, `HLG`, `I25`, ...).
 
 All four placement paths (`placeSpawn`, `placeDoor`, `placeObject`, and the scale figure) build through the same code. A model is indexed and built once:
 
 - **Index:** `models\modelIndex.json` lists every archive's models and animations, rebuilt when the client listing changes.
 - **Built models:** `models\built\<model>@<archive>[@appearance][@pose]`, rebuilt when the client's files change.
 
-Placements take Blender values (`location`, `headingDegrees`) or the server's (`eqLocation`, `eqHeading` in 512ths of a turn). The heading becomes a turn of -heading about Z, following the EQEmu heading formula through the axis swap. Measured doors confirm there is no quarter-turn offset; the turn direction is to be confirmed against client screenshots.
+Placements take Blender values (`location`, `headingDegrees`) or EQ's (`x`, `y`, `z`, and `heading` in 512ths of a turn, as the server and the dumps give them). `eqgame.exe`'s heading toward a point (`0x4ef250`, which `/face` stores as the player's heading) is 0 toward +y and 128 toward +x. Through the axis swap, that is a turn of +heading about Z for a model whose front is +X. Measured doors confirm there is no quarter-turn offset.

@@ -5,7 +5,7 @@ description: Place and render EverQuest characters (NPCs, players, pets, the sca
 
 # Render spawns
 
-`placeSpawn` puts an EverQuest character into the open scene, drawn the size the client draws it, with the appearance the client would give it. The model is found the way the client finds it (see "Client models" in the README; `findModel` shows the search), built once, and cached under the tooling root (`models\built\<model>@<archive>@<appearance>`).
+`placeSpawn` puts an EverQuest character into the open scene, drawn at the scale the client draws it, with the appearance the client would give it. The model is found the way the client finds it (see "Client models" in the README; `findModel` shows the search), built once, and cached under the tooling root (`models\built\<model>@<archive>@<appearance>`).
 
 ## placeSpawn
 
@@ -13,16 +13,16 @@ description: Place and render EverQuest characters (NPCs, players, pets, the sca
 |---|---|
 | `zone` | The zone whose archives to search first (`poknowledge`, `neighborhood`, ...); `null` searches only what every zone loads |
 | `model` | The actorDef, with or without `_ACTORDEF`: `DAF`, `HUF`, `KOB`, `GBN`, `PMA`, ... |
-| `size` | EQ size. The client draws a model `size` units tall, so a size-5 dark elf female is 5 units tall |
-| `location` + `headingDegrees` | Blender position of the feet and facing (0 = +Y, clockwise from above) |
-| `eqLocation` + `eqHeading` | Or the server's values as the dumps give them; give one pair, not both |
+| `height` | The spawn's height (EQEmu's size); the client draws the model at a scale from it (see Sizes) |
+| `location` + `headingDegrees` | Blender position and facing (0 = +Y, clockwise from above) |
+| `x`, `y`, `z` + `heading` | Or EQ's values as the server and the dumps give them; give these or the Blender pair, not both |
 | `variation`, `headType`, `textureSet` | Appearance: body piece, head piece, texture set |
 | `animation`, `animationVariant`, `animationFrame` | Pose: an animation code (`L01`, `S03`) or the client's label (`WALK`, `WAVE`), a variant letter for a Luclin model (`A`, `B`, ...), and a frame; default `P01` (STAND STILL), first variant, frame 0 |
-| `snapToGround` | Drop the feet to the surface below (default true; the server's z sits a few units above the ground) |
+| `snapToGround` | Stand the model origin `avatarHeight` above the surface below, as the client does (default true); false puts the origin at the position |
 | `source` | `"archive"` or `"archive:entry"` to take a definition other than the first the client loads |
 | `name`, `collection` | Object name and collection |
 
-The result's `source` names the archive and the link that chose it (`linkedBy`: `eqgame.exe startup`, `GlobalLoad.txt`, the zone load order, `<zone>_chr.txt`, or `OnDemandResources.txt`), the pieces drawn, how many materials the texture set swapped, and any `missingTextures`. Its `pose` names the animation resource drawn (such as `S03AELF`), the archive it came from, `borrowedFrom` when the model borrowed another code's animation, the variants available, and the frame, `frameCount`, and `millisecondsPerFrame`, so a render can pick a frame by time.
+The result gives `height`, `scale`, and `avatarHeight` in the client's terms, so they compare with a dump row. Its `source` names the archive and the link that chose it (`linkedBy`: `eqgame.exe startup`, `GlobalLoad.txt`, the zone load order, `<zone>_chr.txt`, or `OnDemandResources.txt`), the pieces drawn, how many materials the texture set swapped, and any `missingTextures`. Its `pose` names the animation resource drawn (such as `S03AELF`), the archive it came from, `borrowedFrom` when the model borrowed another code's animation, the variants available, and the frame, `frameCount`, and `millisecondsPerFrame`, so a render can pick a frame by time.
 
 ## Animations
 
@@ -46,8 +46,8 @@ A model without an animation of its own borrows one, as the client does: a dark 
 | Column | Argument |
 |---|---|
 | `actorDef` | `model` (a value like `A | B` merges several captures; it is not a model name, so pick one or skip it) |
-| `height` | `size` |
-| `positions` | `x,y,z,heading`, so `eqLocation` = `[x, y, z]` and `eqHeading` = `heading` (the first entry of a `|` list) |
+| `height` | `height` (the dump's `avatarHeight` should match the result's) |
+| `positions` | `x,y,z,heading`, the first entry of a `|` list: `x`, `y`, `z`, `heading` |
 | `textureType` | `textureSet` (`-1` means no override, so 0) |
 | `headType`, `variation` | `headType`, `variation` |
 
@@ -65,14 +65,24 @@ These are the client's rules, read from `eqgame.exe` and `EQGraphicsDX9.dll`:
 
 ## Sizes
 
+The client draws a spawn at a scale from its height (`eqgame.exe` `0x5a3f40`):
+
+| Model | Zone without `NewEngineZone` | Zone with `NewEngineZone` |
+|---|---|---|
+| WLD | height / 5 | height / 6.5 |
+| EQG | height * 1.3 / 6 | height / 6 |
+
+EQG models are those whose race the client registers with its EQG flag. `NewEngineZone` comes from the zone header, so set it with `setZoneProperties` before placing spawns: the dumps' `fields\zoneHeaders.tsv` gives it per zone (the bazaar, guild lobby, guild hall, and Plane of Knowledge have it off; the neighborhood and housing interiors on), and EQEmu sends false for every zone. A dark elf female of the race-default height 5 stands about 6.5 units tall with it off, 5 with it on.
+
+`avatarHeight` is how high the client stands the model origin above the ground: `Resources\moddat.ini`'s `ROffset` for the model (3.125 when it has none) times the scale.
+
 Common race defaults in the dumps: DAF 5, ELF 5, HUF 6, HUM 6, IKM 6.5, DKF 5.7.
 
 ## Scale figure
 
-Every eye-level `renderView` (`standAt`) stands a dark elf female at size 5 about 15 units ahead, walked along the ground like a player so walls, drops, and climbs stop her, facing the camera.
+Every eye-level `renderView` (`standAt`) stands a dark elf female of height 5, drawn at the client's scale for the zone's `newEngineZone`, about 15 units ahead, walked along the ground like a player so walls, drops, and climbs stop her, facing the camera.
 
 ## Limits
 
 - **EQG characters.** EQG characters (Drakkin and later races) stand in their bind pose: their animations (`.ani`) are not read yet, so asking for one is an error.
 - **Not drawn.** Equipment, faces (`faceStyle`), and particle effects are not drawn. Legacy 0x2C meshes (IVM and a few others) are not read and fail as unsupported.
-- **Heading direction.** The heading's turn direction for `eqHeading` comes from the server's heading formula and has not yet been checked against a client screenshot.

@@ -13,6 +13,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 import blenderBridge
 import eqModels
+import eqRaces
 import extensionCatalog
 import machineProfile
 import toolingLog
@@ -81,12 +82,12 @@ async def callBridge(context, command, arguments):
   return await anyio.to_thread.run_sync(bridge.call, command, arguments, progressReporter(context))
 
 
-# The live dumps record dark elf females at size 5, the race default; EQ draws a model `size` units tall.
+# The live dumps record dark elf females at height 5, the race default.
 figureModelCode = "DAF"
-figureSize = 5.0
+figureHeight = 5.0
 # The server and the live dumps give positions as (x, y, z); the zone files, and so Blender, hold them as (y, x, z): measured, every
-# kind of placement lands on the zone geometry only that way. Server headings run 512 to a turn, 0 facing server +y and 128 facing
-# server -x (the EQEmu heading formula); through the axis swap that is a turn of -heading about Z for a model whose front is +X.
+# kind of placement lands on the zone geometry only that way. Headings run 512 to a turn; eqgame.exe's heading toward a point
+# (0x4ef250) is 0 toward +y and 128 toward +x, which through the axis swap is a turn of +heading about Z for a model whose front is +X.
 eqHeadingUnits = 512
 standPose = {"animation": None, "variant": None, "frame": 0}
 
@@ -99,28 +100,39 @@ def eqModel(zone, model, source=None, appearance=None, animation=None):
     raise ToolError(str(error)) from error
 
 
-def spawnModel(zone, model, size, source=None, appearance=None, animation=None):
-  """A character model posed by an animation frame, and the scale that makes its bind pose `size` units tall, as the client draws it."""
-  if size <= 0:
-    raise ToolError(f"size must be positive, got {size}")
+def spawnModel(zone, model, height, newEngineZone, source=None, appearance=None, animation=None):
+  """A character model posed by an animation frame, with the scale and avatarHeight the client gives a spawn of this height in the zone."""
   folder, details = eqModel(zone, model, source, appearance, animation or standPose)
-  height = details["restMaximum"][2] - details["restMinimum"][2]
-  return {"folder": str(folder), "scale": size / height, "footHeight": details["restMinimum"][2], "size": size, "details": details}
+  code = details["model"].upper()
+  try:
+    scale = eqRaces.spawnScale(code, height, newEngineZone)
+    avatarHeight = eqRaces.avatarHeight(zoneSources.resolveClientRoot(), code, scale)
+  except ValueError as error:
+    raise ToolError(str(error)) from error
+  return {"folder": str(folder), "height": height, "scale": scale, "avatarHeight": avatarHeight, "details": details}
 
 
-def placementFrame(location, headingDegrees, eqLocation, eqHeading):
-  """Blender location and turn about Z (counter-clockwise, degrees) from either Blender values or the server's."""
+async def zoneIsNewEngine(context):
+  """The open zone's newEngineZone, which sets the scale the client draws its spawns at."""
+  zone = await callBridge(context, "getZoneProperties", {})
+  if "newEngineZone" not in zone:
+    raise ToolError("Spawns need the zone's newEngineZone (its zone header's NewEngineZone; EQEmu sends false for every zone): set it with setZoneProperties")
+  return bool(zone["newEngineZone"])
+
+
+def placementFrame(location, headingDegrees, x, y, z, heading):
+  """Blender location and turn about Z (counter-clockwise, degrees) from either Blender values or EQ's."""
   blenderGiven = location is not None or headingDegrees is not None
-  serverGiven = eqLocation is not None or eqHeading is not None
-  if blenderGiven == serverGiven:
-    raise ToolError("Give one pair: location and headingDegrees (Blender; heading 0 = +Y, clockwise) or eqLocation and eqHeading (as the server and the live dumps give them)")
+  eqGiven = any(value is not None for value in (x, y, z, heading))
+  if blenderGiven == eqGiven:
+    raise ToolError("Give location and headingDegrees (Blender; heading 0 = +Y, clockwise) or x, y, z, and heading (EQ, as the server and the live dumps give them)")
   if blenderGiven:
     if location is None or headingDegrees is None or len(location) != 3:
       raise ToolError("location [x, y, z] and headingDegrees go together")
     return list(location), 90 - headingDegrees
-  if eqLocation is None or eqHeading is None or len(eqLocation) != 3:
-    raise ToolError("eqLocation [x, y, z] and eqHeading go together")
-  return [eqLocation[1], eqLocation[0], eqLocation[2]], -eqHeading * 360 / eqHeadingUnits
+  if None in (x, y, z, heading):
+    raise ToolError("x, y, z, and heading go together")
+  return [y, x, z], heading * 360 / eqHeadingUnits
 
 
 def modelSummary(details):
@@ -133,10 +145,10 @@ def modelSummary(details):
   }
 
 
-async def placeEQModel(context, folder, name, location, rotationDegrees, scale, footHeight, snapToGround, collection, details):
+async def placeEQModel(context, folder, name, location, rotationDegrees, scale, avatarHeight, snapToGround, collection, details):
   placed = await callBridge(context, "placeModel", {
     "modelFolder": str(folder), "name": name, "location": location, "rotationDegrees": rotationDegrees, "scale": scale,
-    "footHeight": footHeight, "snapToGround": snapToGround, "collection": collection,
+    "avatarHeight": avatarHeight, "snapToGround": snapToGround, "collection": collection,
   })
   return placed | {"source": modelSummary(details)}
 
@@ -289,30 +301,35 @@ async def setZoneProperties(
   sunColor: list[float] | None = None,
   sunStrength: float | None = None,
   ambientColor: list[float] | None = None,
+  newEngineZone: bool | None = None,
 ):
-  """Set the zone's EQ preview properties stored in the .blend: fog color and distances (fogEnd is also the far clip), sun direction (azimuth 0 = +Y, clockwise), sun color and strength, ambient color."""
+  """Set the zone's EQ properties stored in the .blend: fog color and distances (fogEnd is also the far clip), sun direction (azimuth 0 = +Y, clockwise), sun color and strength, ambient color, and newEngineZone, the zone header's NewEngineZone, which sets the scale the client draws spawns at (the live dumps' zoneHeaders give it per zone; EQEmu sends false for every zone)."""
   updates = {
     "fogColor": fogColor, "fogStart": fogStart, "fogEnd": fogEnd,
     "sunAzimuthDegrees": sunAzimuthDegrees, "sunElevationDegrees": sunElevationDegrees,
-    "sunColor": sunColor, "sunStrength": sunStrength, "ambientColor": ambientColor,
+    "sunColor": sunColor, "sunStrength": sunStrength, "ambientColor": ambientColor, "newEngineZone": newEngineZone,
   }
   return await callBridge(context, "setZoneProperties", {"updates": {key: value for key, value in updates.items() if value is not None}})
 
 
 @guardedTool()
 async def renderView(context: Context, view: dict):
-  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y,z], "headingDegrees": h, "pitchDegrees": p} (heading 0 = +Y, clockwise; eye 5.5 above the ground; adds a dark elf female at her normal size of 5 units, walked ahead along the ground and facing the camera)."""
+  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y,z], "headingDegrees": h, "pitchDegrees": p} (heading 0 = +Y, clockwise; eye 5.5 above the ground; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera)."""
   outputPath = newRenderPath()
-  figure = await anyio.to_thread.run_sync(spawnModel, None, figureModelCode, figureSize)
-  figureModel = {key: figure[key] for key in ("folder", "scale", "footHeight", "size")}
+  figureModel = None
+  zone = await callBridge(context, "getZoneProperties", {})
+  # Without newEngineZone the preview's own check fails, naming it with any other missing zone property.
+  if "standAt" in view and "newEngineZone" in zone:
+    figure = await anyio.to_thread.run_sync(spawnModel, None, figureModelCode, figureHeight, bool(zone["newEngineZone"]))
+    figureModel = {key: figure[key] for key in ("folder", "scale", "avatarHeight")}
   description = await callBridge(context, "renderView", {"view": view, "outputPath": str(outputPath), "figureModel": figureModel})
   return [Image(data=outputPath.read_bytes(), format="png"), description]
 
 
 placementHelp = (
-  " Position it with location [x, y, z] and headingDegrees (Blender: 0 = +Y, clockwise), or with eqLocation [x, y, z] and eqHeading (0-512)"
-  " exactly as the server and the live dumps give them; eqLocation maps to Blender (y, x, z) and eqHeading to a turn of -heading/512 of a"
-  " circle (the turn's direction is still to be confirmed against client screenshots). zone names the zone whose archives the client"
+  " Position it with location [x, y, z] and headingDegrees (Blender: 0 = +Y, clockwise), or with x, y, z, and heading (0-512) exactly as"
+  " the server and the live dumps give them: EQ (x, y, z) is Blender (y, x, z), and heading 0 faces EQ +y and 128 faces EQ +x, as"
+  " eqgame.exe turns a spawn toward a point. zone names the zone whose archives the client"
   " loads (none searches only the global lists); the model is found through the client's own links (see findModel), never by name in an"
   " unrelated archive. source (\"archive\" or \"archive:entry\") takes a definition other than the first the client loads."
   " The result's source lists the archive and link used and anything the client data lacks (missingTextures draw magenta)."
@@ -339,8 +356,12 @@ async def findModel(model: str, zone: str | None = None):
 
 
 @guardedTool(description=(
-  "Place an EverQuest character (its actorDef code, such as DAF, PMA, or SWB) drawn `size` units tall as the client draws it, feet on the"
-  " ground below its position (unless snapToGround is false), front facing its heading. Appearance as the client applies it: variation"
+  "Place an EverQuest character (its actorDef code, such as DAF, PMA, or SWB) at its height (the spawn's size: the dumps' height, EQEmu's"
+  " size), drawn at the scale the client gives that height in the open zone (eqgame.exe: height / 5 for WLD models and height / 6 for EQG"
+  " models, with WLD models 1.3 times smaller in a newEngineZone zone and EQG models 1.3 times larger outside one; set newEngineZone with"
+  " setZoneProperties). The model origin stands avatarHeight (moddat.ini's ROffset for the model, else 3.125, times the scale) above the"
+  " ground below its position, as the client stands a spawn; with snapToGround false it sits at the position. Front faces its heading."
+  " The result gives height, scale, and avatarHeight, which compare with the dumps' height and avatarHeight. Appearance as the client applies it: variation"
   " swaps the body piece, headType the head, textureSet the texture set (the dumps' textureType; -1 there means no override, so 0)."
   " A WLD character is posed at animationFrame of animation (a code such as L01 or S03, or the client's label such as WALK or WAVE;"
   " default P01, STAND STILL), found as the client finds it: the model's own animation, else the one it borrows (a dark elf the elf's);"
@@ -348,32 +369,35 @@ async def findModel(model: str, zone: str | None = None):
   " where it came from, and its frame count and milliseconds per frame. EQG characters stand in their bind pose." + placementHelp
 ))
 async def placeSpawn(
-  context: Context, zone: str | None, model: str, name: str, size: float,
-  location: list[float] | None = None, headingDegrees: float | None = None, eqLocation: list[float] | None = None, eqHeading: float | None = None,
+  context: Context, zone: str | None, model: str, name: str, height: float,
+  location: list[float] | None = None, headingDegrees: float | None = None,
+  x: float | None = None, y: float | None = None, z: float | None = None, heading: float | None = None,
   variation: int = 0, headType: int = 0, textureSet: int = 0, animation: str | None = None, animationVariant: str | None = None, animationFrame: int = 0,
   source: str | None = None, snapToGround: bool = True, collection: str | None = None,
 ):
-  frameLocation, rotation = placementFrame(location, headingDegrees, eqLocation, eqHeading)
+  frameLocation, rotation = placementFrame(location, headingDegrees, x, y, z, heading)
   appearance = {"variation": variation, "headType": headType, "textureSet": textureSet}
   pose = {"animation": animation, "variant": animationVariant.upper() if animationVariant else None, "frame": animationFrame}
-  spawn = await anyio.to_thread.run_sync(spawnModel, zone, model, size, source, appearance, pose)
-  return await placeEQModel(context, spawn["folder"], name, frameLocation, rotation, spawn["scale"], spawn["footHeight"], snapToGround, collection, spawn["details"])
+  spawn = await anyio.to_thread.run_sync(spawnModel, zone, model, height, await zoneIsNewEngine(context), source, appearance, pose)
+  placed = await placeEQModel(context, spawn["folder"], name, frameLocation, rotation, spawn["scale"], spawn["avatarHeight"], snapToGround, collection, spawn["details"])
+  return placed | {key: spawn[key] for key in ("height", "scale", "avatarHeight")}
 
 
 @guardedTool(description=(
   "Place an EverQuest door (the dumps' doors: any server-placed model, from doors and lifts to teleport pads, books, and furniture) closed,"
-  " model origin at its position, scaled by scalePercent (the dumps' scaleFactor)." + placementHelp
+  " model origin at its position, scaled by scaleFactor (percent, as the dumps and EQEmu give it; 100 draws the model as built)." + placementHelp
 ))
 async def placeDoor(
   context: Context, zone: str | None, model: str, name: str,
-  location: list[float] | None = None, headingDegrees: float | None = None, eqLocation: list[float] | None = None, eqHeading: float | None = None,
-  scalePercent: float = 100, source: str | None = None, collection: str | None = None,
+  location: list[float] | None = None, headingDegrees: float | None = None,
+  x: float | None = None, y: float | None = None, z: float | None = None, heading: float | None = None,
+  scaleFactor: float = 100, source: str | None = None, collection: str | None = None,
 ):
-  if scalePercent <= 0:
-    raise ToolError(f"scalePercent must be positive, got {scalePercent}")
-  frameLocation, rotation = placementFrame(location, headingDegrees, eqLocation, eqHeading)
+  if scaleFactor <= 0:
+    raise ToolError(f"scaleFactor must be positive, got {scaleFactor}")
+  frameLocation, rotation = placementFrame(location, headingDegrees, x, y, z, heading)
   folder, details = await anyio.to_thread.run_sync(eqModel, zone, model, source)
-  return await placeEQModel(context, folder, name, frameLocation, rotation, scalePercent / 100, 0, False, collection, details)
+  return await placeEQModel(context, folder, name, frameLocation, rotation, scaleFactor / 100, 0, False, collection, details)
 
 
 @guardedTool(description=(
@@ -382,12 +406,13 @@ async def placeDoor(
 ))
 async def placeObject(
   context: Context, zone: str | None, model: str, name: str,
-  location: list[float] | None = None, headingDegrees: float | None = None, eqLocation: list[float] | None = None, eqHeading: float | None = None,
+  location: list[float] | None = None, headingDegrees: float | None = None,
+  x: float | None = None, y: float | None = None, z: float | None = None, heading: float | None = None,
   scale: float = 1, source: str | None = None, collection: str | None = None,
 ):
   if scale <= 0:
     raise ToolError(f"scale must be positive, got {scale}")
-  frameLocation, rotation = placementFrame(location, headingDegrees, eqLocation, eqHeading)
+  frameLocation, rotation = placementFrame(location, headingDegrees, x, y, z, heading)
   folder, details = await anyio.to_thread.run_sync(eqModel, zone, model, source)
   return await placeEQModel(context, folder, name, frameLocation, rotation, scale, 0, False, collection, details)
 

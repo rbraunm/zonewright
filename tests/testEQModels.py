@@ -39,52 +39,68 @@ def testFindModelFollowsTheClientsLoadOrder(stageServer):
   assert "'nowhere' is not a zone" in notAZone
 
 
-def testPlaceSpawnDrawsLinkedModelsAtTheirEQSize(stageBlenderServer):
+def testPlaceSpawnDrawsTheClientsScaleForTheZone(stageBlenderServer):
   async def steps(session):
     await freshScene(session)
     await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [100, 100], "spacing": 10, "location": [0, 0, 0]})
-    darkElf = await session.expectSuccess("placeSpawn", {"zone": None, "model": "DAF", "name": "darkElf", "size": 5, "location": [0, 0, 20], "headingDegrees": 0})
-    kobold = await session.expectSuccess("placeSpawn", {"zone": "poknowledge", "model": "KOB_ACTORDEF", "name": "kobold", "size": 4, "eqLocation": [20, 10, 3], "eqHeading": 128, "textureSet": 1})
-    gnoll = await session.expectSuccess("placeSpawn", {"zone": None, "model": "GBN", "name": "gnoll", "size": 6, "location": [-10, 0, 0], "headingDegrees": 90, "headType": 3, "snapToGround": False})
-    bothFrames = await session.expectError("placeSpawn", {"zone": None, "model": "DAF", "name": "twice", "size": 5, "location": [0, 0, 0], "headingDegrees": 0, "eqLocation": [0, 0, 0], "eqHeading": 0})
-    airElemental = await session.expectSuccess("placeSpawn", {"zone": "neighborhood", "model": "AEL", "name": "airElemental", "size": 6, "location": [-20, 0, 0], "headingDegrees": 0})
-    unlinked = await session.expectError("placeSpawn", {"zone": "neighborhood", "model": "ARM", "name": "nobody", "size": 5, "location": [0, 0, 0], "headingDegrees": 0})
-    return darkElf, kobold, gnoll, bothFrames, airElemental, unlinked
+    noZoneFlag = await session.expectError("placeSpawn", {"zone": None, "model": "DAF", "name": "early", "height": 5, "location": [0, 0, 0], "headingDegrees": 0})
+    await session.expectSuccess("setZoneProperties", {"newEngineZone": False})
+    darkElf = await session.expectSuccess("placeSpawn", {"zone": None, "model": "DAF", "name": "darkElf", "height": 5, "location": [0, 0, 20], "headingDegrees": 0})
+    kobold = await session.expectSuccess("placeSpawn", {"zone": "poknowledge", "model": "KOB_ACTORDEF", "name": "kobold", "height": 5, "x": 20, "y": 10, "z": 3, "heading": 128, "textureSet": 1})
+    gnoll = await session.expectSuccess("placeSpawn", {"zone": None, "model": "GBN", "name": "gnoll", "height": 3, "location": [-10, 0, 0], "headingDegrees": 90, "headType": 3, "snapToGround": False})
+    bothFrames = await session.expectError("placeSpawn", {"zone": None, "model": "DAF", "name": "twice", "height": 5, "location": [0, 0, 0], "headingDegrees": 0, "x": 0, "y": 0, "z": 0, "heading": 0})
+    noHeight = await session.expectError("placeSpawn", {"zone": None, "model": "DAF", "name": "flat", "height": 0, "location": [0, 0, 0], "headingDegrees": 0})
+    airElemental = await session.expectSuccess("placeSpawn", {"zone": "neighborhood", "model": "AEL", "name": "airElemental", "height": 6, "location": [-20, 0, 0], "headingDegrees": 0})
+    unlinked = await session.expectError("placeSpawn", {"zone": "neighborhood", "model": "ARM", "name": "nobody", "height": 5, "location": [0, 0, 0], "headingDegrees": 0})
+    await session.expectSuccess("setZoneProperties", {"newEngineZone": True})
+    newEngineElf = await session.expectSuccess("placeSpawn", {"zone": None, "model": "DAF", "name": "newEngineElf", "height": 5, "location": [30, 0, 0], "headingDegrees": 0})
+    newEngineGnoll = await session.expectSuccess("placeSpawn", {"zone": None, "model": "GBN", "name": "newEngineGnoll", "height": 4, "location": [-30, 0, 0], "headingDegrees": 0})
+    return noZoneFlag, darkElf, kobold, gnoll, bothFrames, noHeight, airElemental, unlinked, newEngineElf, newEngineGnoll
 
-  darkElf, kobold, gnoll, bothFrames, airElemental, unlinked = stageBlenderServer.session(steps)
-  # Size is the height of the client's stand (P01, frame 0), and the stand's feet go on the ground.
-  assert darkElf["dimensions"][2] == 5.0
-  assert darkElf["anchor"] == [0.0, 0.0, 0.0]
+  noZoneFlag, darkElf, kobold, gnoll, bothFrames, noHeight, airElemental, unlinked, newEngineElf, newEngineGnoll = stageBlenderServer.session(steps)
+  assert "Spawns need the zone's newEngineZone" in noZoneFlag
+  # A WLD model outside a NewEngineZone zone draws at height / 5 with its origin ROffset (3.125 unless moddat.ini says) times that
+  # above the ground; the live dumps record height-5 dark elves and kobolds in poknowledge at avatarHeight 3.125.
+  assert (darkElf["height"], darkElf["scale"], darkElf["avatarHeight"]) == (5, 1.0, 3.125)
+  assert (darkElf["ground"], darkElf["location"]) == ([0.0, 0.0, 0.0], [0.0, 0.0, 3.125])
   assert darkElf["rotationDegrees"][2] == 90.0
   assert (darkElf["source"]["archive"], darkElf["source"]["linkedBy"]) == ("globaldaf_chr.s3d", "eqgame.exe startup")
-  # The server's (x, y, z) is Blender's (y, x, z); heading 128 of 512 is a quarter turn clockwise.
-  assert kobold["anchor"] == [10.0, 20.0, 0.0]
-  assert kobold["rotationDegrees"][2] == -90.0
-  assert kobold["dimensions"][2] == 4.0
+  # EQ (x, y, z) is Blender (y, x, z); heading 128 faces EQ +x, which is Blender +Y, so the +X front turns a quarter counter-clockwise.
+  assert (kobold["ground"], kobold["location"]) == ([10.0, 20.0, 0.0], [10.0, 20.0, 3.125])
+  assert kobold["rotationDegrees"][2] == 90.0
   assert (kobold["source"]["archive"], kobold["source"]["tier"]) == ("poknowledge_chr.s3d", "zone")
   assert kobold["source"]["swappedMaterials"] == 12
   assert gnoll["source"]["pieces"] == ["GBN00", "GBNHE03"]
   assert gnoll["source"]["tier"] == "onDemand"
   assert gnoll["source"]["pose"] == {"bind": "EQG animations (.ani) are not read yet"}
-  assert "Give one pair" in bothFrames
+  # An EQG model outside a NewEngineZone zone draws at height * 1.3 / 6: the dumps' height-3 gnolls in poknowledge stand at 2.03124.
+  assert abs(gnoll["avatarHeight"] - 2.03124) < 0.0001
+  assert (gnoll["ground"], gnoll["location"]) == (None, [-10.0, 0.0, 0.0])
+  assert "Give location and headingDegrees" in bothFrames
+  assert "height must be positive, got 0" in noHeight
   # eqgame.exe loads global5_chr.s3d at startup while UseLuclinElementals is on.
   assert (airElemental["source"]["archive"], airElemental["source"]["linkedBy"]) == ("global5_chr.s3d", "eqgame.exe startup")
   assert "unlinked archives define it: ['beholder_chr.s3d', 'nro_chr.s3d', 'oggok_chr.s3d', 'poeartha_chr.s3d', 'postorms_chr.s3d']" in unlinked
+  # A NewEngineZone zone draws WLD models 1.3 times smaller and EQG models at height / 6, as the dumps' guild halls and neighborhood record.
+  assert abs(newEngineElf["avatarHeight"] - 2.40384) < 0.0001
+  assert abs(newEngineElf["dimensions"][2] * 1.3 - darkElf["dimensions"][2]) < 0.002
+  assert abs(newEngineGnoll["avatarHeight"] - 2.08333) < 0.0001
 
 
 def testSpawnsPlayTheAnimationsTheClientGivesThem(stageBlenderServer):
   async def steps(session):
     await freshScene(session)
     await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [100, 100], "spacing": 10, "location": [0, 0, 0]})
-    stand = await session.expectSuccess("placeSpawn", {"zone": "poknowledge", "model": "DAF", "name": "stand", "size": 5, "location": [0, 0, 0], "headingDegrees": 0})
-    wave = await session.expectSuccess("placeSpawn", {"zone": "poknowledge", "model": "DAF", "name": "wave", "size": 5, "location": [5, 0, 0], "headingDegrees": 0, "animation": "wave", "animationFrame": 12})
-    walk = await session.expectSuccess("placeSpawn", {"zone": "poknowledge", "model": "HUF", "name": "walk", "size": 6, "location": [10, 0, 0], "headingDegrees": 0, "animation": "L01", "animationVariant": "b", "animationFrame": 3})
-    erudite = await session.expectSuccess("placeSpawn", {"zone": "poknowledge", "model": "ERF", "name": "erudite", "size": 6, "location": [15, 0, 0], "headingDegrees": 0, "animation": "O01"})
-    kobold = await session.expectSuccess("placeSpawn", {"zone": "poknowledge", "model": "KOB", "name": "kobold", "size": 4, "location": [20, 0, 0], "headingDegrees": 0})
-    pastTheEnd = await session.expectError("placeSpawn", {"zone": "poknowledge", "model": "DAF", "name": "late", "size": 5, "location": [25, 0, 0], "headingDegrees": 0, "animation": "S03", "animationFrame": 27})
-    noVariant = await session.expectError("placeSpawn", {"zone": "poknowledge", "model": "DAF", "name": "variant", "size": 5, "location": [25, 0, 0], "headingDegrees": 0, "animation": "S03", "animationVariant": "C"})
-    unknown = await session.expectError("placeSpawn", {"zone": "poknowledge", "model": "DAF", "name": "dance", "size": 5, "location": [25, 0, 0], "headingDegrees": 0, "animation": "MOONWALK"})
-    eqgAnimation = await session.expectError("placeSpawn", {"zone": None, "model": "GBN", "name": "gnoll", "size": 6, "location": [25, 0, 0], "headingDegrees": 0, "animation": "L01"})
+    await session.expectSuccess("setZoneProperties", {"newEngineZone": False})
+    stand = await session.expectSuccess("placeSpawn", {"zone": "poknowledge", "model": "DAF", "name": "stand", "height": 5, "location": [0, 0, 0], "headingDegrees": 0})
+    wave = await session.expectSuccess("placeSpawn", {"zone": "poknowledge", "model": "DAF", "name": "wave", "height": 5, "location": [5, 0, 0], "headingDegrees": 0, "animation": "wave", "animationFrame": 12})
+    walk = await session.expectSuccess("placeSpawn", {"zone": "poknowledge", "model": "HUF", "name": "walk", "height": 6, "location": [10, 0, 0], "headingDegrees": 0, "animation": "L01", "animationVariant": "b", "animationFrame": 3})
+    erudite = await session.expectSuccess("placeSpawn", {"zone": "poknowledge", "model": "ERF", "name": "erudite", "height": 6, "location": [15, 0, 0], "headingDegrees": 0, "animation": "O01"})
+    kobold = await session.expectSuccess("placeSpawn", {"zone": "poknowledge", "model": "KOB", "name": "kobold", "height": 4, "location": [20, 0, 0], "headingDegrees": 0})
+    pastTheEnd = await session.expectError("placeSpawn", {"zone": "poknowledge", "model": "DAF", "name": "late", "height": 5, "location": [25, 0, 0], "headingDegrees": 0, "animation": "S03", "animationFrame": 27})
+    noVariant = await session.expectError("placeSpawn", {"zone": "poknowledge", "model": "DAF", "name": "variant", "height": 5, "location": [25, 0, 0], "headingDegrees": 0, "animation": "S03", "animationVariant": "C"})
+    unknown = await session.expectError("placeSpawn", {"zone": "poknowledge", "model": "DAF", "name": "dance", "height": 5, "location": [25, 0, 0], "headingDegrees": 0, "animation": "MOONWALK"})
+    eqgAnimation = await session.expectError("placeSpawn", {"zone": None, "model": "GBN", "name": "gnoll", "height": 6, "location": [25, 0, 0], "headingDegrees": 0, "animation": "L01"})
     return stand, wave, walk, erudite, kobold, pastTheEnd, noVariant, unknown, eqgAnimation
 
   stand, wave, walk, erudite, kobold, pastTheEnd, noVariant, unknown, eqgAnimation = stageBlenderServer.session(steps)
@@ -108,8 +124,8 @@ def testSpawnsPlayTheAnimationsTheClientGivesThem(stageBlenderServer):
 def testDoorsAndObjectsComeFromTheZonesArchives(stageBlenderServer):
   async def steps(session):
     await freshScene(session)
-    door = await session.expectSuccess("placeDoor", {"zone": "poknowledge", "model": "POKDOOR500", "name": "door", "eqLocation": [0, 0, 0], "eqHeading": 0})
-    bigDoor = await session.expectSuccess("placeDoor", {"zone": "poknowledge", "model": "POKDOOR500", "name": "bigDoor", "location": [50, 0, 0], "headingDegrees": 90, "scalePercent": 150})
+    door = await session.expectSuccess("placeDoor", {"zone": "poknowledge", "model": "POKDOOR500", "name": "door", "x": 0, "y": 0, "z": 0, "heading": 0})
+    bigDoor = await session.expectSuccess("placeDoor", {"zone": "poknowledge", "model": "POKDOOR500", "name": "bigDoor", "location": [50, 0, 0], "headingDegrees": 90, "scaleFactor": 150})
     kiln = await session.expectSuccess("placeObject", {"zone": "neighborhood", "model": "IT10800_ACTORDEF", "name": "kiln", "location": [0, 30, 0], "headingDegrees": 0})
     tree = await session.expectSuccess("placeObject", {"zone": "neighborhood", "model": "OBJ_TREEM", "name": "tree", "location": [30, 30, 0], "headingDegrees": 0})
     firstLoaded = await session.expectSuccess("placeObject", {"zone": "neighborhood", "model": "IT67", "name": "it67", "location": [0, 60, 0], "headingDegrees": 0})
@@ -119,7 +135,7 @@ def testDoorsAndObjectsComeFromTheZonesArchives(stageBlenderServer):
 
   door, bigDoor, kiln, tree, firstLoaded, chosen, treeDetail = stageBlenderServer.session(steps)
   assert (door["source"]["archive"], door["source"]["linkedBy"], door["source"]["kind"]) == ("poknowledge_obj.s3d", "zone load order", "wldStatic")
-  assert door["anchor"] == [0.0, 0.0, 0.0]
+  assert door["location"] == [0.0, 0.0, 0.0]
   assert abs(bigDoor["dimensions"][2] - 1.5 * door["dimensions"][2]) < 0.002
   assert (kiln["source"]["archive"], kiln["source"]["linkedBy"]) == ("tradeskill_objects.eqg", "neighborhood_assets.txt")
   # neighborhood.eqg ships only the bark's normal map; no archive the zone loads has its diffuse, so it draws as missing.

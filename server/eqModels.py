@@ -18,7 +18,7 @@ import machineProfile
 import zoneSources
 
 indexFormat = 8
-modelCacheFormat = 6
+modelCacheFormat = 7
 actorTrailingBytes = 4
 staticKinds = ("eqgStatic", "wldStatic")
 
@@ -242,7 +242,8 @@ def findAnimation(index, links, code, isLuclin, request):
 def animationTransforms(clientRoot, found, dags, code, frame, bindLocals):
   """Each bone's local transform at one frame of an animation: the track <resource><bone suffix>_TRACK (the root bone takes the
   animation's root track), or the bone's bind transform when the animation has no track for it. An animation's moving tracks
-  share one frame count; its single-frame tracks hold still."""
+  share one frame count; its single-frame tracks hold still. Of two tracks with one name, the first in the file plays: the client
+  registers tracks in file order and d3dx9 RegisterAnimationSRTKeys refuses a name already registered."""
   archive = eqArchive.EQArchive(clientRoot / found["archive"])
   worldFile = eqWorldFile.WorldFile(archive.read(found["wld"]), f"{found['archive']}:{found['wld']}")
   instances = {}
@@ -256,9 +257,6 @@ def animationTransforms(clientRoot, found, dags, code, frame, bindLocals):
     suffix = dag["name"][len(code):-len("_DAG")]
     trackName = f"{resource}{suffix}_TRACK" if suffix else found["root"]
     sameName = instances.get(trackName, [])
-    # A few WLDs hold two different tracks under one name; which one the client uses is not known.
-    if len(sameName) > 1:
-      raise ValueError(f"{found['archive']}:{found['wld']} holds {len(sameName)} different tracks named {trackName}; which one the client uses is not known")
     if sameName:
       definition, millisecondsPerFrame = eqSkeletons.trackInstance(worldFile, sameName[0].index)
       boneTracks[index] = (trackName, eqSkeletons.trackFrames(worldFile, definition), millisecondsPerFrame)
@@ -298,12 +296,6 @@ def eqgMaterialTextures(materials, triangleMaterials, diffuseSwaps):
     textures.append(diffuse.lower() if diffuse else None)
     cutouts.append(bool(diffuse) and materials[materialIndex]["shader"].lower().startswith("chroma"))
   return textures, cutouts
-
-
-def drawnExtent(parts):
-  """Lowest and highest corner of the vertices that drawn triangles use."""
-  drawn = numpy.concatenate([part["vertices"][numpy.unique(part["triangles"])] for part in parts if len(part["triangles"])])
-  return drawn.min(0), drawn.max(0)
 
 
 def meshPart(vertices, triangles, uvs, textures, cutouts):
@@ -413,11 +405,9 @@ def wldSkeletalParts(archive, definition, appearance, animator):
   dags, skins = eqSkeletons.readSkeleton(worldFile, skeleton)
   meshes = eqSkeletons.skinMeshes(worldFile, skins)
   code = definition["model"].upper()
-  localTransforms, pose, restTransforms, rest = None, {"bind": "no animation requested"}, None, "bind"
+  localTransforms, pose = None, {"bind": "no animation requested"}
   if animator is not None:
-    localTransforms, pose = animator.pose(worldFile, dags, code, animator.request)
-    restTransforms, restPose = animator.pose(worldFile, dags, code, animator.stand)
-    rest = "bind" if restTransforms is None else f"{restPose['resource']} frame 0"
+    localTransforms, pose = animator.pose(worldFile, dags, code)
   meshesByName = {fragment.name.upper(): fragment for fragment in worldFile.fragmentsOfType(0x36)}
   replacements = {}
   if appearance["variation"] != 0:
@@ -426,12 +416,7 @@ def wldSkeletalParts(archive, definition, appearance, animator):
   chosen = [meshesByName.get(replacements.get(mesh.name.upper()), mesh) for mesh in meshes]
   swaps = wldTextureSetSwaps(worldFile, code, appearance["textureSet"])
   parts, particleClouds = eqSkeletons.posedSkeleton(worldFile, skeleton, chosen, lambda mesh: wldMeshPart(mesh, swaps), localTransforms)
-  # An animation moves bones about a fixed model origin, so size and footing come from the client's stand (else the bind pose) whatever the frame.
-  restParts = eqSkeletons.posedSkeleton(worldFile, skeleton, chosen, lambda mesh: wldMeshPart(mesh, swaps), restTransforms)[0]
-  return {
-    "parts": parts, "pose": pose, "pieces": [mesh.name for mesh in chosen], "swappedMaterials": len(swaps), "particleCloudsNotDrawn": particleClouds,
-    "restExtent": drawnExtent(restParts), "rest": rest,
-  }
+  return {"parts": parts, "pose": pose, "pieces": [mesh.name for mesh in chosen], "swappedMaterials": len(swaps), "particleCloudsNotDrawn": particleClouds}
 
 
 partBuilders = {"eqgStatic": eqgStaticParts, "eqgSkinned": eqgSkinnedParts, "wldStatic": wldStaticParts, "wldSkeletal": wldSkeletalParts}
@@ -440,24 +425,22 @@ partBuilders = {"eqgStatic": eqgStaticParts, "eqgSkinned": eqgSkinnedParts, "wld
 class Animator:
   """Poses a spawn's skeleton by an animation frame, found as the client finds it through the archives linked to the zone."""
 
-  stand = {"animation": None, "variant": None, "frame": 0}
-
   def __init__(self, clientRoot, cacheRoot, zoneName, request):
     self.clientRoot = clientRoot
     self.index = loadIndex(clientRoot, cacheRoot)
     self.links = loadOrder(clientRoot, zoneName)[0]
     self.request = request
 
-  def pose(self, worldFile, dags, code, request):
+  def pose(self, worldFile, dags, code):
     if dags[0]["name"] != f"{code}_DAG":
       raise ValueError(f"{worldFile.sourceName}: the root bone of {code} is '{dags[0]['name']}', not {code}_DAG")
     isLuclin = any(dag["name"] == f"{code}TUNIC_POINT_DAG" for dag in dags)
-    found, reason = findAnimation(self.index, self.links, code, isLuclin, request)
+    found, reason = findAnimation(self.index, self.links, code, isLuclin, self.request)
     if found is None:
-      if request["animation"] is not None:
-        raise ValueError(f"Model {code} has no animation {request['animation']}: {reason}")
+      if self.request["animation"] is not None:
+        raise ValueError(f"Model {code} has no animation {self.request['animation']}: {reason}")
       return None, {"bind": reason}
-    localTransforms, timing = animationTransforms(self.clientRoot, found, dags, code, request["frame"], eqSkeletons.bindTransforms(worldFile, dags))
+    localTransforms, timing = animationTransforms(self.clientRoot, found, dags, code, self.request["frame"], eqSkeletons.bindTransforms(worldFile, dags))
     return localTransforms, found | timing
 
 
@@ -531,7 +514,6 @@ def buildModel(clientRoot, cacheRoot, modelName, zoneName, source=None, appearan
     holder = next(candidate for candidate in textureHolders if candidate.archivePath.name.lower() == holderName)
     (modelFolder / textureName).write_bytes(eqTextures.readableTexture(textureName, holder.read(textureName)))
   numpy.savez(modelFolder / "model.npz", vertices=vertices, triangles=triangles, uvs=uvs, textureNames=numpy.array(textures), cutouts=numpy.array(cutouts), missingTextures=numpy.array(missingTextures, dtype=str))
-  restMinimum, restMaximum = built.get("restExtent") or (vertices.min(0), vertices.max(0))
   details = stamp | {
     "model": definition["model"],
     "pose": built["pose"],
@@ -544,9 +526,6 @@ def buildModel(clientRoot, cacheRoot, modelName, zoneName, source=None, appearan
     "droppedTriangles": sum(part["dropped"] for part in parts),
     "minimum": [float(value) for value in vertices.min(0)],
     "maximum": [float(value) for value in vertices.max(0)],
-    "rest": built.get("rest", "static"),
-    "restMinimum": [float(value) for value in restMinimum],
-    "restMaximum": [float(value) for value in restMaximum],
   }
   stampPath.write_text(json.dumps(details, indent=1), encoding="utf-8")
   return modelFolder, details

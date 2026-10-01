@@ -15,7 +15,7 @@ mesh.materials.append(material)
 zoneProperties = {
   "fogColor": [0.55, 0.6, 0.7], "fogStart": 30, "fogEnd": 200,
   "sunAzimuthDegrees": 135, "sunElevationDegrees": 45, "sunColor": [1, 0.95, 0.85], "sunStrength": 3,
-  "ambientColor": [0.3, 0.3, 0.35],
+  "ambientColor": [0.3, 0.3, 0.35], "newEngineZone": False,
 }
 eyeLevelView = {"standAt": [0, 0, 0], "headingDegrees": 0, "pitchDegrees": 0}
 eyeHeight = 5.5
@@ -121,6 +121,7 @@ material.node_tree.links.new(texture.outputs['Color'], material.node_tree.nodes[
   assert images["grassTexture"]["packed"] is False
   assert {"name": "grass", "textures": ["grassTexture"]} in summary["materials"]
   assert summary["zoneProperties"]["fogEnd"] == 200
+  assert summary["zoneProperties"]["newEngineZone"] is False
   assert [sceneObject["name"] for sceneObject in summary["objects"]] == ["ground"]
   assert summary["objects"][0]["triangles"] == 2
 
@@ -151,7 +152,7 @@ def testRenderWithoutZonePropertiesFails(stageBlenderServer):
     await session.expectSuccess("runPython", {"code": groundSceneCode})
     return await session.expectError("renderView", {"view": eyeLevelView})
 
-  assert "Zone properties missing: ['fogColor'," in stageBlenderServer.session(steps)
+  assert "Zone properties missing: ['fogColor', 'fogStart', 'fogEnd', 'sunAzimuthDegrees', 'sunElevationDegrees', 'sunColor', 'sunStrength', 'ambientColor', 'newEngineZone']" in stageBlenderServer.session(steps)
 
 
 def testRenderIsDeterministicFoggedAndFiled(stageBlenderServer):

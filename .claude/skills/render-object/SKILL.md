@@ -14,8 +14,8 @@ description: Place and render EverQuest ground objects in a zonewright Blender s
 | `zone` | The zone the object is in; the client loads its archives after its startup archives |
 | `model` | The object's actor: `IT10800_ACTORDEF` (with or without `_ACTORDEF`), ... |
 | `location` + `headingDegrees` | Blender position of the model origin and turn (0 = +Y, clockwise from above) |
-| `eqLocation` + `eqHeading` | Or the server's values as the dumps give them; give one pair, not both |
-| `scale` | The object's scale (default 1) |
+| `x`, `y`, `z` + `heading` | Or EQ's values as the server and the dumps give them (heading 0 faces EQ +y, 128 faces +x); give these or the Blender pair, not both |
+| `scale` | The object's scale, as the dumps give it (default 1) |
 | `source` | `"archive"` or `"archive:entry"` to take a definition other than the first the client loads |
 | `name`, `collection` | Object name and collection |
 
@@ -28,8 +28,8 @@ Objects are not snapped to the ground: the server's z is the model origin.
 | Column | Argument |
 |---|---|
 | `name` | `model` |
-| `x`, `y`, `z` | `eqLocation` = `[x, y, z]` |
-| `heading` | `eqHeading` |
+| `x`, `y`, `z` | `x`, `y`, `z` |
+| `heading` | `heading` |
 | `scale` | `scale` |
 
 Pitch and roll are 0 in every dumped row, so they are not taken. Housing items placed by players are in `placedObjects\<server>.tsv`.
@@ -46,4 +46,3 @@ Item models (`IT<number>`) come from the first archive the client loads that def
 
 - **Missing textures.** A texture missing from every linked archive draws magenta and is listed in `missingTextures`. The neighborhood's `OBJ_TREEM` bark is one: only its normal map ships.
 - **Particles.** Particle effects (flames, smoke) are not drawn.
-- **Heading direction.** The heading's turn direction for `eqHeading` is still to be checked against a client screenshot (see `render-door`).

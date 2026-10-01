@@ -91,19 +91,21 @@ def modelObject(folder, name, scale, location, rotationDegrees):
   return modelObjectInstance
 
 
-def placeModel(modelFolder, name, location, rotationDegrees, scale, footHeight, snapToGround, collection):
-  """Place a cached EQ model with its anchor at `location`: the feet (model height footHeight) for a spawn, the model origin (footHeight 0) for a door or object. snapToGround first drops the anchor to the surface below."""
+def placeModel(modelFolder, name, location, rotationDegrees, scale, avatarHeight, snapToGround, collection):
+  """Place a cached EQ model with its origin at `location`; snapToGround instead stands the origin avatarHeight above the surface below, as the client stands a spawn."""
   bridgeObjects.requireNewName(name)
-  anchor = mathutils.Vector(location)
+  origin = mathutils.Vector(location)
+  ground = None
   if snapToGround:
-    hit = bridgeMeshAccess.rayCast(anchor + mathutils.Vector((0, 0, 1)), (0, 0, -1), 1000)
+    hit = bridgeMeshAccess.rayCast(origin + mathutils.Vector((0, 0, 1)), (0, 0, -1), 1000)
     if hit is None:
       raise ValueError(f"No ground below {list(location)} for '{name}'")
-    anchor = hit[0]
-  placed = modelObject(modelFolder, name, scale, anchor - mathutils.Vector((0, 0, footHeight * scale)), rotationDegrees)
+    ground = hit[0]
+    origin = ground + mathutils.Vector((0, 0, avatarHeight))
+  placed = modelObject(modelFolder, name, scale, origin, rotationDegrees)
   bridgeObjects.targetCollection(collection).objects.link(placed)
   bpy.context.view_layer.update()
-  return bridgeObjects.describeTransform(placed) | {"anchor": bridgeObjects.roundVector(anchor), "dimensions": bridgeObjects.roundVector(placed.dimensions)}
+  return bridgeObjects.describeTransform(placed) | {"ground": ground and bridgeObjects.roundVector(ground), "dimensions": bridgeObjects.roundVector(placed.dimensions)}
 
 
 commands = {

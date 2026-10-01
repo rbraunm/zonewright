@@ -7,7 +7,7 @@ import mathutils
 
 import bridgeModels
 
-requiredZoneKeys = ("fogColor", "fogStart", "fogEnd", "sunAzimuthDegrees", "sunElevationDegrees", "sunColor", "sunStrength", "ambientColor")
+requiredZoneKeys = ("fogColor", "fogStart", "fogEnd", "sunAzimuthDegrees", "sunElevationDegrees", "sunColor", "sunStrength", "ambientColor", "newEngineZone")
 previewName = "zonewrightPreview"
 renderWidth = 960
 renderHeight = 540
@@ -131,9 +131,9 @@ class PreviewScene:
     return (location, normal, faceIndex, hitObject) if hit else None
 
   def addFigure(self, groundPoint, figureModel, facingHeadingDegrees):
-    """The figure model faces +X; facingHeadingDegrees is 0 = +Y, clockwise."""
-    feet = groundPoint - mathutils.Vector((0, 0, figureModel["footHeight"] * figureModel["scale"]))
-    figure = bridgeModels.modelObject(figureModel["folder"], previewName + "Figure", figureModel["scale"], feet, 90 - facingHeadingDegrees)
+    """The figure model faces +X and stands its origin avatarHeight above the ground; facingHeadingDegrees is 0 = +Y, clockwise."""
+    origin = groundPoint + mathutils.Vector((0, 0, figureModel["avatarHeight"]))
+    figure = bridgeModels.modelObject(figureModel["folder"], previewName + "Figure", figureModel["scale"], origin, 90 - facingHeadingDegrees)
     return self.addObject(figure)
 
   def remove(self):
@@ -205,7 +205,7 @@ def placeScaleFigure(preview, ground, headingDegrees, figureModel):
     position = sideHit[0]
   walked = 0.0
   while walked < figureDistance:
-    chest = position + mathutils.Vector((0, 0, figureModel["size"] / 2))
+    chest = position + mathutils.Vector((0, 0, figureModel["avatarHeight"]))
     if preview.rayCast(chest, ahead, figureStep + figureClearance) is not None:
       break
     nextGround = preview.rayCast(position + ahead * figureStep + mathutils.Vector((0, 0, figureStepClimb)), mathutils.Vector((0, 0, -1)), figureStepClimb + figureStepDrop)
