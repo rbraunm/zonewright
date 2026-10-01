@@ -239,7 +239,8 @@ def parseAnimation(animationBytes, sourceName):
 
 
 def parseLayers(layerBytes, sourceName):
-  """EQGL (.lay): named texture-set layers, each a 32-byte record (name, five texture slots, two more fields) after the string table."""
+  """EQGL (.lay): named texture-set layers, each a 32-byte record (name, five texture slots, two more fields) after the string
+  table. Texture names keep their case, which tells the client their type."""
   if layerBytes[:4] != b"EQGL":
     raise ValueError(f"{sourceName}: magic {layerBytes[:4]!r} is not EQGL")
   _, stringLength, layerCount = struct.unpack_from("<3I", layerBytes, 4)
@@ -250,5 +251,5 @@ def parseLayers(layerBytes, sourceName):
   layers = {}
   for index in range(layerCount):
     nameOffset, *textureOffsets = struct.unpack_from("<6I", layerBytes, position + index * layerRecordBytes)
-    layers[readString(stringTable, nameOffset).upper()] = [readString(stringTable, offset).lower() for offset in textureOffsets if offset != 0xFFFFFFFF]
+    layers[readString(stringTable, nameOffset).upper()] = [readString(stringTable, offset) for offset in textureOffsets if offset != 0xFFFFFFFF]
   return layers

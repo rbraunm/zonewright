@@ -33,10 +33,11 @@ def linearChannel(value):
   return channel / 12.92 if channel <= 0.04045 else ((channel + 0.055) / 1.055) ** 2.4
 
 
-def modelMaterial(folder, textureName, cutout, tint):
-  """One material per texture, cutout mode, and tint, reused across objects built from the same cache folder. A tint other than white
-  multiplies the texture's color, as the client tints hair (0xRRGGBB)."""
-  materialName = f"eq_{os.path.basename(folder)}_{textureName}{'_cutout' if cutout else ''}{'' if tint == untinted else f'_{tint:06x}'}"
+def modelMaterial(folder, textureName, alphaMode, tint):
+  """One material per texture, alpha mode, and tint, reused across objects built from the same cache folder. A tint other than white
+  multiplies the texture's color, as the client tints hair (0xRRGGBB). A cutout keeps the pixels whose alpha passes the threshold; a
+  blended material is as opaque as its alpha."""
+  materialName = f"eq_{os.path.basename(folder)}_{textureName}{'' if alphaMode == 'opaque' else f'_{alphaMode}'}{'' if tint == untinted else f'_{tint:06x}'}"
   material = bpy.data.materials.get(materialName)
   texturePath = os.path.join(folder, textureName)
   if material is not None and material.node_tree.nodes["eqDiffuse"].image.filepath == texturePath:
@@ -61,13 +62,18 @@ def modelMaterial(folder, textureName, cutout, tint):
     material.node_tree.links.new(diffuse.outputs["Color"], colorInputs[0])
     colorInputs[1].default_value = (*(linearChannel((tint >> shift) & 0xFF) for shift in (16, 8, 0)), 1.0)
     material.node_tree.links.new(next(socket for socket in multiply.outputs if socket.type == "RGBA"), shader.inputs["Base Color"])
-  if cutout:
+  if alphaMode == "cutout":
     threshold = nodes.new("ShaderNodeMath")
     threshold.operation = "GREATER_THAN"
     threshold.inputs[1].default_value = alphaThreshold
     material.node_tree.links.new(diffuse.outputs["Alpha"], threshold.inputs[0])
     material.node_tree.links.new(threshold.outputs["Value"], shader.inputs["Alpha"])
     material.surface_render_method = "DITHERED"
+  elif alphaMode == "blended":
+    material.node_tree.links.new(diffuse.outputs["Alpha"], shader.inputs["Alpha"])
+    material.surface_render_method = "DITHERED"
+  elif alphaMode != "opaque":
+    raise ValueError(f"Alpha mode '{alphaMode}' is not opaque, cutout, or blended")
   return material
 
 
@@ -87,8 +93,8 @@ def buildModelMesh(folder, meshName):
   missing = {str(name) for name in data["missingTextures"]}
   slots = {}
   materialIndices = numpy.empty(len(triangles), dtype=numpy.int32)
-  for index, (textureName, cutout, tint) in enumerate(zip(data["textureNames"], data["cutouts"], data["tints"])):
-    key = (str(textureName), bool(cutout), int(tint))
+  for index, (textureName, alphaMode, tint) in enumerate(zip(data["textureNames"], data["alphaModes"], data["tints"])):
+    key = (str(textureName), str(alphaMode), int(tint))
     if key not in slots:
       slots[key] = len(slots)
       mesh.materials.append(missingTextureMaterial(key[0]) if key[0] in missing else modelMaterial(folder, *key))

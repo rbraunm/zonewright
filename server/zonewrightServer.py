@@ -363,10 +363,13 @@ async def findModel(model: str, zone: str | None = None):
   " ground below its position, as the client stands a spawn; with snapToGround false it sits at the position. Front faces its heading."
   " The result gives height, scale, and avatarHeight, which compare with the dumps' height and avatarHeight. Appearance as the client applies it: variation"
   " swaps the body piece, headType the head, textureSet the texture set (the dumps' textureType; -1 there means no override, so 0)."
-  " Head looks take the dumps' terms: faceStyle swaps a Luclin model's face materials; hairStyle and hairColor, and facialHair and"
-  " facialHairColor (255 for none), attach a Luclin model's hair and beard items (IT<n> from the Luclin equipment archives) tinted"
-  " by the client's color table, or a Drakkin's <code>_HAIR_<nn> piece. The result's source.unattached lists any the client would"
-  " not attach either. The character is posed at"
+  " Head looks take the dumps' terms. On a Luclin model faceStyle swaps the face materials, and hairStyle and hairColor, and facialHair"
+  " and facialHairColor (255 for none), attach hair and beard items (IT<n> from the Luclin equipment archives) tinted by the client's"
+  " color table. A Drakkin takes its looks from the client's PlayerCustomization.txt row for its heritage: faceStyle and eyeColor1"
+  " (both eyes) lay face and eye textures, and hairStyle, facialHair, tattoo, and details attach hair, beard, tattoo, and facial"
+  " attachment pieces, the first two tinted from the heritage's colors by hairColor and facialHairColor, the others by its base color;"
+  " a value past the heritage's count is 0, as in the client. The result's source.unattached lists any piece the client would not"
+  " attach either. The character is posed at"
   " animationFrame of animation: a code such as L01 or S03, the client's label such as WALK or WAVE, or an EQG name such as STND or"
   " NRUN; default P01, STAND STILL, which EQG models play as STND. A WLD model plays the client's animation for it: its own, else the"
   " one it borrows (a dark elf the elf's); animationVariant picks a lettered variant (A, B, ...) of a Luclin model's animation. An EQG"
@@ -378,14 +381,14 @@ async def placeSpawn(
   location: list[float] | None = None, headingDegrees: float | None = None,
   x: float | None = None, y: float | None = None, z: float | None = None, heading: float | None = None,
   variation: int = 0, headType: int = 0, textureSet: int = 0, faceStyle: int = 0, hairStyle: int = 0, hairColor: int = 0,
-  facialHair: int = 255, facialHairColor: int = 0,
+  facialHair: int = 255, facialHairColor: int = 0, eyeColor1: int = 0, heritage: int = 0, tattoo: int = 0, details: int = 0,
   animation: str | None = None, animationVariant: str | None = None, animationFrame: int = 0,
   source: str | None = None, snapToGround: bool = True, collection: str | None = None,
 ):
   frameLocation, rotation = placementFrame(location, headingDegrees, x, y, z, heading)
   appearance = {
     "variation": variation, "headType": headType, "textureSet": textureSet, "faceStyle": faceStyle, "hairStyle": hairStyle, "hairColor": hairColor,
-    "facialHair": facialHair, "facialHairColor": facialHairColor,
+    "facialHair": facialHair, "facialHairColor": facialHairColor, "eyeColor1": eyeColor1, "heritage": heritage, "tattoo": tattoo, "details": details,
   }
   pose = {"animation": animation, "variant": animationVariant.upper() if animationVariant else None, "frame": animationFrame}
   spawn = await anyio.to_thread.run_sync(spawnModel, zone, model, height, await zoneIsNewEngine(context), source, appearance, pose)

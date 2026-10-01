@@ -1,4 +1,5 @@
-"""How the client dresses a Luclin character's head without equipment, transcribed from eqgame.exe: faces, and hair and beard items with their colors."""
+"""How the client dresses a character's head without equipment, transcribed from eqgame.exe: a Luclin model's faces, and hair and
+beard items with their colors; an EQG player model's faces, eyes, and attached pieces from PlayerCustomization.txt."""
 import eqRaces
 
 # 0x40a290: each race's block of Luclin hair and beard items; a female's block starts 30 higher, and other races' at 0.
@@ -20,6 +21,11 @@ hairColors = (
 )
 untinted = 0xFFFFFF
 noStyle = 255
+# 0x40ed07: the races whose EQG models take their looks from PlayerCustomization.txt (0x40ecf0).
+playerRaces = frozenset(range(1, 13)) | {128, 130, 330, 522}
+# 0x40b580: the skeleton bone each EQG look piece attaches at.
+hairBone, beardBone, facialAttachmentBone, tattooBone = "CHEST_CHEST03", "NECK_NECK", "HEAD_HEAD", "ROOT_BONE"
+customizationCounts = ("faces", "hairStyles", "eyes", "beards", "tattoos", "facialAttachments")
 
 
 def raceAndGender(code):
@@ -53,6 +59,64 @@ def headItems(code, appearance):
   if appearance["facialHair"] != noStyle and beardType != noBeardType:
     items.append((f"IT{beardItemStart + base + appearance['facialHair']}", beardPoint, hairColor(appearance["facialHairColor"])))
   return items
+
+
+def tint(color):
+  """A color as the client tints with it: black leaves the piece untinted (0x40b260)."""
+  return color & 0xFFFFFF or untinted
+
+
+def isEQGPlayerModel(code):
+  return any(registeredCode == code and race in playerRaces and flags & eqRaces.eqgModelFlag for race, _, registeredCode, flags, _ in eqRaces.raceRegistrations)
+
+
+def playerCustomizations(clientRoot):
+  """Resources/PlayerCustomization.txt as eqgame.exe reads it (0x8ce3f0), by (race, heritage, sex): the base color, the color list,
+  and how many of each look there are. A later row for the same key wins, as the client chains it ahead of the earlier one."""
+  path = clientRoot / "Resources" / "PlayerCustomization.txt"
+  if not path.is_file():
+    raise ValueError(f"The client has no {path}")
+  customizations = {}
+  for lineNumber, line in enumerate(path.read_text(encoding="latin1").splitlines(), 1):
+    if not line.strip() or line.startswith("#"):
+      continue
+    fields = line.split("^")
+    if len(fields) != 13:
+      raise ValueError(f"{path}:{lineNumber} has {len(fields)} fields, not the 13 from RACE to SEX")
+    race, heritage, _, baseColor, _, colors, *counts, sex = fields
+    customizations[(int(race), int(heritage), int(sex))] = {
+      "baseColor": int(baseColor), "colors": [int(color, 16 if color.startswith("0x") else 10) for color in colors.split(",") if color],
+    } | dict(zip(customizationCounts, map(int, counts)))
+  return customizations
+
+
+def eqgPlayerLooks(clientRoot, code, appearance):
+  """The looks eqgame.exe gives an EQG player model as it spawns (0x40ecf0). A value past its count in the model's row is 0. The
+  face and eye layers go on palette entries 0, 1, and 2 (0x40ad60, 0x40add0), both eyes taking eyeColor1. The hair, beard, tattoo,
+  and facial attachment pieces (0x40ac80, 0x40acf0, 0x40ae60, 0x40b050) are (name, bone, tint, layer for their palette entry 0):
+  hair and beard tinted from the color list, the others by the base color, and a tattoo past 0 laying its own layer."""
+  race, gender = raceAndGender(code)
+  customization = playerCustomizations(clientRoot).get((race, appearance["heritage"], gender))
+  if customization is None:
+    raise ValueError(f"PlayerCustomization.txt has no row for race {race}, heritage {appearance['heritage']}, sex {gender}")
+  colorCount = len(customization["colors"])
+  limits = {
+    "faceStyle": customization["faces"], "hairStyle": customization["hairStyles"], "eyeColor1": customization["eyes"], "facialHair": customization["beards"],
+    "tattoo": customization["tattoos"], "details": customization["facialAttachments"], "hairColor": colorCount, "facialHairColor": colorCount,
+  }
+  look = {key: appearance[key] if appearance[key] < limit else 0 for key, limit in limits.items()}
+  # 0x8ceb30: an empty color list gives black, which leaves the piece untinted.
+  colors = customization["colors"] or [0]
+  baseTint = tint(customization["baseColor"])
+  return {
+    "layers": [(0, f"C_{code}_HEAD_S{look['faceStyle']:02d}_M01"), (1, f"C_{code}_RIGHTEYE_S{look['eyeColor1']:02d}_M02"), (2, f"C_{code}_LEFTEYE_S{look['eyeColor1']:02d}_M03")],
+    "pieces": [
+      (f"{code}_HAIR_{look['hairStyle']:02d}", hairBone, tint(colors[look["hairColor"]]), None),
+      (f"{code}_FACIALHAIR_{look['facialHair']:02d}", beardBone, tint(colors[look["facialHairColor"]]), None),
+      (f"{code}_TATTOO_00", tattooBone, baseTint, f"A_{code}_TATTOO_S{look['tattoo']:02d}_M01" if look["tattoo"] > 0 else None),
+      (f"{code}_FACIALATT_{look['details']:02d}", facialAttachmentBone, baseTint, None),
+    ],
+  }
 
 
 def faceSwaps(code, faceStyle, materialNames):

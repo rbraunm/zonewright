@@ -1,3 +1,5 @@
+import re
+
 from conftest import pinnedBlender
 
 
@@ -144,15 +146,15 @@ def testEQGSpawnsPlayTheClientsEQGAnimations(stageBlenderServer):
     "animation": "WAVE", "wldAnimation": "S03", "resource": "WAVE_BA_1_DKF", "archive": "dkf.eqg", "frame": 20, "frameCount": 44, "frameMilliseconds": 1333,
   }
   assert wave["dimensions"][2] > stand["dimensions"][2] + 0.5
-  # The default stand is STND; hairStyle attaches the client's DKF_HAIR_<nn> piece.
-  assert (stand["source"]["pose"]["resource"], stand["source"]["pieces"]) == ("STND_BA_1_DKF", ["dkf.mod", "DKF_HAIR_02"])
+  # The default stand is STND; hairStyle attaches the client's DKF_HAIR_<nn> piece, and facial hair 255 is past a Drakkin's count, so 0.
+  assert (stand["source"]["pose"]["resource"], stand["source"]["pieces"]) == ("STND_BA_1_DKF", ["dkf.mod", "DKF_HAIR_02", "DKF_FACIALHAIR_00", "DKF_TATTOO_00", "DKF_FACIALATT_00"])
   # The DLL lowers the root by ROffset, so the feet meet the ground below an origin standing avatarHeight up.
   assert stand["location"][2] == round(stand["avatarHeight"], 3)
   assert 0 <= standDetail["worldMinimum"][2] < 0.1
   assert (walk["source"]["pose"]["animation"], walk["source"]["pose"]["resource"]) == ("WALK", "WALK_BA_1_GBN")
   assert "has frames 0-43, not 44" in lateFrame
   assert "its animations have no lettered variants" in lettered
-  assert "only its hairStyle is read yet, got {'variation': 1}" in armor
+  assert "variation, headType, and textureSet are not read for it yet, got {'variation': 1}" in armor
 
 
 def testDoorsAndObjectsComeFromTheZonesArchives(stageBlenderServer):
@@ -203,4 +205,45 @@ def testLuclinHeadsTakeTheClientsFaceHairAndBeard(stageBlenderServer):
   assert bearded["source"]["pieces"][-2:] == ["IT1360", "IT2361"]
   assert darkElf["source"]["pieces"][-1] == "IT1180"
   assert darkElf["source"]["unattached"] == []
-  assert noStyle["source"]["unattached"] == [{"item": "IT1399", "reason": "no archive the client loads defines it"}]
+  assert noStyle["source"]["unattached"] == [{"piece": "IT1399", "reason": "no archive the client loads defines it"}]
+
+
+def testDrakkinTakeTheirLooksFromPlayerCustomization(stageBlenderServer):
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("setZoneProperties", {"newEngineZone": True})
+    anastrel = await session.expectSuccess("placeSpawn", {
+      "zone": "guildhalllrg", "model": "DKF", "name": "anastrel", "height": 5.7, "x": -467.625, "y": 20, "z": -21.19, "heading": 10.25,
+      "faceStyle": 0, "hairStyle": 6, "hairColor": 0, "facialHair": 1, "facialHairColor": 0, "eyeColor1": 2, "heritage": 3, "tattoo": 3, "details": 3, "snapToGround": False,
+    })
+    anastrelDetail = await session.expectSuccess("getObjectDetail", {"name": "anastrel"})
+    bounded = await session.expectSuccess("placeSpawn", {
+      "zone": None, "model": "DKM", "name": "bounded", "height": 6, "location": [10, 0, 0], "headingDegrees": 0, "faceStyle": 4, "hairStyle": 20, "hairColor": 9, "snapToGround": False,
+    })
+    boundedDetail = await session.expectSuccess("getObjectDetail", {"name": "bounded"})
+    missingHair = await session.expectSuccess("placeSpawn", {"zone": None, "model": "DKM", "name": "missingHair", "height": 6, "location": [20, 0, 0], "headingDegrees": 0, "hairStyle": 8, "snapToGround": False})
+    noHeritage = await session.expectError("placeSpawn", {"zone": None, "model": "DKF", "name": "noHeritage", "height": 6, "location": [30, 0, 0], "headingDegrees": 0, "heritage": 9})
+    luclinEyes = await session.expectError("placeSpawn", {"zone": None, "model": "HUF", "name": "luclinEyes", "height": 6, "location": [40, 0, 0], "headingDegrees": 0, "eyeColor1": 3})
+    return anastrel, anastrelDetail, bounded, boundedDetail, missingHair, noHeritage, luclinEyes
+
+  anastrel, anastrelDetail, bounded, boundedDetail, missingHair, noHeritage, luclinEyes = stageBlenderServer.session(steps)
+  # The Palatial Guild Hall's Anastrel as the live dump records her. Heritage 3 (Venesh the Green) tints her hair and facial hair
+  # with color 0 of its list (0x000A00) and her tattoo and facial attachment with its base color (0x006400); tattoo 3 lays
+  # A_DKF_TATTOO_S03_M01 on the tattoo piece, which the client blends by its alpha. Face 0 and eye color 2 lay the head and both
+  # eye layers.
+  assert anastrel["source"]["pieces"] == ["dkf.mod", "DKF_HAIR_06", "DKF_FACIALHAIR_01", "DKF_TATTOO_00", "DKF_FACIALATT_03"]
+  assert anastrel["source"]["swappedMaterials"] == 3
+  # Material names follow the cache folder, whose pose key ends before the texture name.
+  assert {re.sub(r"^eq_.*?@pose[^_]*_", "", entry["material"]) for entry in anastrelDetail["materials"]} == {
+    "c_dkf_body_s00_m04_c.dds", "c_dkf_head_s00_m01_c.dds", "c_dkm_righteye_s02_m02_c.dds", "a_dkf_hr_s06_c.dds_000a00", "a_dkf_hr_s06_c.dds_blended_000a00",
+    "a_dkm_fh_c.dds_blended_000a00", "a_dkf_tattoo_s03_m01_c.dds_blended_006400", "a_dkf_hr_s04_c.dds_006400",
+  }
+  # Values past the heritage's counts are 0: hair style 20 of a male's 9 and color 9 of 4 give DKM_HAIR_00 in Atathus the Red's
+  # first color (0x1E0000); face 4 is within the 7 faces.
+  assert bounded["source"]["pieces"][1] == "DKM_HAIR_00"
+  assert any(entry["material"].endswith("a_dkm_hr_s00_c.dds_1e0000") for entry in boundedDetail["materials"])
+  assert any(entry["material"].endswith("c_dkm_head_s04_m01_c.dds") for entry in boundedDetail["materials"])
+  # PlayerCustomization.txt allows a male 9 hair styles, but no archive defines DKM_HAIR_08, so the client attaches none.
+  assert missingHair["source"]["unattached"] == [{"piece": "DKM_HAIR_08", "reason": "no archive the client loads defines it"}]
+  assert "PlayerCustomization.txt has no row for race 522, heritage 9, sex 1" in noHeritage
+  assert "how the client colors its eyes" in luclinEyes

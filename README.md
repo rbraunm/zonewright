@@ -135,7 +135,17 @@ Characters take the client's appearance rules (from `EQGraphicsDX9.dll`):
 
 - **Pieces:** the body piece `<code><nn>` for `variation` and the head piece `<code>HE<nn>` for `headType`, keeping the default when the model lacks the piece.
 - **Texture sets:** `.lay` layers `C_<code>_S<set>_M<n>` for `.mds` models, and `<code><part><set><nn>_MDF` materials for WLD ones.
-- **Drakkin hair:** `hairStyle` attaches `<code>_HAIR_<nn>` (`eqgame.exe` `0x40ac80`, called for the head slot when no helm is worn) where the client defines one.
+- **Layers:** a layer's `M<n>` is entry `n - 1` of the model's material palette. A `.mds` palette holds every material (`0x100631e0`); a `.mod` palette holds only the materials its triangles use, in file order (`0x100620f0`), so an unused `FailsafeShader` takes no entry. A layer's textures are typed by the uppercase letter before `.DDS`: `C` diffuse, `N` normal, `E` environment (`0x100169cd`).
+- **Blending:** an EQG material blends by the first family its shader's name contains (`0x100147f0`): `Alpha` blends by the texture's alpha and `Chroma` cuts out by it. `AddAlpha` (additive) is drawn opaque, as additive blending is not drawn yet.
+- **Hair on other EQG models:** `hairStyle` attaches `<code>_HAIR_<nn>` (`eqgame.exe` `0x40ac80`, called for the head slot when no helm is worn) where the client defines one.
+- **Attached EQG pieces:** a piece's first bone shares the matrix of the skeleton bone its slot names (`eqgame.exe` `0x40b580`: hair at `CHEST_CHEST03`, beard at `NECK_NECK`, facial attachment at `HEAD_HEAD`, tattoo at `ROOT_BONE`); each other bone shares the skeleton's bone of the same name (`0x10043e10`).
+
+A Drakkin's look comes from `Resources\PlayerCustomization.txt`, as the client applies it to an EQG model of a player race when it spawns (`eqgame.exe` `0x40ecf0`; `eqLooks.py`):
+
+- **The row:** the file has one row per race, heritage (`PARENT_ID`), and sex, giving a base color, a color list, and how many faces, hair styles, eye colors, beards, tattoos, and facial attachments there are (`0x8ce3f0`). A look past its count is 0; a heritage with no row is an error.
+- **Face and eyes:** layers `C_<code>_HEAD_S<faceStyle>_M01`, `C_<code>_RIGHTEYE_S<eyeColor1>_M02`, and `C_<code>_LEFTEYE_S<eyeColor1>_M03` go on palette entries 0, 1, and 2 (`0x40ad60`, `0x40add0`). Both eyes take `eyeColor1`.
+- **Pieces:** `<code>_HAIR_<hairStyle>`, `<code>_FACIALHAIR_<facialHair>`, `<code>_TATTOO_00`, and `<code>_FACIALATT_<details>` attach at their slots (`0x40ac80`, `0x40acf0`, `0x40ae60`, `0x40b050`). A tattoo past 0 lays `A_<code>_TATTOO_S<tattoo>_M01` on the tattoo piece. A piece no archive defines attaches nothing, as for `DKM_HAIR_08`, and is listed under `unattached`.
+- **Color:** hair and facial hair take the color list's `hairColor` and `facialHairColor` entries; the tattoo and facial attachment take the base color. Black leaves a piece untinted (`0x40b260`).
 
 A Luclin character's head follows the client's appearance rules (`eqLooks.py`, traced from the character customization window into `eqgame.exe`):
 
