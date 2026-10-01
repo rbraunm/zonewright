@@ -4,7 +4,7 @@ MCP server that gives Claude hands and eyes in Blender to build EverQuest zones 
 
 ## Roles
 - Claude does all the work. The owner supplies concept art, references, and approvals; never ask the owner to edit anything in Blender.
-- The .blend is the source of truth. Python is how Claude's hands move, not a generator that rebuilds the scene. Any operation done by hand twice becomes an MCP tool.
+- The .blend is the source of truth. Work like an artist through the toolkit's purpose-built tools, not a generator that rebuilds the scene. `runPython` is the fallback for what no tool covers yet; when it covers the same kind of operation twice, propose a tool for it (its calls are logged and counted in `getToolingStatus`).
 
 ## Work files
 zonewright is a standalone MCP server; it is not tied to any particular work repository. Tools take full paths to .blend files wherever they live. A work file holds only what an artist would save: textures are separate files on paths relative to the .blend, never packed.

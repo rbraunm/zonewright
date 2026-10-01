@@ -61,7 +61,7 @@ def sortValue(row, sortPath):
 @server.tool()
 def getToolingStatus():
   """Compare installed Blender and extensions with the pins in toolingManifest.json, and report the bridge."""
-  return toolingStatus.getToolingStatus(toolingRoot) | {"bridge": bridge.status()}
+  return toolingStatus.getToolingStatus(toolingRoot) | {"bridge": bridge.status(), "runPython": toolingLog.countRunPython(toolingRoot)}
 
 
 @server.tool()
@@ -140,7 +140,8 @@ def getZoneNotes(zone: str):
 
 @server.tool()
 async def runPython(context: Context, code: str):
-  """Run Python in the headless Blender's persistent namespace (bpy, bmesh, mathutils, math). Set `result` to return a JSON value."""
+  """Fallback only: run Python in the headless Blender's persistent namespace (bpy, bmesh, mathutils, math); set `result` to return a JSON value. Prefer a dedicated tool; every call is logged so repeated scripting becomes a tool."""
+  toolingLog.recordRunPython(code)
   return await callBridge(context, "runPython", {"code": code})
 
 
@@ -201,6 +202,183 @@ async def renderView(context: Context, view: dict):
 async def pick(context: Context, view: dict, pixel: list[int]):
   """What is under a pixel ([x, y] from the top-left of the 960x540 render) of a view: object, world position, normal, material, distance."""
   return await callBridge(context, "pick", {"view": view, "pixel": pixel})
+
+
+selectorHelp = (
+  " A selector picks part of a mesh by world position or surface: {\"all\": true}, {\"sphere\": {\"center\": [x,y,z], \"radius\": r}},"
+  " {\"box\": {\"minimum\": [x,y,z], \"maximum\": [x,y,z]}}, {\"cylinder\": {\"center\": [x,y], \"radius\": r, \"bottom\": z, \"top\": z}},"
+  " {\"facing\": {\"direction\": [x,y,z], \"withinDegrees\": d}}, {\"material\": name}, {\"vertexGroup\": name},"
+  " {\"and\": [selectors]}, {\"or\": [selectors]}, {\"not\": selector}. Shapes test vertex positions, or face centers for face operations."
+  " A selector that matches nothing is an error."
+)
+allSelector = {"all": True}
+
+
+@server.tool()
+async def createPrimitive(
+  context: Context, kind: str, name: str, size: list[float], location: list[float],
+  rotationDegrees: list[float] = [0, 0, 0], collection: str | None = None, segments: int | None = None, divisions: list[int] | None = None,
+):
+  """Block out a mesh: plane, grid, cube, cylinder, cone, or sphere built to exactly `size` [x, y, z] (z ignored for plane and grid), origin at its base center (center for flat shapes). Round shapes need `segments`; a grid needs `divisions` [x, y]."""
+  return await callBridge(context, "createPrimitive", {"kind": kind, "name": name, "size": size, "location": location, "rotationDegrees": rotationDegrees, "collection": collection, "segments": segments, "divisions": divisions})
+
+
+@server.tool()
+async def createTerrainGrid(context: Context, name: str, size: list[float], spacing: float, location: list[float], collection: str | None = None):
+  """A flat terrain grid of `size` [x, y] with a vertex every `spacing` units (EQ terrain uses 8 to 24), centered on `location`, ready to sculpt."""
+  return await callBridge(context, "createTerrainGrid", {"name": name, "size": size, "spacing": spacing, "location": location, "collection": collection})
+
+
+@server.tool()
+async def transformObjects(
+  context: Context, names: list[str], translate: list[float] | None = None, rotateDegrees: list[float] | None = None, scale: list[float] | None = None,
+  location: list[float] | None = None, rotationDegrees: list[float] | None = None,
+):
+  """Move, rotate, or scale objects: relative (translate, rotateDegrees about world axes, scale factors) or absolute (location, rotationDegrees); not both forms of one channel."""
+  return await callBridge(context, "transformObjects", {"names": names, "translate": translate, "rotateDegrees": rotateDegrees, "scale": scale, "location": location, "rotationDegrees": rotationDegrees})
+
+
+@server.tool()
+async def duplicateObjects(context: Context, names: list[str], offset: list[float], linkData: bool = False):
+  """Copy objects, offset from the originals; linkData shares the mesh instead of copying it. Returns original to copy names."""
+  return await callBridge(context, "duplicateObjects", {"names": names, "offset": offset, "linkData": linkData})
+
+
+@server.tool()
+async def deleteObjects(context: Context, names: list[str]):
+  """Delete objects; meshes left with no users are removed too."""
+  return await callBridge(context, "deleteObjects", {"names": names})
+
+
+@server.tool()
+async def organize(context: Context, renames: dict[str, str] | None = None, parents: dict[str, str | None] | None = None, collections: dict[str, str] | None = None):
+  """Rename objects (old to new, applied first), then set parents (child to parent, or null to clear; world transform kept) and move objects into collections (created if missing), using the new names."""
+  return await callBridge(context, "organize", {"renames": renames, "parents": parents, "collections": collections})
+
+
+@server.tool()
+async def getObjectDetail(context: Context, name: str):
+  """One object in depth: transform, world bounds, parent, collections, modifiers; for meshes the vertex, face, and triangle counts, faces per material, UV layers, world units per texture repeat, vertex groups."""
+  return await callBridge(context, "getObjectDetail", {"name": name})
+
+
+@server.tool()
+async def measure(context: Context, points: list[list[float]], snapToSurface: bool = False):
+  """Points and the distances, horizontal distances, height changes, and slopes between consecutive ones; snapToSurface drops each point onto the surface below it first (one point gives a surface height)."""
+  return await callBridge(context, "measure", {"points": points, "snapToSurface": snapToSurface})
+
+
+@server.tool(description="Move the selected vertices of a mesh by `offset` [x, y, z] world units. With `falloff` {center, radius, curve: constant|linear|smooth|sharp} the move fades with distance from the center; this is the precise, fine-detail edit." + selectorHelp)
+async def moveVertices(context: Context, objectName: str, selector: dict, offset: list[float], falloff: dict | None = None):
+  return await callBridge(context, "moveVertices", {"objectName": objectName, "selector": selector, "offset": offset, "falloff": falloff})
+
+
+@server.tool()
+async def sculptAtPoint(
+  context: Context, objectName: str, mode: str, center: list[float], radius: float, strength: float,
+  falloff: str = "smooth", direction: list[float] | None = None, iterations: int = 1,
+):
+  """Sculpt a mesh within `radius` of `center`: raise, lower, or crease (strength in units, along the region's average normal or `direction`); smooth or flatten (strength a fraction 0 to 1; smooth repeats `iterations` times). Falloff curve: constant, linear, smooth, sharp."""
+  return await callBridge(context, "sculptAtPoint", {"objectName": objectName, "mode": mode, "center": center, "radius": radius, "strength": strength, "falloff": falloff, "direction": direction, "iterations": iterations})
+
+
+@server.tool()
+async def sculptAlongPath(
+  context: Context, objectName: str, mode: str, path: list[list[float]], radius: float, strength: float,
+  falloff: str = "smooth", direction: list[float] | None = None, iterations: int = 1, profile: list[list[float]] | None = None,
+):
+  """Sculpt along a polyline path [[x,y,z], ...] within `radius`: raise, lower, crease, smooth, flatten as in sculptAtPoint, or carve, which cuts vertically down to the path's own heights shaped by `profile` [[lateralFraction, heightAboveFloor], ...] from 0 (center) to 1 (edge); carve strength is a fraction."""
+  return await callBridge(context, "sculptAlongPath", {"objectName": objectName, "mode": mode, "path": path, "radius": radius, "strength": strength, "falloff": falloff, "direction": direction, "iterations": iterations, "profile": profile})
+
+
+@server.tool(description="Extrude the selected faces of a mesh by `distance` units along their average normal, or along `direction`." + selectorHelp)
+async def extrudeFaces(context: Context, objectName: str, selector: dict, distance: float, direction: list[float] | None = None):
+  return await callBridge(context, "extrudeFaces", {"objectName": objectName, "selector": selector, "distance": distance, "direction": direction})
+
+
+@server.tool(description="Inset the selected faces of a mesh as one region by `thickness`, pushed in or out by `depth`." + selectorHelp)
+async def insetFaces(context: Context, objectName: str, selector: dict, thickness: float, depth: float = 0.0):
+  return await callBridge(context, "insetFaces", {"objectName": objectName, "selector": selector, "thickness": thickness, "depth": depth})
+
+
+@server.tool(description="Bevel the edges whose two vertices are both selected, by `width` units in `segments` steps; `minimumAngleDegrees` limits it to edges at least that sharp." + selectorHelp)
+async def bevelEdges(context: Context, objectName: str, selector: dict, width: float, segments: int = 1, minimumAngleDegrees: float | None = None):
+  return await callBridge(context, "bevelEdges", {"objectName": objectName, "selector": selector, "width": width, "segments": segments, "minimumAngleDegrees": minimumAngleDegrees})
+
+
+@server.tool(description="Subdivide the selected faces of a mesh with `cuts` cuts per edge, adding detail where it is needed." + selectorHelp)
+async def subdivide(context: Context, objectName: str, cuts: int, selector: dict = allSelector):
+  return await callBridge(context, "subdivide", {"objectName": objectName, "selector": selector, "cuts": cuts})
+
+
+@server.tool()
+async def booleanCut(context: Context, objectName: str, cutterName: str, operation: str = "DIFFERENCE", keepCutter: bool = False):
+  """Apply a boolean (DIFFERENCE, UNION, INTERSECT) of a cutter mesh to a mesh, for cave mouths and openings; the cutter is deleted unless keepCutter."""
+  return await callBridge(context, "booleanCut", {"objectName": objectName, "cutterName": cutterName, "operation": operation, "keepCutter": keepCutter})
+
+
+@server.tool()
+async def decimate(context: Context, objectName: str, ratio: float):
+  """Reduce a mesh to roughly `ratio` (0 to 1) of its triangles."""
+  return await callBridge(context, "decimate", {"objectName": objectName, "ratio": ratio})
+
+
+@server.tool()
+async def cleanupMesh(context: Context, objectName: str, mergeDistance: float = 0.01, recalculateNormals: bool = True):
+  """Merge vertices closer than mergeDistance, dissolve degenerate geometry, and make face normals consistent."""
+  return await callBridge(context, "cleanupMesh", {"objectName": objectName, "mergeDistance": mergeDistance, "recalculateNormals": recalculateNormals})
+
+
+@server.tool()
+async def createMaterial(context: Context, name: str, diffuseTexture: str, normalTexture: str | None = None, cutout: bool = False, alphaThreshold: float = 0.5):
+  """A Phase 1 material: diffuse texture (absolute path), optional normal map, no shine; cutout makes the diffuse alpha a hard alpha test for foliage cards."""
+  return await callBridge(context, "createMaterial", {"name": name, "diffuseTexture": diffuseTexture, "normalTexture": normalTexture, "cutout": cutout, "alphaThreshold": alphaThreshold})
+
+
+@server.tool(description="Assign a material to the selected faces of a mesh, adding a material slot if needed." + selectorHelp)
+async def assignMaterial(context: Context, objectName: str, materialName: str, selector: dict = allSelector):
+  return await callBridge(context, "assignMaterial", {"objectName": objectName, "materialName": materialName, "selector": selector})
+
+
+@server.tool(description="Project UVs onto the selected faces from world positions so one texture repeat spans `worldUnitsPerRepeat` units: `planar` along `direction`, or `box`, which projects each face along its dominant axis so steep faces do not stretch." + selectorHelp)
+async def projectUVs(context: Context, objectName: str, method: str, worldUnitsPerRepeat: float, selector: dict = allSelector, direction: list[float] | None = None):
+  return await callBridge(context, "projectUVs", {"objectName": objectName, "method": method, "worldUnitsPerRepeat": worldUnitsPerRepeat, "selector": selector, "direction": direction})
+
+
+@server.tool()
+async def placeOnSurface(context: Context, objectNames: list[str], at: list[list[float]] | None = None, alignToNormal: bool = False, surfaceObjects: list[str] | None = None, offset: float = 0.0):
+  """Drop objects onto the surface below `at` points (or below their own origins, cast from just above), optionally tilted to the surface normal and restricted to surfaceObjects."""
+  return await callBridge(context, "placeOnSurface", {"objectNames": objectNames, "at": at, "alignToNormal": alignToNormal, "surfaceObjects": surfaceObjects, "offset": offset})
+
+
+@server.tool()
+async def scatterInRegion(
+  context: Context, sourceObject: str, region: dict, density: float, minimumSpacing: float, collection: str,
+  yawRangeDegrees: list[float] = [0, 360], scaleRange: list[float] = [1, 1], alignToNormal: bool = False,
+  maximumSlopeDegrees: float = 90, surfaceObjects: list[str] | None = None, castFromHeight: float | None = None, seed: int = 0,
+):
+  """Scatter linked copies of an object over a region ({"circle": {center, radius}} or {"polygon": [[x,y], ...]}): `density` per 10,000 square units, at least `minimumSpacing` apart, random yaw and scale within ranges, dropped onto surfaces from `castFromHeight` (default just above the scene) and skipped where steeper than maximumSlopeDegrees. Deterministic for a seed."""
+  return await callBridge(context, "scatterInRegion", {
+    "sourceObject": sourceObject, "region": region, "density": density, "minimumSpacing": minimumSpacing, "yawRangeDegrees": yawRangeDegrees,
+    "scaleRange": scaleRange, "alignToNormal": alignToNormal, "maximumSlopeDegrees": maximumSlopeDegrees, "surfaceObjects": surfaceObjects,
+    "castFromHeight": castFromHeight, "seed": seed, "collection": collection,
+  })
+
+
+@server.tool()
+async def markAsset(context: Context, collectionName: str):
+  """Mark a collection as an asset so other files can link it with linkKitAsset; kit libraries are .blend files of marked collections."""
+  return await callBridge(context, "markAsset", {"collectionName": collectionName})
+
+
+@server.tool()
+async def linkKitAsset(
+  context: Context, kitPath: str, assetName: str, instanceName: str, location: list[float],
+  rotationDegrees: list[float] = [0, 0, 0], scale: list[float] = [1, 1, 1], collection: str | None = None,
+):
+  """Link a collection marked as an asset in a kit .blend (absolute path) and place an instance of it."""
+  return await callBridge(context, "linkKitAsset", {"kitPath": kitPath, "assetName": assetName, "instanceName": instanceName, "location": location, "rotationDegrees": rotationDegrees, "scale": scale, "collection": collection})
+
 
 
 if __name__ == "__main__":

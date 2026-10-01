@@ -2,35 +2,20 @@
 import contextlib
 import io
 import json
-import math
 import os
 
-import bmesh
 import bpy
-import mathutils
 
+import bridgeDressing
+import bridgeObjects
+import bridgeShaping
+import bridgeSurfacing
 import bridgeViews
+from bridgeState import requireNoUnsavedChanges, state
 
 zonePropertyName = "zonewrightZone"
 zonePropertyKeys = ("fogColor", "fogStart", "fogEnd", "sunAzimuthDegrees", "sunElevationDegrees", "sunColor", "sunStrength", "ambientColor")
 fileImageSources = ("FILE", "SEQUENCE", "TILED")
-
-
-class BridgeState:
-  def __init__(self):
-    self.unsavedChanges = False
-    self.resetNamespace()
-
-  def resetNamespace(self):
-    self.namespace = {"bpy": bpy, "bmesh": bmesh, "mathutils": mathutils, "math": math}
-
-
-state = BridgeState()
-
-
-def requireNoUnsavedChanges(discardUnsavedChanges, action):
-  if state.unsavedChanges and not discardUnsavedChanges:
-    raise RuntimeError(f"Refusing to {action}: the open file has unsaved changes; save it or pass discardUnsavedChanges")
 
 
 def runPython(code):
@@ -166,6 +151,7 @@ def getSceneSummary(objectLimit):
     "collections": sorted(collection.name for collection in bpy.data.collections),
     "cameras": sorted(sceneObject.name for sceneObject in scene.objects if sceneObject.type == "CAMERA"),
     "materials": [{"name": material.name, "textures": materialTextures(material)} for material in sorted(bpy.data.materials, key=lambda candidate: candidate.name)],
+    "libraries": [{"name": library.name, "filePath": library.filepath} for library in sorted(bpy.data.libraries, key=lambda candidate: candidate.name)],
     "images": [{
       "name": image.name,
       "source": image.source,
@@ -198,7 +184,6 @@ def setZoneProperties(updates):
   if "sunStrength" in zone and zone["sunStrength"] <= 0:
     raise ValueError(f"sunStrength must be positive, got {zone['sunStrength']}")
   bpy.context.scene[zonePropertyName] = zone
-  state.unsavedChanges = True
   return readZoneProperties(bpy.context.scene)
 
 
@@ -211,19 +196,24 @@ def pick(view, pixel):
 
 
 commands = {
-  "runPython": lambda arguments: runPython(arguments["code"]),
-  "newFile": lambda arguments: newFile(arguments["discardUnsavedChanges"]),
-  "openFile": lambda arguments: openFile(arguments["path"], arguments["discardUnsavedChanges"]),
-  "saveFile": lambda arguments: saveFile(arguments["path"]),
-  "getStatus": lambda arguments: getStatus(),
-  "getSceneSummary": lambda arguments: getSceneSummary(arguments["objectLimit"]),
-  "setZoneProperties": lambda arguments: setZoneProperties(arguments["updates"]),
-  "renderView": lambda arguments: renderView(arguments["view"], arguments["outputPath"]),
-  "pick": lambda arguments: pick(arguments["view"], arguments["pixel"]),
-}
+  "runPython": (runPython, False),
+  "newFile": (newFile, False),
+  "openFile": (openFile, False),
+  "saveFile": (saveFile, False),
+  "getStatus": (getStatus, False),
+  "getSceneSummary": (getSceneSummary, False),
+  "setZoneProperties": (setZoneProperties, True),
+  "renderView": (renderView, False),
+  "pick": (pick, False),
+} | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands
 
 
 def dispatch(command, arguments):
+  """Run a command with keyword arguments; commands that change the scene mark it unsaved."""
   if command not in commands:
     raise ValueError(f"Unknown bridge command '{command}'")
-  return commands[command](arguments)
+  handler, changesScene = commands[command]
+  result = handler(**arguments)
+  if changesScene:
+    state.unsavedChanges = True
+  return result

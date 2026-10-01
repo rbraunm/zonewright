@@ -2,9 +2,11 @@ import base64
 import hashlib
 import json
 import shutil
+import struct
 import sys
 import urllib.request
 import zipfile
+import zlib
 from pathlib import Path
 
 import anyio
@@ -171,3 +173,13 @@ def installedLocalAppData(tmp_path_factory, blenderArchivePin):
 @pytest.fixture
 def stageBlenderServer(tmp_path, blenderArchivePin, installedLocalAppData):
   return StagedServer(tmp_path, {"blender": blenderArchivePin, "extensions": {}}, installedLocalAppData)
+
+
+def writePNG(path, width, height, rgba):
+  """A solid-color RGBA PNG, for test textures."""
+  row = b"\x00" + bytes(rgba) * width
+  def chunk(kind, data):
+    return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+  header = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
+  path.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(row * height)) + chunk(b"IEND", b""))
+  return path

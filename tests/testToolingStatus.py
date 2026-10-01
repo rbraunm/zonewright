@@ -14,6 +14,7 @@ def testMissingBlenderReportsMissing(stageServer):
     },
     "extensions": {"pinned": {}, "unpinned": {}},
     "bridge": {"state": "notStarted"},
+    "runPython": {"calls": 0, "logFiles": [str(server.toolingRoot / "logs" / "runPython.log")]},
   }
 
 

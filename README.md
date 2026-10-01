@@ -42,13 +42,38 @@ The first tool that needs Blender starts the pinned Blender headless (`--backgro
 
 | Tool | Does |
 |---|---|
-| `runPython` | Runs code in a persistent namespace (`bpy`, `bmesh`, `mathutils`, `math`); returns printed output and `result` if the code sets it |
+| `runPython` | Fallback only: runs code in a persistent namespace (`bpy`, `bmesh`, `mathutils`, `math`) and returns printed output and `result` if the code sets it. Every call is logged to `logs\runPython.log`; `getToolingStatus` counts them |
 | `newFile` / `openFile` | Start an empty scene or open a .blend by absolute path; refused while the open file has unsaved changes unless `discardUnsavedChanges` |
 | `saveFile` | Saves, or saves as an absolute path; textures and linked libraries become paths relative to the .blend; packed, generated, missing, or other-drive images are refused |
 | `getSceneSummary` | File status, zone properties, objects (type, location, dimensions, triangles, materials), collections, cameras, materials with their textures, images |
 | `setZoneProperties` | Stores the zone's EQ preview properties in the .blend: fog color, fog start and end (the end is also the far clip), sun azimuth and elevation, sun color and strength, ambient color |
 | `renderView` | Renders the EQ preview of a view and returns the PNG inline; the file is kept under `%LOCALAPPDATA%\zonewright\renders` |
 | `pick` | For a pixel of a view, the object hit, world position, surface normal, material, and distance |
+
+### Artist toolkit
+
+Edits address parts of a mesh with selectors instead of an interactive selection: `{"all": true}`, `{"sphere": {center, radius}}`, `{"box": {minimum, maximum}}`, `{"cylinder": {center: [x, y], radius, bottom, top}}`, `{"facing": {direction, withinDegrees}}`, `{"material": name}`, `{"vertexGroup": name}`, and `{"and": [...]}`, `{"or": [...]}`, `{"not": selector}`. Shapes test vertex positions in world units, or face centers for face operations. A selector that matches nothing is an error.
+
+| Activity | Tool | Does |
+|---|---|---|
+| Blocking out | `createPrimitive` | Plane, grid, cube, cylinder, cone, or sphere built to an exact bounding size, origin at its base center (center for flat shapes) |
+| | `createTerrainGrid` | Flat grid with a vertex every `spacing` units, ready to sculpt |
+| | `transformObjects` | Relative or absolute location, rotation, and scale |
+| | `duplicateObjects` / `deleteObjects` | Copies (optionally sharing the mesh) and deletions |
+| | `organize` | Renames, parents (world transform kept), collections |
+| Shaping | `moveVertices` | Moves selected vertices, optionally fading with distance from a center: the fine-detail edit |
+| | `sculptAtPoint` / `sculptAlongPath` | Raise, lower, crease, smooth, flatten around a point or along a path; carve cuts down to a path's heights through a cross-section profile |
+| | `extrudeFaces`, `insetFaces`, `bevelEdges`, `subdivide` | Topology edits on selected faces or edges |
+| | `booleanCut` | Cuts openings with a cutter mesh; refuses a cut that would erase the mesh |
+| | `decimate` / `cleanupMesh` | Triangle reduction; merging, degenerate removal, and consistent normals |
+| Surfacing | `createMaterial` | Diffuse texture, optional normal map, no shine; optional alpha-tested cutout |
+| | `assignMaterial` | Material on selected faces |
+| | `projectUVs` | Planar or box projection at a set number of world units per texture repeat |
+| Dressing | `placeOnSurface` | Drops objects onto the surface below, optionally aligned to its normal |
+| | `scatterInRegion` | Spaced, linked copies over a circle or polygon by density, with yaw and scale ranges and a slope limit; deterministic per seed |
+| | `markAsset` / `linkKitAsset` | Marks kit collections as assets; links and places them from a kit .blend |
+| Inspecting | `getObjectDetail` | Transform, bounds, counts, faces per material, UV density, modifiers, vertex groups |
+| | `measure` | Surface heights, distances, height changes, and slopes between points |
 
 A view is `{"camera": name}`, `{"eye": [x,y,z], "target": [x,y,z]}`, or `{"standAt": [x,y,z], "headingDegrees": h, "pitchDegrees": p}`. Heading 0 looks along +Y and turns clockwise seen from above; positive pitch looks up. `standAt` finds the ground by casting down from just above the point, so it works inside caves, puts the eye 5.5 units above it, and renders a 6-unit scale figure about 15 units ahead.
 
