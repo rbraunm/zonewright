@@ -11,6 +11,7 @@ import bridgeObjects
 
 alphaThreshold = 0.5
 missingTextureColor = (1.0, 0.0, 1.0, 1.0)
+untinted = 0xFFFFFF
 
 
 def missingTextureMaterial(textureName):
@@ -27,9 +28,15 @@ def missingTextureMaterial(textureName):
   return material
 
 
-def modelMaterial(folder, textureName, cutout):
-  """One material per texture and cutout mode, reused across objects built from the same cache folder."""
-  materialName = f"eq_{os.path.basename(folder)}_{textureName}{'_cutout' if cutout else ''}"
+def linearChannel(value):
+  channel = value / 255
+  return channel / 12.92 if channel <= 0.04045 else ((channel + 0.055) / 1.055) ** 2.4
+
+
+def modelMaterial(folder, textureName, cutout, tint):
+  """One material per texture, cutout mode, and tint, reused across objects built from the same cache folder. A tint other than white
+  multiplies the texture's color, as the client tints hair (0xRRGGBB)."""
+  materialName = f"eq_{os.path.basename(folder)}_{textureName}{'_cutout' if cutout else ''}{'' if tint == untinted else f'_{tint:06x}'}"
   material = bpy.data.materials.get(materialName)
   texturePath = os.path.join(folder, textureName)
   if material is not None and material.node_tree.nodes["eqDiffuse"].image.filepath == texturePath:
@@ -43,7 +50,17 @@ def modelMaterial(folder, textureName, cutout):
   diffuse = nodes.new("ShaderNodeTexImage")
   diffuse.name = "eqDiffuse"
   diffuse.image = bpy.data.images.load(texturePath, check_existing=True)
-  material.node_tree.links.new(diffuse.outputs["Color"], shader.inputs["Base Color"])
+  if tint == untinted:
+    material.node_tree.links.new(diffuse.outputs["Color"], shader.inputs["Base Color"])
+  else:
+    multiply = nodes.new("ShaderNodeMix")
+    multiply.data_type = "RGBA"
+    multiply.blend_type = "MULTIPLY"
+    multiply.inputs["Factor"].default_value = 1.0
+    colorInputs = [socket for socket in multiply.inputs if socket.type == "RGBA"]
+    material.node_tree.links.new(diffuse.outputs["Color"], colorInputs[0])
+    colorInputs[1].default_value = (*(linearChannel((tint >> shift) & 0xFF) for shift in (16, 8, 0)), 1.0)
+    material.node_tree.links.new(next(socket for socket in multiply.outputs if socket.type == "RGBA"), shader.inputs["Base Color"])
   if cutout:
     threshold = nodes.new("ShaderNodeMath")
     threshold.operation = "GREATER_THAN"
@@ -70,8 +87,8 @@ def buildModelMesh(folder, meshName):
   missing = {str(name) for name in data["missingTextures"]}
   slots = {}
   materialIndices = numpy.empty(len(triangles), dtype=numpy.int32)
-  for index, (textureName, cutout) in enumerate(zip(data["textureNames"], data["cutouts"])):
-    key = (str(textureName), bool(cutout))
+  for index, (textureName, cutout, tint) in enumerate(zip(data["textureNames"], data["cutouts"], data["tints"])):
+    key = (str(textureName), bool(cutout), int(tint))
     if key not in slots:
       slots[key] = len(slots)
       mesh.materials.append(missingTextureMaterial(key[0]) if key[0] in missing else modelMaterial(folder, *key))

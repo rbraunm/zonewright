@@ -140,7 +140,7 @@ def modelSummary(details):
   definition = details["definition"]
   return {
     "model": details["model"], "kind": definition["kind"], "archive": definition["archive"], "linkedBy": definition["via"], "tier": definition["tier"],
-    "pose": details["pose"], "pieces": details["pieces"], "swappedMaterials": details["swappedMaterials"],
+    "pose": details["pose"], "pieces": details["pieces"], "unattached": details["unattached"], "swappedMaterials": details["swappedMaterials"],
     "missingTextures": details["missingTextures"], "droppedTriangles": details["droppedTriangles"], "particleCloudsNotDrawn": details["particleCloudsNotDrawn"],
   }
 
@@ -362,8 +362,11 @@ async def findModel(model: str, zone: str | None = None):
   " setZoneProperties). The model origin stands avatarHeight (moddat.ini's ROffset for the model, else 3.125, times the scale) above the"
   " ground below its position, as the client stands a spawn; with snapToGround false it sits at the position. Front faces its heading."
   " The result gives height, scale, and avatarHeight, which compare with the dumps' height and avatarHeight. Appearance as the client applies it: variation"
-  " swaps the body piece, headType the head, textureSet the texture set (the dumps' textureType; -1 there means no override, so 0), and"
-  " hairStyle attaches the hair piece <code>_HAIR_<nn> where the client defines one (Drakkin). The character is posed at"
+  " swaps the body piece, headType the head, textureSet the texture set (the dumps' textureType; -1 there means no override, so 0)."
+  " Head looks take the dumps' terms: faceStyle swaps a Luclin model's face materials; hairStyle and hairColor, and facialHair and"
+  " facialHairColor (255 for none), attach a Luclin model's hair and beard items (IT<n> from the Luclin equipment archives) tinted"
+  " by the client's color table, or a Drakkin's <code>_HAIR_<nn> piece. The result's source.unattached lists any the client would"
+  " not attach either. The character is posed at"
   " animationFrame of animation: a code such as L01 or S03, the client's label such as WALK or WAVE, or an EQG name such as STND or"
   " NRUN; default P01, STAND STILL, which EQG models play as STND. A WLD model plays the client's animation for it: its own, else the"
   " one it borrows (a dark elf the elf's); animationVariant picks a lettered variant (A, B, ...) of a Luclin model's animation. An EQG"
@@ -374,12 +377,16 @@ async def placeSpawn(
   context: Context, zone: str | None, model: str, name: str, height: float,
   location: list[float] | None = None, headingDegrees: float | None = None,
   x: float | None = None, y: float | None = None, z: float | None = None, heading: float | None = None,
-  variation: int = 0, headType: int = 0, textureSet: int = 0, hairStyle: int = 0,
+  variation: int = 0, headType: int = 0, textureSet: int = 0, faceStyle: int = 0, hairStyle: int = 0, hairColor: int = 0,
+  facialHair: int = 255, facialHairColor: int = 0,
   animation: str | None = None, animationVariant: str | None = None, animationFrame: int = 0,
   source: str | None = None, snapToGround: bool = True, collection: str | None = None,
 ):
   frameLocation, rotation = placementFrame(location, headingDegrees, x, y, z, heading)
-  appearance = {"variation": variation, "headType": headType, "textureSet": textureSet, "hairStyle": hairStyle}
+  appearance = {
+    "variation": variation, "headType": headType, "textureSet": textureSet, "faceStyle": faceStyle, "hairStyle": hairStyle, "hairColor": hairColor,
+    "facialHair": facialHair, "facialHairColor": facialHairColor,
+  }
   pose = {"animation": animation, "variant": animationVariant.upper() if animationVariant else None, "frame": animationFrame}
   spawn = await anyio.to_thread.run_sync(spawnModel, zone, model, height, await zoneIsNewEngine(context), source, appearance, pose)
   placed = await placeEQModel(context, spawn["folder"], name, frameLocation, rotation, spawn["scale"], spawn["avatarHeight"], snapToGround, collection, spawn["details"])

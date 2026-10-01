@@ -152,7 +152,7 @@ def testEQGSpawnsPlayTheClientsEQGAnimations(stageBlenderServer):
   assert (walk["source"]["pose"]["animation"], walk["source"]["pose"]["resource"]) == ("WALK", "WALK_BA_1_GBN")
   assert "has frames 0-43, not 44" in lateFrame
   assert "its animations have no lettered variants" in lettered
-  assert "variation, headType, and textureSet are not read yet" in armor
+  assert "only its hairStyle is read yet, got {'variation': 1}" in armor
 
 
 def testDoorsAndObjectsComeFromTheZonesArchives(stageBlenderServer):
@@ -177,3 +177,30 @@ def testDoorsAndObjectsComeFromTheZonesArchives(stageBlenderServer):
   assert "eq_missing_ab_dg_treebark_c.dds" in [entry["material"] for entry in treeDetail["materials"]]
   assert firstLoaded["source"]["archive"] == "equipment-01.eqg"
   assert chosen["source"]["archive"] == "gequip.s3d"
+
+
+def testLuclinHeadsTakeTheClientsFaceHairAndBeard(stageBlenderServer):
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("setZoneProperties", {"newEngineZone": True})
+    christine = await session.expectSuccess("placeSpawn", {
+      "zone": "neighborhood", "model": "HUF", "name": "christine", "height": 6, "x": 2015.6, "y": -2849.1, "z": 3.3, "heading": 246,
+      "faceStyle": 6, "hairStyle": 1, "hairColor": 4, "snapToGround": False,
+    })
+    christineDetail = await session.expectSuccess("getObjectDetail", {"name": "christine"})
+    bearded = await session.expectSuccess("placeSpawn", {"zone": None, "model": "HUM", "name": "bearded", "height": 6, "location": [10, 0, 0], "headingDegrees": 0, "facialHair": 1, "facialHairColor": 2, "snapToGround": False})
+    darkElf = await session.expectSuccess("placeSpawn", {"zone": None, "model": "DAM", "name": "darkElf", "height": 6, "location": [20, 0, 0], "headingDegrees": 0, "facialHair": 0, "snapToGround": False})
+    noStyle = await session.expectSuccess("placeSpawn", {"zone": None, "model": "HUF", "name": "noStyle", "height": 6, "location": [30, 0, 0], "headingDegrees": 0, "hairStyle": 9, "snapToGround": False})
+    return christine, christineDetail, bearded, darkElf, noStyle
+
+  christine, christineDetail, bearded, darkElf, noStyle = stageBlenderServer.session(steps)
+  # The neighborhood's Christine as the live dump records her: face 6 swaps head parts 1, 4, and 5 (HUFHE0061, 64, 65), and hair
+  # style 1 is item 1000 + 390 (human female block) + 1, tinted by color 4 (0x650B06).
+  assert christine["source"]["pieces"] == ["HUFEYE_R_DMSPRITEDEF", "HUF_DMSPRITEDEF", "HUFEYE_L_DMSPRITEDEF", "IT1391"]
+  assert christine["source"]["swappedMaterials"] == 3
+  assert any(entry["material"].endswith("it1391har01.dds_650b06") for entry in christineDetail["materials"])
+  # A human male takes hair item 1360 and beard item 2000 + 360 + 1; a dark elf male's race takes no beard.
+  assert bearded["source"]["pieces"][-2:] == ["IT1360", "IT2361"]
+  assert darkElf["source"]["pieces"][-1] == "IT1180"
+  assert darkElf["source"]["unattached"] == []
+  assert noStyle["source"]["unattached"] == [{"item": "IT1399", "reason": "no archive the client loads defines it"}]

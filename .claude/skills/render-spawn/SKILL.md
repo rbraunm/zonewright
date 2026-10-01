@@ -17,7 +17,9 @@ description: Place and render EverQuest characters (NPCs, players, pets, the sca
 | `location` + `headingDegrees` | Blender position and facing (0 = +Y, clockwise from above) |
 | `x`, `y`, `z` + `heading` | Or EQ's values as the server and the dumps give them; give these or the Blender pair, not both |
 | `variation`, `headType`, `textureSet` | Appearance: body piece, head piece, texture set |
-| `hairStyle` | The hair piece `<code>_HAIR_<nn>` the client attaches where it defines one (Drakkin) |
+| `faceStyle` | A Luclin model's face: its head materials swap to `<code>HE<face / 10><face % 10><part>` |
+| `hairStyle`, `hairColor` | Hair: a Luclin model's hair item (`IT<1000 + block + style>`), or a Drakkin's `<code>_HAIR_<nn>`; the color tints Luclin hair from the client's 24-color table |
+| `facialHair`, `facialHairColor` | A Luclin model's beard item (`IT<2000 + block + style>`) and its tint; 255 (the default) is none |
 | `animation`, `animationVariant`, `animationFrame` | Pose: an animation code (`L01`, `S03`), the client's label (`WALK`, `WAVE`), or an EQG name (`STND`, `NRUN`); a variant letter for a Luclin model (`A`, `B`, ...); and a frame. The default is `P01` (STAND STILL), which EQG models play as `STND`, at the first variant and frame 0 |
 | `snapToGround` | Stand the model origin `avatarHeight` above the surface below, as the client does (default true); false puts the origin at the position |
 | `source` | `"archive"` or `"archive:entry"` to take a definition other than the first the client loads |
@@ -52,7 +54,8 @@ EQG characters (Drakkin, the gnoll `GBN`, and later races) play the client's EQG
 | `height` | `height` (the dump's `avatarHeight` should match the result's) |
 | `positions` | `x,y,z,heading`, the first entry of a `|` list: `x`, `y`, `z`, `heading` |
 | `textureType` | `textureSet` (`-1` means no override, so 0) |
-| `headType`, `variation`, `hairStyle` | `headType`, `variation`, `hairStyle` |
+| `headType`, `variation` | `headType`, `variation` |
+| `faceStyle`, `hairStyle`, `hairColor`, `facialHair`, `facialHairColor` | the same names |
 
 The dumps come from live servers and our client is a modified RoF2, so many spawns name models this client lacks or does not link to that zone; those fail with an error listing any unlinked archives that define the model. Skip them; do not borrow a model from an unlinked archive.
 
@@ -87,5 +90,5 @@ Every eye-level `renderView` (`standAt`) stands a dark elf female of height 5, d
 
 ## Limits
 
-- **Not drawn.** Equipment, faces (`faceStyle`), hair on Luclin WLD models, and particle effects are not drawn. Legacy 0x2C meshes (IVM and a few others) are not read and fail as unsupported.
+- **Not drawn.** Equipment, eye colors, and particle effects are not drawn. Without equipment a Luclin body shows bare skin: the client's clothing layers in these files are empty placeholders. Legacy 0x2C meshes (IVM and a few others) are not read and fail as unsupported.
 - **Drakkin pieces.** A Drakkin draws its base model (`dkf.mod`, `dkm.mod`) and its hair. Its armor pieces (`dkf_<material>_<variation>_<bone>`), facial attachments, tattoos, and face and texture-set layers are not drawn. How the client picks armor pieces for an unequipped spawn is not yet read, so `variation`, `headType`, and `textureSet` are errors on Drakkin.

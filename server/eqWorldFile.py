@@ -134,6 +134,9 @@ class WorldFile:
     else:
       uvs = numpy.frombuffer(body, dtype="<f4", count=uvCount * 2, offset=position).reshape(uvCount, 2).astype(numpy.float64)
       position += uvCount * 8
+    # WLD counts v down from a texture's top row; Blender counts up from its bottom. Measured: a Luclin face draws as the client
+    # shows it only flipped.
+    uvs = uvs * (1, -1) + (0, 1)
     position += normalCount * 3 + colorCount * 4
     polygons = numpy.frombuffer(body, dtype=numpy.dtype([("flags", "<u2"), ("indices", "<u2", 3)]), count=polygonCount, offset=position)
     position += polygonCount * 8 + vertexPieceCount * 4

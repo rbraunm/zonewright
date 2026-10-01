@@ -128,13 +128,22 @@ Supported models:
 - EQG models (`.mod`): static, or skinned when the file stores bones (Drakkin and many later creatures).
 - EQG skinned piece models (`.mds`).
 - WLD static actors.
+- WLD textures: WLD meshes count `v` down from a texture's top row, so their UVs are flipped for Blender. Before this flip, faces drew upside down.
 - WLD skeletal actors: skinned meshes and bone-attached meshes. Particle clouds are counted, not drawn.
 
 Characters take the client's appearance rules (from `EQGraphicsDX9.dll`):
 
 - **Pieces:** the body piece `<code><nn>` for `variation` and the head piece `<code>HE<nn>` for `headType`, keeping the default when the model lacks the piece.
 - **Texture sets:** `.lay` layers `C_<code>_S<set>_M<n>` for `.mds` models, and `<code><part><set><nn>_MDF` materials for WLD ones.
-- **Hair:** `hairStyle` attaches `<code>_HAIR_<nn>` (`eqgame.exe` `0x40ac80`, called for the head slot when no helm is worn) where the client defines one, as for Drakkin.
+- **Drakkin hair:** `hairStyle` attaches `<code>_HAIR_<nn>` (`eqgame.exe` `0x40ac80`, called for the head slot when no helm is worn) where the client defines one.
+
+A Luclin character's head follows the client's appearance rules (`eqLooks.py`, traced from the character customization window into `eqgame.exe`):
+
+- **Face:** `faceStyle` swaps each head material `<code>HE000<part>_MDF` for `<code>HE<face / 10><face % 10><part>_MDF` where the file has it (`0x40d1a0`, the face split by `0x40c2a0`).
+- **Hair and beard:** these are item models, not part of the body. Hair style `n` attaches `IT<1000 + block + n>` and beard style `n` attaches `IT<2000 + block + n>`. The block is per race, 30 higher for females (`0x40a290`); a human female's styles are `IT1390`-`IT1392`. They come from the Luclin equipment archives (`lgequip.s3d`, `lgequip2.s3d`, `vequip.s3d`).
+- **Attachment points:** hair attaches at `<code>HAIR_POINT_DAG` and the beard at `<code>BEARD_POINT_DAG`, each item in its own bind pose. A point the skeleton lacks, or an item no loaded archive defines, attaches nothing, as in the client; placements list these under `unattached`.
+- **Who gets none:** froglok and Vah Shir characters take none unless the face is 7 (`0x40aaa1`). High, dark, and half elf males and dwarf females take no beard (`0x40a240`). Style 255 is none.
+- **Color:** `hairColor` and `facialHairColor` index the client's 24-color table (`0xac1a70`), which tints the item's grayscale texture (`0x40b260`). An index past the table leaves the item untinted.
 
 A WLD character plays the client's animations (`eqAnimations.py`, transcribed from `eqgame.exe`):
 

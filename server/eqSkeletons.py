@@ -123,7 +123,8 @@ def skinMeshes(worldFile, skins):
 
 
 def posedSkeleton(worldFile, skeletonFragment, skinned, meshArrays, localTransforms=None):
-  """Skinned meshes (0x36 fragments rigged to this skeleton) and the meshes attached to its bones, posed by its bones at localTransforms (the bind pose when None); meshArrays turns one posed mesh into its part."""
+  """Skinned meshes (0x36 fragments rigged to this skeleton) and the meshes attached to its bones, posed by its bones at localTransforms
+  (the bind pose when None); meshArrays turns one posed mesh into its part. Also returns each bone's posed transform by name."""
   dags, _ = readSkeleton(worldFile, skeletonFragment)
   worldTransforms = poseSkeleton(dags, bindTransforms(worldFile, dags) if localTransforms is None else localTransforms)
   parts = []
@@ -145,4 +146,4 @@ def posedSkeleton(worldFile, skeletonFragment, skinned, meshArrays, localTransfo
     mesh = worldFile.mesh(worldFile.fragment(meshFragment.index, 0x36))
     transform = worldTransforms[bone]
     parts.append(meshArrays(mesh | {"vertices": mesh["vertices"] @ transform[:3, :3].T + transform[:3, 3]}))
-  return parts, particleClouds
+  return parts, particleClouds, {dag["name"]: transform for dag, transform in zip(dags, worldTransforms)}

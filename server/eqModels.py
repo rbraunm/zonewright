@@ -12,6 +12,7 @@ import eqArchive
 import eqgFiles
 import eqgSkeletons
 import eqLinks
+import eqLooks
 import eqRaces
 import eqSkeletons
 import eqTextures
@@ -20,9 +21,10 @@ import machineProfile
 import zoneSources
 
 indexFormat = 9
-modelCacheFormat = 8
+modelCacheFormat = 10
 actorTrailingBytes = 4
 staticKinds = ("wldStatic",)
+defaultAppearance = {"variation": 0, "headType": 0, "textureSet": 0, "hairStyle": 0, "faceStyle": 0, "hairColor": 0, "facialHair": eqLooks.noStyle, "facialHairColor": 0}
 bindTolerance = 1e-3
 
 
@@ -330,7 +332,15 @@ def meshPart(vertices, triangles, uvs, textures, cutouts):
   """Drawn triangles only; triangles with non-finite vertices are dropped and counted."""
   finite = triangleKeep(vertices, triangles)
   keep = numpy.array([texture is not None for texture in textures], dtype=bool) & finite
-  return {"vertices": vertices, "triangles": triangles[keep], "uvs": uvs, "textures": [texture for texture, kept in zip(textures, keep) if kept], "cutouts": [cutout for cutout, kept in zip(cutouts, keep) if kept], "dropped": int((~finite).sum())}
+  keptTextures = [texture for texture, kept in zip(textures, keep) if kept]
+  return {
+    "vertices": vertices, "triangles": triangles[keep], "uvs": uvs, "textures": keptTextures, "cutouts": [cutout for cutout, kept in zip(cutouts, keep) if kept],
+    "tints": [eqLooks.untinted] * len(keptTextures), "dropped": int((~finite).sum()),
+  }
+
+
+def changedAppearance(appearance):
+  return {key: value for key, value in appearance.items() if value != defaultAppearance[key]}
 
 
 def eqgSkeletonPose(bones, animation, sourceName):
@@ -391,12 +401,12 @@ def eqgModelParts(archive, definition, appearance, context):
   if model["bones"] is None:
     if context.request is not None and context.request["animation"] is not None:
       raise ValueError(f"Model '{definition['model']}' is static; it has no animations")
-    if any(appearance.values()):
-      raise ValueError(f"Model '{definition['model']}' is static; variation, headType, textureSet, and hairStyle do not apply, got {appearance}")
+    if changedAppearance(appearance):
+      raise ValueError(f"Model '{definition['model']}' is static; appearance does not apply, got {changedAppearance(appearance)}")
     return {"parts": [meshPart(model["vertices"], model["triangles"], model["uvs"], *textures)], "pose": {"static": True}}
-  unread = {key: appearance[key] for key in ("variation", "headType", "textureSet") if appearance[key]}
+  unread = {key: value for key, value in changedAppearance(appearance).items() if key != "hairStyle"}
   if unread:
-    raise ValueError(f"Model '{definition['model']}' is an EQG model built from attached pieces; its variation, headType, and textureSet are not read yet, got {unread}")
+    raise ValueError(f"Model '{definition['model']}' is an EQG model built from attached pieces; only its hairStyle is read yet, got {unread}")
   code = definition["model"].upper()
   animation, description = context.eqgAnimation(code)
   pose = None if animation is None else eqgSkeletonPose(model["bones"], animation, sourceName)
@@ -448,6 +458,8 @@ def eqgLayerDiffuses(archive, code, materialCount, textureSet, sourceName):
 def eqgSkinnedParts(archive, definition, appearance, context):
   """The pieces the client shows for this appearance, textured by its texture set, posed by the requested animation, with the hair piece the client attaches."""
   sourceName = f"{definition['archive']}:{definition['entry']}"
+  if appearance["faceStyle"] != 0:
+    raise ValueError(f"Model '{definition['model']}' is an EQG skinned model; how the client applies faceStyle to it is not read yet")
   model = eqgFiles.parseSkinnedModel(archive.read(definition["entry"]), sourceName)
   code = definition["model"].upper()
   pieces = {piece["name"].upper(): piece for piece in model["pieces"]}
@@ -519,8 +531,44 @@ def wldSkeletalParts(archive, definition, appearance, context):
   replacements[f"{code}HE00_DMSPRITEDEF"] = f"{code}HE{appearance['headType']:02d}_DMSPRITEDEF"
   chosen = [meshesByName.get(replacements.get(mesh.name.upper()), mesh) for mesh in meshes]
   swaps = wldTextureSetSwaps(worldFile, code, appearance["textureSet"])
-  parts, particleClouds = eqSkeletons.posedSkeleton(worldFile, skeleton, chosen, lambda mesh: wldMeshPart(mesh, swaps), localTransforms)
-  return {"parts": parts, "pose": pose, "pieces": [mesh.name for mesh in chosen], "swappedMaterials": len(swaps), "particleCloudsNotDrawn": particleClouds}
+  materialIndices = {fragment.name.upper(): fragment.index for fragment in worldFile.fragmentsOfType(0x30)}
+  faceSwaps = eqLooks.faceSwaps(code, appearance["faceStyle"], set(materialIndices))
+  clashing = sorted(set(faceSwaps) & set(swaps))
+  if clashing:
+    raise ValueError(f"Model {code}: texture set {appearance['textureSet']} and face {appearance['faceStyle']} both swap {clashing}; which the client keeps is not known")
+  swaps |= {name: worldFile.material(materialIndices[candidate]) for name, candidate in faceSwaps.items()}
+  parts, particleClouds, boneWorlds = eqSkeletons.posedSkeleton(worldFile, skeleton, chosen, lambda mesh: wldMeshPart(mesh, swaps), localTransforms)
+  attached, unattached = wldHeadItems(context, code, appearance, boneWorlds)
+  return {
+    "parts": parts + [item["part"] for item in attached], "pose": pose, "pieces": [mesh.name for mesh in chosen] + [item["piece"] for item in attached],
+    "swappedMaterials": len(swaps), "particleCloudsNotDrawn": particleClouds, "attachedArchives": [item["archive"] for item in attached], "unattached": unattached,
+  }
+
+
+def wldHeadItems(context, code, appearance, boneWorlds):
+  """The hair and beard items the client attaches at the skeleton's head points (eqgame.exe 0x40aa30): each item model in its bind
+  pose, placed at the point and tinted by its color. An item the client finds no point or model for is not attached (nor drawn
+  by the client), and is listed with the reason."""
+  if not any(f"{code}{point}" in boneWorlds for point in (eqLooks.hairPoint, eqLooks.beardPoint)):
+    return [], []
+  attached, unattached = [], []
+  for item, point, color in eqLooks.headItems(code, appearance):
+    pointWorld = boneWorlds.get(f"{code}{point}")
+    definition = context.attachment(item) if pointWorld is not None else None
+    if definition is None:
+      unattached.append({"item": item, "reason": f"the skeleton has no {code}{point}" if pointWorld is None else "no archive the client loads defines it"})
+      continue
+    if definition["kind"] not in ("wldSkeletal", "wldStatic"):
+      raise ValueError(f"{item} in {definition['archive']} is a {definition['kind']} model, not a WLD item")
+    itemArchive = eqArchive.EQArchive(context.clientRoot / definition["archive"])
+    itemAppearance = defaultAppearance | {"hairStyle": eqLooks.noStyle}
+    built = partBuilders[definition["kind"]](itemArchive, definition | {"model": item.lower()}, itemAppearance, ModelContext(context.clientRoot, context.cacheRoot, context.zoneName, None))
+    for part in built["parts"]:
+      attached.append({
+        "part": part | {"vertices": part["vertices"] @ pointWorld[:3, :3].T + pointWorld[:3, 3], "tints": [color] * len(part["textures"])},
+        "piece": item, "archive": definition["archive"],
+      })
+  return attached, unattached
 
 
 partBuilders = {"eqgModel": eqgModelParts, "eqgSkinned": eqgSkinnedParts, "wldStatic": wldStaticParts, "wldSkeletal": wldSkeletalParts}
@@ -600,17 +648,17 @@ def buildModel(clientRoot, cacheRoot, modelName, zoneName, source=None, appearan
   if definition["kind"] in staticKinds:
     if animation is not None and animation["animation"] is not None:
       raise ValueError(f"Model '{definition['model']}' is static; it has no animations")
-    if any((appearance or {}).values()):
-      raise ValueError(f"Model '{definition['model']}' is static; variation, headType, textureSet, and hairStyle do not apply, got {appearance}")
+    if changedAppearance(defaultAppearance | (appearance or {})):
+      raise ValueError(f"Model '{definition['model']}' is static; appearance does not apply, got {changedAppearance(defaultAppearance | (appearance or {}))}")
     appearance, animation = {}, None
   else:
-    appearance = {"variation": 0, "headType": 0, "textureSet": 0, "hairStyle": 0} | (appearance or {})
+    appearance = defaultAppearance | (appearance or {})
     negative = {key: value for key, value in appearance.items() if value < 0}
     if negative:
       raise ValueError(f"Appearance values must be 0 or more, got {negative}")
   searched = textureArchives(clientRoot, zoneName, definition)
   poseKey = "" if animation is None else f"@pose{animation['animation'] or 'stand'}{animation['variant'] or ''}f{animation['frame']}"
-  folderName = f"{definition['model']}@{definition['archive']}" + "".join(f"@{key}{value}" for key, value in sorted(appearance.items())) + poseKey
+  folderName = f"{definition['model']}@{definition['archive']}" + "".join(f"@{key}{value}" for key, value in sorted(changedAppearance(appearance).items())) + poseKey
   modelFolder = cacheRoot / "built" / folderName
   stampPath = modelFolder / "source.json"
   # The listing fingerprint covers the archives an animation may come from.
@@ -626,7 +674,7 @@ def buildModel(clientRoot, cacheRoot, modelName, zoneName, source=None, appearan
   built = partBuilders[definition["kind"]](archive, definition, appearance, ModelContext(clientRoot, cacheRoot, zoneName, animation))
   searched = searched + [name for name in built.get("attachedArchives", []) if name not in searched]
   parts = built["parts"]
-  vertexChunks, triangleChunks, uvChunks, textures, cutouts = [], [], [], [], []
+  vertexChunks, triangleChunks, uvChunks, textures, cutouts, tints = [], [], [], [], [], []
   offset = 0
   for part in parts:
     vertexChunks.append(part["vertices"])
@@ -634,6 +682,7 @@ def buildModel(clientRoot, cacheRoot, modelName, zoneName, source=None, appearan
     uvChunks.append(part["uvs"])
     textures += part["textures"]
     cutouts += part["cutouts"]
+    tints += part["tints"]
     offset += len(part["vertices"])
   triangles = numpy.concatenate(triangleChunks)
   if len(triangles) == 0:
@@ -655,13 +704,14 @@ def buildModel(clientRoot, cacheRoot, modelName, zoneName, source=None, appearan
   for textureName, holderName in textureSources.items():
     holder = next(candidate for candidate in textureHolders if candidate.archivePath.name.lower() == holderName)
     (modelFolder / textureName).write_bytes(eqTextures.readableTexture(textureName, holder.read(textureName)))
-  numpy.savez(modelFolder / "model.npz", vertices=vertices, triangles=triangles, uvs=uvs, textureNames=numpy.array(textures), cutouts=numpy.array(cutouts), missingTextures=numpy.array(missingTextures, dtype=str))
+  numpy.savez(modelFolder / "model.npz", vertices=vertices, triangles=triangles, uvs=uvs, textureNames=numpy.array(textures), cutouts=numpy.array(cutouts), tints=numpy.array(tints, dtype=numpy.uint32), missingTextures=numpy.array(missingTextures, dtype=str))
   details = stamp | {
     "model": definition["model"],
     "pose": built["pose"],
     "pieces": built.get("pieces"),
     "swappedMaterials": built.get("swappedMaterials"),
     "particleCloudsNotDrawn": built.get("particleCloudsNotDrawn", 0),
+    "unattached": built.get("unattached", []),
     "textureSources": textureSources,
     "missingTextures": missingTextures,
     "searchedArchives": searched,
