@@ -20,7 +20,8 @@ description: Place and render EverQuest characters (NPCs, players, pets, the sca
 | `faceStyle` | A Luclin model's face (its head materials swap to `<code>HE<face / 10><face % 10><part>`), or a Drakkin's face layer |
 | `hairStyle`, `hairColor` | Hair: a Luclin model's hair item (`IT<1000 + block + style>`) tinted from the client's 24-color table, or a Drakkin's `<code>_HAIR_<nn>` tinted from its heritage's colors |
 | `facialHair`, `facialHairColor` | A Luclin model's beard item (`IT<2000 + block + style>`) and its tint, 255 (the default) for none; or a Drakkin's `<code>_FACIALHAIR_<nn>` |
-| `heritage`, `eyeColor1`, `tattoo`, `details` | A Drakkin's heritage (its row in `PlayerCustomization.txt`), eye color (both eyes), tattoo, and facial attachment |
+| `eyeColor1` | Both eyes' color: a Luclin model's `CHR_EYE<n>_MDF` material, or a Drakkin's eye layers |
+| `heritage`, `tattoo`, `details` | A Drakkin's heritage (its row in `PlayerCustomization.txt`), tattoo, and facial attachment |
 | `animation`, `animationVariant`, `animationFrame` | Pose: an animation code (`L01`, `S03`), the client's label (`WALK`, `WAVE`), or an EQG name (`STND`, `NRUN`); a variant letter for a Luclin model (`A`, `B`, ...); and a frame. The default is `P01` (STAND STILL), which EQG models play as `STND`, at the first variant and frame 0 |
 | `snapToGround` | Stand the model origin `avatarHeight` above the surface below, as the client does (default true); false puts the origin at the position |
 | `source` | `"archive"` or `"archive:entry"` to take a definition other than the first the client loads |
@@ -57,7 +58,8 @@ EQG characters (Drakkin, the gnoll `GBN`, and later races) play the client's EQG
 | `textureType` | `textureSet` (`-1` means no override, so 0) |
 | `headType`, `variation` | `headType`, `variation` |
 | `faceStyle`, `hairStyle`, `hairColor`, `facialHair`, `facialHairColor` | the same names |
-| `heritage`, `eyeColor1`, `tattoo`, `details` | the same names, for Drakkin; `eyeColor2` is not read (the client gives a Drakkin's eyes `eyeColor1`) |
+| `eyeColor1`, `heritage`, `tattoo`, `details` | the same names; `eyeColor2` is not read, as the client gives a spawn's eyes `eyeColor1` |
+| `npcTintIndex` | none: this client stores it on the spawn (`eqgame.exe` +0x88f4) but never draws with it |
 
 The dumps come from live servers and our client is a modified RoF2, so many spawns name models this client lacks or does not link to that zone; those fail with an error listing any unlinked archives that define the model. Skip them; do not borrow a model from an unlinked archive.
 
@@ -93,5 +95,5 @@ Every eye-level `renderView` (`standAt`) stands a dark elf female of height 5, d
 
 ## Limits
 
-- **Not drawn.** Equipment, a Luclin model's eye colors (`eyeColor1` on one is an error), additive (`AddAlpha`) blending, and particle effects are not drawn. Without equipment a Luclin body shows bare skin: the client's clothing layers in these files are empty placeholders. Legacy 0x2C meshes (IVM and a few others) are not read and fail as unsupported.
+- **Not drawn.** Equipment, additive (`AddAlpha`) blending, and particle effects are not drawn. Without equipment a Luclin body shows bare skin: the client's clothing layers in these files are empty placeholders. Legacy 0x2C meshes (IVM and a few others) are not read and fail as unsupported.
 - **Drakkin armor.** A Drakkin's armor pieces (`dkf_<material>_<variation>_<bone>`) and armor layers are not drawn. How the client picks them is not yet read, so `variation`, `headType`, and `textureSet` are errors on Drakkin.

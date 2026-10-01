@@ -193,9 +193,13 @@ def testLuclinHeadsTakeTheClientsFaceHairAndBeard(stageBlenderServer):
     bearded = await session.expectSuccess("placeSpawn", {"zone": None, "model": "HUM", "name": "bearded", "height": 6, "location": [10, 0, 0], "headingDegrees": 0, "facialHair": 1, "facialHairColor": 2, "snapToGround": False})
     darkElf = await session.expectSuccess("placeSpawn", {"zone": None, "model": "DAM", "name": "darkElf", "height": 6, "location": [20, 0, 0], "headingDegrees": 0, "facialHair": 0, "snapToGround": False})
     noStyle = await session.expectSuccess("placeSpawn", {"zone": None, "model": "HUF", "name": "noStyle", "height": 6, "location": [30, 0, 0], "headingDegrees": 0, "hairStyle": 9, "snapToGround": False})
-    return christine, christineDetail, bearded, darkElf, noStyle
+    eyes = {}
+    for name, model, look in (("blue", "HUF", {"eyeColor1": 3}), ("patched", "HUM", {"faceStyle": 3, "eyeColor1": 2}), ("unchanged", "DAF", {}), ("iksar", "IKM", {"eyeColor1": 1})):
+      eyes[name] = await session.expectSuccess("placeSpawn", {"zone": None, "model": model, "name": name, "height": 6, "location": [40, 0, 0], "headingDegrees": 0, "snapToGround": False} | look)
+      eyes[name]["materials"] = [entry["material"] for entry in (await session.expectSuccess("getObjectDetail", {"name": name}))["materials"]]
+    return christine, christineDetail, bearded, darkElf, noStyle, eyes
 
-  christine, christineDetail, bearded, darkElf, noStyle = stageBlenderServer.session(steps)
+  christine, christineDetail, bearded, darkElf, noStyle, eyes = stageBlenderServer.session(steps)
   # The neighborhood's Christine as the live dump records her: face 6 swaps head parts 1, 4, and 5 (HUFHE0061, 64, 65), and hair
   # style 1 is item 1000 + 390 (human female block) + 1, tinted by color 4 (0x650B06).
   assert christine["source"]["pieces"] == ["HUFEYE_R_DMSPRITEDEF", "HUF_DMSPRITEDEF", "HUFEYE_L_DMSPRITEDEF", "IT1391"]
@@ -206,6 +210,14 @@ def testLuclinHeadsTakeTheClientsFaceHairAndBeard(stageBlenderServer):
   assert darkElf["source"]["pieces"][-1] == "IT1180"
   assert darkElf["source"]["unattached"] == []
   assert noStyle["source"]["unattached"] == [{"piece": "IT1399", "reason": "no archive the client loads defines it"}]
+  # Both eyes take eyeColor1 as CHR_EYE<color + race offset>_MDF from lgequip.s3d. A human male's face 3 fixes his right eye at 209.
+  # A dark elf's default color 0 names CHR_EYE020_MDF, which no archive defines, so she keeps her own eyes; an iksar's offset is 40.
+  def eyeTextures(name):
+    return sorted({re.search(r"chr_eye\d+\.dds", material).group() for material in eyes[name]["materials"] if "chr_eye" in material})
+  assert (eyeTextures("blue"), eyes["blue"]["source"]["swappedMaterials"]) == (["chr_eye003.dds"], 2)
+  assert eyeTextures("patched") == ["chr_eye002.dds", "chr_eye209.dds"]
+  assert (eyeTextures("unchanged"), eyes["unchanged"]["source"]["swappedMaterials"]) == (["chr_eye021.dds"], 0)
+  assert eyeTextures("iksar") == ["chr_eye041.dds"]
 
 
 def testDrakkinTakeTheirLooksFromPlayerCustomization(stageBlenderServer):
@@ -223,10 +235,9 @@ def testDrakkinTakeTheirLooksFromPlayerCustomization(stageBlenderServer):
     boundedDetail = await session.expectSuccess("getObjectDetail", {"name": "bounded"})
     missingHair = await session.expectSuccess("placeSpawn", {"zone": None, "model": "DKM", "name": "missingHair", "height": 6, "location": [20, 0, 0], "headingDegrees": 0, "hairStyle": 8, "snapToGround": False})
     noHeritage = await session.expectError("placeSpawn", {"zone": None, "model": "DKF", "name": "noHeritage", "height": 6, "location": [30, 0, 0], "headingDegrees": 0, "heritage": 9})
-    luclinEyes = await session.expectError("placeSpawn", {"zone": None, "model": "HUF", "name": "luclinEyes", "height": 6, "location": [40, 0, 0], "headingDegrees": 0, "eyeColor1": 3})
-    return anastrel, anastrelDetail, bounded, boundedDetail, missingHair, noHeritage, luclinEyes
+    return anastrel, anastrelDetail, bounded, boundedDetail, missingHair, noHeritage
 
-  anastrel, anastrelDetail, bounded, boundedDetail, missingHair, noHeritage, luclinEyes = stageBlenderServer.session(steps)
+  anastrel, anastrelDetail, bounded, boundedDetail, missingHair, noHeritage = stageBlenderServer.session(steps)
   # The Palatial Guild Hall's Anastrel as the live dump records her. Heritage 3 (Venesh the Green) tints her hair and facial hair
   # with color 0 of its list (0x000A00) and her tattoo and facial attachment with its base color (0x006400); tattoo 3 lays
   # A_DKF_TATTOO_S03_M01 on the tattoo piece, which the client blends by its alpha. Face 0 and eye color 2 lay the head and both
@@ -246,4 +257,3 @@ def testDrakkinTakeTheirLooksFromPlayerCustomization(stageBlenderServer):
   # PlayerCustomization.txt allows a male 9 hair styles, but no archive defines DKM_HAIR_08, so the client attaches none.
   assert missingHair["source"]["unattached"] == [{"piece": "DKM_HAIR_08", "reason": "no archive the client loads defines it"}]
   assert "PlayerCustomization.txt has no row for race 522, heritage 9, sex 1" in noHeritage
-  assert "how the client colors its eyes" in luclinEyes

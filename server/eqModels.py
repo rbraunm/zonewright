@@ -20,8 +20,8 @@ import eqWorldFile
 import machineProfile
 import zoneSources
 
-indexFormat = 9
-modelCacheFormat = 11
+indexFormat = 10
+modelCacheFormat = 12
 actorTrailingBytes = 4
 staticKinds = ("wldStatic",)
 defaultAppearance = {
@@ -86,10 +86,11 @@ def eqgKind(entryName):
 
 
 def archiveModels(archivePath):
-  """Every model an archive defines, by model key (a key defined twice in one archive keeps both definitions), and the animations it
-  registers: its WLDs' by resource name, and its EQG .ani entries by resource name (the entry name without .ani)."""
+  """Every model an archive defines, by model key (a key defined twice in one archive keeps both definitions); the animations it
+  registers: its WLDs' by resource name, and its EQG .ani entries by resource name (the entry name without .ani); and the eye
+  materials (CHR_EYE<n>_MDF) its WLDs define, which the client looks up by name (EQGraphicsDX9.dll 0x10040d9d)."""
   archive = eqArchive.EQArchive(archivePath)
-  models, animations = {}, {}
+  models, animations, eyeMaterials = {}, {}, {}
   for entryName in archive.names():
     if entryName.endswith((".mod", ".mds")):
       models.setdefault(eqLinks.modelKey(entryName[:-4]), []).append({"kind": eqgKind(entryName), "entry": entryName})
@@ -103,14 +104,17 @@ def archiveModels(archivePath):
       if resource in animations:
         raise ValueError(f"{archivePath.name}: animation {resource} is in two of its WLDs")
       animations[resource] = animation | {"wld": wldName}
-  return models, animations
+    for fragment in worldFile.fragmentsOfType(0x30):
+      if fragment.name.startswith("CHR_EYE"):
+        eyeMaterials.setdefault(fragment.name, {"wld": wldName, "fragment": fragment.index})
+  return models, animations, eyeMaterials
 
 
 def indexedArchive(archivePath):
   """Runs in a worker process. An archive this parser cannot read is recorded with its error, so resolving through it fails loudly."""
   try:
-    models, animations = archiveModels(archivePath)
-    return {"models": models, "animations": animations}
+    models, animations, eyeMaterials = archiveModels(archivePath)
+    return {"models": models, "animations": animations, "eyeMaterials": eyeMaterials}
   except (ValueError, KeyError, struct.error) as parseError:
     return {"error": f"{type(parseError).__name__}: {parseError}"}
 
@@ -590,8 +594,6 @@ def wldSkeletalParts(archive, definition, appearance, context):
   dags, skins = eqSkeletons.readSkeleton(worldFile, skeleton)
   meshes = eqSkeletons.skinMeshes(worldFile, skins)
   code = definition["model"].upper()
-  if appearance["eyeColor1"] != 0 and any(dag["name"] == f"{code}TUNIC_POINT_DAG" for dag in dags):
-    raise ValueError(f"Model {code} is a Luclin model; how the client colors its eyes (CHR_EYE materials, eqgame.exe 0x40c350) is not drawn yet")
   localTransforms, pose = context.wldPose(worldFile, dags, code)
   meshesByName = {fragment.name.upper(): fragment for fragment in worldFile.fragmentsOfType(0x36)}
   replacements = {}
@@ -606,12 +608,35 @@ def wldSkeletalParts(archive, definition, appearance, context):
   if clashing:
     raise ValueError(f"Model {code}: texture set {appearance['textureSet']} and face {appearance['faceStyle']} both swap {clashing}; which the client keeps is not known")
   swaps |= {name: worldFile.material(materialIndices[candidate]) for name, candidate in faceSwaps.items()}
+  eyes, eyeArchives = wldEyeSwaps(worldFile, dags, chosen, code, appearance, context)
+  clashing = sorted(set(eyes) & set(swaps))
+  if clashing:
+    raise ValueError(f"Model {code}: the eye colors and the face or texture set both swap {clashing}; which the client keeps is not known")
+  swaps |= eyes
   parts, particleClouds, boneWorlds = eqSkeletons.posedSkeleton(worldFile, skeleton, chosen, lambda mesh: wldMeshPart(mesh, swaps), localTransforms)
   attached, unattached = wldHeadItems(context, code, appearance, boneWorlds)
   return {
     "parts": parts + [item["part"] for item in attached], "pose": pose, "pieces": [mesh.name for mesh in chosen] + [item["piece"] for item in attached],
-    "swappedMaterials": len(swaps), "particleCloudsNotDrawn": particleClouds, "attachedArchives": [item["archive"] for item in attached], "unattached": unattached,
+    "swappedMaterials": len(swaps), "particleCloudsNotDrawn": particleClouds, "attachedArchives": [item["archive"] for item in attached] + eyeArchives, "unattached": unattached,
   }
+
+
+def wldEyeSwaps(worldFile, dags, meshes, code, appearance, context):
+  """A Luclin model's eye materials, which the client swaps for the CHR_EYE materials its eye color names (eqLooks.luclinEyes),
+  with the archives they come from. A model without <code>TUNIC_POINT_DAG is not Luclin and keeps its eyes (eqgame.exe 0x40796b),
+  as does an eye whose material no loaded archive defines."""
+  if not any(dag["name"] == f"{code}TUNIC_POINT_DAG" for dag in dags):
+    return {}, []
+  paletteReferences = sorted({struct.unpack_from("<i", mesh.body, 8)[0] for mesh in meshes})
+  if len(paletteReferences) != 1:
+    raise ValueError(f"{worldFile.sourceName}: the meshes of {code} use material lists {paletteReferences}, not one palette")
+  swaps, archives = {}, []
+  for paletteName, eyeName in eqLooks.luclinEyes(code, appearance, [material["name"].upper() for material in worldFile.materialList(paletteReferences[0])]).items():
+    found = context.eyeMaterial(eyeName)
+    if found is not None:
+      swaps[paletteName] = found["material"]
+      archives.append(found["archive"])
+  return swaps, archives
 
 
 def wldHeadItems(context, code, appearance, boneWorlds):
@@ -661,6 +686,17 @@ class ModelContext:
     if not found["linked"] and not found["onDemand"]:
       return None
     return resolveModel(self.clientRoot, self.cacheRoot, name, self.zoneName)
+
+  def eyeMaterial(self, name):
+    """An eye material the client looks up by name, from the first archive it loads that defines it (it registers a name once), or
+    None when none does."""
+    for link in self.links:
+      found = indexEntry(self.index, link)["eyeMaterials"].get(name)
+      if found is not None:
+        sourceName = f"{link['archive']}:{found['wld']}"
+        worldFile = eqWorldFile.WorldFile(eqArchive.EQArchive(self.clientRoot / link["archive"]).read(found["wld"]), sourceName)
+        return {"material": worldFile.material(found["fragment"]), "archive": link["archive"]}
+    return None
 
   def eqgAnimation(self, code):
     """The requested EQG animation frame ({tracks, frame, rootDrop}) and its description, or None (the bind pose) and the reason.

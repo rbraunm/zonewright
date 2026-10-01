@@ -26,6 +26,12 @@ playerRaces = frozenset(range(1, 13)) | {128, 130, 330, 522}
 # 0x40b580: the skeleton bone each EQG look piece attaches at.
 hairBone, beardBone, facialAttachmentBone, tattooBone = "CHEST_CHEST03", "NECK_NECK", "HEAD_HEAD", "ROOT_BONE"
 customizationCounts = ("faces", "hairStyles", "eyes", "beards", "tattoos", "facialAttachments")
+# 0x40c4a8: each race's offset into the client's CHR_EYE<n>_MDF eye materials; other races take none.
+eyeOffsets = {6: 20, 9: 100, 10: 80, 128: 40, 130: 60, 330: 120}
+# 0x40c447: the fixed right eye a male of these (race, face % 10) takes, whatever his eye color.
+fixedRightEyes = {(1, 3): 209, (2, 6): 209, (8, 5): 207, (2, 4): 207}
+halfling = 11
+noEyeColor = 255
 
 
 def raceAndGender(code):
@@ -117,6 +123,32 @@ def eqgPlayerLooks(clientRoot, code, appearance):
       (f"{code}_FACIALATT_{look['details']:02d}", facialAttachmentBone, baseTint, None),
     ],
   }
+
+
+def luclinEyes(code, appearance, paletteNames):
+  """The CHR_EYE<n>_MDF material each eye of a Luclin model takes as it spawns, by the palette material it replaces. Both eyes take
+  eyeColor1, the right first (eqgame.exe 0x40f032, 0x40c350); EQGraphicsDX9.dll finds the eye entries by name (0x10040c50). The
+  client changes neither eye for color 255 or a palette without a right eye."""
+  race, gender = raceAndGender(code)
+  left = right = None
+  for name in paletteNames:
+    if name[3:8] == "L_EYE":
+      left = name
+    elif name[3:8] == "R_EYE":
+      right = name
+    elif race == halfling and gender == 0 and name[3:7] == "R_01":
+      right = name
+    elif race == froglok and name[4:7] == "EYE":
+      left = right = name
+  color = appearance["eyeColor1"]
+  if color == noEyeColor or right is None:
+    return {}
+  offset = eyeOffsets.get(race, 0)
+  rightColor = fixedRightEyes.get((race, appearance["faceStyle"] % 10), color) if gender == 0 else color
+  eyes = {right: f"CHR_EYE{rightColor + offset:03d}_MDF"}
+  if left is not None:
+    eyes[left] = f"CHR_EYE{color + offset:03d}_MDF"
+  return eyes
 
 
 def faceSwaps(code, faceStyle, materialNames):
