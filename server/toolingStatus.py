@@ -7,6 +7,7 @@ from pathlib import Path
 repositoryRoot = Path(__file__).resolve().parent.parent
 manifestPath = repositoryRoot / "toolingManifest.json"
 versionPattern = re.compile(r"\d+\.\d+\.\d+")
+sha256Pattern = re.compile(r"[0-9a-f]{64}")
 blenderVersionLinePattern = re.compile(r"^Blender (\d+\.\d+\.\d+)", re.MULTILINE)
 blenderVersionTimeoutSeconds = 120
 
@@ -23,6 +24,12 @@ def loadManifest():
   blenderVersion = manifest["blender"]["version"]
   if not versionPattern.fullmatch(blenderVersion):
     raise ValueError(f"{manifestPath.name}: blender.version '{blenderVersion}' is not MAJOR.MINOR.PATCH")
+  blenderUrl = manifest["blender"]["url"]
+  if not isinstance(blenderUrl, str) or not blenderUrl:
+    raise ValueError(f"{manifestPath.name}: blender.url must be a non-empty string")
+  blenderSha256 = manifest["blender"]["sha256"]
+  if not sha256Pattern.fullmatch(blenderSha256):
+    raise ValueError(f"{manifestPath.name}: blender.sha256 '{blenderSha256}' is not 64 lowercase hex digits")
   return manifest
 
 

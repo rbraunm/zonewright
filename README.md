@@ -19,8 +19,9 @@ Run Claude Code from the repository root, since `.mcp.json` launches the server 
 
 ## Tooling
 
-`toolingManifest.json` pins every tool zonewright manages. Installs live under `%LOCALAPPDATA%\zonewright`.
+`toolingManifest.json` pins every tool zonewright manages: version, download URL, and SHA-256. To upgrade, update all three and run `installBlender`. Installs live under `%LOCALAPPDATA%\zonewright`.
 
 | Tool | Does |
 |---|---|
 | `getToolingStatus` | Reports each managed tool's state against its pin: `missing`, `broken`, `versionMismatch`, or `installed` |
+| `installBlender` | Downloads the pinned Blender zip, verifies its SHA-256, and installs it; does nothing if already installed, and removes other versions after an upgrade. A `broken` or `versionMismatch` install is an error to clear by hand |
