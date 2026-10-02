@@ -34,6 +34,18 @@ Blender-built zones drawn as the client would draw them depend on these.
 13. **Cover map mips.** D3DX recompresses each generated mip level of a terrain cover map to DXT5; the preview box filters without recompressing.
 14. **Spawn looks not read.** Appearance values some EQG models carry (an ALA's face style and heritage) are refused rather than guessed.
 
+## Validation
+
+Rules the renderer uses that are not yet confirmed against the RoF2 client itself. Code traces read what the DLL does but can miss a step. Calibration screenshots so far come from the live client, which has moved on since RoF2. Each of these needs RoF2 evidence: screenshots taken in the RoF2 client on Peridot, its `Logs\dbg.txt` (the graphics DLL logs there, including every baked light it ignores), or a read of the running client.
+
+- **Which variant a zone loads.** Some zones ship both a classic `.s3d` and an EQG `.eqg` with a `.zon` (`arena`, `tutorialb`, ...); the import takes the classic one, an untested choice.
+- **Which `.zon` an EQG zone loads,** and so the Guild Lobby's objects and baked light (see clientRendering.md, EQG zones).
+- **Texture orientation** of static EQG models (checked against live screenshots only).
+- **The camera constants** (field of view, pitch offset, eye height), measured against live screenshots.
+- **EQ terrain:** 32 texels per tile (the DLL's default distance table; `eqgame.exe` may set others); quad kind bit 2 drawn as ordinary; placement z above the ground; tilt order; the cover map's mip filtering.
+- **Objects without baked light** (most placed objects): drawn with no baked light and the full share of scene light, an assumption (`0x1009d670` is the client's path).
+- **Tilt order** of EQG zone placements.
+
 ## Parked
 
 - **Particle effects** (flames, smoke, spell clouds): not drawn until the owner asks; placements count WLD particle clouds in `particleCloudsNotDrawn`.
