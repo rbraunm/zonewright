@@ -101,7 +101,7 @@ The EQ preview renders the open scene's objects (its own lights and cameras excl
 | `getZoneSurvey` | Every survey group for one zone, both lanes (measured and interpreted) |
 | `getZoneNotes` | Lists a zone's Brewall labels: text, map position, and layer file |
 | `findModel` | Where the client finds a model in a zone: every definition by link tier, unlinked archives that also define it, and the one placement uses (see Client models) |
-| `importZone` | Brings a client zone into the open scene as one object named for it: a classic (WLD) zone's region meshes and the objects its `objects.wld` places, textured, with the vertex colors and normals the client lights them by, in the zone file's coordinates. EQG and terrain zones are not read yet |
+| `importZone` | Brings a client zone into the open scene as one object named for it, with the vertex colors and normals the client lights it by, in the zone file's coordinates: a classic (WLD) zone's region meshes and the objects its `objects.wld` places, or an EQ terrain zone's tiles (each ecosystem's cover and detail textures blended as the client blends them) and the objects and object groups its tiles place on the ground. EQG (EQGZ) zones are not read yet |
 | `calibrateShot` | Calibrates the renderer against a live client screenshot named `<zone>,<loc y>,<loc x>,<loc z>,<heading>,<pitch>.jpg`: imports the zone in a new file, fits the scene light that best explains the screenshot, renders with it, and returns the screenshot beside the render. Runs are kept under `%LOCALAPPDATA%\zonewright\calibration`; `getToolingStatus` lists the latest per screenshot (see the `calibrate-renderer` skill) |
 
 ### Client models

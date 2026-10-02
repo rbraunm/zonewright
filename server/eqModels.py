@@ -21,7 +21,7 @@ import machineProfile
 import zoneSources
 
 indexFormat = 10
-modelCacheFormat = 14
+modelCacheFormat = 15
 actorTrailingBytes = 4
 staticKinds = ("wldStatic",)
 defaultAppearance = {
@@ -841,10 +841,20 @@ def writePartsCache(modelFolder, parts, textureHolders, label):
   lighting = {}
   if litParts:
     lighting = {key: numpy.concatenate([part["lighting"][key] for part in parts])[used] for key in ("normals", "colors")}
+  # Terrain tiles carry a detail texture coordinate and a tint per vertex; only terrain materials read them, so other parts' vertices
+  # hold zeros.
+  terrainAttributes = {}
+  if any("detailUVs" in part for part in parts):
+    terrainAttributes = {
+      key: numpy.concatenate([part[key] if key in part else numpy.zeros((len(part["vertices"]), width), dtype=dataType) for part in parts])[used]
+      for key, width, dataType in (("detailUVs", 2, numpy.float64), ("vertexTints", 4, numpy.uint8))
+    }
   textureSources = {}
   # A texture absent from every linked archive is absent for the client too; its faces are drawn as missing and reported.
   missingTextures = []
   for textureName in sorted(set(textures)):
+    if textureName.startswith("terrain:"):
+      continue
     holder = next((candidate for candidate in textureHolders if textureName in candidate.entries), None)
     if holder is None:
       missingTextures.append(textureName)
@@ -856,9 +866,15 @@ def writePartsCache(modelFolder, parts, textureHolders, label):
     holder = next(candidate for candidate in textureHolders if candidate.archivePath.name.lower() == holderName)
     fileNames[textureName], readable = eqTextures.readableTexture(textureName, holder.read(textureName))
     (modelFolder / fileNames[textureName]).write_bytes(readable)
+  # Triangles index a palette of materials (texture file, alpha mode, tint).
+  palette, triangleMaterials = {}, numpy.empty(len(textures), dtype=numpy.int32)
+  for index, key in enumerate(zip(textures, alphaModes, tints)):
+    triangleMaterials[index] = palette.setdefault(key, len(palette))
   numpy.savez(
-    modelFolder / "model.npz", vertices=vertices, triangles=triangles, uvs=uvs, textureNames=numpy.array([fileNames.get(texture, texture) for texture in textures]), alphaModes=numpy.array(alphaModes),
-    tints=numpy.array(tints, dtype=numpy.uint32), missingTextures=numpy.array(missingTextures, dtype=str), **lighting,
+    modelFolder / "model.npz", vertices=vertices.astype(numpy.float32), triangles=triangles.astype(numpy.int32), uvs=uvs.astype(numpy.float32),
+    materialTextures=numpy.array([fileNames.get(texture, texture) for texture, _, _ in palette]), materialAlphaModes=numpy.array([alphaMode for _, alphaMode, _ in palette]),
+    materialTints=numpy.array([tint for _, _, tint in palette], dtype=numpy.uint32), triangleMaterials=triangleMaterials, missingTextures=numpy.array(missingTextures, dtype=str),
+    **{key: value.astype(numpy.float32) if value.dtype == numpy.float64 else value for key, value in (lighting | terrainAttributes).items()},
   )
   return {
     "textureSources": textureSources, "missingTextures": missingTextures, "droppedTriangles": sum(part["dropped"] for part in parts), "lit": bool(litParts),

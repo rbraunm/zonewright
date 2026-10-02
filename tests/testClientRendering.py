@@ -140,3 +140,22 @@ def testCalibrationFitsTheFogOfAShotWithoutAZoneHeader(stageBlenderServer, tmp_p
   assert abs(fit["fogStart"] - known["fogStart"]) <= 60
   assert abs(fit["fogEnd"] - known["fogEnd"]) <= 120
   assert result["meanPixelDifference"] < 4
+
+
+def testImportZoneBringsATerrainZone(stageBlenderServer):
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    return await session.expectSuccess("importZone", {"zone": "neighborhood"})
+
+  imported = stageBlenderServer.session(steps)
+  source = imported["source"]
+  assert {key: source[key] for key in ("archive", "format", "tiles", "ecosystems", "terrainCombos", "placements", "objectGroups", "missingObjectGroups")} == {
+    "archive": "neighborhood.eqg", "format": "eqtzp", "tiles": 629, "ecosystems": ["dirtpath", "forest", "grassland", "lightdirt"],
+    "terrainCombos": [["grassland"], ["grassland", "dirtpath"], ["grassland", "dirtpath", "forest"], ["grassland", "forest", "dirtpath"], ["grassland", "lightdirt"]],
+    "placements": 5730, "objectGroups": 5, "missingObjectGroups": ["drgbrownie"],
+  }
+  # Every tile placement is drawn, plus the merchant tent and the zone-out wall of the two object groups the archive holds; the wall's
+  # baked light file does not fit its model.
+  assert source["placedObjects"] == 5732
+  assert source["litFilesNotMatchingModels"] == ["zoneout_obj_zone_out.lit"]
+  assert source["missingModels"] == [] and source["missingTextures"] == []

@@ -74,7 +74,8 @@ def addEQGModel(builder, model, placement):
   # Material -1 (no material) indexes the trailing entry.
   triangleMaterials = model["triangleMaterials"][keptTriangles]
   materialIndices = numpy.where(triangleMaterials < 0, len(model["materials"]), triangleMaterials)
-  builder.add(eqgFiles.placeVertices(vertices, placement), triangles, materialTextures[materialIndices], materialSurfaces[materialIndices])
+  placed = vertices @ placement["transform"].T + placement["position"] if "transform" in placement else eqgFiles.placeVertices(vertices, placement)
+  builder.add(placed, triangles, materialTextures[materialIndices], materialSurfaces[materialIndices])
 
 
 def addPlacements(builder, library, placements):
@@ -139,15 +140,6 @@ def buildEQGGeometry(clientRoot, source):
   return geometry | {"terrainBounds": (terrainVertices.min(0), terrainVertices.max(0)) if terrainVertexCount else None}
 
 
-def terrainGridTriangles(quads):
-  rows, columns = numpy.meshgrid(numpy.arange(quads), numpy.arange(quads), indexing="ij")
-  corner = (rows * (quads + 1) + columns).ravel()
-  return numpy.concatenate([
-    numpy.stack([corner, corner + 1, corner + quads + 2], axis=1),
-    numpy.stack([corner, corner + quads + 2, corner + quads + 1], axis=1),
-  ])
-
-
 def buildTerrainGeometry(clientRoot, source):
   archivePaths, missingArchives = zoneSources.assetArchivePaths(clientRoot, source)
   library = zoneSources.ModelLibrary(archivePaths, source["zone"])
@@ -156,15 +148,25 @@ def buildTerrainGeometry(clientRoot, source):
   quads = terrain["header"]["quadsPerTile"]
   spacing = terrain["header"]["unitsPerVertex"]
   rows, columns = numpy.meshgrid(numpy.arange(quads + 1), numpy.arange(quads + 1), indexing="ij")
-  gridTriangles = terrainGridTriangles(quads)
   builder = GeometryBuilder()
   for tile in terrain["tiles"]:
-    # Height rows run along y and columns along x, matching the reference renderer's seam-checked orientation.
+    # Height rows run along y and columns along x, as the client lays out a tile's vertices.
     vertices = numpy.stack([tile["x"] + columns.ravel() * spacing, tile["y"] + rows.ravel() * spacing, tile["heights"].ravel().astype(numpy.float64)], axis=1)
+    gridTriangles = eqgTerrain.tileTriangles(tile["quadFlags"])
     builder.add(vertices, gridTriangles, numpy.full(len(gridTriangles), builder.textureID(tile["baseLayer"]), dtype=numpy.int64), numpy.full(len(gridTriangles), surfaceCode["solid"], dtype=numpy.int8))
-  placementCounts, missingModels = addPlacements(builder, library, terrain["placements"])
+  tilesByOrigin = {(tile["x"], tile["y"]): tile for tile in terrain["tiles"]}
+  missingModels, placementCounts = set(), collections.Counter()
+  for placement in terrain["placements"]:
+    placementCounts[placement["model"]] += 1
+    model = library.model(placement["model"])
+    if model is None:
+      missingModels.add(placement["model"])
+      continue
+    transform = eqgTerrain.placementMatrix(placement["rotationDegrees"], placement["scale"])
+    position = eqgTerrain.placedPosition(terrain, tilesByOrigin, placement)
+    addEQGModel(builder, model, {"model": placement["model"], "transform": transform, "position": position})
   minimum, maximum = eqgTerrain.terrainBounds(terrain)
-  return builder.build(placementCounts=placementCounts, regionNames=terrain["regionNames"], missingModels=missingModels, missingAssetArchives=missingArchives) | {
+  return builder.build(placementCounts=placementCounts, regionNames=terrain["regionNames"], missingModels=sorted(missingModels), missingAssetArchives=missingArchives) | {
     "terrainBounds": (numpy.array(minimum), numpy.array(maximum)),
     "tileShape": {"quadsPerTile": quads, "unitsPerVertex": spacing},
   }

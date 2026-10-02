@@ -50,6 +50,50 @@ The zone header (the server's NewZone packet) carries zone type, sky type, fog c
 - **Objects without vertex colors** (most placed objects) are drawn with no baked light and the full share of scene light. Where the client takes their color from is not traced.
 - Zone and object textures are often DDS data under `.bmp` names.
 
+## EQ terrain zones
+
+An EQ terrain zone (`EQTZP`, such as the Neighborhood) is a grid of tiles in the zone's `.dat`, each a 17x17 height grid with two vertex colors per vertex and ecosystem layers (`.eco` files). `EQGraphicsDX9.dll` reads the tiles at `0x101004a0` (data versions 20 and 21 differ only in a water sheet block) and draws each ecosystem on a tile as its own pass with `SPL\Terrain_Bump<n>Detail.fxo` (`n` the ecosystem's texture layers, 1-3), technique `TerrainBump<n>Detail_DX9_VS1_PS20`. Where an ecosystem's first layer has no normal map it uses `Terrain_<n>Detail` instead, whose `DX9_VS1_PS11` technique clamps the doubled light and tint together in the vertex shader; the zones read so far all have normal maps.
+
+### Vertices
+
+The vertex buffer (`0x100ac170`) holds, per grid vertex:
+
+- **Position:** x and y in whole units, height times 8, each truncated to a short; the shader multiplies the height by 0.125.
+- **Normal:** from the heights beside the vertex (`0x100f2190`): `(h(x-1) - h(x+1), h(y-1) - h(y+1), 2 * unitsPerVertex)`, normalized, reaching into the neighboring tile at an edge and one-sided where there is none; packed as color bytes `trunc(255 * (n * 0.5 + 0.5))`.
+- **COLOR0:** the tile's second color array: baked light in RGB and the share of scene light in alpha, as on a classic zone (`0xff000000`, black with the full share, by default).
+- **COLOR1:** the first color array, a tint the shader doubles (`0x00808080`, neutral, by default).
+- **TEXCOORD0:** across the tile's color map and detail mask, from the first texel's center to the last's, in 256ths.
+- **TEXCOORD1:** 0 to 1 across the tile, times each detail layer's `DETAILREPEAT` in the shader.
+
+A quad's flag `0x80` picks its diagonal: clear splits it from its (0, 0) corner to (1, 1), set from (1, 0) to (0, 1) (the height query, `0x100f2fc0`). Flag bits 1 and 4 mark quad kinds (`0x100f2100`) whose drawing is not traced; bit 2 reads back like no bit.
+
+### The pass
+
+    light  = COLOR0.rgb + COLOR0.a * (ambient + bounce * max(N . D, 0) + sun * max(N . -D, 0)) + specialAmbient   (clamped to 1)
+    detail = mask.r * Detail0(uv1 * repeat0) + mask.g * Detail1(uv1 * repeat1) + mask.b * Detail2(uv1 * repeat2)
+    pixel  = 2 * colorMap.rgb * detail * COLOR1.rgb * light,  written with alpha colorMap.a
+
+plus point light 0 through the detail normal maps (not drawn). The passes' alphas add to 1 across a tile's ecosystems.
+
+### Tile textures
+
+Each ecosystem on a tile has a 32x32 color map and detail mask (A8R8G8B8, no mipmaps). The terrain system's distance table (`0x100ec12a`) gives 32 texels at every distance. They are computed once per tile (`0x100f3fd0`):
+
+- **Height and slope per texel:** texel `t` samples the vertex grid at `t * 16 / 31` along each axis, bilinearly: the height, and the normal's z, whose slope in degrees comes from a table, `acos(round(z * 1000) / 1000)` (`0x100ec630`).
+- **Layer weights (`0x100ee790`):** a texture layer covers a texel fully inside `MINHEIGHT`-`MAXHEIGHT` and `MINSLOPE`-`MAXSLOPE`, falling off linearly across `HEIGHTTOL` and `SLOPETOL` outside them (the two factors multiplied). The last layer takes `round(factor * 255)`; each earlier one, back to the second, takes its factor of what is left; the first layer takes the rest.
+- **Color map RGB (`0x100eeed0`):** each layer's `COVERMAP` times its weight / 255, summed: a weight below 3 adds nothing and one of 253 or more takes the cover map whole. The cover map is read at 32x32 from the mip chain D3DX builds for it with a box filter (the cover maps ship without mips), so it repeats once per tile.
+- **Coverage, the color map's alpha (`0x100f4690`):** each later ecosystem's 64x64 mask from the `.dat` (texel `t` reads mask texel `2t`) times each layer's weight, scaled by 1/65535 and summed. Working from the last ecosystem back to the second, each takes that share of what later ones left, snapped to 0 below 3 and 255 from 253. The first ecosystem takes the rest.
+- **Detail mask (`0x100ac770`):** red, green, and blue are the first three layers' weights. A texel on the tile's edge is averaged with the neighboring tile's texel beside it where that tile has the same ecosystem (left, right, below, above, in that order).
+
+`BLENDMAP` and `LAYERINGMAP` (`default.bmp` in the zones read so far) and child layers modify the weights and coverage; they are not read yet.
+
+### Objects
+
+- **Placements:** a tile's placements give a model (`.mod`, with `.lod` levels the client switches by distance), the ecosystem that placed it, a position from its own tile's origin with z above the ground beneath it, turns in degrees, and a scale. Most have z 0; hand-placed rocks sink a few units.
+- **Object groups (`.tog`):** place their members' models relative to the group, each with a `.lit` file of baked light per vertex. The Neighborhood's zone-out wall, whose `.lit` holds 2175 colors for 1788 vertices, shows in screenshots as an object without baked light, so a `.lit` that does not fit its model is not applied.
+
+Neighborhood calibration: the two day shots redraw within about 13.5 and 16.8 levels of 255 with the zone's header fog. Doors (the gate in the second shot), spawns, radial flora (grass cards near the camera), the sky, and level-of-detail models are not drawn yet.
+
 ## Camera
 
 Measured by aligning renders to live client screenshots (Plane of Knowledge twice, Eastern Wastes once), each cropped about its center to 16:9:
@@ -79,4 +123,6 @@ Results: the two Plane of Knowledge night shots redraw within about 11-13 levels
 - The sun object's color and direction over the day, and the sky object's ambient.
 - `SpecialAmbient` and `BounceColor` sources in `eqgame.exe`.
 - Point lights: `lights.wld` and how the three per mesh are chosen.
-- EQG zones (`RegionCBS1` and the other DX9 region effects) and EQ terrain (`Terrain_*`).
+- EQG zones (`RegionCBS1` and the other DX9 region effects).
+- EQ terrain: radial flora, water sheets, quad kinds 1 and 4, `BLENDMAP` and `LAYERINGMAP`, child layers, tiles without ecosystems, model levels of detail by distance, and how EQG objects (`MPL` effects) are lit.
+- The cover map's mip levels are box filtered here; D3DX recompresses each generated level to DXT5, which is not reproduced.

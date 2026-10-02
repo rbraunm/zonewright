@@ -14,7 +14,7 @@ import zoneGeometry
 import zoneSources
 
 logger = logging.getLogger(__name__)
-cacheFormat = 2
+cacheFormat = 3
 sourcePathKeys = ("archive", "zonPath")
 hashChunkBytes = 1024 * 1024
 

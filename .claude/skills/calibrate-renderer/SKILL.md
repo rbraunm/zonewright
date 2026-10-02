@@ -11,7 +11,7 @@ The preview draws what the client draws (`docs\clientRendering.md`): unlit surfa
 
 The owner keeps live client screenshots in `C:\Games\Steam\steamapps\common\Everquest F2P\Screenshots`, named `<zone>,<loc y>,<loc x>,<loc z>,<heading>,<pitch>.jpg`:
 
-- `<zone>` is the owner's best name for the zone, not always the client's file name. Map it to the client zone: `ewastes` is `eastwastes`; `pallatialguildhall` (server `guildhalllrg_int`) has no interior in this client, so it cannot be calibrated against zone geometry.
+- `<zone>` is the owner's best name for the zone, not always the client's file name. Map it to the client zone: `ewastes` is `eastwastes`; `neighborhood` is the EQ terrain zone `neighborhood` (header fog 1500-6000, color 200, 200, 200, `NewEngineZone` 1); `pallatialguildhall` (server `guildhalllrg_int`) has no interior in this client, so it cannot be calibrated against zone geometry.
 - `/loc` order is EQ y, x, z: the scene's x, y, z.
 - `<heading>` is compass degrees clockwise from north (the scene's +X); `<pitch>` is in 512ths of a turn, positive up.
 - A name without all six fields is not ready yet. Check the folder now and then, not often.
@@ -33,4 +33,5 @@ It imports the zone, renders the screenshot's view as passes, fits the scene lig
 - **Shifted or scaled scene:** the camera. Its constants (`eyeAboveLoc`, `pitchOffsetDegrees` in `eqCalibration.py`, `verticalFieldOfViewDegrees` in `bridgeViews.py`) come from aligning renders to screenshots; re-measure them with several shots before changing them, and note an outlier shot rather than bending the constants to it.
 - **Wrong overall light:** the time of day differs between shots; the fit measures it per shot. Shots of one zone a few minutes apart should fit alike.
 - **Local glows, sky, distant haze:** the sky and point lights are not drawn yet, and fog without the zone header's values is a guess (see the to-do list in `docs\clientRendering.md`).
+- **Missing props, people, and grass:** doors, ground items, and spawns are not placed by `calibrateShot` (the neighborhood's gate and info board are doors), and an EQ terrain zone's radial flora is not drawn; they count against the difference.
 - **Magenta:** a texture no archive holds, as for the client.

@@ -1,4 +1,5 @@
 """EQ models built from the server's model cache (model.npz plus textures) into Blender objects. Runs under Blender's Python."""
+import json
 import math
 import os
 
@@ -63,6 +64,70 @@ def modelMaterial(folder, textureName, alphaMode, tint, lit):
   return material
 
 
+def dataImage(path):
+  image = bpy.data.images.load(path, check_existing=True)
+  image.colorspace_settings.name = "Non-Color"
+  image.alpha_mode = "CHANNEL_PACKED"
+  return image
+
+
+def terrainMaterial(folder, comboIndex):
+  """A terrain tile's ecosystems as the client draws them (docs/clientRendering.md, EQ terrain), its passes summed: per ecosystem, its
+  color map times twice the detail textures weighed by its detail mask, times the vertex tint, weighed by the color map's coverage."""
+  materialName = f"eq_{os.path.basename(folder)}_terrain{comboIndex}"
+  material = bpy.data.materials.get(materialName)
+  if material is not None and material.get("eqFolder") == folder:
+    return material
+  combo = json.loads(open(os.path.join(folder, "terrain.json"), encoding="utf-8").read())["combos"][comboIndex]
+  material = bpy.data.materials.new(materialName)
+  material["eqFolder"] = folder
+  material.use_nodes = True
+  tree = material.node_tree
+  nodes, links = tree.nodes, tree.links
+
+  def vectorMath(operation, first, second):
+    node = nodes.new("ShaderNodeVectorMath")
+    node.operation = operation
+    links.new(first, node.inputs[0])
+    if operation == "SCALE" and isinstance(second, float):
+      node.inputs["Scale"].default_value = second
+    else:
+      links.new(second, node.inputs["Scale" if operation == "SCALE" else 1])
+    return node.outputs["Vector"]
+
+  def texture(fileName, coordinates, extension):
+    node = nodes.new("ShaderNodeTexImage")
+    node.image = dataImage(os.path.join(folder, fileName))
+    node.interpolation = "Linear"
+    node.extension = extension
+    links.new(coordinates, node.inputs["Vector"])
+    return node
+
+  atlas = nodes.new("ShaderNodeUVMap")
+  atlas.uv_map = "UVMap"
+  detail = nodes.new("ShaderNodeUVMap")
+  detail.uv_map = bridgeClientLight.detailUVMap
+  tint = nodes.new("ShaderNodeAttribute")
+  tint.attribute_type = "GEOMETRY"
+  tint.attribute_name = bridgeClientLight.tintAttribute
+  doubledTint = vectorMath("SCALE", tint.outputs["Color"], 2.0)
+  total = None
+  for slot in combo:
+    colorMap = texture(slot["colorMap"], atlas.outputs["UV"], "EXTEND")
+    weights = nodes.new("ShaderNodeSeparateColor")
+    links.new(texture(slot["detailMask"], atlas.outputs["UV"], "EXTEND").outputs["Color"], weights.inputs["Color"])
+    details = None
+    for channel, layer in zip(("Red", "Green", "Blue"), slot["details"]):
+      repeated = vectorMath("SCALE", detail.outputs["UV"], float(layer["repeat"]))
+      weighed = vectorMath("SCALE", texture(layer["texture"], repeated, "REPEAT").outputs["Color"], weights.outputs[channel])
+      details = weighed if details is None else vectorMath("ADD", details, weighed)
+    passColor = vectorMath("MULTIPLY", vectorMath("MULTIPLY", colorMap.outputs["Color"], details), doubledTint)
+    covered = vectorMath("SCALE", passColor, colorMap.outputs["Alpha"])
+    total = covered if total is None else vectorMath("ADD", total, covered)
+  bridgeClientLight.surfaceOutput(material, total, None, "opaque", True, alphaThreshold)
+  return material
+
+
 def buildModelMesh(folder, meshName):
   data = numpy.load(os.path.join(folder, "model.npz"))
   vertices, triangles, uvs = data["vertices"], data["triangles"], data["uvs"]
@@ -82,16 +147,19 @@ def buildModelMesh(folder, meshName):
     normals.data.foreach_set("vector", data["normals"].astype(numpy.float32).ravel())
     baked = mesh.color_attributes.new(bridgeClientLight.bakedAttribute, "FLOAT_COLOR", "POINT")
     baked.data.foreach_set("color", (data["colors"].astype(numpy.float32) / 255).ravel())
+  if "detailUVs" in data:
+    detailLayer = mesh.uv_layers.new(name=bridgeClientLight.detailUVMap)
+    detailLayer.data.foreach_set("uv", data["detailUVs"][triangles.ravel()].astype(numpy.float32).ravel())
+    tints = mesh.color_attributes.new(bridgeClientLight.tintAttribute, "FLOAT_COLOR", "POINT")
+    tints.data.foreach_set("color", (data["vertexTints"].astype(numpy.float32) / 255).ravel())
   missing = {str(name) for name in data["missingTextures"]}
-  slots = {}
-  materialIndices = numpy.empty(len(triangles), dtype=numpy.int32)
-  for index, (textureName, alphaMode, tint) in enumerate(zip(data["textureNames"], data["alphaModes"], data["tints"])):
+  for textureName, alphaMode, tint in zip(data["materialTextures"], data["materialAlphaModes"], data["materialTints"]):
     key = (str(textureName), str(alphaMode), int(tint), lit)
-    if key not in slots:
-      slots[key] = len(slots)
+    if key[0].startswith("terrain:"):
+      mesh.materials.append(terrainMaterial(folder, int(key[0].split(":")[1])))
+    else:
       mesh.materials.append(missingTextureMaterial(key[0]) if key[0] in missing else modelMaterial(folder, *key))
-    materialIndices[index] = slots[key]
-  mesh.polygons.foreach_set("material_index", materialIndices)
+  mesh.polygons.foreach_set("material_index", data["triangleMaterials"].astype(numpy.int32))
   mesh.update()
   mesh.validate()
   return mesh

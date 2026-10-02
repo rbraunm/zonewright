@@ -86,6 +86,7 @@ def parseModel(modelBytes, sourceName):
     raise ValueError(f"{sourceName}: triangle materials span {int(triangles['material'].min())}..{int(triangles['material'].max())} with {materialCount} materials")
   return {
     "vertices": vertices["position"].astype(numpy.float64),
+    "normals": vertices["normal"].astype(numpy.float64),
     "uvs": vertices["uv"].astype(numpy.float64),
     "triangles": triangles["indices"].astype(numpy.int64),
     "triangleMaterials": triangles["material"].astype(numpy.int64),

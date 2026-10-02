@@ -457,17 +457,17 @@ async def placeZone(context, zone, collection):
     "modelFolder": str(folder), "name": zone, "location": [0, 0, 0], "rotationDegrees": 0, "scale": 1, "avatarHeight": 0,
     "snapToGround": False, "collection": collection,
   })
-  return placed | {"source": {key: details[key] for key in (
-    "archive", "format", "regionMeshes", "placements", "placedObjects", "objectArchives", "missingModels", "missingTextures", "droppedTriangles",
-    "particleCloudsNotDrawn",
-  )}}
+  stampKeys = ("zoneCacheFormat", "modelCacheFormat", "indexFormat", "archives", "listingFingerprint", "zone", "textureSources", "lit", "minimum", "maximum")
+  return placed | {"source": {key: value for key, value in details.items() if key not in stampKeys}}
 
 
 @guardedTool()
 async def importZone(context: Context, zone: str, collection: str | None = None):
-  """Bring a client zone into the open scene as one object named for it, drawn as the client draws it: a classic (WLD) zone's region
-  meshes and the objects its objects.wld places, textured, with the vertex colors and normals the client lights them by. It keeps the
-  zone file's coordinates, which the scene shares (Blender x, y are the server's y, x). EQG and terrain zones are not read yet."""
+  """Bring a client zone into the open scene as one object named for it, drawn as the client draws it, with the vertex colors and normals
+  the client lights it by: a classic (WLD) zone's region meshes and the objects its objects.wld places, or an EQ terrain zone's tiles
+  (each ecosystem's cover and detail textures blended as the client blends them) and the objects and object groups its tiles place on
+  the ground. It keeps the zone file's coordinates, which the scene shares (Blender x, y are the server's y, x). EQG (EQGZ) zones are
+  not read yet."""
   return await placeZone(context, zone, collection)
 
 

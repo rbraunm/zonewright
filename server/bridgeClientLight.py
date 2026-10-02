@@ -8,9 +8,11 @@ import bpy
 
 groupName = "eqClientLight"
 # Raised whenever buildGroup changes, so a group saved in an older .blend is rebuilt in place.
-groupVersion = 3
+groupVersion = 4
 bakedAttribute = "eqColor"
 normalAttribute = "eqNormal"
+tintAttribute = "eqTint"
+detailUVMap = "eqDetailUV"
 # RegionOldA.fxo's fFogRange: the fog ramp spans ten units of density between fog start and end.
 fogRange = 10.0
 environmentColors = ("ambientColor", "specialAmbientColor", "bounceColor", "sunColor", "fogColor")
@@ -87,7 +89,8 @@ def buildGroup(tree):
   for axis in "XYZ":
     ones.inputs[axis].default_value = 1.0
   clamped = build.vectorMath("MINIMUM", build.vectorMath("MAXIMUM", light, build.node("ShaderNodeCombineXYZ").outputs["Vector"]), ones.outputs["Vector"])
-  lit = build.vectorMath("MULTIPLY", inputs["Base"], clamped)
+  # The framebuffer holds no more than 1: a terrain texture doubled by its effect can light past it.
+  lit = build.vectorMath("MINIMUM", build.vectorMath("MULTIPLY", inputs["Base"], clamped), ones.outputs["Vector"])
   distance = build.node("ShaderNodeCameraData").outputs["View Distance"]
   ramp = build.math("MULTIPLY", build.math("SUBTRACT", distance, build.value("fogStart")), build.value("fogRampScale"))
   rampClamped = build.math("MINIMUM", build.math("MAXIMUM", ramp, 0.0), fogRange)
