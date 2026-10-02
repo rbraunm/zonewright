@@ -25,7 +25,7 @@ import surveyFields
 import zoneGeometry
 import zoneSources
 
-surveyVersion = 3
+surveyVersion = 4
 thumbnailSide = 128
 imageExtensions = (".dds", ".bmp", ".tga", ".png", ".jpg")
 looseFolders = ("Resources/Sky", "Resources/WaterSwap", "Resources/Precipitation", "EnvEmitterEffects")
@@ -117,29 +117,36 @@ def imageFacts(textureName, data):
   }, rgba
 
 
-class TextureStore:
-  """Readable texture files and thumbnails under the catalog folder, one per distinct content."""
+def textureFolder(cacheRoot, digest):
+  return cacheRoot / "textures" / digest[:12]
 
-  def __init__(self, catalogRoot):
-    self.textureRoot = catalogRoot / "textures"
-    self.thumbnailRoot = catalogRoot / "thumbnails"
+
+def thumbnailPath(cacheRoot, digest):
+  return cacheRoot / "thumbnails" / f"{digest[:12]}.png"
+
+
+class TextureStore:
+  """Readable texture files and thumbnails under the tooling root's catalog folder, one per distinct content; the measured facts name
+  only the file, so they read the same on every machine."""
+
+  def __init__(self, cacheRoot):
+    self.cacheRoot = cacheRoot
 
   def store(self, textureName, rawBytes):
     digest = shortHash(rawBytes)
     fileName, readable = eqTextures.readableTexture(textureName, rawBytes)
-    folder = self.textureRoot / digest[:12]
-    filePath = folder / fileName
-    if not filePath.is_file():
+    folder = textureFolder(self.cacheRoot, digest)
+    if not (folder / fileName).is_file():
       folder.mkdir(parents=True, exist_ok=True)
-      filePath.write_bytes(readable)
+      (folder / fileName).write_bytes(readable)
     facts, rgba = imageFacts(textureName, readable)
-    thumbnailPath = self.thumbnailRoot / f"{digest[:12]}.png"
-    if not thumbnailPath.is_file():
-      self.thumbnailRoot.mkdir(parents=True, exist_ok=True)
-      thumbnail = Image.fromarray(rgba, "RGBA")
-      thumbnail.thumbnail((thumbnailSide, thumbnailSide))
-      thumbnail.save(thumbnailPath)
-    return f"texture/{textureName}@{digest[:8]}", {"kind": "texture", "name": textureName, "sha256": digest, "file": str(filePath), "thumbnail": str(thumbnailPath)} | facts
+    thumbnail = thumbnailPath(self.cacheRoot, digest)
+    if not thumbnail.is_file():
+      thumbnail.parent.mkdir(parents=True, exist_ok=True)
+      image = Image.fromarray(rgba, "RGBA")
+      image.thumbnail((thumbnailSide, thumbnailSide))
+      image.save(thumbnail)
+    return f"texture/{textureName}@{digest[:8]}", {"kind": "texture", "name": textureName, "sha256": digest, "fileName": fileName} | facts
 
 
 def textureUses(geometry):
@@ -302,10 +309,6 @@ def ecosystemFacts(zoneName, archive, tileSide):
   return facts, layerUses
 
 
-def fileStamp(paths):
-  return {path.name.lower(): [path.stat().st_size, path.stat().st_mtime_ns] for path in paths}
-
-
 def storeTextures(store, archives, uses, materialUses, wldMaterials, layerUses):
   """Every image in the archives, in load order; a later archive's different image under a name already seen is marked shadowed, as
   the client keeps the first."""
@@ -338,11 +341,11 @@ def zoneArchivePaths(clientRoot, zoneName):
   return [clientRoot / link["archive"] for link in links if "_chr" not in link["archive"] and not link["via"].endswith("_chr.txt")]
 
 
-def clientZoneStamp(clientRoot, zoneName):
-  """The size and modification time of every file a client zone's survey reads."""
+def clientZoneSourcePaths(clientRoot, zoneName):
+  """Every file a client zone's survey reads."""
   source = eqZones.zoneSource(clientRoot, zoneName)
   emitterPath = eqEmitters.emitterListPath(clientRoot, zoneName)
-  return fileStamp(zoneArchivePaths(clientRoot, zoneName) + ([source["zonPath"]] if "zonPath" in source else []) + ([emitterPath] if emitterPath else []))
+  return zoneArchivePaths(clientRoot, zoneName) + ([source["zonPath"]] if "zonPath" in source else []) + ([emitterPath] if emitterPath else [])
 
 
 def looseFolderPaths(clientRoot, folder):
@@ -351,13 +354,9 @@ def looseFolderPaths(clientRoot, folder):
   return sorted(path for path in (clientRoot / folder).iterdir() if path.suffix.lower() in imageExtensions)
 
 
-def looseFolderStamp(clientRoot, folder):
-  return fileStamp(looseFolderPaths(clientRoot, folder))
-
-
-def zoneFileStamp(archivePath):
+def zoneFileSourcePaths(archivePath):
   emitterPath = archivePath.parent / f"{archivePath.stem}_EnvironmentEmitters.txt"
-  return fileStamp([archivePath] + ([emitterPath] if emitterPath.is_file() else []))
+  return [archivePath] + ([emitterPath] if emitterPath.is_file() else [])
 
 
 def surveyClientZone(clientRoot, cacheRoot, catalogRoot, zoneName):
@@ -393,7 +392,7 @@ def surveyClientZone(clientRoot, cacheRoot, catalogRoot, zoneName):
   emitters = eqEmitters.parseEmitters(emitterPath.read_text(encoding="latin1"), emitterPath.name) if emitterPath else []
   assets = storeTextures(TextureStore(catalogRoot), archives, textureUses(geometry), materialUses, wldMaterials, layerUses)
   assets |= models | lightFacts(zoneName, lights or []) | emitterFacts(zoneName, emitters)
-  return {"source": f"zone:{zoneName}", "zone": zoneName, "format": source["format"], "archives": [path.name.lower() for path in archivePaths], "stamp": clientZoneStamp(clientRoot, zoneName), "assets": assets, "problems": problems}
+  return {"source": f"zone:{zoneName}", "zone": zoneName, "format": source["format"], "archives": [path.name.lower() for path in archivePaths], "assets": assets, "problems": problems}
 
 
 def surveyLooseFolder(clientRoot, catalogRoot, folder):
@@ -402,7 +401,7 @@ def surveyLooseFolder(clientRoot, catalogRoot, folder):
   for path in paths:
     assetID, facts = store.store(path.name.lower(), path.read_bytes())
     assets.setdefault(assetID, facts | {"archives": [folder], "shadowed": False})
-  return {"source": f"folder:{folder}", "folder": folder, "stamp": fileStamp(paths), "assets": assets, "problems": []}
+  return {"source": f"folder:{folder}", "folder": folder, "assets": assets, "problems": []}
 
 
 def surveyZoneFile(clientRoot, catalogRoot, archivePath):
@@ -419,4 +418,4 @@ def surveyZoneFile(clientRoot, catalogRoot, archivePath):
   emitters = eqEmitters.parseEmitters(emitterPath.read_text(encoding="latin1"), emitterPath.name) if emitterPath.is_file() else []
   assets = storeTextures(TextureStore(catalogRoot), [archive], textureUses(geometry), materialUses, {}, {})
   assets |= models | lightFacts(zoneName, zone["lights"]) | emitterFacts(zoneName, emitters)
-  return {"source": f"file:{archivePath}", "zone": zoneName, "format": "eqgz", "archives": [archivePath.name.lower()], "stamp": zoneFileStamp(archivePath), "assets": assets, "problems": []}
+  return {"source": f"file:{archivePath}", "zone": zoneName, "format": "eqgz", "archives": [archivePath.name.lower()], "assets": assets, "problems": []}

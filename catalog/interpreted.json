@@ -1,0 +1,1243 @@
+{
+ "texture/av_rock05_c.dds@da173111": {
+  "category": "rock",
+  "description": "Dark grey-brown mottled rock with rusty stains.",
+  "pairsWith": [
+   "texture/av_rock05_n.dds@b0d60d3a"
+  ],
+  "tags": {
+   "biome": [
+    "mountain",
+    "ruins"
+   ],
+   "color": [
+    "brown",
+    "grey"
+   ],
+   "condition": [
+    "worn",
+    "dirty"
+   ],
+   "material": [
+    "granite"
+   ],
+   "pattern": [
+    "tiling",
+    "noisy"
+   ],
+   "quality": [
+    "good"
+   ],
+   "tone": [
+    "dark",
+    "muted"
+   ],
+   "use": [
+    "cliffFace"
+   ]
+  },
+  "usage": "Wall of Slaughter's rock models at about 34 units per repeat with av_rock05_n: weathered boulders and outcrops, not warm canyon walls.",
+  "worldUnitsPerRepeat": 34
+ },
+ "texture/av_rock05_n.dds@b0d60d3a": {
+  "category": "normalMap",
+  "description": "Normal map for av_rock05_c.dds.",
+  "pairsWith": [
+   "texture/av_rock05_c.dds@da173111"
+  ],
+  "tags": {},
+  "usage": "The normal texture of a material whose diffuse is av_rock05_c.dds; at the same repeat.",
+  "worldUnitsPerRepeat": null
+ },
+ "texture/blend_sand_rock.dds@304ec155": {
+  "category": "transition",
+  "description": "Ochre rock with a thin fringe of pale sand along its lower edge; repeats across.",
+  "pairsWith": [
+   "texture/blend_sand_rock_5n.dds@7f7b8d01"
+  ],
+  "tags": {
+   "biome": [
+    "desert",
+    "canyon"
+   ],
+   "color": [
+    "tan"
+   ],
+   "material": [
+    "sandstone",
+    "sand"
+   ],
+   "quality": [
+    "good"
+   ],
+   "scale": [
+    "coarse"
+   ],
+   "tone": [
+    "warm"
+   ],
+   "use": [
+    "terrainSlope"
+   ]
+  },
+  "usage": "Like blend_sand_rock_lg with a narrower sand fringe, for a rock base meeting sand on gentler ground; not placed in Sunderock's geometry. Pairs with blend_sand_rock_5n.",
+  "worldUnitsPerRepeat": 24
+ },
+ "texture/blend_sand_rock_5n.dds@7f7b8d01": {
+  "category": "normalMap",
+  "description": "Normal map for blend_sand_rock.dds.",
+  "pairsWith": [
+   "texture/blend_sand_rock.dds@304ec155"
+  ],
+  "tags": {},
+  "usage": "The normal texture of a material whose diffuse is blend_sand_rock.dds; at the same repeat.",
+  "worldUnitsPerRepeat": null
+ },
+ "texture/blend_sand_rock_lg.dds@bbf9255e": {
+  "category": "transition",
+  "description": "Ochre rock over its upper two thirds fading through a ragged edge into a broad band of pale sand along the bottom; repeats across but not down.",
+  "pairsWith": [
+   "texture/blend_sand_rock_lg10n.dds@de686fb2",
+   "texture/rock_light2.dds@d0386cbb",
+   "texture/di_tak_ruin_sand2.dds@a4789fca"
+  ],
+  "tags": {
+   "biome": [
+    "desert",
+    "canyon"
+   ],
+   "color": [
+    "tan"
+   ],
+   "material": [
+    "sandstone",
+    "sand"
+   ],
+   "quality": [
+    "good"
+   ],
+   "scale": [
+    "coarse"
+   ],
+   "tone": [
+    "warm"
+   ],
+   "use": [
+    "cliffFace",
+    "terrainSlope"
+   ]
+  },
+  "usage": "The foot of a rock face where it meets sand: map it once vertically with the sand band at the ground line and repeat it along the wall (it tiles horizontally only); Sunderock's spires use about 20 units per repeat, and big cliffs can go to 40. Pairs with blend_sand_rock_lg10n; the rock above takes rock_light2 or rock_light5 and the ground di_tak_ruin_sand2.",
+  "worldUnitsPerRepeat": 24
+ },
+ "texture/blend_sand_rock_lg10n.dds@de686fb2": {
+  "category": "normalMap",
+  "description": "Normal map for blend_sand_rock_lg.dds.",
+  "pairsWith": [
+   "texture/blend_sand_rock_lg.dds@bbf9255e"
+  ],
+  "tags": {},
+  "usage": "The normal texture of a material whose diffuse is blend_sand_rock_lg.dds; at the same repeat.",
+  "worldUnitsPerRepeat": null
+ },
+ "texture/canwall1.bmp@acc2b333": {
+  "category": "rock",
+  "description": "Classic-era dark ochre canyon wall with eroded ridges and deep shadows.",
+  "pairsWith": [],
+  "tags": {
+   "biome": [
+    "desert",
+    "canyon"
+   ],
+   "color": [
+    "brown"
+   ],
+   "material": [
+    "sandstone"
+   ],
+   "pattern": [
+    "tiling",
+    "organic"
+   ],
+   "quality": [
+    "usable"
+   ],
+   "scale": [
+    "coarse"
+   ],
+   "tone": [
+    "warm",
+    "dark"
+   ],
+   "use": [
+    "cliffFace"
+   ]
+  },
+  "usage": "Oasis of Marr's canyon walls at about 130 units per repeat on steep slopes; softer and darker than the Underfoot rocks, for distant or shaded walls.",
+  "worldUnitsPerRepeat": 120
+ },
+ "texture/cavefloordrk2_c.dds@923c5e4f": {
+  "category": "dirt",
+  "description": "Plain dark brown fine earth, nearly uniform.",
+  "pairsWith": [],
+  "tags": {
+   "biome": [
+    "cave",
+    "forest"
+   ],
+   "color": [
+    "brown"
+   ],
+   "material": [
+    "soil"
+   ],
+   "pattern": [
+    "tiling",
+    "smooth"
+   ],
+   "quality": [
+    "good"
+   ],
+   "scale": [
+    "fine"
+   ],
+   "tone": [
+    "dark",
+    "muted"
+   ],
+   "use": [
+    "terrainFlat",
+    "floor"
+   ]
+  },
+  "usage": "Cave floors and shaded ground: Goru'kar Mesa's grass-dirt recipe at about 10 units per repeat.",
+  "worldUnitsPerRepeat": 12
+ },
+ "texture/cavewall.dds@568482fc": {
+  "category": "rock",
+  "description": "The same rose-red sandstone as cavewall2 with its marks running vertically: runnels and cracks top to bottom.",
+  "pairsWith": [
+   "texture/cavewall2.dds@ca260dbb"
+  ],
+  "tags": {
+   "biome": [
+    "desert",
+    "canyon",
+    "cave"
+   ],
+   "color": [
+    "red",
+    "pink"
+   ],
+   "material": [
+    "sandstone"
+   ],
+   "pattern": [
+    "tiling"
+   ],
+   "quality": [
+    "usable"
+   ],
+   "scale": [
+    "coarse"
+   ],
+   "tone": [
+    "warm",
+    "muted"
+   ],
+   "use": [
+    "cliffFace",
+    "ceiling"
+   ]
+  },
+  "usage": "Vertical companion to cavewall2 for cave roofs and walls where the grain should run down; the Scarlet Desert used it mostly on overhangs at about 55 units per repeat.",
+  "worldUnitsPerRepeat": 56
+ },
+ "texture/cavewall2.dds@ca260dbb": {
+  "category": "rock",
+  "description": "Dusty rose-red sandstone with horizontal ledges, pits, and crumbling bands; soft, low contrast detail.",
+  "pairsWith": [
+   "texture/cavewall.dds@568482fc"
+  ],
+  "tags": {
+   "biome": [
+    "desert",
+    "canyon",
+    "cave"
+   ],
+   "color": [
+    "red",
+    "pink"
+   ],
+   "material": [
+    "sandstone"
+   ],
+   "pattern": [
+    "tiling",
+    "strata"
+   ],
+   "quality": [
+    "usable"
+   ],
+   "scale": [
+    "coarse"
+   ],
+   "tone": [
+    "warm",
+    "muted"
+   ],
+   "use": [
+    "cliffFace"
+   ]
+  },
+  "usage": "Red canyon and cave walls: the Scarlet Desert covers its walls and cave roofs with it at about 78 units per repeat. Its horizontal ledges suit layered canyon strata; box-project on walls and keep the repeat large, as it goes soft up close.",
+  "worldUnitsPerRepeat": 64
+ },
+ "texture/deposits_pools.dds@dabe929d": {
+  "category": "ground",
+  "description": "Pale yellow and white mineral crust in blotchy layers, like the rim of a hot spring.",
+  "pairsWith": [],
+  "tags": {
+   "biome": [
+    "volcanic",
+    "desert"
+   ],
+   "color": [
+    "yellow",
+    "white"
+   ],
+   "material": [
+    "crystal"
+   ],
+   "pattern": [
+    "tiling",
+    "organic"
+   ],
+   "quality": [
+    "usable"
+   ],
+   "scale": [
+    "fine"
+   ],
+   "tone": [
+    "light",
+    "warm"
+   ],
+   "use": [
+    "terrainFlat",
+    "accent"
+   ]
+  },
+  "usage": "Rims and terraces of mineral pools on gentle slopes (Sunderock's pools recipe, slopes 8 to 23 degrees, about 13 units per repeat); bright enough to need small areas.",
+  "worldUnitsPerRepeat": 13
+ },
+ "texture/di_lolands_river_bottom.dds@d01799a8": {
+  "category": "gravel",
+  "description": "Grey-tan pebbles and shell-like fragments packed tightly, like a dry stream bed.",
+  "pairsWith": [
+   "texture/di_lolands_river_bottom_4n.dds@4aeaa312"
+  ],
+  "tags": {
+   "biome": [
+    "canyon",
+    "coast"
+   ],
+   "color": [
+    "grey",
+    "tan"
+   ],
+   "material": [
+    "gravel"
+   ],
+   "pattern": [
+    "tiling",
+    "noisy"
+   ],
+   "quality": [
+    "good"
+   ],
+   "scale": [
+    "fine"
+   ],
+   "tone": [
+    "neutral",
+    "muted"
+   ],
+   "use": [
+    "terrainFlat"
+   ]
+  },
+  "usage": "River and pool beds under the water line: Sunderock's river recipes apply it at the river's heights on slopes up to 45 degrees, about 13 units per repeat, with di_lolands_river_bottom_4n.",
+  "worldUnitsPerRepeat": 13
+ },
+ "texture/di_lolands_river_bottom_4n.dds@4aeaa312": {
+  "category": "normalMap",
+  "description": "Normal map for di_lolands_river_bottom.dds.",
+  "pairsWith": [
+   "texture/di_lolands_river_bottom.dds@d01799a8"
+  ],
+  "tags": {},
+  "usage": "The normal texture of a material whose diffuse is di_lolands_river_bottom.dds; at the same repeat.",
+  "worldUnitsPerRepeat": null
+ },
+ "texture/di_lolands_sulfur_ground.dds@eac3c863": {
+  "category": "ground",
+  "description": "Yellow-green sulfur crust mottled over pale ground.",
+  "pairsWith": [
+   "texture/di_lolands_sulfur_ground_12n.dds@6fe78dc1"
+  ],
+  "tags": {
+   "biome": [
+    "volcanic"
+   ],
+   "color": [
+    "yellow",
+    "green"
+   ],
+   "material": [
+    "crystal",
+    "soil"
+   ],
+   "pattern": [
+    "tiling",
+    "noisy"
+   ],
+   "quality": [
+    "good"
+   ],
+   "tone": [
+    "warm",
+    "saturated"
+   ],
+   "use": [
+    "terrainFlat",
+    "accent"
+   ]
+  },
+  "usage": "Flats around sulfur vents: Sunderock's sulfur recipe on slopes of 8 to 45 degrees within a band of heights, about 13 units per repeat, with di_lolands_sulfur_ground_12n.",
+  "worldUnitsPerRepeat": 13
+ },
+ "texture/di_lolands_sulfur_ground_12n.dds@6fe78dc1": {
+  "category": "normalMap",
+  "description": "Normal map for di_lolands_sulfur_ground.dds.",
+  "pairsWith": [
+   "texture/di_lolands_sulfur_ground.dds@eac3c863"
+  ],
+  "tags": {},
+  "usage": "The normal texture of a material whose diffuse is di_lolands_sulfur_ground.dds; at the same repeat.",
+  "worldUnitsPerRepeat": null
+ },
+ "texture/di_ro_sand_grass2.dds@2cae8bf1": {
+  "category": "grass",
+  "description": "Sparse green grass tufts over tan sand, about half and half.",
+  "pairsWith": [
+   "texture/di_ro_sand_grass2n.dds@a2a6548f",
+   "texture/di_tak_ruin_sand2.dds@a4789fca"
+  ],
+  "tags": {
+   "biome": [
+    "desert",
+    "coast",
+    "grassland"
+   ],
+   "color": [
+    "green",
+    "tan"
+   ],
+   "material": [
+    "grass",
+    "sand"
+   ],
+   "pattern": [
+    "tiling",
+    "organic"
+   ],
+   "quality": [
+    "good"
+   ],
+   "scale": [
+    "fine"
+   ],
+   "tone": [
+    "warm",
+    "muted"
+   ],
+   "use": [
+    "terrainFlat"
+   ]
+  },
+  "usage": "Grass where sand gets water: oases, riverbanks, sheltered canyon floors. Sunderock uses it at about 13 units per repeat with di_ro_sand_grass2n; a natural step between di_tak_ruin_sand2 and full grass.",
+  "worldUnitsPerRepeat": 16
+ },
+ "texture/di_ro_sand_grass2n.dds@a2a6548f": {
+  "category": "normalMap",
+  "description": "Normal map for di_ro_sand_grass2.dds.",
+  "pairsWith": [
+   "texture/di_ro_sand_grass2.dds@2cae8bf1"
+  ],
+  "tags": {},
+  "usage": "The normal texture of a material whose diffuse is di_ro_sand_grass2.dds; at the same repeat.",
+  "worldUnitsPerRepeat": null
+ },
+ "texture/di_tak__ruin_grnd2_plain.dds@381f159d": {
+  "category": "dirt",
+  "description": "Brown packed earth with faint mottling; plain trodden ground.",
+  "pairsWith": [
+   "texture/di_tak__ruin_grnd_plain_n.dds@c403d09d"
+  ],
+  "tags": {
+   "biome": [
+    "desert",
+    "canyon",
+    "ruins"
+   ],
+   "color": [
+    "brown"
+   ],
+   "material": [
+    "soil"
+   ],
+   "pattern": [
+    "tiling",
+    "smooth"
+   ],
+   "quality": [
+    "good"
+   ],
+   "scale": [
+    "fine"
+   ],
+   "tone": [
+    "warm",
+    "muted"
+   ],
+   "use": [
+    "terrainFlat",
+    "path"
+   ]
+  },
+  "usage": "Trails and bare ground: Goru'kar Mesa's paths recipe at about 13 units per repeat and its barren ground at about 10, with di_tak__ruin_grnd_plain_n.",
+  "worldUnitsPerRepeat": 12
+ },
+ "texture/di_tak__ruin_grnd_plain_n.dds@c403d09d": {
+  "category": "normalMap",
+  "description": "Normal map for di_tak__ruin_grnd2_plain.dds.",
+  "pairsWith": [
+   "texture/di_tak__ruin_grnd2_plain.dds@381f159d"
+  ],
+  "tags": {},
+  "usage": "The normal texture of a material whose diffuse is di_tak__ruin_grnd2_plain.dds; at the same repeat.",
+  "worldUnitsPerRepeat": null
+ },
+ "texture/di_tak_ruin_sand2.dds@a4789fca": {
+  "category": "sand",
+  "description": "Pale cream fine sand with faint soft ripples; almost featureless.",
+  "pairsWith": [
+   "texture/di_tak_ruin_sand_6n.dds@7f48fdc9"
+  ],
+  "tags": {
+   "biome": [
+    "desert",
+    "canyon",
+    "coast"
+   ],
+   "color": [
+    "tan"
+   ],
+   "material": [
+    "sand"
+   ],
+   "pattern": [
+    "tiling",
+    "smooth"
+   ],
+   "quality": [
+    "good"
+   ],
+   "scale": [
+    "fine"
+   ],
+   "tone": [
+    "light",
+    "warm",
+    "muted"
+   ],
+   "use": [
+    "terrainFlat",
+    "path"
+   ]
+  },
+  "usage": "Sandy flats, canyon floors, and paths: Sunderock's ground recipes lay it on all ground at about 43 units per repeat with di_tak_ruin_sand_6n. Plain enough to need breaking up: rock_light2 on slopes, river rocks in beds, grassy sand by water.",
+  "worldUnitsPerRepeat": 43
+ },
+ "texture/di_tak_ruin_sand_6n.dds@7f48fdc9": {
+  "category": "normalMap",
+  "description": "Normal map for di_tak_ruin_sand2.dds.",
+  "pairsWith": [
+   "texture/di_tak_ruin_sand2.dds@a4789fca"
+  ],
+  "tags": {},
+  "usage": "The normal texture of a material whose diffuse is di_tak_ruin_sand2.dds; at the same repeat.",
+  "worldUnitsPerRepeat": null
+ },
+ "texture/dirtwall.dds@605d3ce4": {
+  "category": "rock",
+  "description": "Warm orange-tan layered rock with blocky ledges, crisp cracks, and pale weathered faces; reads as canyon sandstone.",
+  "pairsWith": [
+   "texture/dirtwall_n3.dds@c60e6fab",
+   "texture/dirtwallb.dds@2686115b"
+  ],
+  "tags": {
+   "biome": [
+    "desert",
+    "canyon"
+   ],
+   "color": [
+    "orange",
+    "tan"
+   ],
+   "material": [
+    "sandstone"
+   ],
+   "pattern": [
+    "tiling",
+    "strata"
+   ],
+   "quality": [
+    "good"
+   ],
+   "scale": [
+    "coarse"
+   ],
+   "tone": [
+    "warm"
+   ],
+   "use": [
+    "cliffFace",
+    "wall"
+   ]
+  },
+  "usage": "Barren Coast's tower uses it at about 16 units per repeat with dirtwall_n3. A crisp warm canyon rock: cliffs at 40 to 60 units per repeat with box projection, and carved rock dwellings at closer repeats. Alternate with dirtwallb on long walls.",
+  "worldUnitsPerRepeat": 48
+ },
+ "texture/dirtwall_n3.dds@c60e6fab": {
+  "category": "normalMap",
+  "description": "Normal map for dirtwall.dds.",
+  "pairsWith": [
+   "texture/dirtwall.dds@605d3ce4"
+  ],
+  "tags": {},
+  "usage": "The normal texture of a material whose diffuse is dirtwall.dds; at the same repeat.",
+  "worldUnitsPerRepeat": null
+ },
+ "texture/dirtwallb.dds@2686115b": {
+  "category": "rock",
+  "description": "A variant of dirtwall: the same warm layered orange-tan rock with its ledges and cracks in other places.",
+  "pairsWith": [
+   "texture/dirtwall_n3.dds@c60e6fab",
+   "texture/dirtwall.dds@605d3ce4"
+  ],
+  "tags": {
+   "biome": [
+    "desert",
+    "canyon"
+   ],
+   "color": [
+    "orange",
+    "tan"
+   ],
+   "material": [
+    "sandstone"
+   ],
+   "pattern": [
+    "tiling",
+    "strata"
+   ],
+   "quality": [
+    "good"
+   ],
+   "scale": [
+    "coarse"
+   ],
+   "tone": [
+    "warm"
+   ],
+   "use": [
+    "cliffFace",
+    "wall"
+   ]
+  },
+  "usage": "Alternate with dirtwall to break repetition on large walls; Sunderock uses it on small forge props at about 6 units per repeat with dirtwall_n3.",
+  "worldUnitsPerRepeat": 48
+ },
+ "texture/greytranswl.dds@b1eef270": {
+  "category": "transition",
+  "description": "Dark speckled grey rock above, giving way to the rose-red sandstone of cavewall2 below; repeats across, not down.",
+  "pairsWith": [
+   "texture/cavewall2.dds@ca260dbb"
+  ],
+  "tags": {
+   "biome": [
+    "desert",
+    "cave"
+   ],
+   "color": [
+    "grey",
+    "red"
+   ],
+   "material": [
+    "sandstone",
+    "granite"
+   ],
+   "quality": [
+    "usable"
+   ],
+   "scale": [
+    "coarse"
+   ],
+   "tone": [
+    "dark",
+    "warm"
+   ],
+   "use": [
+    "cliffFace"
+   ]
+  },
+  "usage": "Where dark rock meets red sandstone on a wall: map it once vertically and repeat it along the wall; the Scarlet Desert uses it at about 56 units per repeat.",
+  "worldUnitsPerRepeat": 56
+ },
+ "texture/kl_sand_6n.dds@e2b7c70d": {
+  "category": "normalMap",
+  "description": "Normal map for kl_sand_dirt_dead.dds.",
+  "pairsWith": [
+   "texture/kl_sand_dirt_dead.dds@8c76cb89"
+  ],
+  "tags": {},
+  "usage": "The normal texture of a material whose diffuse is kl_sand_dirt_dead.dds; at the same repeat.",
+  "worldUnitsPerRepeat": null
+ },
+ "texture/kl_sand_dirt_dead.dds@8c76cb89": {
+  "category": "dirt",
+  "description": "Brown dirt patched with pale dead grass.",
+  "pairsWith": [
+   "texture/kl_sand_6n.dds@e2b7c70d"
+  ],
+  "tags": {
+   "biome": [
+    "desert",
+    "grassland"
+   ],
+   "color": [
+    "brown",
+    "tan"
+   ],
+   "material": [
+    "soil",
+    "grass"
+   ],
+   "pattern": [
+    "tiling",
+    "organic"
+   ],
+   "quality": [
+    "good"
+   ],
+   "scale": [
+    "fine"
+   ],
+   "tone": [
+    "warm",
+    "muted"
+   ],
+   "use": [
+    "terrainFlat"
+   ]
+  },
+  "usage": "Dry ground with dead grass between sand and grass: Goru'kar Mesa's dry ground at about 10 units per repeat with kl_sand_6n.",
+  "worldUnitsPerRepeat": 12
+ },
+ "texture/kl_sand_grey_dead.dds@b3065cb4": {
+  "category": "sand",
+  "description": "Grey ashy sand with paler blotches.",
+  "pairsWith": [],
+  "tags": {
+   "biome": [
+    "desert",
+    "cave"
+   ],
+   "color": [
+    "grey"
+   ],
+   "material": [
+    "sand"
+   ],
+   "pattern": [
+    "tiling",
+    "noisy"
+   ],
+   "quality": [
+    "good"
+   ],
+   "scale": [
+    "fine"
+   ],
+   "tone": [
+    "neutral",
+    "muted"
+   ],
+   "use": [
+    "terrainFlat"
+   ]
+  },
+  "usage": "Grey dead ground in hollows and lairs: Goru'kar Mesa's harpy hole on slopes under 30 degrees.",
+  "worldUnitsPerRepeat": 12
+ },
+ "texture/lolands_sulfur_rock01.dds@be0d115d": {
+  "category": "rock",
+  "description": "Brown rock crusted with bright orange and yellow sulfur or lichen blooms.",
+  "pairsWith": [
+   "texture/lolands_sulfur_rock01_6n.dds@b1687c4a"
+  ],
+  "tags": {
+   "biome": [
+    "volcanic",
+    "desert"
+   ],
+   "color": [
+    "orange",
+    "yellow"
+   ],
+   "material": [
+    "sandstone"
+   ],
+   "pattern": [
+    "tiling",
+    "noisy"
+   ],
+   "quality": [
+    "good"
+   ],
+   "tone": [
+    "warm",
+    "saturated"
+   ],
+   "use": [
+    "cliffFace",
+    "accent"
+   ]
+  },
+  "usage": "Accent rock for sulfur springs and mineral vents (Sunderock's sulfur spires, about 37 units per repeat, with lolands_sulfur_rock01_6n); too loud for broad walls.",
+  "worldUnitsPerRepeat": 37
+ },
+ "texture/lolands_sulfur_rock01_6n.dds@b1687c4a": {
+  "category": "normalMap",
+  "description": "Normal map for lolands_sulfur_rock01.dds.",
+  "pairsWith": [
+   "texture/lolands_sulfur_rock01.dds@be0d115d"
+  ],
+  "tags": {},
+  "usage": "The normal texture of a material whose diffuse is lolands_sulfur_rock01.dds; at the same repeat.",
+  "worldUnitsPerRepeat": null
+ },
+ "texture/newwat1.dds@f3bc6474": {
+  "category": "water",
+  "description": "Deep blue water flecked with white sparkles.",
+  "pairsWith": [],
+  "tags": {
+   "color": [
+    "blue"
+   ],
+   "material": [
+    "water"
+   ],
+   "pattern": [
+    "tiling",
+    "noisy"
+   ],
+   "quality": [
+    "usable"
+   ],
+   "tone": [
+    "dark",
+    "cool"
+   ],
+   "use": [
+    "water"
+   ]
+  },
+  "usage": "A classic open-water surface (Hollowshade, Dawnshroud, the Scarlet Desert) at 26 to 116 units per repeat; too dark and blue for a turquoise canyon river.",
+  "worldUnitsPerRepeat": 60
+ },
+ "texture/ngrass4_c.dds@00e839aa": {
+  "category": "grass",
+  "description": "Lush, dense green grass blades with a slight diagonal grain.",
+  "pairsWith": [],
+  "tags": {
+   "biome": [
+    "grassland",
+    "forest"
+   ],
+   "color": [
+    "green"
+   ],
+   "material": [
+    "grass"
+   ],
+   "pattern": [
+    "tiling",
+    "grain"
+   ],
+   "quality": [
+    "good"
+   ],
+   "scale": [
+    "fine"
+   ],
+   "tone": [
+    "cool",
+    "saturated"
+   ],
+   "use": [
+    "terrainFlat"
+   ]
+  },
+  "usage": "Green meadow ground: Goru'kar Mesa's main ground at about 19 units per repeat. Too lush for a dry canyon except watered terraces and gardens.",
+  "worldUnitsPerRepeat": 19
+ },
+ "texture/riverrocks2.dds@7a77a868": {
+  "category": "gravel",
+  "description": "Rounded river stones in browns, tans, and greys, packed shoulder to shoulder with dark gaps.",
+  "pairsWith": [
+   "texture/riverrocks_n.dds@97b9368b"
+  ],
+  "tags": {
+   "biome": [
+    "canyon",
+    "coast",
+    "forest"
+   ],
+   "color": [
+    "brown",
+    "tan"
+   ],
+   "material": [
+    "gravel"
+   ],
+   "pattern": [
+    "tiling",
+    "organic"
+   ],
+   "quality": [
+    "good"
+   ],
+   "scale": [
+    "medium"
+   ],
+   "tone": [
+    "warm"
+   ],
+   "use": [
+    "terrainFlat",
+    "path"
+   ]
+  },
+  "usage": "River beds, streambanks, stony shores, and dry washes: Goru'kar Mesa uses it below the water line at about 19 units per repeat with riverrocks_n. Reads well at the waterline beside sand.",
+  "worldUnitsPerRepeat": 19
+ },
+ "texture/riverrocks_n.dds@97b9368b": {
+  "category": "normalMap",
+  "description": "Normal map for riverrocks2.dds.",
+  "pairsWith": [
+   "texture/riverrocks2.dds@7a77a868"
+  ],
+  "tags": {},
+  "usage": "The normal texture of a material whose diffuse is riverrocks2.dds; at the same repeat.",
+  "worldUnitsPerRepeat": null
+ },
+ "texture/rock_light2.dds@d0386cbb": {
+  "category": "rock",
+  "description": "Pale tan sandstone with the same crumpled, streaked surface as rock_light5, a little lighter and less yellow.",
+  "pairsWith": [
+   "texture/rock_light_10n.dds@f61a9afb",
+   "texture/rock_light5.dds@f972d95c"
+  ],
+  "tags": {
+   "biome": [
+    "desert",
+    "canyon"
+   ],
+   "color": [
+    "tan"
+   ],
+   "material": [
+    "sandstone"
+   ],
+   "pattern": [
+    "tiling",
+    "organic"
+   ],
+   "quality": [
+    "good"
+   ],
+   "scale": [
+    "coarse"
+   ],
+   "tone": [
+    "warm",
+    "muted"
+   ],
+   "use": [
+    "terrainSlope",
+    "cliffFace"
+   ]
+  },
+  "usage": "Terrain slopes steeper than about 40 degrees, as Sunderock's ground recipes apply it, at about 43 units per repeat with rock_light_10n. A near twin of rock_light5, so the two alternate on long walls to hide repetition.",
+  "worldUnitsPerRepeat": 43
+ },
+ "texture/rock_light5.dds@f972d95c": {
+  "category": "rock",
+  "description": "Ochre-yellow sandstone face with a crumpled, wind-carved surface and faint horizontal streaks; reads as warm, dry rock from a distance.",
+  "pairsWith": [
+   "texture/rock_light_10n.dds@f61a9afb"
+  ],
+  "tags": {
+   "biome": [
+    "desert",
+    "canyon"
+   ],
+   "color": [
+    "tan",
+    "yellow"
+   ],
+   "material": [
+    "sandstone"
+   ],
+   "pattern": [
+    "tiling",
+    "organic"
+   ],
+   "quality": [
+    "good"
+   ],
+   "scale": [
+    "coarse"
+   ],
+   "tone": [
+    "warm",
+    "muted"
+   ],
+   "use": [
+    "cliffFace",
+    "terrainSlope"
+   ]
+  },
+  "usage": "Steep and vertical canyon walls and large rock models: Sunderock covers its cliffs with it at about 49 units per repeat. Box-project on cliffs and pair with rock_light_10n. Yellow rather than red; blends down into rock_light2 and blend_sand_rock_lg at the foot of a wall.",
+  "worldUnitsPerRepeat": 48
+ },
+ "texture/rock_light_10n.dds@f61a9afb": {
+  "category": "normalMap",
+  "description": "Normal map for rock_light2.dds.",
+  "pairsWith": [
+   "texture/rock_light2.dds@d0386cbb"
+  ],
+  "tags": {},
+  "usage": "The normal texture of a material whose diffuse is rock_light2.dds; at the same repeat.",
+  "worldUnitsPerRepeat": null
+ },
+ "texture/rockface2_c.dds@de1bae1e": {
+  "category": "rock",
+  "description": "Dark earthy brown rock, finely mottled with faint cracks and darker stains; low contrast.",
+  "pairsWith": [
+   "texture/rockface_n.dds@4efffe63"
+  ],
+  "tags": {
+   "biome": [
+    "mountain",
+    "canyon",
+    "cave"
+   ],
+   "color": [
+    "brown"
+   ],
+   "material": [
+    "soil",
+    "sandstone"
+   ],
+   "pattern": [
+    "tiling",
+    "noisy"
+   ],
+   "quality": [
+    "good"
+   ],
+   "scale": [
+    "medium"
+   ],
+   "tone": [
+    "dark",
+    "warm",
+    "muted"
+   ],
+   "use": [
+    "cliffFace",
+    "terrainSlope"
+   ]
+  },
+  "usage": "Goru'kar Mesa's recipes put it on slopes over 25 to 30 degrees at about 38 units per repeat with rockface_n. A dark, earthy cliff for shaded walls, cave mouths, and overhang undersides rather than sunlit red rock.",
+  "worldUnitsPerRepeat": 38
+ },
+ "texture/rockface_n.dds@4efffe63": {
+  "category": "normalMap",
+  "description": "Normal map for rockface2_c.dds.",
+  "pairsWith": [
+   "texture/rockface2_c.dds@de1bae1e"
+  ],
+  "tags": {},
+  "usage": "The normal texture of a material whose diffuse is rockface2_c.dds; at the same repeat.",
+  "worldUnitsPerRepeat": null
+ },
+ "texture/sp_ft_wall_mid.dds@06a766dc": {
+  "category": "masonry",
+  "description": "Courses of dark stained stone blocks with rust-red streaks and pale mortar.",
+  "pairsWith": [],
+  "tags": {
+   "biome": [
+    "ruins",
+    "urban"
+   ],
+   "color": [
+    "brown",
+    "red"
+   ],
+   "condition": [
+    "worn",
+    "dirty"
+   ],
+   "material": [
+    "sandstone"
+   ],
+   "pattern": [
+    "tiling",
+    "blocks"
+   ],
+   "quality": [
+    "good"
+   ],
+   "tone": [
+    "dark",
+    "warm"
+   ],
+   "use": [
+    "wall"
+   ]
+  },
+  "usage": "Built fortress walls: Wall of Slaughter's fortress at about 48 units per repeat, with di_ent_cinderblock01_mid_n.",
+  "worldUnitsPerRepeat": 48
+ },
+ "texture/twicliff01.dds@7807df97": {
+  "category": "rock",
+  "description": "Red striped cliff rock at only 64 by 64 pixels; banded but blurry.",
+  "pairsWith": [],
+  "tags": {
+   "biome": [
+    "desert",
+    "canyon"
+   ],
+   "color": [
+    "red"
+   ],
+   "material": [
+    "sandstone"
+   ],
+   "pattern": [
+    "tiling",
+    "strata"
+   ],
+   "quality": [
+    "poor"
+   ],
+   "scale": [
+    "coarse"
+   ],
+   "tone": [
+    "warm",
+    "muted"
+   ],
+   "use": [
+    "cliffFace"
+   ]
+  },
+  "usage": "The Scarlet Desert's giant cliff walls at about 180 units per repeat. It blurs badly at eye height; only for distant backdrop cliffs.",
+  "worldUnitsPerRepeat": 180
+ },
+ "texture/wtr_waterfall_tileb.dds@c3790289": {
+  "category": "water",
+  "description": "Frothing white water with pale teal under the foam, streaked top to bottom, edges fraying into transparency.",
+  "pairsWith": [
+   "texture/wtr_waterfall_tilec.dds@970059de"
+  ],
+  "tags": {
+   "biome": [
+    "canyon",
+    "mountain"
+   ],
+   "color": [
+    "white",
+    "teal"
+   ],
+   "material": [
+    "water"
+   ],
+   "pattern": [
+    "grain"
+   ],
+   "quality": [
+    "good"
+   ],
+   "tone": [
+    "cool",
+    "light"
+   ],
+   "use": [
+    "water"
+   ]
+  },
+  "usage": "Heavy white falls, cascades, and geysers (Sunderock's geyser, about 130 units per repeat); the base of a fall that uses wtr_waterfall_tilec above.",
+  "worldUnitsPerRepeat": 100
+ },
+ "texture/wtr_waterfall_tilec.dds@970059de": {
+  "category": "water",
+  "description": "Falling water: teal sheets streaked with white foam running top to bottom, its side edges fraying into transparency.",
+  "pairsWith": [
+   "texture/wtr_waterfall_tileb.dds@c3790289"
+  ],
+  "tags": {
+   "biome": [
+    "canyon",
+    "mountain"
+   ],
+   "color": [
+    "teal",
+    "white"
+   ],
+   "material": [
+    "water"
+   ],
+   "pattern": [
+    "grain"
+   ],
+   "quality": [
+    "good"
+   ],
+   "tone": [
+    "cool",
+    "light"
+   ],
+   "use": [
+    "water"
+   ]
+  },
+  "usage": "Waterfall faces: map it so the streaks fall down the face; Sunderock's waterfall models stretch it about 190 units per repeat. The frayed alpha suits falling water, not pools; pair with wtr_waterfall_tileb where the fall whitens.",
+  "worldUnitsPerRepeat": 120
+ }
+}

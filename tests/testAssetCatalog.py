@@ -1,5 +1,6 @@
 import io
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -21,7 +22,7 @@ def stageCatalogServer(stageServer):
 
 
 def catalogFile(server, sourceKey):
-  return [path for path in (server.toolingRoot / "catalog" / "measured").glob("*.json") if json.loads(path.read_text(encoding="utf-8"))["source"] == sourceKey]
+  return [path for path in (server.repositoryPath / "catalog" / "measured").glob("*.json") if json.loads(path.read_text(encoding="utf-8"))["source"] == sourceKey]
 
 
 def testSurveyMeasuresAZonesTexturesLightsAndEmittersAndCachesThem(stageServer):
@@ -47,6 +48,13 @@ def testSurveyMeasuresAZonesTexturesLightsAndEmittersAndCachesThem(stageServer):
   top = textures["assets"][0]
   assert surveyed["mostUsedTextures"][0]["id"] == top["id"] and Path(top["file"]).is_file()
   assert 0 < tiling["total"] < textures["total"] and all(entry["tiles"] for entry in tiling["assets"])
+  # The kept measurement names no machine path and identifies its files by content; the images it lacks are extracted again unchanged.
+  kept = measured[0].read_text(encoding="utf-8")
+  assert str(server.toolingRoot) not in kept and str(server.repositoryPath) not in kept
+  assert all(len(digest) == 64 for digest in json.loads(kept)["fileHashes"].values())
+  shutil.rmtree(server.toolingRoot / "catalog" / "textures")
+  server.callToolExpectingSuccess("surveyAssets", {"zone": classicZone})
+  assert Path(top["file"]).is_file() and measured[0].read_text(encoding="utf-8") == kept
 
 
 def testDescriptionsUseTheVocabularyAndAreFoundByWhatTheySay(stageServer):

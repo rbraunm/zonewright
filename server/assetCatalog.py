@@ -1,14 +1,17 @@
 """The asset catalog: client graphical assets with what was measured from their files (assetSurvey) and what they were judged to be
-(descriptions written in assetVocabulary's words), kept under the tooling root's catalog folder: measured/ holds one file per surveyed
-source, interpreted.json the descriptions, vocabulary.json the terms added to the vocabulary, textures/ and thumbnails/ the extracted
-images. A source's measured facts are rebuilt when its files change; descriptions stay until rewritten. Texture and model ids carry a
-hash of the content, so a description follows the asset across every zone that ships it."""
+(descriptions written in assetVocabulary's words). The repository's catalog folder holds what is worth keeping and sharing: measured/
+with one file per surveyed client source, interpreted.json with the descriptions, and vocabulary.json with the terms added to the
+vocabulary. The tooling root's catalog folder holds what the client regenerates and this machine alone uses: the extracted textures and
+thumbnails, and the measurements of zone archives outside the client. A source's measured facts are rebuilt when its files' SHA-256 or
+the survey's version changes; descriptions stay until rewritten. Texture and model ids carry a hash of the content, so a description
+follows the asset across every zone that ships it."""
 import hashlib
 import json
 import re
 
 import assetSurvey
 import assetVocabulary
+import zoneSurvey
 
 # Facts that differ between the sources an asset appears in; everything else is a property of the asset itself.
 perSourceKeys = ("archives", "shadowed", "uses", "materials", "wldMaterials", "ecosystemLayers", "archive", "modelKind", "placements", "scaleRange")
@@ -18,40 +21,64 @@ textSearchFields = ("description", "usage", "category")
 
 
 class AssetCatalog:
-  def __init__(self, toolingRoot):
-    self.root = toolingRoot / "catalog"
-    self.measuredRoot = self.root / "measured"
+  def __init__(self, toolingRoot, repositoryCatalogRoot):
+    self.toolingRoot = toolingRoot
+    self.root = repositoryCatalogRoot
+    self.cacheRoot = toolingRoot / "catalog"
     self.interpretedPath = self.root / "interpreted.json"
     self.vocabularyPath = self.root / "vocabulary.json"
     self.mergedAssets = None
 
+  def measuredFolder(self, sourceKey):
+    """Client sources are kept in the repository; a zone archive outside the client is this machine's alone."""
+    return (self.root if sourceKey.startswith(("zone:", "folder:")) else self.cacheRoot) / "measured"
+
   def sourcePath(self, sourceKey):
     slug = re.sub(r"[^a-z0-9]+", "_", sourceKey.lower()).strip("_")[-60:]
-    return self.measuredRoot / f"{slug}_{hashlib.sha256(sourceKey.encode()).hexdigest()[:8]}.json"
+    return self.measuredFolder(sourceKey) / f"{slug}_{hashlib.sha256(sourceKey.encode()).hexdigest()[:8]}.json"
 
-  def survey(self, surveyFunction, sourceKey, stamp, refresh):
-    """The measured lane for one source, rebuilt when its files' sizes or modification times, or the survey's version, changed."""
+  def fileHashes(self, paths):
+    """SHA-256 by file name, through the zone survey's memo of hashes by size and modification time."""
+    cache = zoneSurvey.SurveyCache(self.toolingRoot)
+    hashes = zoneSurvey.hashFiles(paths, cache, False)
+    cache.save()
+    return {path.name.lower(): hashes[path] for path in paths}
+
+  def texturesPresent(self, surveyed):
+    return all((assetSurvey.textureFolder(self.cacheRoot, facts["sha256"]) / facts["fileName"]).is_file() and assetSurvey.thumbnailPath(self.cacheRoot, facts["sha256"]).is_file()
+      for facts in surveyed["assets"].values() if facts["kind"] == "texture" and "fileName" in facts)
+
+  def survey(self, surveyFunction, sourceKey, sourcePaths, refresh):
+    """The measured lane for one source, rebuilt when its files' SHA-256 or the survey's version changed, or when this machine lacks
+    the textures extracted from it."""
     path = self.sourcePath(sourceKey)
+    fileHashes = self.fileHashes(sourcePaths)
     if path.is_file() and not refresh:
       cached = json.loads(path.read_text(encoding="utf-8"))
-      if cached["surveyVersion"] == assetSurvey.surveyVersion and cached["stamp"] == stamp:
+      if cached["surveyVersion"] == assetSurvey.surveyVersion and cached["fileHashes"] == fileHashes and self.texturesPresent(cached):
         return cached
-    surveyed = surveyFunction() | {"surveyVersion": assetSurvey.surveyVersion}
-    if surveyed["stamp"] != stamp:
+    surveyed = surveyFunction() | {"surveyVersion": assetSurvey.surveyVersion, "fileHashes": fileHashes}
+    if self.fileHashes(sourcePaths) != fileHashes:
       raise ValueError(f"{sourceKey}: its files changed while it was surveyed; survey it again")
-    self.measuredRoot.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(surveyed, indent=1), encoding="utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(surveyed, indent=1, sort_keys=True), encoding="utf-8")
     self.mergedAssets = None
     return surveyed
+
+  def withFilePaths(self, facts):
+    """A texture's facts with where this machine keeps its extracted file and thumbnail."""
+    if facts["kind"] != "texture" or "fileName" not in facts:
+      return facts
+    return facts | {"file": str(assetSurvey.textureFolder(self.cacheRoot, facts["sha256"]) / facts["fileName"]), "thumbnail": str(assetSurvey.thumbnailPath(self.cacheRoot, facts["sha256"]))}
 
   def assets(self):
     """Every surveyed asset: the facts of the first source (by source key) that holds it, and per source what differs there."""
     if self.mergedAssets is None:
       merged = {}
-      paths = sorted(self.measuredRoot.glob("*.json")) if self.measuredRoot.is_dir() else []
+      paths = sorted(path for folder in (self.root / "measured", self.cacheRoot / "measured") if folder.is_dir() for path in folder.glob("*.json"))
       for source in sorted((json.loads(path.read_text(encoding="utf-8")) for path in paths), key=lambda source: source["source"]):
         for assetID, facts in source["assets"].items():
-          entry = merged.setdefault(assetID, {"id": assetID, "kind": facts["kind"], "name": facts["name"], "measured": {key: value for key, value in facts.items() if key not in perSourceKeys}, "sources": {}})
+          entry = merged.setdefault(assetID, {"id": assetID, "kind": facts["kind"], "name": facts["name"], "measured": {key: value for key, value in self.withFilePaths(facts).items() if key not in perSourceKeys}, "sources": {}})
           entry["sources"][source["source"]] = {key: facts[key] for key in perSourceKeys if key in facts}
           if facts["kind"] == "emitter":
             entry["measured"]["zones"] = entry["measured"]["zones"] | facts["zones"]
@@ -95,7 +122,7 @@ class AssetCatalog:
         raise ValueError(f"'{term}' is already a {group} term: {vocabulary['tagGroups'][group]['terms'][term]}")
       extensions["tags"].setdefault(group, {})[term] = meaning.strip()
     self.root.mkdir(parents=True, exist_ok=True)
-    self.vocabularyPath.write_text(json.dumps(extensions, indent=1), encoding="utf-8")
+    self.vocabularyPath.write_text(json.dumps(extensions, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     return {"group": group, "term": term, "meaning": meaning.strip()}
 
   def validatedDescription(self, description, vocabulary):
@@ -134,7 +161,7 @@ class AssetCatalog:
       raise ValueError("Each asset is described once per call")
     interpretations = self.interpretations() | validated
     self.root.mkdir(parents=True, exist_ok=True)
-    self.interpretedPath.write_text(json.dumps(interpretations, indent=1, sort_keys=True), encoding="utf-8")
+    self.interpretedPath.write_text(json.dumps(interpretations, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     return sorted(validated)
 
   def entry(self, assetID):

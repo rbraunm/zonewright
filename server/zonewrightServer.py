@@ -283,7 +283,7 @@ def getZoneNotes(zone: str):
   return {"zone": zone, "labels": zoneSurvey.readBrewallLabels(clientRoot, zone.lower())}
 
 
-catalog = assetCatalog.AssetCatalog(toolingRoot)
+catalog = assetCatalog.AssetCatalog(toolingRoot, serverDirectory.parent / "catalog")
 assetKinds = "texture, model, light, emitter, or ecosystem"
 findHelp = (
   " Filters, each optional: kind (" + assetKinds + "); text, words that must all appear in the id, name, description, usage, category,"
@@ -309,27 +309,28 @@ async def surveyAssets(context: Context, zone: str | None = None, folder: str | 
   for its own geometry and objects, with how the zone uses each: area share, world units per texture repeat, slopes, shaders, paired
   textures; its placed models; its light styles; its emitters; an EQ terrain zone's ecosystems), a client folder of loose images
   (Resources/Sky, Resources/WaterSwap, Resources/Precipitation, EnvEmitterEffects), or an EQG zone archive at an absolute `path`, such as
-  one exportZone wrote. Each texture is written out readable, with a thumbnail. Cached until the source's files change. Returns counts and
-  the most-used textures; findAssets, viewTextures, viewModels, and getAsset read the rest, and describeAssets writes what they are."""
+  one exportZone wrote. Each texture is written out readable, with a thumbnail, under the tooling root; a client source's measurements
+  are kept in the repository's catalog folder to be committed. Cached until the source's files change. Returns counts and the most-used
+  textures; findAssets, viewTextures, viewModels, and getAsset read the rest, and describeAssets writes what they are."""
   if sum(value is not None for value in (zone, folder, path)) != 1:
     raise ToolError("Survey one source: a zone, a folder, or a path")
   clientRoot = zoneSources.resolveClientRoot()
   if zone is not None:
     zoneName = zone.lower()
-    key, stamp = f"zone:{zoneName}", catalogCall(assetSurvey.clientZoneStamp, clientRoot, zoneName)
-    surveyFunction = lambda: assetSurvey.surveyClientZone(clientRoot, toolingRoot / "models", catalog.root, zoneName)
+    key, sourcePaths = f"zone:{zoneName}", catalogCall(assetSurvey.clientZoneSourcePaths, clientRoot, zoneName)
+    surveyFunction = lambda: assetSurvey.surveyClientZone(clientRoot, toolingRoot / "models", catalog.cacheRoot, zoneName)
   elif folder is not None:
-    key, stamp = f"folder:{folder}", catalogCall(assetSurvey.looseFolderStamp, clientRoot, folder)
-    surveyFunction = lambda: assetSurvey.surveyLooseFolder(clientRoot, catalog.root, folder)
+    key, sourcePaths = f"folder:{folder}", catalogCall(assetSurvey.looseFolderPaths, clientRoot, folder)
+    surveyFunction = lambda: assetSurvey.surveyLooseFolder(clientRoot, catalog.cacheRoot, folder)
   else:
     archivePath = Path(path)
     if not archivePath.is_absolute() or archivePath.suffix.lower() != ".eqg" or not archivePath.is_file():
       raise ToolError(f"'{path}' is not an absolute path to an existing .eqg file")
-    key, stamp = f"file:{archivePath}", assetSurvey.zoneFileStamp(archivePath)
-    surveyFunction = lambda: assetSurvey.surveyZoneFile(clientRoot, catalog.root, archivePath)
+    key, sourcePaths = f"file:{archivePath}", assetSurvey.zoneFileSourcePaths(archivePath)
+    surveyFunction = lambda: assetSurvey.surveyZoneFile(clientRoot, catalog.cacheRoot, archivePath)
   reportProgress = progressReporter(context)
   await anyio.to_thread.run_sync(reportProgress, 0, 1, f"surveying {key}")
-  surveyed = await anyio.to_thread.run_sync(catalogCall, catalog.survey, surveyFunction, key, stamp, refresh)
+  surveyed = await anyio.to_thread.run_sync(catalogCall, catalog.survey, surveyFunction, key, sourcePaths, refresh)
   await anyio.to_thread.run_sync(reportProgress, 1, 1, f"surveyed {key}")
   interpretations = catalog.interpretations()
   kinds = {}

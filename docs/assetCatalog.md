@@ -68,14 +68,15 @@ Every word is checked against the vocabulary (`server/assetVocabulary.py`, plus 
 
 ## Storage
 
-Everything lives under the tooling root (`%LOCALAPPDATA%\zonewright\catalog`), as client content must:
+What is worth keeping and sharing is committed in the repository's `catalog/` folder; client content and what only this machine uses stay under the tooling root (`%LOCALAPPDATA%\zonewright\catalog`):
 
-| Path | Holds |
-|---|---|
-| `measured/<source>.json` | One source's measured lane |
-| `interpreted.json` | The descriptions |
-| `vocabulary.json` | Terms added to the vocabulary |
-| `textures/`, `thumbnails/` | Extracted images |
+| Path | Where | Holds |
+|---|---|---|
+| `measured/<source>.json` | Repository | A client zone's or image folder's measured lane, identified by its files' SHA-256 and free of machine paths, so it reads the same on every machine with the same client |
+| `interpreted.json` | Repository | The descriptions |
+| `vocabulary.json` | Repository | Terms added to the vocabulary |
+| `textures/`, `thumbnails/` | Tooling root | Extracted images, by content hash; a survey re-extracts them when they are missing |
+| `measured/<source>.json` | Tooling root | Measurements of zone archives outside the client, such as exports |
 
 ## Lights and emitters in Blender
 
