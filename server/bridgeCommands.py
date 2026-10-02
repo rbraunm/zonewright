@@ -15,7 +15,10 @@ import bridgeViews
 from bridgeState import requireNoUnsavedChanges, state
 
 zonePropertyName = "zonewrightZone"
-zonePropertyKeys = ("fogColor", "fogStart", "fogEnd", "sunAzimuthDegrees", "sunElevationDegrees", "sunColor", "sunStrength", "ambientColor", "newEngineZone")
+zonePropertyKeys = (
+  "ambientColor", "specialAmbientColor", "bounceColor", "sunColor", "sunAzimuthDegrees", "sunElevationDegrees", "fogColor", "fogStart", "fogEnd",
+  "fogDensity", "newEngineZone",
+)
 fileImageSources = ("FILE", "SEQUENCE", "TILED")
 
 
@@ -182,17 +185,17 @@ def setZoneProperties(updates):
   if unknownKeys:
     raise ValueError(f"Unknown zone properties {unknownKeys}; known: {list(zonePropertyKeys)}")
   zone = readZoneProperties(bpy.context.scene) | updates
-  for colorKey in ("fogColor", "sunColor", "ambientColor"):
+  for colorKey in ("ambientColor", "specialAmbientColor", "bounceColor", "sunColor", "fogColor"):
     if colorKey in zone:
       validateColor(colorKey, zone[colorKey])
   if "fogStart" in zone and zone["fogStart"] < 0:
     raise ValueError(f"fogStart must be at least 0, got {zone['fogStart']}")
   if "fogStart" in zone and "fogEnd" in zone and zone["fogEnd"] <= zone["fogStart"]:
     raise ValueError(f"fogEnd {zone['fogEnd']} must be greater than fogStart {zone['fogStart']}")
-  if "sunElevationDegrees" in zone and not 0 < zone["sunElevationDegrees"] <= 90:
-    raise ValueError(f"sunElevationDegrees must be in (0, 90], got {zone['sunElevationDegrees']}")
-  if "sunStrength" in zone and zone["sunStrength"] <= 0:
-    raise ValueError(f"sunStrength must be positive, got {zone['sunStrength']}")
+  if "sunElevationDegrees" in zone and not -90 <= zone["sunElevationDegrees"] <= 90:
+    raise ValueError(f"sunElevationDegrees must be in [-90, 90], got {zone['sunElevationDegrees']}")
+  if "fogDensity" in zone and zone["fogDensity"] < 0:
+    raise ValueError(f"fogDensity must be at least 0, got {zone['fogDensity']}")
   if "newEngineZone" in zone and not isinstance(zone["newEngineZone"], bool):
     raise ValueError(f"newEngineZone must be true or false, got {zone['newEngineZone']!r}")
   bpy.context.scene[zonePropertyName] = zone
@@ -211,6 +214,10 @@ def pick(view, pixel):
   return bridgeViews.pick(bpy.context.scene, readZoneProperties(bpy.context.scene), view, pixel)
 
 
+def renderPasses(view, outputFolder, passNames):
+  return bridgeViews.renderPasses(bpy.context.scene, readZoneProperties(bpy.context.scene), view, outputFolder, passNames)
+
+
 commands = {
   "runPython": (runPython, False),
   "newFile": (newFile, False),
@@ -222,6 +229,7 @@ commands = {
   "getZoneProperties": (getZoneProperties, False),
   "renderView": (renderView, False),
   "pick": (pick, False),
+  "renderPasses": (renderPasses, False),
 } | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands | bridgeModels.commands
 
 

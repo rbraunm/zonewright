@@ -21,7 +21,7 @@ import machineProfile
 import zoneSources
 
 indexFormat = 10
-modelCacheFormat = 12
+modelCacheFormat = 14
 actorTrailingBytes = 4
 staticKinds = ("wldStatic",)
 defaultAppearance = {
@@ -30,6 +30,9 @@ defaultAppearance = {
 }
 eqgPlayerOnly = ("faceStyle", "hairColor", "facialHair", "facialHairColor", "eyeColor1", "heritage", "tattoo", "details")
 bindTolerance = 1e-3
+# A WLD mesh without vertex colors (most placed objects): no baked light and the full share of scene light. Where the client takes
+# this from is not traced; calibration against screenshots checks it.
+colorlessMeshColor = (0, 0, 0, 255)
 
 
 def actorReferences(worldFile, actorFragment):
@@ -347,14 +350,15 @@ def eqgMaterialTextures(materials, triangleMaterials, diffuseSwaps):
   return textures, alphaModes
 
 
-def meshPart(vertices, triangles, uvs, textures, alphaModes):
-  """Drawn triangles only; triangles with non-finite vertices are dropped and counted."""
+def meshPart(vertices, triangles, uvs, textures, alphaModes, lighting=None):
+  """Drawn triangles only; triangles with non-finite vertices are dropped and counted. lighting is the file's per-vertex normals and
+  RGBA colors as the client lights them ({normals, colors}), or None for a mesh lit without them."""
   finite = triangleKeep(vertices, triangles)
   keep = numpy.array([texture is not None for texture in textures], dtype=bool) & finite
   keptTextures = [texture for texture, kept in zip(textures, keep) if kept]
   return {
     "vertices": vertices, "triangles": triangles[keep], "uvs": uvs, "textures": keptTextures, "alphaModes": [mode for mode, kept in zip(alphaModes, keep) if kept],
-    "tints": [eqLooks.untinted] * len(keptTextures), "dropped": int((~finite).sum()),
+    "tints": [eqLooks.untinted] * len(keptTextures), "dropped": int((~finite).sum()), "lighting": lighting,
   }
 
 
@@ -548,9 +552,9 @@ def eqgSkinnedParts(archive, definition, appearance, context):
   }
 
 
-def wldMeshPart(mesh, materialSwaps):
-  if mesh["uvs"] is None:
-    raise ValueError(f"mesh '{mesh['name']}' has no per-vertex UVs")
+def wldMeshPart(mesh, materialSwaps, lit):
+  """A WLD mesh's drawn triangles; lit keeps its normals and vertex colors, which a posed skin's would no longer match. A mesh the
+  client draws none of (a collision mesh) needs neither UVs nor normals."""
   materials = [materialSwaps.get(material["name"].upper(), material) for material in mesh["materials"]]
   textures, alphaModes = [], []
   for index in mesh["triangleMaterials"]:
@@ -558,7 +562,18 @@ def wldMeshPart(mesh, materialSwaps):
     drawn = material["renderMethod"] != eqWorldFile.invisibleRenderMethod and bool(material["textureNames"])
     textures.append(material["textureNames"][0].removesuffix("_layer") if drawn else None)
     alphaModes.append("cutout" if drawn and material["renderMethod"] & 0xFF == 0x13 else "opaque")
-  return meshPart(mesh["vertices"], mesh["triangles"], mesh["uvs"], textures, alphaModes)
+  vertexCount = len(mesh["vertices"])
+  drawsNothing = all(texture is None for texture in textures)
+  if mesh["uvs"] is None and not drawsNothing:
+    raise ValueError(f"mesh '{mesh['name']}' has no per-vertex UVs")
+  lighting = None
+  if lit:
+    if mesh["normals"] is None and not drawsNothing:
+      raise ValueError(f"mesh '{mesh['name']}' lacks per-vertex normals, which the client lights it by")
+    colors = mesh["colors"] if mesh["colors"] is not None else numpy.tile(numpy.array(colorlessMeshColor, dtype=numpy.uint8), (vertexCount, 1))
+    lighting = {"normals": mesh["normals"] if mesh["normals"] is not None else numpy.zeros((vertexCount, 3)), "colors": colors}
+  uvs = mesh["uvs"] if mesh["uvs"] is not None else numpy.zeros((vertexCount, 2))
+  return meshPart(mesh["vertices"], mesh["triangles"], uvs, textures, alphaModes, lighting)
 
 
 def wldActor(archive, definition):
@@ -569,7 +584,7 @@ def wldActor(archive, definition):
 def wldStaticParts(archive, definition, appearance, context):
   worldFile, actor = wldActor(archive, definition)
   meshes = [worldFile.fragment(struct.unpack_from("<i", reference.body, 4)[0], 0x36) for reference in actorReferences(worldFile, actor)]
-  return {"parts": [wldMeshPart(worldFile.mesh(meshFragment), {}) for meshFragment in meshes], "pose": {"static": True}}
+  return {"parts": [wldMeshPart(worldFile.mesh(meshFragment), {}, True) for meshFragment in meshes], "pose": {"static": True}}
 
 
 def wldTextureSetSwaps(worldFile, code, textureSet):
@@ -584,6 +599,15 @@ def wldTextureSetSwaps(worldFile, code, textureSet):
     if candidate in materialIndices:
       swaps[name] = worldFile.material(materialIndices[candidate])
   return swaps
+
+
+def wldSkeletalBindParts(archive, definition):
+  """A skeletal WLD actor's meshes in the bind pose, lit by their normals and vertex colors: a placed zone object such as a torch."""
+  worldFile, actor = wldActor(archive, definition)
+  skeleton = worldFile.fragment(struct.unpack_from("<i", actorReferences(worldFile, actor)[0].body, 4)[0], 0x10)
+  _, skins = eqSkeletons.readSkeleton(worldFile, skeleton)
+  parts, particleClouds, _ = eqSkeletons.posedSkeleton(worldFile, skeleton, eqSkeletons.skinMeshes(worldFile, skins), lambda mesh: wldMeshPart(mesh, {}, True))
+  return parts, particleClouds
 
 
 def wldSkeletalParts(archive, definition, appearance, context):
@@ -613,7 +637,7 @@ def wldSkeletalParts(archive, definition, appearance, context):
   if clashing:
     raise ValueError(f"Model {code}: the eye colors and the face or texture set both swap {clashing}; which the client keeps is not known")
   swaps |= eyes
-  parts, particleClouds, boneWorlds = eqSkeletons.posedSkeleton(worldFile, skeleton, chosen, lambda mesh: wldMeshPart(mesh, swaps), localTransforms)
+  parts, particleClouds, boneWorlds = eqSkeletons.posedSkeleton(worldFile, skeleton, chosen, lambda mesh: wldMeshPart(mesh, swaps, False), localTransforms)
   attached, unattached = wldHeadItems(context, code, appearance, boneWorlds)
   return {
     "parts": parts + [item["part"] for item in attached], "pose": pose, "pieces": [mesh.name for mesh in chosen] + [item["piece"] for item in attached],
@@ -659,7 +683,7 @@ def wldHeadItems(context, code, appearance, boneWorlds):
     built = partBuilders[definition["kind"]](itemArchive, definition | {"model": item.lower()}, itemAppearance, ModelContext(context.clientRoot, context.cacheRoot, context.zoneName, None))
     for part in built["parts"]:
       attached.append({
-        "part": part | {"vertices": part["vertices"] @ pointWorld[:3, :3].T + pointWorld[:3, 3], "tints": [color] * len(part["textures"])},
+        "part": part | {"vertices": part["vertices"] @ pointWorld[:3, :3].T + pointWorld[:3, 3], "tints": [color] * len(part["textures"]), "lighting": None},
         "piece": item, "archive": definition["archive"],
       })
   return attached, unattached
@@ -778,7 +802,23 @@ def buildModel(clientRoot, cacheRoot, modelName, zoneName, source=None, appearan
   archive = eqArchive.EQArchive(clientRoot / definition["archive"])
   built = partBuilders[definition["kind"]](archive, definition, appearance, ModelContext(clientRoot, cacheRoot, zoneName, animation))
   searched = searched + [name for name in built.get("attachedArchives", []) if name not in searched]
-  parts = built["parts"]
+  written = writePartsCache(modelFolder, built["parts"], [eqArchive.EQArchive(clientRoot / name) if name != definition["archive"] else archive for name in searched], f"Model '{definition['model']}' from {definition['archive']}")
+  details = stamp | {
+    "model": definition["model"],
+    "pose": built["pose"],
+    "pieces": built.get("pieces"),
+    "swappedMaterials": built.get("swappedMaterials"),
+    "particleCloudsNotDrawn": built.get("particleCloudsNotDrawn", 0),
+    "unattached": built.get("unattached", []),
+    "searchedArchives": searched,
+  } | written
+  stampPath.write_text(json.dumps(details, indent=1), encoding="utf-8")
+  return modelFolder, details
+
+
+def writePartsCache(modelFolder, parts, textureHolders, label):
+  """Write parts as one mesh (model.npz) with its textures into a cache folder; returns where each texture came from, the missing
+  ones, dropped triangles, and bounds. Lighting is written when every part carries it."""
   vertexChunks, triangleChunks, uvChunks, textures, alphaModes, tints = [], [], [], [], [], []
   offset = 0
   for part in parts:
@@ -791,11 +831,16 @@ def buildModel(clientRoot, cacheRoot, modelName, zoneName, source=None, appearan
     offset += len(part["vertices"])
   triangles = numpy.concatenate(triangleChunks)
   if len(triangles) == 0:
-    raise ValueError(f"Model '{definition['model']}' from {definition['archive']} has no drawn triangles")
+    raise ValueError(f"{label} has no drawn triangles")
+  litParts = sum(part["lighting"] is not None for part in parts)
+  if litParts not in (0, len(parts)):
+    raise ValueError(f"{label}: {litParts} of {len(parts)} parts carry lighting; how the client lights them together is not known")
   # Only drawn geometry is kept, so the cached mesh measures what the client shows.
   used = numpy.unique(triangles)
   vertices, uvs, triangles = numpy.concatenate(vertexChunks)[used], numpy.concatenate(uvChunks)[used], numpy.searchsorted(used, triangles)
-  textureHolders = [eqArchive.EQArchive(clientRoot / name) if name != definition["archive"] else archive for name in searched]
+  lighting = {}
+  if litParts:
+    lighting = {key: numpy.concatenate([part["lighting"][key] for part in parts])[used] for key in ("normals", "colors")}
   textureSources = {}
   # A texture absent from every linked archive is absent for the client too; its faces are drawn as missing and reported.
   missingTextures = []
@@ -806,23 +851,16 @@ def buildModel(clientRoot, cacheRoot, modelName, zoneName, source=None, appearan
     else:
       textureSources[textureName] = holder.archivePath.name.lower()
   modelFolder.mkdir(parents=True, exist_ok=True)
+  fileNames = {}
   for textureName, holderName in textureSources.items():
     holder = next(candidate for candidate in textureHolders if candidate.archivePath.name.lower() == holderName)
-    (modelFolder / textureName).write_bytes(eqTextures.readableTexture(textureName, holder.read(textureName)))
-  numpy.savez(modelFolder / "model.npz", vertices=vertices, triangles=triangles, uvs=uvs, textureNames=numpy.array(textures), alphaModes=numpy.array(alphaModes), tints=numpy.array(tints, dtype=numpy.uint32), missingTextures=numpy.array(missingTextures, dtype=str))
-  details = stamp | {
-    "model": definition["model"],
-    "pose": built["pose"],
-    "pieces": built.get("pieces"),
-    "swappedMaterials": built.get("swappedMaterials"),
-    "particleCloudsNotDrawn": built.get("particleCloudsNotDrawn", 0),
-    "unattached": built.get("unattached", []),
-    "textureSources": textureSources,
-    "missingTextures": missingTextures,
-    "searchedArchives": searched,
-    "droppedTriangles": sum(part["dropped"] for part in parts),
-    "minimum": [float(value) for value in vertices.min(0)],
-    "maximum": [float(value) for value in vertices.max(0)],
+    fileNames[textureName], readable = eqTextures.readableTexture(textureName, holder.read(textureName))
+    (modelFolder / fileNames[textureName]).write_bytes(readable)
+  numpy.savez(
+    modelFolder / "model.npz", vertices=vertices, triangles=triangles, uvs=uvs, textureNames=numpy.array([fileNames.get(texture, texture) for texture in textures]), alphaModes=numpy.array(alphaModes),
+    tints=numpy.array(tints, dtype=numpy.uint32), missingTextures=numpy.array(missingTextures, dtype=str), **lighting,
+  )
+  return {
+    "textureSources": textureSources, "missingTextures": missingTextures, "droppedTriangles": sum(part["dropped"] for part in parts), "lit": bool(litParts),
+    "minimum": [float(value) for value in vertices.min(0)], "maximum": [float(value) for value in vertices.max(0)],
   }
-  stampPath.write_text(json.dumps(details, indent=1), encoding="utf-8")
-  return modelFolder, details

@@ -13,18 +13,14 @@ material.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value =
 mesh.materials.append(material)
 """
 zoneProperties = {
-  "fogColor": [0.55, 0.6, 0.7], "fogStart": 30, "fogEnd": 200,
-  "sunAzimuthDegrees": 135, "sunElevationDegrees": 45, "sunColor": [1, 0.95, 0.85], "sunStrength": 3,
-  "ambientColor": [0.3, 0.3, 0.35], "newEngineZone": False,
+  "ambientColor": [0.3, 0.3, 0.35], "specialAmbientColor": [0, 0, 0], "bounceColor": [0, 0, 0], "sunColor": [0.6, 0.57, 0.5],
+  "sunAzimuthDegrees": 135, "sunElevationDegrees": 45, "fogColor": [0.55, 0.6, 0.7], "fogStart": 30, "fogEnd": 200, "fogDensity": 0.33,
+  "newEngineZone": False,
 }
 eyeLevelView = {"standAt": [0, 0, 0], "headingDegrees": 0, "pitchDegrees": 0}
 eyeHeight = 5.5
 renderHeight = 540
-verticalFieldOfViewDegrees = 52
-
-
-def linearToSRGB(component):
-  return 12.92 * component if component <= 0.0031308 else 1.055 * component ** (1 / 2.4) - 0.055
+verticalFieldOfViewDegrees = 46.5
 
 
 async def buildGroundScene(session):
@@ -152,7 +148,7 @@ def testRenderWithoutZonePropertiesFails(stageBlenderServer):
     await session.expectSuccess("runPython", {"code": groundSceneCode})
     return await session.expectError("renderView", {"view": eyeLevelView})
 
-  assert "Zone properties missing: ['fogColor', 'fogStart', 'fogEnd', 'sunAzimuthDegrees', 'sunElevationDegrees', 'sunColor', 'sunStrength', 'ambientColor', 'newEngineZone']" in stageBlenderServer.session(steps)
+  assert "Zone properties missing: ['ambientColor', 'specialAmbientColor', 'bounceColor', 'sunColor', 'sunAzimuthDegrees', 'sunElevationDegrees', 'fogColor', 'fogStart', 'fogEnd', 'fogDensity', 'newEngineZone']" in stageBlenderServer.session(steps)
 
 
 def testRenderIsDeterministicFoggedAndFiled(stageBlenderServer):
@@ -174,8 +170,9 @@ result = list(image.pixels[index:index + 3])
   assert firstDescription["outputPath"] != secondDescription["outputPath"]
   assert firstImage[:8] == b"\x89PNG\r\n\x1a\n"
   assert (firstDescription["width"], firstDescription["height"]) == (960, 540)
+  # The preview writes raw values, as the client does: where nothing is drawn, the fog color itself.
   for measured, fogComponent in zip(skyPixel, zoneProperties["fogColor"]):
-    assert abs(measured - linearToSRGB(fogComponent)) <= 2 / 255
+    assert abs(measured - fogComponent) <= 1 / 255
 
 
 def testEyeLevelViewPlacesFigureAndPickMeasuresTheGround(stageBlenderServer):

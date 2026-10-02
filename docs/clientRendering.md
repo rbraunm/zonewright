@@ -17,7 +17,7 @@ A classic (WLD) zone mesh draws with `SPL\RegionOldA.fxo` (technique `RegionOldA
 
 - N is the stored normal (bytes 0-255 mapped to -1..1), D the sun direction, L the direction to a point light; k is a per-light reciprocal range computed in the effect's preshader.
 - The pixel is the texture times the light, clamped to 1 by the fixed-function stage, then fogged.
-- Fog is exponential squared: `fog = exp(-(density * clamp((distance - fogStart) * rangeInverse, 0, fogRange))^2)`, distance from the eye.
+- Fog is exponential squared per vertex: `fog = exp(-(density * clamp(10 * (distance - fogStart) / (fogEnd - fogStart), 0, 10))^2)`, distance from the eye, and the pixel is `lerp(fogColor, pixel, fog)`. The 10 is the effect's own `fFogRange`; the DLL sets start, end, and density (default 0.33), so at the default density fog reaches 63% a third of the way from start to end and is total at the end.
 
 So a WLD zone mesh's vertex colors are not a multiplier: in Plane of Knowledge they are near black with alpha 255 (lit by scene light), in Eastern Wastes black with alpha about 200.
 
@@ -42,8 +42,33 @@ The DLL sets the effect parameters per draw (`0x10088cb5`) from its world object
 
 The zone header (the server's NewZone packet) carries zone type, sky type, fog colors and distances (four sets), clip distances, and whether fog and sky are on. The live dumps record it in `fields\zoneHeaders.tsv`.
 
+## Zone files as the renderer reads them
+
+- **Vertex colors** (WLD 0x36) are stored blue first (D3DCOLOR): Plane of Knowledge's torch-lit walls bake orange only read that way.
+- **Normals** are signed bytes over 127.
+- **Placed objects** (`objects.wld` 0x15): actor, position, a heading and a tilt in 512ths of a turn (the third rotation is always 0 in the zones read so far), and one scale. The renderer turns an object by its tilt about its Y axis, then its heading about Z as a spawn's heading turns it; screenshots check it.
+- **Objects without vertex colors** (most placed objects) are drawn with no baked light and the full share of scene light. Where the client takes their color from is not traced.
+- Zone and object textures are often DDS data under `.bmp` names.
+
+## Camera
+
+Measured by aligning renders to live client screenshots (Plane of Knowledge twice, Eastern Wastes once), each cropped about its center to 16:9:
+
+- **Field of view:** 46.5 degrees vertical; the three shots scaled to 45.3-47.3 at 52.
+- **Pitch:** 4.5 degrees below the pitch the screenshot's name records (-3.7 to -5.5 measured).
+- **Heading:** as recorded (within 1.5 degrees).
+- **Eye:** 0.66 above `/loc`'s z, from the Palatial Guild Hall shot; 2D alignment cannot separate eye height from pitch, so this rests on that shot.
+
+The Eastern Wastes shot at `-1994.17, 3027.87` matches in heading but sits about 15 degrees off in pitch; its recorded `/loc` or pitch likely was not taken at the moment of the screenshot, and it is left out.
+
+## Calibration
+
+`calibrateShot` renders a screenshot's view as passes (lit, texture, normal, baked light, share, position), groups pixels by surface direction, and solves the classic lighting formula for the ambient, sun, and bounce colors and sun direction that best explain the screenshot's color over the texture's in each group (medians, so glows and misregistered edges do not steer it). Special ambient adds exactly like ambient where every surface takes the full share of scene light, so the fit folds it into ambient. The two Plane of Knowledge shots are night shots: they measure a blue night light near (0.47, 0.50, 0.73) on walls.
+
 ## To do
 
+- The sky: the client draws a sky dome (stars and moon at night) where the preview shows the fog color.
+- Point lights: the shader's three point lights per mesh (dynamic lights such as a player's light source) are not drawn; the static torch light on Plane of Knowledge's walls is baked into their vertex colors and is drawn.
 - The sun object's color and direction over the day, and the sky object's ambient.
 - `SpecialAmbient` and `BounceColor` sources in `eqgame.exe`.
 - Point lights: `lights.wld` and how the three per mesh are chosen.

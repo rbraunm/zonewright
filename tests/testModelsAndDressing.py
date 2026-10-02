@@ -10,8 +10,9 @@ def testScaleFigureWalksAheadUntilAWall(stageBlenderServer):
     await freshScene(session)
     await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [100, 100], "spacing": 10, "location": [0, 0, 0]})
     await session.expectSuccess("setZoneProperties", {
-      "fogColor": [0.5, 0.5, 0.5], "fogStart": 50, "fogEnd": 300, "sunAzimuthDegrees": 0, "sunElevationDegrees": 45,
-      "sunColor": [1, 1, 1], "sunStrength": 3, "ambientColor": [0.3, 0.3, 0.3], "newEngineZone": False,
+      "ambientColor": [0.3, 0.3, 0.3], "specialAmbientColor": [0, 0, 0], "bounceColor": [0, 0, 0], "sunColor": [0.6, 0.6, 0.6],
+      "sunAzimuthDegrees": 0, "sunElevationDegrees": 45, "fogColor": [0.5, 0.5, 0.5], "fogStart": 50, "fogEnd": 300, "fogDensity": 0.33,
+      "newEngineZone": False,
     })
     _, open = await session.expectImage("renderView", {"view": {"standAt": [0, 0, 0], "headingDegrees": 0, "pitchDegrees": 0}})
     await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "wall", "size": [40, 2, 20], "location": [0, 9, 0]})

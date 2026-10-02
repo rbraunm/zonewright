@@ -2,18 +2,23 @@ import atexit
 import datetime
 import functools
 import inspect
+import io
+import json
 import sys
 from pathlib import Path
 
 import anyio.from_thread
 import anyio.to_thread
+import numpy
 from mcp.server import MCPServer
 from mcp.server.mcpserver import Context, Image
 from mcp.server.mcpserver.exceptions import ToolError
 
 import blenderBridge
+import eqCalibration
 import eqModels
 import eqRaces
+import eqZones
 import extensionCatalog
 import machineProfile
 import toolingLog
@@ -170,11 +175,13 @@ def sortValue(row, sortPath):
 
 @guardedTool()
 def getToolingStatus():
-  """Compare installed Blender and extensions with the pins in toolingManifest.json, and report the bridge."""
+  """Compare installed Blender and extensions with the pins in toolingManifest.json, and report the bridge, runPython use, and the
+  renderer's latest calibration against each screenshot (calibrateShot)."""
   return toolingStatus.getToolingStatus(toolingRoot) | {
     "machineProfile": machineProfile.profileStatus(toolingRoot),
     "bridge": bridge.status(),
     "runPython": toolingLog.countRunPython(toolingRoot),
+    "calibration": eqCalibration.latestResults(toolingRoot / "calibration"),
   }
 
 
@@ -293,21 +300,27 @@ async def getSceneSummary(context: Context, objectLimit: int = 200):
 @guardedTool()
 async def setZoneProperties(
   context: Context,
+  ambientColor: list[float] | None = None,
+  specialAmbientColor: list[float] | None = None,
+  bounceColor: list[float] | None = None,
+  sunColor: list[float] | None = None,
+  sunAzimuthDegrees: float | None = None,
+  sunElevationDegrees: float | None = None,
   fogColor: list[float] | None = None,
   fogStart: float | None = None,
   fogEnd: float | None = None,
-  sunAzimuthDegrees: float | None = None,
-  sunElevationDegrees: float | None = None,
-  sunColor: list[float] | None = None,
-  sunStrength: float | None = None,
-  ambientColor: list[float] | None = None,
+  fogDensity: float | None = None,
   newEngineZone: bool | None = None,
 ):
-  """Set the zone's EQ properties stored in the .blend: fog color and distances (fogEnd is also the far clip), sun direction (azimuth 0 = +Y, clockwise), sun color and strength, ambient color, and newEngineZone, the zone header's NewEngineZone, which sets the scale the client draws spawns at (the live dumps' zoneHeaders give it per zone; EQEmu sends false for every zone)."""
+  """Set the zone's EQ properties stored in the .blend, in the client's lighting terms (docs/clientRendering.md): ambient, special
+  ambient, bounce, and sun colors (0-1, raw as the client uses them); the direction toward the sun (azimuth 0 = +Y, clockwise;
+  elevation -90 to 90); fog color, start, end (also the far clip), and density (the client's default is 0.33); and newEngineZone,
+  the zone header's NewEngineZone, which sets the scale the client draws spawns at (the live dumps' zoneHeaders give it per zone;
+  EQEmu sends false for every zone)."""
   updates = {
-    "fogColor": fogColor, "fogStart": fogStart, "fogEnd": fogEnd,
-    "sunAzimuthDegrees": sunAzimuthDegrees, "sunElevationDegrees": sunElevationDegrees,
-    "sunColor": sunColor, "sunStrength": sunStrength, "ambientColor": ambientColor, "newEngineZone": newEngineZone,
+    "ambientColor": ambientColor, "specialAmbientColor": specialAmbientColor, "bounceColor": bounceColor, "sunColor": sunColor,
+    "sunAzimuthDegrees": sunAzimuthDegrees, "sunElevationDegrees": sunElevationDegrees, "fogColor": fogColor, "fogStart": fogStart,
+    "fogEnd": fogEnd, "fogDensity": fogDensity, "newEngineZone": newEngineZone,
   }
   return await callBridge(context, "setZoneProperties", {"updates": {key: value for key, value in updates.items() if value is not None}})
 
@@ -429,6 +442,87 @@ async def placeObject(
   frameLocation, rotation = placementFrame(location, headingDegrees, x, y, z, heading)
   folder, details = await anyio.to_thread.run_sync(eqModel, zone, model, source)
   return await placeEQModel(context, folder, name, frameLocation, rotation, scale, 0, False, collection, details)
+
+
+def zoneModel(zone):
+  try:
+    return eqZones.buildZone(zoneSources.resolveClientRoot(), toolingRoot / "models", zone)
+  except ValueError as error:
+    raise ToolError(str(error)) from error
+
+
+async def placeZone(context, zone, collection):
+  folder, details = await anyio.to_thread.run_sync(zoneModel, zone)
+  placed = await callBridge(context, "placeModel", {
+    "modelFolder": str(folder), "name": zone, "location": [0, 0, 0], "rotationDegrees": 0, "scale": 1, "avatarHeight": 0,
+    "snapToGround": False, "collection": collection,
+  })
+  return placed | {"source": {key: details[key] for key in (
+    "archive", "format", "regionMeshes", "placements", "placedObjects", "objectArchives", "missingModels", "missingTextures", "droppedTriangles",
+    "particleCloudsNotDrawn",
+  )}}
+
+
+@guardedTool()
+async def importZone(context: Context, zone: str, collection: str | None = None):
+  """Bring a client zone into the open scene as one object named for it, drawn as the client draws it: a classic (WLD) zone's region
+  meshes and the objects its objects.wld places, textured, with the vertex colors and normals the client lights them by. It keeps the
+  zone file's coordinates, which the scene shares (Blender x, y are the server's y, x). EQG and terrain zones are not read yet."""
+  return await placeZone(context, zone, collection)
+
+
+def passArrays(passes):
+  return {name: numpy.load(path) for name, path in passes.items()}
+
+
+@guardedTool()
+async def calibrateShot(
+  context: Context, screenshotPath: str, zone: str, newEngineZone: bool, fogColor: list[float], fogStart: float, fogEnd: float,
+  fogDensity: float = 0.0, discardUnsavedChanges: bool = False,
+):
+  """Calibrate the renderer against a live client screenshot named <zone>,<loc y>,<loc x>,<loc z>,<compass heading>,<pitch>.jpg (see the
+  calibrate-renderer skill). Opens a new file (discarding unsaved changes only with discardUnsavedChanges), imports zone (the client's
+  zone file name), renders the screenshot's view, fits the scene light (ambient, sun, bounce, sun direction) that best explains the
+  screenshot under the client's lighting, renders with it, and returns the screenshot beside the render. Fog comes from the zone
+  header (the live dumps' zoneHeaders; density 0 for a zone whose FogOnOff is 0). Each run is kept under the tooling root's
+  calibration folder with its fit and mean pixel difference, and getToolingStatus lists the latest per screenshot."""
+  try:
+    shot = eqCalibration.parseShotName(screenshotPath)
+  except ValueError as error:
+    raise ToolError(str(error)) from error
+  if not Path(screenshotPath).is_file():
+    raise ToolError(f"No screenshot at {screenshotPath}")
+  view = eqCalibration.shotView(shot)
+  await callBridge(context, "newFile", {"discardUnsavedChanges": discardUnsavedChanges})
+  imported = await placeZone(context, zone, None)
+  neutral = {"ambientColor": [1, 1, 1], "specialAmbientColor": [0, 0, 0], "bounceColor": [0, 0, 0], "sunColor": [0, 0, 0], "sunAzimuthDegrees": 0, "sunElevationDegrees": 45}
+  environment = {"fogColor": fogColor, "fogStart": fogStart, "fogEnd": fogEnd, "fogDensity": fogDensity, "newEngineZone": newEngineZone}
+  await callBridge(context, "setZoneProperties", {"updates": neutral | environment})
+  runFolder = toolingRoot / "calibration" / Path(screenshotPath).stem / datetime.datetime.now(datetime.UTC).strftime("%Y%m%d-%H%M%S")
+  runFolder.mkdir(parents=True, exist_ok=True)
+  measured = passArrays((await callBridge(context, "renderPasses", {"view": view, "outputFolder": str(runFolder), "passNames": ["lit", "base", "normal", "baked", "share"]}))["passes"])
+  height, width = measured["lit"].shape[:2]
+  screen = await anyio.to_thread.run_sync(eqCalibration.screenshotPixels, screenshotPath, width, height)
+  try:
+    fit = eqCalibration.fitLighting(eqCalibration.surfaceGroups(screen, measured))
+  except ValueError as error:
+    raise ToolError(str(error)) from error
+  lighting = {key: fit[key] for key in ("ambientColor", "specialAmbientColor", "bounceColor", "sunColor", "sunAzimuthDegrees", "sunElevationDegrees")}
+  await callBridge(context, "setZoneProperties", {"updates": lighting})
+  rendered = passArrays((await callBridge(context, "renderPasses", {"view": view, "outputFolder": str(runFolder), "passNames": ["lit"]}))["passes"])["lit"]
+  background = numpy.concatenate([numpy.array(fogColor), [1.0]])
+  composited = rendered * rendered[..., 3:4] + background * (1 - rendered[..., 3:4])
+  image, difference = eqCalibration.comparison(screen, numpy.concatenate([composited[..., :3], rendered[..., 3:4]], axis=2))
+  comparePath = runFolder / "compare.png"
+  image.save(comparePath)
+  result = {
+    "screenshot": Path(screenshotPath).name, "zone": zone, "view": view, "fit": fit, "meanPixelDifference": difference, "environment": environment,
+    "comparePath": str(comparePath), "time": runFolder.name,
+  }
+  (runFolder / "result.json").write_text(json.dumps(result, indent=1), encoding="utf-8")
+  preview = io.BytesIO()
+  image.resize((image.width * 2 // 3, image.height * 2 // 3)).save(preview, format="PNG")
+  return [Image(data=preview.getvalue(), format="png"), result | {"import": imported["source"]}]
 
 
 @guardedTool()

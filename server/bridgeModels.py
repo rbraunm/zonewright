@@ -6,6 +6,7 @@ import bpy
 import mathutils
 import numpy
 
+import bridgeClientLight
 import bridgeMeshAccess
 import bridgeObjects
 
@@ -15,29 +16,28 @@ untinted = 0xFFFFFF
 
 
 def missingTextureMaterial(textureName):
-  """Faces whose texture no linked archive holds: flat magenta, so the gap is visible in every render."""
+  """Faces whose texture no linked archive holds: flat magenta, unlit and unfogged, so the gap is visible in every render."""
   materialName = f"eq_missing_{textureName}"
   material = bpy.data.materials.get(materialName)
   if material is None:
     material = bpy.data.materials.new(materialName)
     material.use_nodes = True
-    shader = material.node_tree.nodes["Principled BSDF"]
-    shader.inputs["Base Color"].default_value = missingTextureColor
-    shader.inputs["Roughness"].default_value = 1.0
-    shader.inputs["Specular IOR Level"].default_value = 0.0
+    nodes = material.node_tree.nodes
+    for unused in [node for node in nodes if node.type == "BSDF_PRINCIPLED"]:
+      nodes.remove(unused)
+    emission = nodes.new("ShaderNodeEmission")
+    emission.inputs["Color"].default_value = missingTextureColor
+    output = next(node for node in nodes if node.type == "OUTPUT_MATERIAL")
+    material.node_tree.links.new(emission.outputs["Emission"], output.inputs["Surface"])
   return material
 
 
-def linearChannel(value):
-  channel = value / 255
-  return channel / 12.92 if channel <= 0.04045 else ((channel + 0.055) / 1.055) ** 2.4
-
-
-def modelMaterial(folder, textureName, alphaMode, tint):
-  """One material per texture, alpha mode, and tint, reused across objects built from the same cache folder. A tint other than white
-  multiplies the texture's color, as the client tints hair (0xRRGGBB). A cutout keeps the pixels whose alpha passes the threshold; a
-  blended material is as opaque as its alpha."""
-  materialName = f"eq_{os.path.basename(folder)}_{textureName}{'' if alphaMode == 'opaque' else f'_{alphaMode}'}{'' if tint == untinted else f'_{tint:06x}'}"
+def modelMaterial(folder, textureName, alphaMode, tint, lit):
+  """One material per texture, alpha mode, tint, and lighting, reused across objects built from the same cache folder, drawn as the
+  client draws it (bridgeClientLight). A tint other than white multiplies the texture's color, as the client tints hair (0xRRGGBB).
+  A cutout keeps the pixels whose alpha passes the threshold; a blended material is as opaque as its alpha. A lit mesh is lit by its
+  file's baked colors and normals."""
+  materialName = f"eq_{os.path.basename(folder)}_{textureName}{'' if alphaMode == 'opaque' else f'_{alphaMode}'}{'' if tint == untinted else f'_{tint:06x}'}{'_lit' if lit else ''}"
   material = bpy.data.materials.get(materialName)
   texturePath = os.path.join(folder, textureName)
   if material is not None and material.node_tree.nodes["eqDiffuse"].image.filepath == texturePath:
@@ -45,35 +45,21 @@ def modelMaterial(folder, textureName, alphaMode, tint):
   material = bpy.data.materials.new(materialName)
   material.use_nodes = True
   nodes = material.node_tree.nodes
-  shader = nodes["Principled BSDF"]
-  shader.inputs["Roughness"].default_value = 1.0
-  shader.inputs["Specular IOR Level"].default_value = 0.0
   diffuse = nodes.new("ShaderNodeTexImage")
   diffuse.name = "eqDiffuse"
   diffuse.image = bpy.data.images.load(texturePath, check_existing=True)
-  if tint == untinted:
-    material.node_tree.links.new(diffuse.outputs["Color"], shader.inputs["Base Color"])
-  else:
+  diffuse.image.colorspace_settings.name = "Non-Color"
+  baseColor = diffuse.outputs["Color"]
+  if tint != untinted:
     multiply = nodes.new("ShaderNodeMix")
     multiply.data_type = "RGBA"
     multiply.blend_type = "MULTIPLY"
     multiply.inputs["Factor"].default_value = 1.0
     colorInputs = [socket for socket in multiply.inputs if socket.type == "RGBA"]
     material.node_tree.links.new(diffuse.outputs["Color"], colorInputs[0])
-    colorInputs[1].default_value = (*(linearChannel((tint >> shift) & 0xFF) for shift in (16, 8, 0)), 1.0)
-    material.node_tree.links.new(next(socket for socket in multiply.outputs if socket.type == "RGBA"), shader.inputs["Base Color"])
-  if alphaMode == "cutout":
-    threshold = nodes.new("ShaderNodeMath")
-    threshold.operation = "GREATER_THAN"
-    threshold.inputs[1].default_value = alphaThreshold
-    material.node_tree.links.new(diffuse.outputs["Alpha"], threshold.inputs[0])
-    material.node_tree.links.new(threshold.outputs["Value"], shader.inputs["Alpha"])
-    material.surface_render_method = "DITHERED"
-  elif alphaMode == "blended":
-    material.node_tree.links.new(diffuse.outputs["Alpha"], shader.inputs["Alpha"])
-    material.surface_render_method = "DITHERED"
-  elif alphaMode != "opaque":
-    raise ValueError(f"Alpha mode '{alphaMode}' is not opaque, cutout, or blended")
+    colorInputs[1].default_value = (*(((tint >> shift) & 0xFF) / 255 for shift in (16, 8, 0)), 1.0)
+    baseColor = next(socket for socket in multiply.outputs if socket.type == "RGBA")
+  bridgeClientLight.surfaceOutput(material, baseColor, diffuse.outputs["Alpha"], alphaMode, lit, alphaThreshold)
   return material
 
 
@@ -90,11 +76,17 @@ def buildModelMesh(folder, meshName):
   mesh.polygons.foreach_set("loop_total", numpy.full(len(triangles), 3, dtype=numpy.int32))
   uvLayer = mesh.uv_layers.new(name="UVMap")
   uvLayer.data.foreach_set("uv", uvs[triangles.ravel()].astype(numpy.float32).ravel())
+  lit = "colors" in data
+  if lit:
+    normals = mesh.attributes.new(bridgeClientLight.normalAttribute, "FLOAT_VECTOR", "POINT")
+    normals.data.foreach_set("vector", data["normals"].astype(numpy.float32).ravel())
+    baked = mesh.color_attributes.new(bridgeClientLight.bakedAttribute, "FLOAT_COLOR", "POINT")
+    baked.data.foreach_set("color", (data["colors"].astype(numpy.float32) / 255).ravel())
   missing = {str(name) for name in data["missingTextures"]}
   slots = {}
   materialIndices = numpy.empty(len(triangles), dtype=numpy.int32)
   for index, (textureName, alphaMode, tint) in enumerate(zip(data["textureNames"], data["alphaModes"], data["tints"])):
-    key = (str(textureName), str(alphaMode), int(tint))
+    key = (str(textureName), str(alphaMode), int(tint), lit)
     if key not in slots:
       slots[key] = len(slots)
       mesh.materials.append(missingTextureMaterial(key[0]) if key[0] in missing else modelMaterial(folder, *key))

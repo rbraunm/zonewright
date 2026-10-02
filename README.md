@@ -53,8 +53,8 @@ Nothing runs stale code. Every tool checks the server's own loaded source files 
 | `newFile` / `openFile` | Start an empty scene or open a .blend by absolute path; refused while the open file has unsaved changes unless `discardUnsavedChanges` |
 | `saveFile` | Saves, or saves as an absolute path; textures and linked libraries become paths relative to the .blend; packed, generated, missing, or other-drive images are refused |
 | `getSceneSummary` | File status, zone properties, objects (type, location, dimensions, triangles, materials), collections, cameras, materials with their textures, images |
-| `setZoneProperties` | Stores the zone's EQ properties in the .blend, all required to render: fog color, fog start and end (the end is also the far clip), sun azimuth and elevation, sun color and strength, ambient color, and `newEngineZone` (the zone header's `NewEngineZone`, which sets the scale spawns draw at) |
-| `renderView` | Renders the EQ preview of a view and returns the PNG inline; the file is kept under `%LOCALAPPDATA%\zonewright\renders` |
+| `setZoneProperties` | Stores the zone's EQ properties in the .blend, all required to render, in the client's lighting terms: ambient, special ambient, bounce, and sun colors; sun azimuth and elevation; fog color, start, end (also the far clip), and density; and `newEngineZone` (the zone header's `NewEngineZone`, which sets the scale spawns draw at) |
+| `renderView` | Renders the EQ preview of a view, lit and fogged as the client does (see below), and returns the PNG inline; the file is kept under `%LOCALAPPDATA%\zonewright\renders` |
 | `pick` | For a pixel of a view, the object hit, world position, surface normal, material, and distance |
 
 ### Artist toolkit
@@ -89,7 +89,7 @@ Edits address parts of a mesh with selectors instead of an interactive selection
 
 A view is `{"camera": name}`, `{"eye": [x,y,z], "target": [x,y,z]}`, or `{"standAt": [x,y,z], "headingDegrees": h, "pitchDegrees": p}`. Heading 0 looks along +Y and turns clockwise seen from above; positive pitch looks up. `standAt` finds the ground by casting down from just above the point, so it works inside caves, puts the eye 5.5 units above it, and stands a scale figure ahead: the client's own dark elf female at the race-default height 5, drawn at the client's scale for the zone's `newEngineZone`, walked up to 15 units along the ground like a player (walls, drops, and climbs stop her) and facing the camera.
 
-The EQ preview renders the open scene's objects (its own lights and cameras excluded) in a temporary scene: EEVEE without ray tracing, GI, or bloom; one shadowed sun and uniform ambient, both with no specular; linear distance fog composited from the mist pass, with the far clip at the fog end; 52 degree vertical field of view; 960 x 540. Output is byte-identical for identical input. These are starting values to calibrate against client screenshots.
+The EQ preview renders the open scene's objects (its own lights and cameras excluded) in a temporary scene, drawn as the client draws them ([docs/clientRendering.md](docs/clientRendering.md)): every surface is unlit by Blender and emits its texture times the light the client's vertex shader computes from the zone's ambient, special ambient, bounce, and sun and the surface's baked vertex color, share of scene light, and normal, fogged exponentially squared. Values stay raw, as the client multiplies texture bytes: textures load as Non-Color and the render uses the Raw view transform. A surface without the file's lighting data (artist geometry, characters) has no baked light and the full share of scene light. Where nothing is drawn shows the fog color; the client's sky is not drawn yet. EEVEE, no shadows, 960 x 540, a 46.5 degree vertical field of view (calibrated), the far clip at the fog end. Output is byte-identical for identical input.
 
 ## EverQuest reference
 
@@ -101,6 +101,8 @@ The EQ preview renders the open scene's objects (its own lights and cameras excl
 | `getZoneSurvey` | Every survey group for one zone, both lanes (measured and interpreted) |
 | `getZoneNotes` | Lists a zone's Brewall labels: text, map position, and layer file |
 | `findModel` | Where the client finds a model in a zone: every definition by link tier, unlinked archives that also define it, and the one placement uses (see Client models) |
+| `importZone` | Brings a client zone into the open scene as one object named for it: a classic (WLD) zone's region meshes and the objects its `objects.wld` places, textured, with the vertex colors and normals the client lights them by, in the zone file's coordinates. EQG and terrain zones are not read yet |
+| `calibrateShot` | Calibrates the renderer against a live client screenshot named `<zone>,<loc y>,<loc x>,<loc z>,<heading>,<pitch>.jpg`: imports the zone in a new file, fits the scene light that best explains the screenshot, renders with it, and returns the screenshot beside the render. Runs are kept under `%LOCALAPPDATA%\zonewright\calibration`; `getToolingStatus` lists the latest per screenshot (see the `calibrate-renderer` skill) |
 
 ### Client models
 

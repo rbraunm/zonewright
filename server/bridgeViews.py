@@ -1,19 +1,26 @@
-"""EQ preview rendering and picking in a temporary scene that links the open scene's objects. Runs under Blender's Python."""
+"""EQ preview rendering and picking in a temporary scene that links the open scene's objects, lit and fogged as the client lights them
+(bridgeClientLight). Runs under Blender's Python."""
 import math
+import os
 import time
 
 import bpy
 import mathutils
+import numpy
 
+import bridgeClientLight
 import bridgeModels
 
-requiredZoneKeys = ("fogColor", "fogStart", "fogEnd", "sunAzimuthDegrees", "sunElevationDegrees", "sunColor", "sunStrength", "ambientColor", "newEngineZone")
+requiredZoneKeys = (
+  "ambientColor", "specialAmbientColor", "bounceColor", "sunColor", "sunAzimuthDegrees", "sunElevationDegrees", "fogColor", "fogStart", "fogEnd",
+  "fogDensity", "newEngineZone",
+)
 previewName = "zonewrightPreview"
 renderWidth = 960
 renderHeight = 540
 renderSamples = 4
-# Starting values, to be calibrated against client screenshots: the reference renderer matched a live view at 52 degrees vertical.
-verticalFieldOfViewDegrees = 52.0
+# Measured by aligning renders to Plane of Knowledge and Eastern Wastes screenshots (16:9 crops of the live client's first-person view).
+verticalFieldOfViewDegrees = 46.5
 eyeHeight = 5.5
 cameraClipStart = 0.5
 groundSearchDistance = 50.0
@@ -34,7 +41,8 @@ def requireZone(zone):
 
 
 class PreviewScene:
-  """A scene holding links to the open scene's renderable objects plus the preview's own camera, sun, world, and fog."""
+  """A scene holding links to the open scene's renderable objects plus the preview's own camera and world, the client's lighting set
+  from the zone. Where nothing is drawn shows the fog color; the client's sky is not drawn yet."""
 
   def __init__(self, sourceScene, zone):
     requireZone(zone)
@@ -50,28 +58,14 @@ class PreviewScene:
     self.camera.data.clip_start = cameraClipStart
     self.camera.data.clip_end = zone["fogEnd"]
     self.scene.camera = self.camera
-    self.addSun()
     self.configureRender()
     self.configureWorld()
-    self.configureFog()
+    bridgeClientLight.applyEnvironment(zone)
 
   def addObject(self, newObject):
     self.scene.collection.objects.link(newObject)
     self.createdObjects.append(newObject)
     return newObject
-
-  def addSun(self):
-    sun = self.addObject(bpy.data.objects.new(previewName + "Sun", bpy.data.lights.new(previewName + "Sun", "SUN")))
-    azimuth = math.radians(self.zone["sunAzimuthDegrees"])
-    elevation = math.radians(self.zone["sunElevationDegrees"])
-    towardSun = mathutils.Vector((math.sin(azimuth) * math.cos(elevation), math.cos(azimuth) * math.cos(elevation), math.sin(elevation)))
-    sun.rotation_mode = "QUATERNION"
-    sun.rotation_quaternion = towardSun.to_track_quat("Z", "Y")
-    sun.data.color = self.zone["sunColor"]
-    sun.data.energy = self.zone["sunStrength"]
-    sun.data.specular_factor = 0.0
-    sun.data.angle = 0.0
-    sun.data.use_shadow = True
 
   def configureRender(self):
     render = self.scene.render
@@ -90,37 +84,20 @@ class PreviewScene:
     eevee.taa_render_samples = renderSamples
     eevee.use_raytracing = False
     eevee.use_fast_gi = False
-    eevee.use_shadows = True
-    self.scene.view_settings.view_transform = "Standard"
+    eevee.use_shadows = False
+    # Raw: output values are written as computed, as the client writes its texture-times-light bytes.
+    self.scene.view_settings.view_transform = "Raw"
     self.scene.view_settings.look = "None"
     self.scene.view_settings.exposure = 0.0
     self.scene.view_settings.gamma = 1.0
-    self.scene.view_layers[0].use_pass_mist = True
 
   def configureWorld(self):
     world = bpy.data.worlds.new(previewName + "World")
     world.use_nodes = True
     background = world.node_tree.nodes["Background"]
-    background.inputs["Color"].default_value = (*self.zone["ambientColor"], 1.0)
+    background.inputs["Color"].default_value = (*self.zone["fogColor"], 1.0)
     background.inputs["Strength"].default_value = 1.0
-    world.mist_settings.start = self.zone["fogStart"]
-    world.mist_settings.depth = self.zone["fogEnd"] - self.zone["fogStart"]
-    world.mist_settings.falloff = "LINEAR"
     self.scene.world = world
-
-  def configureFog(self):
-    tree = bpy.data.node_groups.new(previewName + "Fog", "CompositorNodeTree")
-    tree.interface.new_socket("Image", in_out="OUTPUT", socket_type="NodeSocketColor")
-    layers = tree.nodes.new("CompositorNodeRLayers")
-    layers.scene = self.scene
-    mix = tree.nodes.new("ShaderNodeMix")
-    mix.data_type = "RGBA"
-    mix.inputs["B"].default_value = (*self.zone["fogColor"], 1.0)
-    output = tree.nodes.new("NodeGroupOutput")
-    tree.links.new(layers.outputs["Mist"], mix.inputs["Factor"])
-    tree.links.new(layers.outputs["Image"], mix.inputs["A"])
-    tree.links.new(mix.outputs["Result"], output.inputs["Image"])
-    self.scene.compositing_node_group = tree
 
   def depsgraph(self):
     with bpy.context.temp_override(scene=self.scene, view_layer=self.scene.view_layers[0]):
@@ -147,7 +124,6 @@ class PreviewScene:
       elif isinstance(data, bpy.types.Mesh):
         bpy.data.meshes.remove(data)
     bpy.data.worlds.remove(self.scene.world)
-    bpy.data.node_groups.remove(self.scene.compositing_node_group)
     bpy.data.scenes.remove(self.scene)
 
 
@@ -239,6 +215,42 @@ def renderView(sourceScene, zone, view, outputPath, figureModel):
     "height": renderHeight,
     "renderSeconds": round(renderSeconds, 2),
   }
+
+
+def renderPasses(sourceScene, zone, view, outputFolder, passNames):
+  """Render a view once per named bridgeClientLight pass as raw floats (numpy .npy, rows top to bottom, RGBA, alpha 0 where nothing
+  is drawn) for calibration: the drawn color (lit), the base (texture) color, the normal, the baked light, and the share of scene
+  light."""
+  unknown = sorted(set(passNames) - set(bridgeClientLight.passes))
+  if unknown:
+    raise ValueError(f"Unknown passes {unknown}; known: {list(bridgeClientLight.passes)}")
+  preview = PreviewScene(sourceScene, zone)
+  written = {}
+  try:
+    description = placeCamera(preview, view, None)
+    preview.scene.render.film_transparent = True
+    preview.scene.render.image_settings.file_format = "OPEN_EXR"
+    preview.scene.render.image_settings.color_mode = "RGBA"
+    preview.scene.render.image_settings.color_depth = "32"
+    for passName in passNames:
+      bridgeClientLight.selectPass(passName)
+      exrPath = os.path.join(outputFolder, f"{passName}.exr")
+      preview.scene.render.filepath = exrPath
+      bpy.ops.render.render(write_still=True, scene=preview.scene.name)
+      image = bpy.data.images.load(exrPath)
+      try:
+        pixels = numpy.empty(image.size[0] * image.size[1] * 4, dtype=numpy.float32)
+        image.pixels.foreach_get(pixels)
+      finally:
+        bpy.data.images.remove(image)
+      arrayPath = os.path.join(outputFolder, f"{passName}.npy")
+      numpy.save(arrayPath, pixels.reshape(renderHeight, renderWidth, 4)[::-1])
+      os.remove(exrPath)
+      written[passName] = arrayPath
+  finally:
+    bridgeClientLight.selectPass("lit")
+    preview.remove()
+  return {key: roundVector(value) if isinstance(value, list) else value for key, value in description.items()} | {"passes": written}
 
 
 def pick(sourceScene, zone, view, pixel):

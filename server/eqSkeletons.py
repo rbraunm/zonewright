@@ -122,28 +122,39 @@ def skinMeshes(worldFile, skins):
   return [worldFile.fragments[struct.unpack_from("<i", worldFile.fragment(reference, 0x2D).body, 4)[0] - 1] for reference in skins]
 
 
+def turnedNormals(normals, transform):
+  """Normals carried by a bone transform: turned by its inverse transpose and kept unit length."""
+  turned = normals @ numpy.linalg.inv(transform[:3, :3])
+  return turned / numpy.maximum(numpy.linalg.norm(turned, axis=1, keepdims=True), 1e-12)
+
+
 def posedSkeleton(worldFile, skeletonFragment, skinned, meshArrays, localTransforms=None):
   """Skinned meshes (0x36 fragments rigged to this skeleton) and the meshes attached to its bones, posed by its bones at localTransforms
-  (the bind pose when None); meshArrays turns one posed mesh into its part. Also returns each bone's posed transform by name."""
+  (the bind pose when None), their normals turned with them; meshArrays turns one posed mesh into its part. Also returns each bone's
+  posed transform by name."""
   dags, _ = readSkeleton(worldFile, skeletonFragment)
   worldTransforms = poseSkeleton(dags, bindTransforms(worldFile, dags) if localTransforms is None else localTransforms)
   parts = []
   for meshFragment in skinned:
     mesh = worldFile.mesh(meshFragment)
     posed = numpy.empty_like(mesh["vertices"])
+    turned = None if mesh["normals"] is None else numpy.empty_like(mesh["normals"])
     start = 0
     for count, bone in meshVertexPieces(worldFile, meshFragment):
       if bone >= len(worldTransforms):
         raise ValueError(f"{worldFile.sourceName}: mesh '{mesh['name']}' uses bone {bone} of a {len(worldTransforms)}-bone skeleton")
       transform = worldTransforms[bone]
       posed[start:start + count] = mesh["vertices"][start:start + count] @ transform[:3, :3].T + transform[:3, 3]
+      if turned is not None:
+        turned[start:start + count] = turnedNormals(mesh["normals"][start:start + count], transform)
       start += count
     if start != len(posed):
       raise ValueError(f"{worldFile.sourceName}: bone pieces of '{mesh['name']}' cover {start} of {len(posed)} vertices")
-    parts.append(meshArrays(mesh | {"vertices": posed}))
+    parts.append(meshArrays(mesh | {"vertices": posed, "normals": turned}))
   attached, particleClouds = boneAttachments(worldFile, dags)
   for bone, meshFragment in attached:
     mesh = worldFile.mesh(worldFile.fragment(meshFragment.index, 0x36))
     transform = worldTransforms[bone]
-    parts.append(meshArrays(mesh | {"vertices": mesh["vertices"] @ transform[:3, :3].T + transform[:3, 3]}))
+    normals = None if mesh["normals"] is None else turnedNormals(mesh["normals"], transform)
+    parts.append(meshArrays(mesh | {"vertices": mesh["vertices"] @ transform[:3, :3].T + transform[:3, 3], "normals": normals}))
   return parts, particleClouds, {dag["name"]: transform for dag, transform in zip(dags, worldTransforms)}

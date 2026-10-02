@@ -25,4 +25,8 @@ def repairDDS(ddsBytes):
 
 
 def readableTexture(textureName, textureBytes):
-  return repairDDS(textureBytes) if textureName.endswith(".dds") else textureBytes
+  """The file name and bytes Blender reads a client texture from. DDS data, which the client also keeps under .bmp names, becomes a
+  repaired .dds file, since Blender picks a reader by the extension."""
+  if textureBytes[:4] == b"DDS ":
+    return (textureName if textureName.endswith(".dds") else textureName + ".dds"), repairDDS(textureBytes)
+  return textureName, textureBytes

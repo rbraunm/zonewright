@@ -137,7 +137,11 @@ class WorldFile:
     # WLD counts v down from a texture's top row; Blender counts up from its bottom. Measured: a Luclin face draws as the client
     # shows it only flipped.
     uvs = uvs * (1, -1) + (0, 1)
-    position += normalCount * 3 + colorCount * 4
+    normals = numpy.frombuffer(body, dtype=numpy.int8, count=normalCount * 3, offset=position).reshape(normalCount, 3) / 127.0
+    position += normalCount * 3
+    # D3DCOLOR order, blue first: Plane of Knowledge's torch-lit walls bake orange only read this way.
+    colors = numpy.frombuffer(body, dtype=numpy.uint8, count=colorCount * 4, offset=position).reshape(colorCount, 4)[:, [2, 1, 0, 3]]
+    position += colorCount * 4
     polygons = numpy.frombuffer(body, dtype=numpy.dtype([("flags", "<u2"), ("indices", "<u2", 3)]), count=polygonCount, offset=position)
     position += polygonCount * 8 + vertexPieceCount * 4
     polygonTextures = numpy.frombuffer(body, dtype="<u2", count=polygonTextureCount * 2, offset=position).reshape(polygonTextureCount, 2)
@@ -151,6 +155,9 @@ class WorldFile:
       "name": meshFragment.name,
       "vertices": vertices,
       "uvs": uvs if uvCount == vertexCount else None,
+      "normals": normals if normalCount == vertexCount else None,
+      # Per-vertex baked light and the share of scene light received (alpha), as RGBA bytes.
+      "colors": colors if colorCount == vertexCount else None,
       # WLD winds clockwise against its stored normals; reorder to counter-clockwise like EQG and Blender.
       "triangles": polygons["indices"][:, [0, 2, 1]].astype(numpy.int64),
       "isPassable": (polygons["flags"] & passablePolygonFlag) != 0,

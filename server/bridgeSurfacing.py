@@ -4,6 +4,7 @@ import os
 import bpy
 import numpy
 
+import bridgeClientLight
 import bridgeMeshAccess
 
 projectionMethods = ("planar", "box")
@@ -23,33 +24,24 @@ def createMaterial(name, diffuseTexture, normalTexture, cutout, alphaThreshold):
     raise ValueError(f"A material named '{name}' already exists")
   if cutout and not 0 < alphaThreshold < 1:
     raise ValueError(f"alphaThreshold must be in (0, 1), got {alphaThreshold}")
-  diffuseImage = loadImage(diffuseTexture, "sRGB")
+  # Texture bytes stay raw: the preview lights them as the client does (bridgeClientLight).
+  diffuseImage = loadImage(diffuseTexture, "Non-Color")
   normalImage = loadImage(normalTexture, "Non-Color") if normalTexture is not None else None
   material = bpy.data.materials.new(name)
   material.use_nodes = True
   nodes = material.node_tree.nodes
   links = material.node_tree.links
-  shader = nodes["Principled BSDF"]
-  shader.inputs["Roughness"].default_value = 1.0
-  shader.inputs["Specular IOR Level"].default_value = 0.0
   diffuse = nodes.new("ShaderNodeTexImage")
   diffuse.image = diffuseImage
   diffuse.interpolation = "Linear"
-  links.new(diffuse.outputs["Color"], shader.inputs["Base Color"])
+  normal = None
   if normalImage is not None:
     normalNode = nodes.new("ShaderNodeTexImage")
     normalNode.image = normalImage
     normalMap = nodes.new("ShaderNodeNormalMap")
     links.new(normalNode.outputs["Color"], normalMap.inputs["Color"])
-    links.new(normalMap.outputs["Normal"], shader.inputs["Normal"])
-  if cutout:
-    # EEVEE has no alpha-clip mode; a threshold on the texture alpha gives the hard cutout EQ uses.
-    threshold = nodes.new("ShaderNodeMath")
-    threshold.operation = "GREATER_THAN"
-    threshold.inputs[1].default_value = alphaThreshold
-    links.new(diffuse.outputs["Alpha"], threshold.inputs[0])
-    links.new(threshold.outputs["Value"], shader.inputs["Alpha"])
-    material.surface_render_method = "DITHERED"
+    normal = normalMap.outputs["Normal"]
+  bridgeClientLight.surfaceOutput(material, diffuse.outputs["Color"], diffuse.outputs["Alpha"], "cutout" if cutout else "opaque", False, alphaThreshold, normal)
   return {"material": name, "diffuseTexture": diffuse.image.name, "normalTexture": os.path.basename(normalTexture) if normalTexture else None, "cutout": cutout}
 
 
