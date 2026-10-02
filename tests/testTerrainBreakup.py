@@ -1,4 +1,5 @@
 import numpy
+from PIL import Image
 
 vertexProbe = """
 import numpy
@@ -21,20 +22,29 @@ async def newGrid(session, name, size=128, spacing=8):
   await session.expectSuccess("createTerrainGrid", {"name": name, "size": [size, size], "spacing": spacing, "location": [0, 0, 0]})
 
 
-def testMaskSelectorsPickBySlopeHeightAndRoute(stageBlenderServer):
+def testMaskSelectorsPickBySlopeHeightRouteAndMaterial(stageBlenderServer, tmp_path):
+  texturePath = tmp_path / "path.png"
+  Image.new("RGBA", (8, 8), (120, 100, 70, 255)).save(texturePath)
+
   async def steps(session):
     await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
     await newGrid(session, "ground", 64, 8)
     await session.expectSuccess("moveVertices", {"objectName": "ground", "selector": {"box": {"minimum": [8, -100, -1], "maximum": [100, 100, 1]}}, "offset": [0, 0, 40]})
+    await session.expectSuccess("createMaterial", {"name": "grass", "diffuseTexture": str(texturePath)})
+    await session.expectSuccess("createMaterial", {"name": "path", "diffuseTexture": str(texturePath)})
+    await session.expectSuccess("assignMaterial", {"objectName": "ground", "materialName": "grass"})
+    await session.expectSuccess("assignMaterial", {"objectName": "ground", "materialName": "path", "selector": {"box": {"minimum": [-32, -100, -1], "maximum": [-24, 100, 1]}}})
     flat = await session.expectSuccess("moveVertices", {"objectName": "ground", "selector": {"slope": {"minimumDegrees": 0, "maximumDegrees": 1}}, "offset": [0, 0, 0]})
     high = await session.expectSuccess("moveVertices", {"objectName": "ground", "selector": {"height": {"minimum": 39, "maximum": 41}}, "offset": [0, 0, 0]})
     route = await session.expectSuccess("moveVertices", {"objectName": "ground", "selector": {"nearPath": {"path": [[-32, -32, 0], [-32, 32, 0]], "radius": 1}}, "offset": [0, 0, 0]})
-    return flat, high, route
+    paved = await session.expectSuccess("moveVertices", {"objectName": "ground", "selector": {"material": "path"}, "offset": [0, 0, 0]})
+    return flat, high, route, paved
 
-  flat, high, route = stageBlenderServer.session(steps)
+  flat, high, route, paved = stageBlenderServer.session(steps)
   # A 9 x 9 grid with the four columns from x = 8 raised 40: the step between x = 0 and x = 8 tilts the normals of the two columns
-  # beside it, leaving 63 flat vertices; the route along x = -32 passes one column.
-  assert high["movedVertices"] == 36 and flat["movedVertices"] == 63 and route["movedVertices"] == 9
+  # beside it, leaving 63 flat vertices; the route along x = -32 passes one column; the path material covers the quads between the
+  # columns at x = -32 and x = -24.
+  assert high["movedVertices"] == 36 and flat["movedVertices"] == 63 and route["movedVertices"] == 9 and paved["movedVertices"] == 18
 
 
 def testRoughenFollowsTheSurfaceStaysInItsMaskAndRepeatsBySeed(stageBlenderServer):

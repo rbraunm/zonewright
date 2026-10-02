@@ -139,12 +139,18 @@ def materialSlotIndex(sceneObject, materialName):
   raise ValueError(f"'{sceneObject.name}' has no material '{materialName}'")
 
 
-def faceVertexIndices(sceneObject):
+def faceLoops(sceneObject):
+  """Each face's vertex count and the vertex indices of all faces' corners, face after face."""
   mesh = sceneObject.data
   loopTotals = numpy.empty(len(mesh.polygons), dtype=numpy.int32)
   mesh.polygons.foreach_get("loop_total", loopTotals)
   loopVertices = numpy.empty(len(mesh.loops), dtype=numpy.int32)
   mesh.loops.foreach_get("vertex_index", loopVertices)
+  return loopTotals, loopVertices
+
+
+def faceVertexIndices(sceneObject):
+  loopTotals, loopVertices = faceLoops(sceneObject)
   return numpy.split(loopVertices, numpy.cumsum(loopTotals)[:-1])
 
 
@@ -185,9 +191,9 @@ def evaluateSelector(selector, sceneObject, elementKind):
     if elementKind == "faces":
       return materialIndices == slotIndex
     faceMask = readFaceArrays(sceneObject)[2] == slotIndex
+    loopTotals, loopVertices = faceLoops(sceneObject)
     vertexMask = numpy.zeros(len(positions), dtype=bool)
-    for faceVertices in numpy.array(faceVertexIndices(sceneObject), dtype=object)[faceMask]:
-      vertexMask[faceVertices] = True
+    vertexMask[loopVertices[numpy.repeat(faceMask, loopTotals)]] = True
     return vertexMask
   if key == "insideObject":
     return insideMask(requireMeshObject(value), positions)
