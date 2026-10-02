@@ -31,6 +31,7 @@ figureStepClimb = 2.0
 figureStepDrop = 4.0
 figureMinimumDistance = 3.0
 figureSideOffset = 1.5
+mapClearance = 100.0
 
 
 
@@ -155,6 +156,8 @@ def placeCamera(preview, view, figureModel):
     eye, target = mathutils.Vector(view["eye"]), mathutils.Vector(view["target"])
     camera.location, camera.rotation_quaternion = eye, lookRotation(target - eye)
     return {"eye": list(eye), "forward": list((target - eye).normalized()), "figure": None}
+  if viewKeys == {"map"}:
+    return placeMapCamera(preview, view["map"])
   if viewKeys == {"standAt", "headingDegrees", "pitchDegrees"}:
     standAt = mathutils.Vector(view["standAt"])
     groundHit = preview.rayCast(standAt + mathutils.Vector((0, 0, 1)), mathutils.Vector((0, 0, -1)), groundSearchDistance)
@@ -167,7 +170,29 @@ def placeCamera(preview, view, figureModel):
     if figureModel is not None:
       description["figure"] = list(placeScaleFigure(preview, groundHit[0], view["headingDegrees"], figureModel))
     return description
-  raise ValueError(f"A view is {{camera}}, {{eye, target}}, or {{standAt, headingDegrees, pitchDegrees}}; got keys {sorted(viewKeys)}")
+  raise ValueError(f"A view is {{camera}}, {{eye, target}}, {{map}}, or {{standAt, headingDegrees, pitchDegrees}}; got keys {sorted(viewKeys)}")
+
+
+def sceneHeightRange(preview):
+  heights = [(sceneObject.matrix_world @ mathutils.Vector(corner)).z for sceneObject in preview.scene.objects if sceneObject.type == "MESH" for corner in sceneObject.bound_box]
+  if not heights:
+    raise ValueError("The scene has no meshes to map")
+  return min(heights), max(heights)
+
+
+def placeMapCamera(preview, mapView):
+  """Straight down from above everything, orthographic, north (+Y) up and east (+X) right."""
+  if not isinstance(mapView, dict) or set(mapView) != {"center", "width"} or len(mapView["center"]) != 2 or mapView["width"] <= 0:
+    raise ValueError(f"A map view is {{\"map\": {{\"center\": [x, y], \"width\": w}}}} with a positive width, got {mapView!r}")
+  bottom, top = sceneHeightRange(preview)
+  camera = preview.camera
+  camera.data.type = "ORTHO"
+  camera.data.sensor_fit = "HORIZONTAL"
+  camera.data.ortho_scale = mapView["width"]
+  camera.location = mathutils.Vector((*mapView["center"], top + mapClearance))
+  camera.rotation_quaternion = mathutils.Quaternion()
+  camera.data.clip_end = top - bottom + 2 * mapClearance
+  return {"mapCenter": list(mapView["center"]), "mapWidth": mapView["width"], "mapHeight": mapView["width"] * renderHeight / renderWidth, "unitsPerPixel": mapView["width"] / renderWidth, "figure": None}
 
 
 def placeScaleFigure(preview, ground, headingDegrees, figureModel):
@@ -200,7 +225,8 @@ def roundVector(vector, digits=3):
 
 
 def renderView(sourceScene, zone, view, outputPath, figureModel):
-  preview = PreviewScene(sourceScene, zone)
+  # A map is for reading the layout, so it is drawn without fog.
+  preview = PreviewScene(sourceScene, zone | {"fogDensity": 0.0} if "map" in view else zone)
   try:
     description = placeCamera(preview, view, figureModel)
     preview.scene.render.filepath = outputPath
@@ -262,9 +288,14 @@ def pick(sourceScene, zone, view, pixel):
     topRight, _, bottomLeft, topLeft = preview.camera.data.view_frame(scene=preview.scene)
     across = (pixel[0] + 0.5) / renderWidth
     down = (pixel[1] + 0.5) / renderHeight
-    localDirection = topLeft + (topRight - topLeft) * across + (bottomLeft - topLeft) * down
-    origin = preview.camera.location.copy()
-    direction = (preview.camera.rotation_quaternion @ localDirection).normalized()
+    localPoint = topLeft + (topRight - topLeft) * across + (bottomLeft - topLeft) * down
+    rotation = preview.camera.rotation_quaternion
+    if preview.camera.data.type == "ORTHO":
+      origin = preview.camera.location + rotation @ mathutils.Vector((localPoint.x, localPoint.y, 0))
+      direction = rotation @ mathutils.Vector((0, 0, -1))
+    else:
+      origin = preview.camera.location.copy()
+      direction = (rotation @ localPoint).normalized()
     hit = preview.rayCast(origin, direction, preview.camera.data.clip_end)
     if hit is None:
       return {"hit": False, "origin": roundVector(origin), "direction": roundVector(direction)}

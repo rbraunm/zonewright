@@ -151,6 +151,17 @@ def testRenderWithoutZonePropertiesFails(stageBlenderServer):
   assert "Zone properties missing: ['ambientColor', 'specialAmbientColor', 'bounceColor', 'sunColor', 'sunAzimuthDegrees', 'sunElevationDegrees', 'fogColor', 'fogStart', 'fogEnd', 'fogDensity', 'newEngineZone']" in stageBlenderServer.session(steps)
 
 
+def testMisspelledOrMissingArgumentsAreRefused(stageBlenderServer):
+  async def steps(session):
+    misspelled = await session.expectError("setZoneProperties", {"properties": {"fogStart": 10}})
+    empty = await session.expectError("setZoneProperties", {})
+    return misspelled, empty
+
+  misspelled, empty = stageBlenderServer.session(steps)
+  assert "properties" in misspelled and "Extra inputs are not permitted" in misspelled
+  assert "setZoneProperties needs at least one of ['ambientColor'" in empty
+
+
 def testRenderIsDeterministicFoggedAndFiled(stageBlenderServer):
   async def steps(session):
     await buildGroundScene(session)
@@ -196,6 +207,30 @@ def testEyeLevelViewPlacesFigureAndPickMeasuresTheGround(stageBlenderServer):
   assert abs(picked["position"][1] - eyeHeight / math.tan(depression)) < 0.01
   assert abs(picked["distance"] - eyeHeight / math.sin(depression)) < 0.01
   assert sky["hit"] is False
+
+
+def testMapViewLooksStraightDownWithoutFogAndPicksWhereItShows(stageBlenderServer):
+  async def steps(session):
+    await buildGroundScene(session)
+    # Fog this thick hides the ground in any view from more than 2 units away.
+    await session.expectSuccess("setZoneProperties", {"fogStart": 0, "fogEnd": 2})
+    mapView = {"map": {"center": [100, 50], "width": 400}}
+    _, description = await session.expectImage("renderView", {"view": mapView})
+    middle = await session.expectSuccess("runPython", {"code": f"""
+image = bpy.data.images.load(r'{description['outputPath']}')
+width, height = image.size
+index = ((height // 2) * width + width // 4) * 4
+result = list(image.pixels[index:index + 3])
+"""})
+    # The pixel a quarter across and a quarter down lies 100 units west and 56.25 north of the center.
+    picked = await session.expectSuccess("pick", {"view": mapView, "pixel": [240, 135]})
+    return description, middle["result"], picked
+
+  description, middle, picked = stageBlenderServer.session(steps)
+  assert description["unitsPerPixel"] == 400 / 960 and description["mapHeight"] == 225
+  assert max(abs(measured - fogComponent) for measured, fogComponent in zip(middle, zoneProperties["fogColor"])) > 0.1
+  assert picked["hit"] is True and picked["object"] == "ground" and picked["direction"] == [0.0, 0.0, -1.0]
+  assert abs(picked["position"][0] - (100 - 100 + 400 / 960 / 2)) < 0.01 and abs(picked["position"][1] - (50 + 56.25 - 400 / 960 / 2)) < 0.01
 
 
 def testSyncStopsAnIdleBridgeButRefusesUnsavedChanges(stageBlenderServer):

@@ -13,6 +13,7 @@ import numpy
 from mcp.server import MCPServer
 from mcp.server.mcpserver import Context, Image
 from mcp.server.mcpserver.exceptions import ToolError
+from pydantic import ConfigDict
 
 import blenderBridge
 import eqCalibration
@@ -57,8 +58,16 @@ def requireCurrentServerCode():
     raise ToolError(f"zonewright server code changed on disk since this server started ({', '.join(changed)}); reconnect with /mcp to load it")
 
 
+def refuseUnknownArguments(tool):
+  """The MCP SDK drops arguments a tool does not take, so a misspelled parameter would silently leave its default in place."""
+  class StrictArguments(tool.fn_metadata.arg_model):
+    model_config = ConfigDict(extra="forbid")
+  tool.fn_metadata.arg_model = StrictArguments
+  tool.parameters["additionalProperties"] = False
+
+
 def guardedTool(**options):
-  """server.tool that first refuses to run outdated server code."""
+  """server.tool that refuses unknown arguments and first refuses to run outdated server code."""
   def decorate(function):
     if inspect.iscoroutinefunction(function):
       @functools.wraps(function)
@@ -70,7 +79,9 @@ def guardedTool(**options):
       def guarded(*arguments, **keywordArguments):
         requireCurrentServerCode()
         return function(*arguments, **keywordArguments)
-    return server.tool(**options)(guarded)
+    server.tool(**options)(guarded)
+    refuseUnknownArguments(server._tool_manager.get_tool(options.get("name", function.__name__)))
+    return guarded
   return decorate
 
 
@@ -324,12 +335,15 @@ async def setZoneProperties(
     "sunAzimuthDegrees": sunAzimuthDegrees, "sunElevationDegrees": sunElevationDegrees, "fogColor": fogColor, "fogStart": fogStart,
     "fogEnd": fogEnd, "fogDensity": fogDensity, "newEngineZone": newEngineZone,
   }
-  return await callBridge(context, "setZoneProperties", {"updates": {key: value for key, value in updates.items() if value is not None}})
+  given = {key: value for key, value in updates.items() if value is not None}
+  if not given:
+    raise ToolError(f"setZoneProperties needs at least one of {list(updates)}")
+  return await callBridge(context, "setZoneProperties", {"updates": given})
 
 
 @guardedTool()
 async def renderView(context: Context, view: dict):
-  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y,z], "headingDegrees": h, "pitchDegrees": p} (heading 0 = +Y, clockwise; eye 5.5 above the ground; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera)."""
+  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y,z], "headingDegrees": h, "pitchDegrees": p} (heading 0 = +Y, clockwise; eye 5.5 above the ground; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog."""
   outputPath = newRenderPath()
   figureModel = None
   zone = await callBridge(context, "getZoneProperties", {})
