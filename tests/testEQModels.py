@@ -1,6 +1,15 @@
 import re
+import sys
+from pathlib import Path
 
-from conftest import pinnedBlender
+import numpy
+
+from conftest import everquestClient, pinnedBlender
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
+import eqArchive
+import eqgFiles
+import eqModels
 
 
 async def freshScene(session):
@@ -257,3 +266,16 @@ def testDrakkinTakeTheirLooksFromPlayerCustomization(stageBlenderServer):
   # PlayerCustomization.txt allows a male 9 hair styles, but no archive defines DKM_HAIR_08, so the client attaches none.
   assert missingHair["source"]["unattached"] == [{"piece": "DKM_HAIR_08", "reason": "no archive the client loads defines it"}]
   assert "PlayerCustomization.txt has no row for race 522, heritage 9, sex 1" in noHeritage
+
+
+def testStaticEQGModelsDrawTheirTexturesUpright():
+  archive = eqArchive.EQArchive(Path(everquestClient) / "neighborhood.eqg")
+  gate = eqgFiles.parseModel(archive.read("obj_guildgate.mod"), "obj_guildgate.mod")
+  material = next(index for index, entry in enumerate(gate["materials"]) if entry["properties"].get("e_TextureDiffuse0") == "iron_gate.dds")
+  corners = numpy.unique(gate["triangles"][gate["triangleMaterials"] == material])
+  uvs = eqModels.staticEQGUVs(gate["uvs"][corners])
+  heights = gate["vertices"][corners, 2]
+  low, high = uvs[heights.argmin(), 1], uvs[heights.argmax(), 1]
+  # Nine tenths of the way up the gate, Blender reads the texture nine tenths of the way up from its bottom: the arches at the iron
+  # gate texture's top stand at the gate's top, as the client draws them.
+  assert abs((low + 0.9 * (high - low)) % 1 - 0.9) < 0.01

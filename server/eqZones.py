@@ -18,7 +18,7 @@ import eqTextures
 import eqWorldFile
 import zoneSources
 
-zoneCacheFormat = 3
+zoneCacheFormat = 4
 readFormats = ("wld", "eqtzp")
 # A model's vertex light where its file gives none: no baked light and the full share of scene light, an assumption until the client's
 # lighting of EQG objects is traced.
@@ -198,7 +198,7 @@ class TerrainObjects:
     textures, alphaModes = eqModels.eqgMaterialTextures(model["materials"], model["triangleMaterials"], {})
     normals = model["normals"] @ numpy.linalg.inv(transform)
     normals /= numpy.maximum(numpy.linalg.norm(normals, axis=1, keepdims=True), 1e-12)
-    return eqModels.meshPart(model["vertices"] @ transform.T + position, model["triangles"], model["uvs"], textures, alphaModes, {"normals": normals, "colors": colors})
+    return eqModels.meshPart(model["vertices"] @ transform.T + position, model["triangles"], eqModels.staticEQGUVs(model["uvs"]), textures, alphaModes, {"normals": normals, "colors": colors})
 
 
 def terrainAtlasLayout(terrain):

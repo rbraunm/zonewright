@@ -49,6 +49,7 @@ The zone header (the server's NewZone packet) carries zone type, sky type, fog c
 - **Placed objects** (`objects.wld` 0x15): actor, position, a heading and a tilt in 512ths of a turn (the third rotation is always 0 in the zones read so far), and one scale. The renderer turns an object by its tilt about its Y axis, then its heading about Z as a spawn's heading turns it; screenshots check it.
 - **Objects without vertex colors** (most placed objects) are drawn with no baked light and the full share of scene light. Where the client takes their color from is not traced.
 - Zone and object textures are often DDS data under `.bmp` names.
+- **Texture orientation:** WLD meshes and static (boneless) EQG models count v down from a texture's top, so the renderer flips them for Blender. The Neighborhood's map board and guild gate show upright only that way. Skinned EQG models (a Drakkin's face) show upright unflipped. Which DLL step makes the difference is not traced: the static model effects (`SModel*`) read texture coordinates as shorts over 256, the skinned ones (`SkinMesh*`) as floats.
 
 ## EQ terrain zones
 
@@ -92,7 +93,7 @@ Each ecosystem on a tile has a 32x32 color map and detail mask (A8R8G8B8, no mip
 - **Placements:** a tile's placements give a model (`.mod`, with `.lod` levels the client switches by distance), the ecosystem that placed it, a position from its own tile's origin with z above the ground beneath it, turns in degrees, and a scale. Most have z 0; hand-placed rocks sink a few units.
 - **Object groups (`.tog`):** place their members' models relative to the group, each with a `.lit` file of baked light per vertex. The Neighborhood's zone-out wall, whose `.lit` holds 2175 colors for 1788 vertices, shows in screenshots as an object without baked light, so a `.lit` that does not fit its model is not applied.
 
-Neighborhood calibration: the two day shots redraw within about 13.5 and 16.8 levels of 255 with the zone's header fog. Doors (the gate in the second shot), spawns, radial flora (grass cards near the camera), the sky, and level-of-detail models are not drawn yet.
+Neighborhood calibration: the two day shots redraw within about 13.5 and 16.6 levels of 255, using the zone's header fog and the doors, ground items, and NPCs of the bristle behavior recording at each shot's moment. The Peridot server's door table agrees with the live dump for the gate in the second shot (`OBJ_GUILDGATE`, door 134). NPC equipment, radial flora (grass cards near the camera), the sky, and level-of-detail models are not drawn yet.
 
 ## Camera
 

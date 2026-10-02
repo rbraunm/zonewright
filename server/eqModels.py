@@ -22,7 +22,7 @@ import machineProfile
 import zoneSources
 
 indexFormat = 10
-modelCacheFormat = 16
+modelCacheFormat = 17
 actorTrailingBytes = 4
 staticKinds = ("wldStatic",)
 defaultAppearance = {
@@ -351,6 +351,13 @@ def eqgMaterialTextures(materials, triangleMaterials, diffuseSwaps):
   return textures, alphaModes
 
 
+def staticEQGUVs(uvs):
+  """A static (boneless) EQG model's texture coordinates as Blender counts them, v up from a texture's bottom: measured against
+  screenshots, the Neighborhood's map board and guild gate show upright only with v flipped, while skinned models (a Drakkin's face)
+  show upright unflipped."""
+  return uvs * (1, -1) + (0, 1)
+
+
 def meshPart(vertices, triangles, uvs, textures, alphaModes, lighting=None):
   """Drawn triangles only; triangles with non-finite vertices are dropped and counted. lighting is the file's per-vertex normals and
   RGBA colors as the client lights them ({normals, colors}), or None for a mesh lit without them."""
@@ -477,7 +484,7 @@ def eqgModelParts(archive, definition, appearance, context):
       raise ValueError(f"Model '{definition['model']}' is static; it has no animations")
     if changedAppearance(appearance):
       raise ValueError(f"Model '{definition['model']}' is static; appearance does not apply, got {changedAppearance(appearance)}")
-    return {"parts": [meshPart(model["vertices"], model["triangles"], model["uvs"], *eqgMaterialTextures(model["materials"], model["triangleMaterials"], {}))], "pose": {"static": True}}
+    return {"parts": [meshPart(model["vertices"], model["triangles"], staticEQGUVs(model["uvs"]), *eqgMaterialTextures(model["materials"], model["triangleMaterials"], {}))], "pose": {"static": True}}
   code = definition["model"].upper()
   if eqLooks.isEQGPlayerModel(code):
     unread = {key: value for key, value in changedAppearance(appearance).items() if key in ("variation", "headType", "textureSet")}
