@@ -39,7 +39,7 @@ Performance settings are discovered per machine, never configured by hand. `sync
 
 Blender scenes are authored at **1 Blender unit = 1 EQ unit**, Z up, in the zone files' own axes, so client models and zone files load unchanged. The server, and so the live dumps, give positions as (x, y, z) with x and y swapped against the zone files: Blender = (y, x, z), measured by every dumped door, ground object, and spawn landing on its zone's geometry only that way. `/loc` prints the server's y, x, z, which is Blender's x, y, z in order. Spawns draw at the client's scale for their height (see "Spawn size" under Client models): a dark elf female of the race-default height 5 stands about 6.5 units tall in a zone without `NewEngineZone` and about 5 in one with it. Eye-level views put the eye 5.5 units above the ground.
 
-EQGZI's Blender exporter (`xackery/eqgzi` `out/convert.py`) works at 1 Blender unit = 2 EQ units and writes placements as EQ = (-Blender.y, Blender.x, Blender.z) x 2. Phase 2 export applies that conversion; nothing in Phase 1 does.
+Zones export as EQG zones in these same units and axes: zonewright writes the .eqg itself, so no conversion applies (EQGZI's Blender exporter, by contrast, works at 1 Blender unit = 2 EQ units).
 
 ## Blender bridge
 

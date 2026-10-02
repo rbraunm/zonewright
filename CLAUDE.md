@@ -22,7 +22,8 @@ zonewright is a standalone MCP server; it is not tied to any particular work rep
 ## EverQuest reference
 - Scale and layout come only from the client's actual zone files. Brewall maps are design notes (place names), never geometry or scale.
 - Client content (extracted zones, models, textures) stays under the tooling root, never in a work repository or git.
-- Blender is 1 unit = 1 EQ unit, Z up; Phase 2 export converts to EQGZI's convention.
+- Blender is 1 unit = 1 EQ unit, Z up, in the zone files' own axes; export writes those coordinates unchanged.
+- Zones export as EQG zones (an .eqg archive with an EQGZ .zon, meshes, and DDS textures), written by zonewright's own writer and checked by its own reader and renderer.
 
 ## Tests
 Tests exercise the real pinned Blender through the real bridge. No mocking the code path under test.
