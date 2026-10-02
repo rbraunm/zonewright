@@ -335,7 +335,8 @@ def storeTextures(store, archives, uses, materialUses, wldMaterials, layerUses):
       raw = archive.read(name)
       try:
         assetID, facts = store.store(name, raw)
-      except (OSError, ValueError, struct.error) as error:
+      # Pillow raises NotImplementedError for DDS pixel formats it cannot decode.
+      except (OSError, ValueError, struct.error, NotImplementedError) as error:
         assets[f"texture/{name}@unreadable"] = {"kind": "texture", "name": name, "archive": archive.archivePath.name.lower(), "problem": f"{type(error).__name__}: {error}"}
         continue
       archiveName = archive.archivePath.name.lower()

@@ -99,9 +99,14 @@ class AssetCatalog:
     elif stale:
       with concurrent.futures.ProcessPoolExecutor(min(machineProfile.workerCount(), len(stale)), mp_context=multiprocessing.get_context("spawn")) as pool:
         futures = {pool.submit(assetSurvey.surveyClientZoneInWorker, clientRoot, modelCacheRoot, self.cacheRoot, zoneName): zoneName for zoneName in stale}
-        for done, future in enumerate(concurrent.futures.as_completed(futures), start=1):
-          record(futures[future], future.result())
-          reportProgress(done, len(stale), f"surveyed zone:{futures[future]}")
+        try:
+          for done, future in enumerate(concurrent.futures.as_completed(futures), start=1):
+            record(futures[future], future.result())
+            reportProgress(done, len(stale), f"surveyed zone:{futures[future]}")
+        except BaseException:
+          # Leaving the pool otherwise runs every queued zone before the error surfaces.
+          pool.shutdown(wait=False, cancel_futures=True)
+          raise
     return dict(sorted(outcomes.items()))
 
   def survey(self, surveyFunction, sourceKey, sourcePaths, refresh):
