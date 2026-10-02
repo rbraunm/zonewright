@@ -54,7 +54,7 @@ Nothing runs stale code. Every tool checks the server's own loaded source files 
 | `saveFile` | Saves, or saves as an absolute path; textures and linked libraries become paths relative to the .blend; packed, generated, missing, or other-drive images are refused |
 | `getSceneSummary` | File status, zone properties, objects (type, location, dimensions, triangles, materials), collections, cameras, materials with their textures, images |
 | `setZoneProperties` | Stores the zone's EQ properties in the .blend, all required to render, in the client's lighting terms: ambient, special ambient, bounce, and sun colors; sun azimuth and elevation; fog color, start, end (also the far clip), and density; and `newEngineZone` (the zone header's `NewEngineZone`, which sets the scale spawns draw at) |
-| `renderView` | Renders the EQ preview of a view, lit and fogged as the client does (see below), and returns the PNG inline; the file is kept under `%LOCALAPPDATA%\zonewright\renders`. A map view draws the layout from straight above, orthographic and without fog |
+| `renderView` | Renders the EQ preview of a view, lit and fogged as the client does (see below), and returns the PNG inline; the file is kept under `%LOCALAPPDATA%\zonewright\renders`. A map view draws the layout from straight above, orthographic and without fog; layout shading draws any view unlit in height bands (their edges read as contours) and relief light, for judging shape |
 | `pick` | For a pixel of a view, the object hit, world position, surface normal, material, and distance |
 
 ### Artist toolkit

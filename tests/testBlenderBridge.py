@@ -233,6 +233,37 @@ result = list(image.pixels[index:index + 3])
   assert abs(picked["position"][0] - (100 - 100 + 400 / 960 / 2)) < 0.01 and abs(picked["position"][1] - (50 + 56.25 - 400 / 960 / 2)) < 0.01
 
 
+def testLayoutShadingColorsByHeightAndSlope(stageBlenderServer):
+  mesaCode = """
+mesh = bpy.data.meshes.new('mesa')
+mesh.from_pydata([(50, -50, 100), (150, -50, 100), (150, 50, 100), (50, 50, 100)], [], [(0, 1, 2, 3)])
+bpy.context.scene.collection.objects.link(bpy.data.objects.new('mesa', mesh))
+"""
+
+  async def steps(session):
+    await buildGroundScene(session)
+    await session.expectSuccess("runPython", {"code": mesaCode})
+    _, description = await session.expectImage("renderView", {"view": {"map": {"center": [0, 0], "width": 400}}, "shading": "layout"})
+    pixels = await session.expectSuccess("runPython", {"code": f"""
+image = bpy.data.images.load(r'{description['outputPath']}')
+width, height = image.size
+def pixel(column):
+  index = ((height // 2) * width + column) * 4
+  return list(image.pixels[index:index + 3])
+result = [pixel(240), pixel(720)]
+"""})
+    return description, pixels["result"]
+
+  description, (ground, mesa) = stageBlenderServer.session(steps)
+  assert description["heightRange"] == [0.0, 100.0] and description["bandHeight"] == 50.0
+  # Flat ground faces the layout light at 45 degrees: 0.3 + 0.7 * cos(45) of the lowest and the highest height color.
+  shade = 0.3 + 0.7 * 0.7071
+  for measured, lowest in zip(ground, (0.22, 0.36, 0.26)):
+    assert abs(measured - shade * lowest) <= 2 / 255
+  for measured, highest in zip(mesa, (0.92, 0.9, 0.87)):
+    assert abs(measured - shade * highest) <= 2 / 255
+
+
 def testSyncStopsAnIdleBridgeButRefusesUnsavedChanges(stageBlenderServer):
   async def steps(session):
     await session.expectSuccess("runPython", {"code": "bpy.data.objects.new('marker', None)"})

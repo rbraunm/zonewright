@@ -208,8 +208,8 @@ def getZoneProperties():
   return readZoneProperties(bpy.context.scene)
 
 
-def renderView(view, outputPath, figureModel):
-  return bridgeViews.renderView(bpy.context.scene, readZoneProperties(bpy.context.scene), view, outputPath, figureModel)
+def renderView(view, outputPath, figureModel, shading, bandHeight):
+  return bridgeViews.renderView(bpy.context.scene, readZoneProperties(bpy.context.scene), view, outputPath, figureModel, shading, bandHeight)
 
 
 def pick(view, pixel):

@@ -32,6 +32,11 @@ figureStepDrop = 4.0
 figureMinimumDistance = 3.0
 figureSideOffset = 1.5
 mapClearance = 100.0
+viewShadings = ("client", "layout")
+# Layout shading lights from the northwest, as relief maps do, so slopes read the same whatever the zone's sun.
+layoutLightDirection = (-0.5, 0.5, 0.7071)
+layoutAmbient = 0.3
+layoutHeightColors = ((0.0, (0.22, 0.36, 0.26)), (0.35, (0.58, 0.56, 0.36)), (0.7, (0.62, 0.45, 0.32)), (1.0, (0.92, 0.9, 0.87)))
 
 
 
@@ -124,8 +129,11 @@ class PreviewScene:
         bpy.data.lights.remove(data)
       elif isinstance(data, bpy.types.Mesh):
         bpy.data.meshes.remove(data)
+    override = self.scene.view_layers[0].material_override
     bpy.data.worlds.remove(self.scene.world)
     bpy.data.scenes.remove(self.scene)
+    if override is not None:
+      bpy.data.materials.remove(override)
 
 
 def lookRotation(forward):
@@ -173,11 +181,69 @@ def placeCamera(preview, view, figureModel):
   raise ValueError(f"A view is {{camera}}, {{eye, target}}, {{map}}, or {{standAt, headingDegrees, pitchDegrees}}; got keys {sorted(viewKeys)}")
 
 
+def sceneCorners(preview):
+  corners = [sceneObject.matrix_world @ mathutils.Vector(corner) for sceneObject in preview.scene.objects if sceneObject.type == "MESH" for corner in sceneObject.bound_box]
+  if not corners:
+    raise ValueError("The scene has no meshes")
+  return corners
+
+
 def sceneHeightRange(preview):
-  heights = [(sceneObject.matrix_world @ mathutils.Vector(corner)).z for sceneObject in preview.scene.objects if sceneObject.type == "MESH" for corner in sceneObject.bound_box]
-  if not heights:
-    raise ValueError("The scene has no meshes to map")
+  heights = [corner.z for corner in sceneCorners(preview)]
   return min(heights), max(heights)
+
+
+def applyLayoutShading(preview, bandHeight):
+  """Draw every surface unlit in a color for its height across the scene's height range, banded every bandHeight units so the band
+  edges read as contours, and darker facing away from the layout light so slopes read; returns that height range."""
+  if bandHeight <= 0:
+    raise ValueError(f"bandHeight must be positive, got {bandHeight}")
+  bottom, top = sceneHeightRange(preview)
+  material = bpy.data.materials.new(previewName + "Layout")
+  material.use_nodes = True
+  nodes, links = material.node_tree.nodes, material.node_tree.links
+  nodes.clear()
+  geometry = nodes.new("ShaderNodeNewGeometry")
+  height = nodes.new("ShaderNodeSeparateXYZ")
+  links.new(geometry.outputs["Position"], height.inputs["Vector"])
+  banded = nodes.new("ShaderNodeMath")
+  banded.operation = "SNAP"
+  links.new(height.outputs["Z"], banded.inputs[0])
+  banded.inputs[1].default_value = bandHeight
+  fraction = nodes.new("ShaderNodeMapRange")
+  links.new(banded.outputs["Value"], fraction.inputs["Value"])
+  fraction.inputs["From Min"].default_value = bottom
+  fraction.inputs["From Max"].default_value = max(top, bottom + bandHeight)
+  ramp = nodes.new("ShaderNodeValToRGB")
+  elements = ramp.color_ramp.elements
+  while len(elements) < len(layoutHeightColors):
+    elements.new(0.5)
+  for element, (position, color) in zip(elements, layoutHeightColors):
+    element.position, element.color = position, (*color, 1.0)
+  links.new(fraction.outputs["Result"], ramp.inputs["Fac"])
+  facing = nodes.new("ShaderNodeVectorMath")
+  facing.operation = "DOT_PRODUCT"
+  links.new(geometry.outputs["Normal"], facing.inputs[0])
+  facing.inputs[1].default_value = layoutLightDirection
+  lit = nodes.new("ShaderNodeMath")
+  lit.operation = "MAXIMUM"
+  links.new(facing.outputs["Value"], lit.inputs[0])
+  lit.inputs[1].default_value = 0.0
+  shade = nodes.new("ShaderNodeMath")
+  shade.operation = "MULTIPLY_ADD"
+  links.new(lit.outputs["Value"], shade.inputs[0])
+  shade.inputs[1].default_value = 1 - layoutAmbient
+  shade.inputs[2].default_value = layoutAmbient
+  shaded = nodes.new("ShaderNodeVectorMath")
+  shaded.operation = "SCALE"
+  links.new(ramp.outputs["Color"], shaded.inputs[0])
+  links.new(shade.outputs["Value"], shaded.inputs["Scale"])
+  emission = nodes.new("ShaderNodeEmission")
+  links.new(shaded.outputs["Vector"], emission.inputs["Color"])
+  output = nodes.new("ShaderNodeOutputMaterial")
+  links.new(emission.outputs["Emission"], output.inputs["Surface"])
+  preview.scene.view_layers[0].material_override = material
+  return bottom, top
 
 
 def placeMapCamera(preview, mapView):
@@ -224,11 +290,18 @@ def roundVector(vector, digits=3):
   return [round(float(component), digits) for component in vector]
 
 
-def renderView(sourceScene, zone, view, outputPath, figureModel):
-  # A map is for reading the layout, so it is drawn without fog.
-  preview = PreviewScene(sourceScene, zone | {"fogDensity": 0.0} if "map" in view else zone)
+def renderView(sourceScene, zone, view, outputPath, figureModel, shading, bandHeight):
+  if shading not in viewShadings:
+    raise ValueError(f"shading must be one of {list(viewShadings)}, got '{shading}'")
+  # A map or a layout drawing is for reading the shape, so neither is fogged.
+  preview = PreviewScene(sourceScene, zone | {"fogDensity": 0.0} if "map" in view or shading == "layout" else zone)
   try:
     description = placeCamera(preview, view, figureModel)
+    if shading == "layout":
+      description["heightRange"] = list(applyLayoutShading(preview, bandHeight))
+      description["bandHeight"] = bandHeight
+      if preview.camera.data.type != "ORTHO":
+        preview.camera.data.clip_end = max((corner - preview.camera.location).length for corner in sceneCorners(preview)) + mapClearance
     preview.scene.render.filepath = outputPath
     start = time.perf_counter()
     bpy.ops.render.render(write_still=True, scene=preview.scene.name)

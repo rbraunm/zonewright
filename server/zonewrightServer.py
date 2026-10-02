@@ -342,8 +342,8 @@ async def setZoneProperties(
 
 
 @guardedTool()
-async def renderView(context: Context, view: dict):
-  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y,z], "headingDegrees": h, "pitchDegrees": p} (heading 0 = +Y, clockwise; eye 5.5 above the ground; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog."""
+async def renderView(context: Context, view: dict, shading: str = "client", bandHeight: float = 50.0):
+  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y,z], "headingDegrees": h, "pitchDegrees": p} (heading 0 = +Y, clockwise; eye 5.5 above the ground; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog. shading "client" draws the zone as the client does; "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout."""
   outputPath = newRenderPath()
   figureModel = None
   zone = await callBridge(context, "getZoneProperties", {})
@@ -351,7 +351,7 @@ async def renderView(context: Context, view: dict):
   if "standAt" in view and "newEngineZone" in zone:
     figure = await anyio.to_thread.run_sync(spawnModel, None, figureModelCode, figureHeight, bool(zone["newEngineZone"]))
     figureModel = {key: figure[key] for key in ("folder", "scale", "avatarHeight")}
-  description = await callBridge(context, "renderView", {"view": view, "outputPath": str(outputPath), "figureModel": figureModel})
+  description = await callBridge(context, "renderView", {"view": view, "outputPath": str(outputPath), "figureModel": figureModel, "shading": shading, "bandHeight": bandHeight})
   return [Image(data=outputPath.read_bytes(), format="png"), description]
 
 
