@@ -81,11 +81,16 @@ def shapedMesh(sceneObject):
     evaluated.to_mesh_clear()
 
 
-def distancesToPolyline(points, path, horizontal):
-  """Distance from each point to a polyline, the interpolated path height at the nearest spot, and that nearest spot."""
+def strokeAlongPath(points, path, radii, horizontal):
+  """For a stroke along a polyline whose radius changes evenly from each path point's radius to the next: how far across the stroke each
+  point lies, as a fraction of the radius there (0 on the path, 1 at the stroke's edge), taken on the segment where that fraction is
+  smallest; and there, the path's height, the stroke's radius, and the nearest path spot."""
   pathArray = toArray(path)
   if pathArray.ndim != 2 or pathArray.shape[1] != 3 or len(pathArray) < 2:
     raise ValueError(f"A path is at least two [x, y, z] points, got {path!r}")
+  radiiArray = toArray(radii)
+  if radiiArray.shape != (len(pathArray),) or (radiiArray <= 0).any():
+    raise ValueError(f"radii are one positive radius per path point ({len(pathArray)}), got {radii!r}")
   axes = slice(0, 2) if horizontal else slice(0, 3)
   starts, ends = pathArray[:-1], pathArray[1:]
   segments = ends[:, axes] - starts[:, axes]
@@ -93,11 +98,18 @@ def distancesToPolyline(points, path, horizontal):
   offsets = points[:, None, axes] - starts[None, :, axes]
   along = numpy.clip((offsets * segments[None]).sum(2) / lengths[None], 0, 1)
   nearest = starts[None, :, axes] + along[:, :, None] * segments[None]
-  distances = numpy.linalg.norm(points[:, None, axes] - nearest, axis=2)
-  closest = distances.argmin(1)
+  segmentRadii = radiiArray[None, :-1] + along * (radiiArray[None, 1:] - radiiArray[None, :-1])
+  fractions = numpy.linalg.norm(points[:, None, axes] - nearest, axis=2) / segmentRadii
+  closest = fractions.argmin(1)
   rows = numpy.arange(len(points))
   heights = starts[closest, 2] + along[rows, closest] * (ends[closest, 2] - starts[closest, 2])
-  return distances[rows, closest], heights, nearest[rows, closest]
+  return fractions[rows, closest], heights, segmentRadii[rows, closest], nearest[rows, closest]
+
+
+def distancesToPolyline(points, path, horizontal):
+  """Distance from each point to a polyline, the interpolated path height at the nearest spot, and that nearest spot."""
+  distances, heights, _, nearest = strokeAlongPath(points, path, numpy.ones(len(path)), horizontal)
+  return distances, heights, nearest
 
 
 def readVertexArrays(sceneObject):

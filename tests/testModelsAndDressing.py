@@ -86,6 +86,32 @@ def testScatterAvoidsObjectsWithClearance(stageBlenderServer):
   assert all(math.hypot(x, y) > 10 + 8 - 0.5 for x, y, _ in grove)
 
 
+def testCarveWidensAlongThePathWithRadii(stageBlenderServer):
+  readVertices = "result = [list(vertex.co) for vertex in bpy.data.objects['ground'].data.vertices]"
+  carve = {"objectName": "ground", "mode": "carve", "path": [[-80, 0, -20], [80, 0, -20]], "strength": 1, "profile": [[0, 0], [1, 30]], "conformRim": False}
+
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [200, 200], "spacing": 5, "location": [0, 0, 0]})
+    both = await session.expectError("sculptAlongPath", carve | {"radius": 10, "radii": [10, 50]})
+    miscounted = await session.expectError("sculptAlongPath", carve | {"radii": [10, 30, 50]})
+    await session.expectSuccess("sculptAlongPath", carve | {"radii": [10, 50]})
+    return both, miscounted, (await session.expectSuccess("runPython", {"code": readVertices}))["result"]
+
+  both, miscounted, vertices = stageBlenderServer.session(steps)
+  assert "Give either radius" in both and "one positive radius per path point (2)" in miscounted
+
+  def carvedRow(x):
+    return sorted(round(y, 3) for vx, y, z in vertices if abs(vx - x) < 1e-3 and z < -0.01)
+
+  # The profile reaches the ground (height 0, 20 above the floor) two thirds of the way out, so the cut is 2/3 of the radius wide on each
+  # side: radius 10 at the start, 30 halfway, 50 at the end.
+  assert carvedRow(-80) == [-5, 0, 5]
+  assert carvedRow(0) == [-15, -10, -5, 0, 5, 10, 15]
+  assert carvedRow(80) == list(range(-30, 35, 5))
+  assert round(min(z for x, y, z in vertices if abs(y) < 1e-3 and -80 <= x <= 80), 3) == -20
+
+
 def testCarveConformSlidesRimVerticesOntoTheContour(stageBlenderServer):
   path = [[-100, -100, -20], [100, 100, -20]]
   profile = [[0, 0], [0.5, 10], [1, 30]]
