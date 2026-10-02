@@ -115,8 +115,10 @@ def parseZone(zoneBytes, sourceName):
     if not 0 <= modelIndex < modelCount:
       raise ValueError(f"{sourceName}: object at {position} references model {modelIndex} of {modelCount}")
     position += 36
+    colors = None
     if version == 2:
       colorCount = struct.unpack_from("<I", zoneBytes, position)[0]
+      colors = numpy.frombuffer(zoneBytes, dtype="<u4", count=colorCount, offset=position + 4)
       position += 4 + 4 * colorCount
     placements.append({
       "model": modelNames[modelIndex],
@@ -124,6 +126,7 @@ def parseZone(zoneBytes, sourceName):
       "position": (x, y, z),
       "rotation": (heading, rotationY, rotationX),
       "scale": scale,
+      "colors": colors,
     })
   regionNames = []
   for _ in range(regionCount):
@@ -132,7 +135,7 @@ def parseZone(zoneBytes, sourceName):
   position += lightCount * zoneLightBytes
   if position != len(zoneBytes):
     raise ValueError(f"{sourceName}: zone data ends at {position} of {len(zoneBytes)} bytes")
-  return {"modelNames": modelNames, "placements": placements, "regionNames": regionNames, "lightCount": lightCount}
+  return {"version": version, "modelNames": modelNames, "placements": placements, "regionNames": regionNames, "lightCount": lightCount}
 
 
 def placementMatrix(placement):

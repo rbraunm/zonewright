@@ -9,6 +9,10 @@ import bridgeMeshAccess
 
 projectionMethods = ("planar", "box")
 uvLayerName = "UVMap"
+# What zone export reads a createMaterial material by.
+diffuseNodeName = "zonewrightDiffuse"
+normalNodeName = "zonewrightNormal"
+cutoutPropertyName = "zonewrightCutout"
 
 
 def loadImage(path, colorSpace):
@@ -32,11 +36,14 @@ def createMaterial(name, diffuseTexture, normalTexture, cutout, alphaThreshold):
   nodes = material.node_tree.nodes
   links = material.node_tree.links
   diffuse = nodes.new("ShaderNodeTexImage")
+  diffuse.name = diffuseNodeName
   diffuse.image = diffuseImage
   diffuse.interpolation = "Linear"
+  material[cutoutPropertyName] = bool(cutout)
   normal = None
   if normalImage is not None:
     normalNode = nodes.new("ShaderNodeTexImage")
+    normalNode.name = normalNodeName
     normalNode.image = normalImage
     normalMap = nodes.new("ShaderNodeNormalMap")
     links.new(normalNode.outputs["Color"], normalMap.inputs["Color"])

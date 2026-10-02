@@ -16,6 +16,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 import blenderBridge
 import eqCalibration
+import eqgExport
 import eqModels
 import eqRaces
 import eqRecording
@@ -467,9 +468,55 @@ async def importZone(context: Context, zone: str, collection: str | None = None)
   """Bring a client zone into the open scene as one object named for it, drawn as the client draws it, with the vertex colors and normals
   the client lights it by: a classic (WLD) zone's region meshes and the objects its objects.wld places, or an EQ terrain zone's tiles
   (each ecosystem's cover and detail textures blended as the client blends them) and the objects and object groups its tiles place on
-  the ground. It keeps the zone file's coordinates, which the scene shares (Blender x, y are the server's y, x). EQG (EQGZ) zones are
-  not read yet."""
+  the ground, or an EQG (EQGZ) zone's terrain and placed models (the loose .zon beside the archive when the client has one, as it
+  loads it), with baked light where its count fits each model. It keeps the zone file's coordinates, which the scene shares (Blender
+  x, y are the server's y, x)."""
   return await placeZone(context, zone, collection)
+
+
+zoneFileSourceKeys = ("zoneCacheFormat", "modelCacheFormat", "sha256", "textureSources", "lit", "minimum", "maximum")
+
+
+@guardedTool()
+async def importZoneFile(context: Context, path: str, collection: str | None = None):
+  """Bring an EQG zone archive outside the client, such as one exportZone wrote, into the open scene as one object named for its zone
+  (the file name), drawn as importZone draws the client's EQG zones: its terrain and placed models, with baked light where its count
+  fits each model."""
+  archivePath = Path(path)
+  if not archivePath.is_absolute() or archivePath.suffix.lower() != ".eqg" or not archivePath.is_file():
+    raise ToolError(f"'{path}' is not an absolute path to an existing .eqg file")
+  try:
+    folder, details = await anyio.to_thread.run_sync(eqZones.buildZoneFile, toolingRoot / "models", archivePath)
+  except (OSError, ValueError) as error:
+    raise ToolError(f"{type(error).__name__}: {error}") from error
+  placed = await callBridge(context, "placeModel", {
+    "modelFolder": str(folder), "name": archivePath.stem.lower(), "location": [0, 0, 0], "rotationDegrees": 0, "scale": 1, "avatarHeight": 0,
+    "snapToGround": False, "collection": collection,
+  })
+  return placed | {"source": {key: value for key, value in details.items() if key not in zoneFileSourceKeys}}
+
+
+@guardedTool()
+async def exportZone(context: Context, path: str):
+  """Write the open scene as an EQG zone archive at `path`, an absolute path ending in <zone>.eqg, the zone's short name in lowercase
+  letters and digits. The `terrain` collection's meshes become the zone's terrain; every other rendered mesh becomes a model placed at
+  its object's transform (copies sharing a mesh and without modifiers share one model) and every collection instance a model of its
+  collection's meshes; a placed object takes one uniform scale. Materials must come from createMaterial: diffuse and normal map export
+  as Opaque_MaxCB1.fx, diffuse only as Opaque_MaxC1.fx, a cutout (diffuse only) as Chroma_MPLBasicAT.fx. DDS textures are stored
+  unchanged, others as uncompressed DDS with power-of-two sides. No baked light is written yet."""
+  archivePath = Path(path)
+  if not archivePath.is_absolute() or archivePath.suffix != ".eqg" or not archivePath.parent.is_dir():
+    raise ToolError(f"'{path}' is not an absolute .eqg path in an existing folder")
+  zone = archivePath.stem
+  if not eqgExport.zoneNamePattern.match(zone):
+    raise ToolError(f"Zone name '{zone}' must be lowercase letters and digits, as the client's zone short names are")
+  collected = await callBridge(context, "collectZoneExport", {"outputFolder": str(toolingRoot / "exports" / zone), "zoneName": zone})
+  try:
+    data, summary = await anyio.to_thread.run_sync(eqgExport.zoneArchive, collected)
+    archivePath.write_bytes(data)
+  except (OSError, ValueError) as error:
+    raise ToolError(f"{type(error).__name__}: {error}") from error
+  return summary | {"path": str(archivePath)}
 
 
 def passArrays(passes):
