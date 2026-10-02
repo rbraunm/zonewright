@@ -139,7 +139,7 @@ Characters take the client's appearance rules (from `EQGraphicsDX9.dll`):
 - **Pieces:** the body piece `<code><nn>` for `variation` and the head piece `<code>HE<nn>` for `headType`, keeping the default when the model lacks the piece.
 - **Texture sets:** `.lay` layers `C_<code>_S<set>_M<n>` for `.mds` models, and `<code><part><set><nn>_MDF` materials for WLD ones.
 - **Layers:** a layer's `M<n>` is entry `n - 1` of the model's material palette. A `.mds` palette holds every material (`0x100631e0`); a `.mod` palette holds only the materials its triangles use, in file order (`0x100620f0`), so an unused `FailsafeShader` takes no entry. A layer's textures are typed by the uppercase letter before `.DDS`: `C` diffuse, `N` normal, `E` environment (`0x100169cd`).
-- **Blending:** an EQG material blends by the first family its shader's name contains (`0x100147f0`): `Alpha` blends by the texture's alpha and `Chroma` cuts out by it. `AddAlpha` (additive) is drawn opaque for now; see the to-do list below.
+- **Blending:** an EQG material blends by the first family its shader's name contains (`0x100147f0`): `Alpha` blends by the texture's alpha and `Chroma` cuts out by it. `AddAlpha` (additive) is drawn opaque for now; see the [rendering worklist](docs/renderingWorklist.md).
 - **Hair on other EQG models:** `hairStyle` attaches `<code>_HAIR_<nn>` (`eqgame.exe` `0x40ac80`, called for the head slot when no helm is worn) where the client defines one.
 - **Attached EQG pieces:** a piece's first bone shares the matrix of the skeleton bone its slot names (`eqgame.exe` `0x40b580`: hair at `CHEST_CHEST03`, beard at `NECK_NECK`, facial attachment at `HEAD_HEAD`, tattoo at `ROOT_BONE`); each other bone shares the skeleton's bone of the same name (`0x10043e10`).
 
@@ -159,10 +159,7 @@ A Luclin character's head follows the client's appearance rules (`eqLooks.py`, t
 - **Color:** `hairColor` and `facialHairColor` index the client's 24-color table (`0xac1a70`), which tints the item's grayscale texture (`0x40b260`). An index past the table leaves the item untinted.
 - **Eyes:** both eyes take `eyeColor1` as the spawn appears (`0x40f032`). The DLL finds the eye entries in the model's material palette by name (`<code>L_EYE...`, `<code>R_EYE...`; `0x10040c50`). It swaps each for `CHR_EYE<color + race offset>_MDF`, looked up by name in what the client loads, which is `lgequip.s3d` for most races (`0x40c350`, `0x10040d50`). The offset is 20 for dark elves, 40 for iksar, 60 for Vah Shir, 80 for ogres, 100 for trolls, 120 for frogloks, and 0 otherwise. A human male's face 3 and a barbarian male's face 6 fix the right eye at 209; a dwarf male's face 5 and a barbarian male's face 4 fix it at 207. Color 255, or an eye material no archive defines (such as the dark elf's default `CHR_EYE020_MDF`), leaves the eye as modeled.
 
-To do for characters and models:
-
-- **Particle effects:** flames, smoke, and spell clouds are not drawn; placements count WLD particle clouds in `particleCloudsNotDrawn`.
-- **Additive blending:** `EQGraphicsDX9.dll` has one additive render pass, source and destination factor one with fog off (`0x10088ac5`), chosen through a descriptor per shader type (`0x1009a3ec`). Which shader types it serves, and so whether `AddAlpha` takes it, is not traced yet.
+What characters and models do not yet draw as the client does (particle effects, additive blending, equipment) is in [docs/renderingWorklist.md](docs/renderingWorklist.md).
 
 A WLD character plays the client's animations (`eqAnimations.py`, transcribed from `eqgame.exe`):
 

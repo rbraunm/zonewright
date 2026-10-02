@@ -119,11 +119,4 @@ Results: the two Plane of Knowledge night shots redraw within about 11-13 levels
 
 ## To do
 
-- The sky: the client draws a sky dome (stars and moon at night) where the preview shows the fog color.
-- Point lights: the shader's three point lights per mesh (dynamic lights such as a player's light source) are not drawn; the static torch light on Plane of Knowledge's walls is baked into their vertex colors and is drawn.
-- The sun object's color and direction over the day, and the sky object's ambient.
-- `SpecialAmbient` and `BounceColor` sources in `eqgame.exe`.
-- Point lights: `lights.wld` and how the three per mesh are chosen.
-- EQG zones (`RegionCBS1` and the other DX9 region effects).
-- EQ terrain: radial flora, water sheets, quad kinds 1 and 4, `BLENDMAP` and `LAYERINGMAP`, child layers, tiles without ecosystems, model levels of detail by distance, and how EQG objects (`MPL` effects) are lit.
-- The cover map's mip levels are box filtered here; D3DX recompresses each generated level to DXT5, which is not reproduced.
+What is not yet drawn as the client draws it is in [renderingWorklist.md](renderingWorklist.md).
