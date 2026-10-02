@@ -18,6 +18,7 @@ import blenderBridge
 import eqCalibration
 import eqModels
 import eqRaces
+import eqRecording
 import eqZones
 import extensionCatalog
 import machineProfile
@@ -482,18 +483,99 @@ def passArrays(passes):
   return arrays
 
 
+# How far from a screenshot's camera calibrateShot places what a recording shows.
+recordingReach = 1000.0
+# The recording writes -1 for a look value a spawn does not set (a non-Drakkin's tattoo, a WLD model's head override); the client reads
+# such indexes as past their count, which draws 0.
+recordedLookKeys = ("variation", "headType", "faceStyle", "hairStyle", "hairColor", "facialHair", "facialHairColor", "eyeColor1", "heritage", "tattoo", "details")
+
+
+def recordedAppearance(look):
+  appearance = {key: max(int(look[key]), 0) for key in recordedLookKeys}
+  return appearance | {"textureSet": max(int(look["textureType"]), 0)}
+
+
+async def placeRecorded(context, recordingPath, liveDumpsPath, atMilliseconds, near, radius, collection):
+  """Place the NPCs, doors, ground items, and placed objects a recording shows in its zone at a moment (within radius of near, a Blender
+  location, when given); each one that cannot be drawn is listed with why instead."""
+  try:
+    zone = await anyio.to_thread.run_sync(eqRecording.zoneAt, recordingPath, atMilliseconds)
+    sizes = await anyio.to_thread.run_sync(eqRecording.propSizes, liveDumpsPath, zone)
+  except (OSError, ValueError, KeyError) as error:
+    raise ToolError(f"{type(error).__name__}: {error}") from error
+
+  def inReach(x, y, z):
+    return near is None or float(numpy.linalg.norm(numpy.array([y, x, z]) - numpy.array(near))) <= radius
+
+  placed, notPlaced = [], []
+  newEngine = await zoneIsNewEngine(context)
+  for npc in zone["npcs"]:
+    if not inReach(npc["x"], npc["y"], npc["z"]):
+      continue
+    look = npc["appearance"]
+    try:
+      spawn = await anyio.to_thread.run_sync(spawnModel, zone["zone"], look["actorDef"], npc["height"], newEngine, None, recordedAppearance(look), None)
+      location, rotation = placementFrame(None, None, npc["x"], npc["y"], npc["z"], npc["heading"])
+      await placeEQModel(context, spawn["folder"], npc["name"], location, rotation, spawn["scale"], spawn["avatarHeight"], True, collection, spawn["details"])
+      placed.append({"kind": "npc", "name": npc["name"], "model": look["actorDef"]})
+    except ToolError as error:
+      notPlaced.append({"kind": "npc", "name": npc["name"], "model": look["actorDef"], "reason": str(error)})
+  for prop in zone["props"]:
+    if not inReach(prop["x"], prop["y"], prop["z"]):
+      continue
+    name = f"{prop['kind']}{prop['id']}_{prop['name']}"
+    scale, reason = eqRecording.propSize(sizes, prop)
+    if reason is not None:
+      notPlaced.append({"kind": prop["kind"], "name": name, "model": prop["name"], "reason": reason})
+      continue
+    try:
+      folder, details = await anyio.to_thread.run_sync(eqModel, zone["zone"], prop["name"])
+      location, rotation = placementFrame(None, None, prop["x"], prop["y"], prop["z"], prop["heading"])
+      await placeEQModel(context, folder, name, location, rotation, scale, 0, False, collection, details)
+      placed.append({"kind": prop["kind"], "name": name, "model": prop["name"]})
+    except ToolError as error:
+      notPlaced.append({"kind": prop["kind"], "name": name, "model": prop["name"], "reason": str(error)})
+  return {"zone": zone["zone"], "server": zone["server"], "placed": placed, "notPlaced": notPlaced}
+
+
+@guardedTool()
+async def placeRecording(
+  context: Context, recordingPath: str, liveDumpsPath: str, at: str, near: list[float] | None = None, radius: float | None = None,
+  collection: str | None = None,
+):
+  """Place what a live behavior recording (MQ2PeridotLive's peridotLiveBehavior_<server>_<zone>_<instance>_<character>_<start>.txt) shows
+  in its zone at a moment: at is local time as the recording's start line writes it (YYYYMMDD-HHMMSS). NPCs stand where they last moved
+  to, in their latest look (without equipment, which is not drawn yet) and the stand pose; doors (drawn closed), ground items, and placed
+  objects take their latest state, with the scales (and ground items' tilts) the recording lacks from the live dumps' master folder
+  (liveDumpsPath, holding doors.tsv and ground.tsv). Players are left out: the recording
+  character is the camera. near ([x, y, z], Blender) and radius limit it to what stands within reach. Set the zone's newEngineZone first
+  (setZoneProperties), as for placeSpawn. Each one the client data cannot draw (live-only models are common) is listed with why."""
+  if (near is None) != (radius is None):
+    raise ToolError("near and radius go together")
+  try:
+    start = await anyio.to_thread.run_sync(eqRecording.recordingStart, recordingPath)
+    moment = datetime.datetime.strptime(at, eqRecording.timeFormat)
+  except (OSError, ValueError) as error:
+    raise ToolError(str(error)) from error
+  return await placeRecorded(context, recordingPath, liveDumpsPath, (moment - start).total_seconds() * 1000, near, radius, collection)
+
+
 @guardedTool()
 async def calibrateShot(
   context: Context, screenshotPath: str, zone: str, newEngineZone: bool, fogColor: list[float] | None = None, fogStart: float | None = None,
-  fogEnd: float | None = None, fogDensity: float | None = None, discardUnsavedChanges: bool = False,
+  fogEnd: float | None = None, fogDensity: float | None = None, recordingPath: str | None = None, liveDumpsPath: str | None = None,
+  discardUnsavedChanges: bool = False,
 ):
   """Calibrate the renderer against a live client screenshot named <zone>,<loc y>,<loc x>,<loc z>,<compass heading>,<pitch>.jpg (see the
   calibrate-renderer skill). Opens a new file (discarding unsaved changes only with discardUnsavedChanges), imports zone (the client's
   zone file name), renders the screenshot's view, fits the scene light (ambient, sun, bounce, sun direction) that best explains the
   screenshot under the client's lighting, renders with it, and returns the screenshot beside the render. Give the fog from the zone
   header (the live dumps' zoneHeaders; density 0 for a zone whose FogOnOff is 0), all four values; with none given, the fog's start,
-  end, and color are fitted with the light, at the client's density. Each run is kept under the tooling root's
-  calibration folder with its fit and mean pixel difference, and getToolingStatus lists the latest per screenshot."""
+  end, and color are fitted with the light, at the client's density. Give recordingPath, a live behavior recording of the zone running
+  when the screenshot was taken, and liveDumpsPath to place what stood within recordingReach of the camera at that moment (see
+  placeRecording). Each run is
+  kept under the tooling root's calibration folder with its fit and mean pixel difference, and getToolingStatus lists the latest per
+  screenshot."""
   try:
     shot = eqCalibration.parseShotName(screenshotPath)
   except ValueError as error:
@@ -512,6 +594,17 @@ async def calibrateShot(
   else:
     environment = {"fogColor": [0, 0, 0], "fogStart": 0, "fogEnd": 100000, "fogDensity": 0, "newEngineZone": newEngineZone}
   await callBridge(context, "setZoneProperties", {"updates": neutral | environment})
+  recorded = None
+  if (recordingPath is None) != (liveDumpsPath is None):
+    raise ToolError("recordingPath and liveDumpsPath go together")
+  if recordingPath is not None:
+    try:
+      start = await anyio.to_thread.run_sync(eqRecording.recordingStart, recordingPath)
+    except (OSError, ValueError) as error:
+      raise ToolError(str(error)) from error
+    # The screenshot's file time is when the client took it.
+    taken = datetime.datetime.fromtimestamp(Path(screenshotPath).stat().st_mtime)
+    recorded = await placeRecorded(context, recordingPath, liveDumpsPath, (taken - start).total_seconds() * 1000, view["eye"], recordingReach, None)
   runFolder = toolingRoot / "calibration" / Path(screenshotPath).stem / datetime.datetime.now(datetime.UTC).strftime("%Y%m%d-%H%M%S")
   runFolder.mkdir(parents=True, exist_ok=True)
   measured = passArrays((await callBridge(context, "renderPasses", {"view": view, "outputFolder": str(runFolder), "passNames": ["lit", "base", "normal", "baked", "share", "distance"]}))["passes"])
@@ -539,7 +632,7 @@ async def calibrateShot(
   (runFolder / "result.json").write_text(json.dumps(result, indent=1), encoding="utf-8")
   preview = io.BytesIO()
   image.resize((image.width * 2 // 3, image.height * 2 // 3)).save(preview, format="PNG")
-  return [Image(data=preview.getvalue(), format="png"), result | {"import": imported["source"]}]
+  return [Image(data=preview.getvalue(), format="png"), result | {"import": imported["source"], "recorded": recorded}]
 
 
 @guardedTool()

@@ -1,5 +1,6 @@
 """EverQuest models found through the client's own links (eqLinks) and built into per-model caches: EQG models (.mod, static or skinned), EQG skinned piece models (.mds), and WLD static and skeletal actors."""
 import concurrent.futures
+import hashlib
 import json
 import multiprocessing
 import re
@@ -21,7 +22,7 @@ import machineProfile
 import zoneSources
 
 indexFormat = 10
-modelCacheFormat = 15
+modelCacheFormat = 16
 actorTrailingBytes = 4
 staticKinds = ("wldStatic",)
 defaultAppearance = {
@@ -786,9 +787,10 @@ def buildModel(clientRoot, cacheRoot, modelName, zoneName, source=None, appearan
     if negative:
       raise ValueError(f"Appearance values must be 0 or more, got {negative}")
   searched = textureArchives(clientRoot, zoneName, definition)
-  poseKey = "" if animation is None else f"@pose{animation['animation'] or 'stand'}{animation['variant'] or ''}f{animation['frame']}"
-  folderName = f"{definition['model']}@{definition['archive']}" + "".join(f"@{key}{value}" for key, value in sorted(changedAppearance(appearance).items())) + poseKey
-  modelFolder = cacheRoot / "built" / folderName
+  # The folder is named by a digest of the archive, look, and pose, which source.json spells out: spelled out, they push file paths past
+  # Windows' 260 characters, and the material names that start with the folder name past Blender's 63.
+  variantKey = json.dumps({"archive": definition["archive"], "appearance": changedAppearance(appearance), "animation": animation}, sort_keys=True)
+  modelFolder = cacheRoot / "built" / f"{definition['model']}@{hashlib.sha256(variantKey.encode('utf-8')).hexdigest()[:12]}"
   stampPath = modelFolder / "source.json"
   # The listing fingerprint covers the archives an animation may come from.
   stamp = {

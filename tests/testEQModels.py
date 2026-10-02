@@ -244,8 +244,8 @@ def testDrakkinTakeTheirLooksFromPlayerCustomization(stageBlenderServer):
   # eye layers.
   assert anastrel["source"]["pieces"] == ["dkf.mod", "DKF_HAIR_06", "DKF_FACIALHAIR_01", "DKF_TATTOO_00", "DKF_FACIALATT_03"]
   assert anastrel["source"]["swappedMaterials"] == 3
-  # Material names follow the cache folder, whose pose key ends before the texture name.
-  assert {re.sub(r"^eq_.*?@pose[^_]*_", "", entry["material"]) for entry in anastrelDetail["materials"]} == {
+  # Material names follow the cache folder, named by the model and a 12-digit digest of its look and pose.
+  assert {re.sub(r"^eq_.*?@[0-9a-f]{12}_", "", entry["material"]) for entry in anastrelDetail["materials"]} == {
     "c_dkf_body_s00_m04_c.dds", "c_dkf_head_s00_m01_c.dds", "c_dkm_righteye_s02_m02_c.dds", "a_dkf_hr_s06_c.dds_000a00", "a_dkf_hr_s06_c.dds_blended_000a00",
     "a_dkm_fh_c.dds_blended_000a00", "a_dkf_tattoo_s03_m01_c.dds_blended_006400", "a_dkf_hr_s04_c.dds_006400",
   }
