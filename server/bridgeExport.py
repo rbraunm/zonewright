@@ -9,6 +9,7 @@ import re
 import bpy
 import numpy
 
+import bridgeEnvironment
 import bridgeSurfacing
 
 terrainCollectionName = "terrain"
@@ -118,9 +119,15 @@ def collectZoneExport(outputFolder, zoneName):
   if terrainCollection is None or not any(member.type == "MESH" for member in terrainCollection.all_objects):
     raise ValueError(f"The scene has no '{terrainCollectionName}' collection with meshes; its meshes become the zone's terrain")
   terrainObjects = {member.name for member in terrainCollection.all_objects}
-  terrainParts, models, placements = [], {}, []
+  terrainParts, models, placements, lights, emitters = [], {}, [], [], []
   for sceneObject in scene.objects:
-    if sceneObject.hide_render or sceneObject.type in ("LIGHT", "CAMERA"):
+    if sceneObject.hide_render or sceneObject.type == "CAMERA":
+      continue
+    if sceneObject.type == "LIGHT":
+      lights.append(bridgeEnvironment.lightRecord(sceneObject))
+      continue
+    if bridgeEnvironment.isEmitter(sceneObject):
+      emitters.append(bridgeEnvironment.emitterRecord(sceneObject))
       continue
     if sceneObject.name in terrainObjects:
       if sceneObject.type != "MESH":
@@ -173,7 +180,7 @@ def collectZoneExport(outputFolder, zoneName):
     })
   return {
     "zone": zoneName, "arrays": os.path.join(outputFolder, modelArraysFileName), "terrain": {"file": f"ter_{zoneName}.ter", "materials": terrain["materials"], "arrays": "terrain"},
-    "models": modelList, "materials": list(materials.values()), "placements": placementList,
+    "models": modelList, "materials": list(materials.values()), "placements": placementList, "lights": lights, "emitters": emitters,
   }
 
 

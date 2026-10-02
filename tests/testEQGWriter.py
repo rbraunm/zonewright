@@ -87,12 +87,19 @@ def testZoneReadsBackThroughTheZoneReader():
     {"model": "ter_test.ter", "name": "TER_test", "position": (0.0, 0.0, 0.0), "rotation": (0.0, 0.0, 0.0), "scale": 1.0},
     {"model": "obj_rock.mod", "name": "OBJ_rock01", "position": (12.5, -3.0, 4.0), "rotation": (1.5, 0.25, -0.5), "scale": 2.0},
   ]
-  zone = eqgFiles.parseZone(eqgWriter.zoneBytes(["ter_test.ter", "obj_rock.mod"], placements), "test.zon")
-  assert zone["modelNames"] == ["ter_test.ter", "obj_rock.mod"] and zone["regionNames"] == [] and zone["lightCount"] == 0
+  lights = [{"name": "LIT_torch01", "position": (5.0, 6.0, 7.5), "color": (1.0, 0.5, 0.25), "radius": 60.0}]
+  zone = eqgFiles.parseZone(eqgWriter.zoneBytes(["ter_test.ter", "obj_rock.mod"], placements, lights), "test.zon")
+  assert zone["modelNames"] == ["ter_test.ter", "obj_rock.mod"] and zone["regionNames"] == [] and zone["lights"] == lights
   assert [placement["model"] for placement in zone["placements"]] == ["ter_test.ter", "obj_rock.mod"]
   rock = zone["placements"][1]
   assert rock["name"] == "OBJ_rock01" and rock["position"] == (12.5, -3.0, 4.0) and rock["rotation"] == (1.5, 0.25, -0.5) and rock["scale"] == 2.0
-  assert struct.unpack_from("<I", eqgWriter.zoneBytes(["ter_test.ter"], placements[:1]), 4)[0] == 1
+  assert struct.unpack_from("<I", eqgWriter.zoneBytes(["ter_test.ter"], placements[:1], []), 4)[0] == 1
+
+
+def testALightOutsideTheClientsRangesIsRefused():
+  placements = [{"model": "ter_test.ter", "name": "TER_test", "position": (0.0, 0.0, 0.0), "rotation": (0.0, 0.0, 0.0), "scale": 1.0}]
+  with pytest.raises(ValueError, match="positive radius and RGB in 0-1"):
+    eqgWriter.zoneBytes(["ter_test.ter"], placements, [{"name": "LIT_sun", "position": (0, 0, 0), "color": (2.0, 1.0, 1.0), "radius": 10.0}])
 
 
 def testLitIsMagicCountAndOneD3DColorPerVertex():

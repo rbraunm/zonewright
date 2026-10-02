@@ -15,8 +15,12 @@ from mcp.server.mcpserver import Context, Image
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import ConfigDict
 
+import assetCatalog
+import assetSheets
+import assetSurvey
 import blenderBridge
 import eqCalibration
+import eqEmitters
 import eqgExport
 import eqModels
 import eqRaces
@@ -279,6 +283,175 @@ def getZoneNotes(zone: str):
   return {"zone": zone, "labels": zoneSurvey.readBrewallLabels(clientRoot, zone.lower())}
 
 
+catalog = assetCatalog.AssetCatalog(toolingRoot)
+assetKinds = "texture, model, light, emitter, or ecosystem"
+findHelp = (
+  " Filters, each optional: kind (" + assetKinds + "); text, words that must all appear in the id, name, description, usage, category,"
+  " tags, or measured names and color; categories, any of; tags, {group: [terms]} with every term required; source, a zone name or a"
+  " source key (zone:<name>, folder:<folder>, file:<path>); described, true for described assets only, false for undescribed only."
+  " For textures, by what was measured: colors, any of the measured color names (" + ", ".join(assetSurvey.colorNames) + ");"
+  " minimumSide in pixels; tiles, true for textures that repeat without a visible seam; usedOn, slope bands (flat, slope, steep,"
+  " vertical, overhang) that together hold at least half of the texture's area where it is used most."
+  " sortBy relevance (text matches in descriptions, then area), areaShare (most-used first), or name."
+)
+
+
+def catalogCall(function, *arguments):
+  try:
+    return function(*arguments)
+  except (OSError, ValueError) as error:
+    raise ToolError(f"{type(error).__name__}: {error}") from error
+
+
+@guardedTool()
+async def surveyAssets(context: Context, zone: str | None = None, folder: str | None = None, path: str | None = None, refresh: bool = False):
+  """Survey one source's graphical assets into the asset catalog's measured lane: a client zone (the textures of the archives it loads
+  for its own geometry and objects, with how the zone uses each: area share, world units per texture repeat, slopes, shaders, paired
+  textures; its placed models; its light styles; its emitters; an EQ terrain zone's ecosystems), a client folder of loose images
+  (Resources/Sky, Resources/WaterSwap, Resources/Precipitation, EnvEmitterEffects), or an EQG zone archive at an absolute `path`, such as
+  one exportZone wrote. Each texture is written out readable, with a thumbnail. Cached until the source's files change. Returns counts and
+  the most-used textures; findAssets, viewTextures, viewModels, and getAsset read the rest, and describeAssets writes what they are."""
+  if sum(value is not None for value in (zone, folder, path)) != 1:
+    raise ToolError("Survey one source: a zone, a folder, or a path")
+  clientRoot = zoneSources.resolveClientRoot()
+  if zone is not None:
+    zoneName = zone.lower()
+    key, stamp = f"zone:{zoneName}", catalogCall(assetSurvey.clientZoneStamp, clientRoot, zoneName)
+    surveyFunction = lambda: assetSurvey.surveyClientZone(clientRoot, toolingRoot / "models", catalog.root, zoneName)
+  elif folder is not None:
+    key, stamp = f"folder:{folder}", catalogCall(assetSurvey.looseFolderStamp, clientRoot, folder)
+    surveyFunction = lambda: assetSurvey.surveyLooseFolder(clientRoot, catalog.root, folder)
+  else:
+    archivePath = Path(path)
+    if not archivePath.is_absolute() or archivePath.suffix.lower() != ".eqg" or not archivePath.is_file():
+      raise ToolError(f"'{path}' is not an absolute path to an existing .eqg file")
+    key, stamp = f"file:{archivePath}", assetSurvey.zoneFileStamp(archivePath)
+    surveyFunction = lambda: assetSurvey.surveyZoneFile(clientRoot, catalog.root, archivePath)
+  reportProgress = progressReporter(context)
+  await anyio.to_thread.run_sync(reportProgress, 0, 1, f"surveying {key}")
+  surveyed = await anyio.to_thread.run_sync(catalogCall, catalog.survey, surveyFunction, key, stamp, refresh)
+  await anyio.to_thread.run_sync(reportProgress, 1, 1, f"surveyed {key}")
+  interpretations = catalog.interpretations()
+  kinds = {}
+  for assetID, facts in surveyed["assets"].items():
+    counts = kinds.setdefault(facts["kind"], {"assets": 0, "described": 0})
+    counts["assets"] += 1
+    counts["described"] += assetID in interpretations
+  used = sorted((asset for asset in catalog.assets().values() if key in asset["sources"] and (asset["sources"][key].get("uses") or {}).get("areaShare")), key=lambda asset: -asset["sources"][key]["uses"]["areaShare"])
+  return {
+    "source": key, "format": surveyed.get("format"), "archives": surveyed.get("archives"), "kinds": kinds, "problems": surveyed["problems"],
+    "unreadable": [assetID for assetID, facts in surveyed["assets"].items() if "problem" in facts],
+    "mostUsedTextures": [{"id": asset["id"], "described": asset["id"] in interpretations} | {field: asset["sources"][key]["uses"][field] for field in ("areaShare", "unitsPerRepeat", "slopeShares")} for asset in used[:15]],
+  }
+
+
+@guardedTool(description="Search the asset catalog: compact entries (measured facts and descriptions) for the assets that match." + findHelp)
+def findAssets(
+  kind: str | None = None, text: str | None = None, categories: list[str] | None = None, tags: dict | None = None, source: str | None = None,
+  described: bool | None = None, colors: list[str] | None = None, minimumSide: int | None = None, tiles: bool | None = None,
+  usedOn: list[str] | None = None, sortBy: str = "relevance", limit: int = 40,
+):
+  return catalogCall(catalog.find, kind, text, categories, tags, source, described, sortBy, limit, colors, minimumSide, tiles, usedOn)
+
+
+@guardedTool()
+def getAsset(id: str):
+  """Everything the catalog holds for one asset: its measured facts, what differs in each source that holds it, and its description."""
+  return catalogCall(catalog.entry, id)
+
+
+@guardedTool()
+def getAssetVocabulary():
+  """The words the catalog describes assets with: asset kinds, each kind's categories, and the tag groups with their terms, each with
+  its meaning. Descriptions must use these; extendAssetVocabulary adds a term when none fits."""
+  return catalog.vocabulary()
+
+
+@guardedTool()
+def extendAssetVocabulary(group: str, term: str, meaning: str):
+  """Add a term to the vocabulary when no existing one fits: group is a tag group's name or category:<kind>; term is one camelCase word."""
+  return catalogCall(catalog.extendVocabulary, group, term, meaning)
+
+
+@guardedTool()
+def describeAssets(descriptions: list[dict]):
+  """Write what assets are, all or none: [{id, category, tags {group: [terms]}, description (what it shows and how it reads), usage
+  (where and how to use it: surfaces, scale, pairings, what to avoid), worldUnitsPerRepeat (textures: the repeat that reads right; the
+  measured unitsPerRepeat is how the source zone used it), pairsWith (ids of assets it goes with: its normal map, transitions)}], in
+  getAssetVocabulary's words. Each replaces its asset's earlier description."""
+  return {"described": catalogCall(catalog.describe, descriptions)}
+
+
+def sheetEntries(ids, kind, text, categories, tags, source, described, sortBy, limit, measuredFilters=(None, None, None, None)):
+  if ids is not None and any(value is not None for value in (text, categories, tags, source, described, *measuredFilters)):
+    raise ToolError("Give ids or filters, not both")
+  if ids is not None:
+    return [catalogCall(catalog.requireAsset, assetID) for assetID in ids]
+  found = catalogCall(catalog.find, kind, text, categories, tags, source, described, sortBy, limit, *measuredFilters)["assets"]
+  return [catalog.assets()[entry["id"]] for entry in found]
+
+
+def writeSheetImage(cells, columns, legend, cellSide):
+  outputPath = newRenderPath().with_suffix(".jpg")
+  size = catalogCall(assetSheets.writeSheet, cells, columns, outputPath, cellSide)
+  return [Image(data=outputPath.read_bytes(), format="jpeg"), {"outputPath": str(outputPath)} | size | {"cells": legend}]
+
+
+@guardedTool(description=(
+  "Look at textures from the catalog on one numbered contact sheet: by ids, or by the findAssets filters (kind is texture). cellSide"
+  " 128 fits 48 thumbnails; 256 fits 16 drawn from the full texture, for a close look. tiled repeats each two by two at half size so"
+  " seams show; showAlpha draws each over a checkerboard by its alpha. Labels give the number, the name, the size, and * when described."
+  + findHelp))
+def viewTextures(
+  ids: list[str] | None = None, text: str | None = None, categories: list[str] | None = None, tags: dict | None = None, source: str | None = None,
+  described: bool | None = None, colors: list[str] | None = None, minimumSide: int | None = None, tiles: bool | None = None,
+  usedOn: list[str] | None = None, sortBy: str = "relevance", limit: int = 40, tiled: bool = False, showAlpha: bool = False,
+  columns: int = 8, cellSide: int = 128,
+):
+  assets = sheetEntries(ids, "texture", text, categories, tags, source, described, sortBy, limit, (colors, minimumSide, tiles, usedOn))
+  if not assets:
+    raise ToolError("No textures match")
+  wrongKind = [asset["id"] for asset in assets if asset["kind"] != "texture" or "thumbnail" not in asset["measured"]]
+  if wrongKind:
+    raise ToolError(f"Not readable textures: {wrongKind}")
+  interpretations = catalog.interpretations()
+  cells = [{
+    "image": asset["measured"]["thumbnail"] if cellSide <= assetSurvey.thumbnailSide else asset["measured"]["file"], "tiled": tiled, "showAlpha": showAlpha,
+    "lines": [f"{number} {asset['name']}", f"{asset['measured']['width']}x{asset['measured']['height']}{' *' if asset['id'] in interpretations else ''}"],
+  } for number, asset in enumerate(assets, start=1)]
+  return writeSheetImage(cells, columns, [{"number": number, "id": asset["id"]} for number, asset in enumerate(assets, start=1)], cellSide)
+
+
+@guardedTool(description=(
+  "Look at models from the catalog on one numbered contact sheet (up to 48), each drawn as the client draws it in neutral daylight from"
+  " three-quarters above: by ids, or by the findAssets filters (kind is model). Models of client zones only." + findHelp))
+async def viewModels(
+  context: Context, ids: list[str] | None = None, text: str | None = None, categories: list[str] | None = None, tags: dict | None = None,
+  source: str | None = None, described: bool | None = None, sortBy: str = "relevance", limit: int = 24, columns: int = 6,
+):
+  assets = sheetEntries(ids, "model", text, categories, tags, source, described, sortBy, limit)
+  if not assets:
+    raise ToolError("No models match")
+  folders = []
+  for asset in assets:
+    zones = [key.split(":", 1)[1] for key in asset["sources"] if key.startswith("zone:")]
+    if asset["kind"] != "model" or not zones:
+      raise ToolError(f"{asset['id']} is not a model of a client zone")
+    zoneName = zones[0]
+    # The client names an EQG model by its entry without the .mod extension.
+    folder, _ = await anyio.to_thread.run_sync(eqModel, zoneName, asset["name"].removesuffix(".mod"), asset["sources"][f"zone:{zoneName}"].get("archive"))
+    folders.append({"folder": str(folder)})
+  outputFolder = toolingRoot / "renders" / "modelThumbnails"
+  outputFolder.mkdir(parents=True, exist_ok=True)
+  rendered = await callBridge(context, "renderModelThumbnails", {"models": folders, "outputFolder": str(outputFolder)})
+  interpretations = catalog.interpretations()
+  cells = [{
+    "image": thumbnail["file"], "tiled": False, "showAlpha": False,
+    "lines": [f"{number} {asset['name']}", f"{'x'.join(str(round(value)) for value in asset['measured'].get('size', []))}{' *' if asset['id'] in interpretations else ''}"],
+  } for number, (asset, thumbnail) in enumerate(zip(assets, rendered["thumbnails"]), start=1)]
+  return writeSheetImage(cells, columns, [{"number": number, "id": asset["id"]} for number, asset in enumerate(assets, start=1)], 256 if len(cells) <= assetSheets.cellSides[256] else 128)
+
+
 @guardedTool()
 async def runPython(context: Context, code: str):
   """Fallback only: run Python in the headless Blender's persistent namespace (bpy, bmesh, mathutils, math); set `result` to return a JSON value. Prefer a dedicated tool; every call is logged so repeated scripting becomes a tool."""
@@ -477,6 +650,34 @@ async def placeZone(context, zone, collection):
   return placed | {"source": {key: value for key, value in details.items() if key not in stampKeys}}
 
 
+def bridgeLights(lights):
+  return [{"name": light["name"], "position": list(light["position"]), "color": list(light["color"]), "radius": light["radius"]} for light in lights]
+
+
+def bridgeEmitters(emitters):
+  """Emitters for the bridge; a few client lists leave a name empty, and a Blender object needs one, so those are named for their definition."""
+  return [{key: list(value) if key == "position" else value for key, value in emitter.items()} | {"name": emitter["name"] or f"emitter{emitter['definition']}"} for emitter in emitters]
+
+
+async def placeZoneEnvironment(context, zone, lights, emitters):
+  """A placed zone's lights and emitters, each set in its own collection named for the zone; None for what is not read."""
+  placed = {"lights": None if lights is None else 0, "emitters": 0}
+  if lights:
+    placed["lights"] = (await callBridge(context, "placeLights", {"lights": bridgeLights(lights), "collection": f"{zone} lights"}))["lights"]
+  if emitters:
+    placed["emitters"] = (await callBridge(context, "placeEmitters", {"emitters": bridgeEmitters(emitters), "collection": f"{zone} emitters"}))["emitters"]
+  return placed
+
+
+def readEmitterList(path):
+  if path is None or not path.is_file():
+    return []
+  try:
+    return eqEmitters.parseEmitters(path.read_text(encoding="latin1"), path.name)
+  except ValueError as error:
+    raise ToolError(str(error)) from error
+
+
 @guardedTool()
 async def importZone(context: Context, zone: str, collection: str | None = None):
   """Bring a client zone into the open scene as one object named for it, drawn as the client draws it, with the vertex colors and normals
@@ -484,8 +685,16 @@ async def importZone(context: Context, zone: str, collection: str | None = None)
   (each ecosystem's cover and detail textures blended as the client blends them) and the objects and object groups its tiles place on
   the ground, or an EQG (EQGZ) zone's terrain and placed models (the loose .zon beside the archive when the client has one, as it
   loads it), with baked light where its count fits each model. It keeps the zone file's coordinates, which the scene shares (Blender
-  x, y are the server's y, x)."""
-  return await placeZone(context, zone, collection)
+  x, y are the server's y, x). The zone's lights (classic and EQG zones) come in as point lights in "<zone> lights" and its emitters as
+  empties in "<zone> emitters", as placeLights and placeEmitters make them."""
+  placed = await placeZone(context, zone, collection)
+  clientRoot = zoneSources.resolveClientRoot()
+  try:
+    lights = await anyio.to_thread.run_sync(eqZones.zoneLights, clientRoot, zone)
+    emitters = readEmitterList(eqEmitters.emitterListPath(clientRoot, zone))
+  except ValueError as error:
+    raise ToolError(str(error)) from error
+  return placed | await placeZoneEnvironment(context, zone, lights, emitters)
 
 
 zoneFileSourceKeys = ("zoneCacheFormat", "modelCacheFormat", "sha256", "textureSources", "lit", "minimum", "maximum")
@@ -495,7 +704,7 @@ zoneFileSourceKeys = ("zoneCacheFormat", "modelCacheFormat", "sha256", "textureS
 async def importZoneFile(context: Context, path: str, collection: str | None = None):
   """Bring an EQG zone archive outside the client, such as one exportZone wrote, into the open scene as one object named for its zone
   (the file name), drawn as importZone draws the client's EQG zones: its terrain and placed models, with baked light where its count
-  fits each model."""
+  fits each model; and its lights and the emitters of the <zone>_EnvironmentEmitters.txt beside it, as importZone brings them."""
   archivePath = Path(path)
   if not archivePath.is_absolute() or archivePath.suffix.lower() != ".eqg" or not archivePath.is_file():
     raise ToolError(f"'{path}' is not an absolute path to an existing .eqg file")
@@ -507,7 +716,13 @@ async def importZoneFile(context: Context, path: str, collection: str | None = N
     "modelFolder": str(folder), "name": archivePath.stem.lower(), "location": [0, 0, 0], "rotationDegrees": 0, "scale": 1, "avatarHeight": 0,
     "snapToGround": False, "collection": collection,
   })
-  return placed | {"source": {key: value for key, value in details.items() if key not in zoneFileSourceKeys}}
+  try:
+    lights = await anyio.to_thread.run_sync(eqZones.zoneFileLights, archivePath)
+  except ValueError as error:
+    raise ToolError(str(error)) from error
+  emitters = readEmitterList(archivePath.parent / f"{archivePath.stem}_EnvironmentEmitters.txt")
+  environment = await placeZoneEnvironment(context, archivePath.stem.lower(), lights, emitters)
+  return placed | {"source": {key: value for key, value in details.items() if key not in zoneFileSourceKeys}} | environment
 
 
 @guardedTool()
@@ -517,7 +732,9 @@ async def exportZone(context: Context, path: str):
   its object's transform (copies sharing a mesh and without modifiers share one model) and every collection instance a model of its
   collection's meshes; a placed object takes one uniform scale. Materials must come from createMaterial: diffuse and normal map export
   as Opaque_MaxCB1.fx, diffuse only as Opaque_MaxC1.fx, a cutout (diffuse only) as Chroma_MPLBasicAT.fx. DDS textures are stored
-  unchanged, others as uncompressed DDS with power-of-two sides. No baked light is written yet."""
+  unchanged, others as uncompressed DDS with power-of-two sides. Point lights placed with placeLight go into the .zon; emitters placed with
+  placeEmitter go into <zone>_EnvironmentEmitters.txt beside the archive (the client reads that list loose from its own folder). No baked
+  light is written yet."""
   archivePath = Path(path)
   if not archivePath.is_absolute() or archivePath.suffix != ".eqg" or not archivePath.parent.is_dir():
     raise ToolError(f"'{path}' is not an absolute .eqg path in an existing folder")
@@ -527,10 +744,17 @@ async def exportZone(context: Context, path: str):
   collected = await callBridge(context, "collectZoneExport", {"outputFolder": str(toolingRoot / "exports" / zone), "zoneName": zone})
   try:
     data, summary = await anyio.to_thread.run_sync(eqgExport.zoneArchive, collected)
+    emitterListPath = archivePath.parent / f"{zone}_EnvironmentEmitters.txt"
+    emitterList = eqEmitters.emitterListText(collected["emitters"]) if collected["emitters"] else None
     archivePath.write_bytes(data)
+    # A list left from an earlier export would place emitters this scene no longer has.
+    if emitterList is None:
+      emitterListPath.unlink(missing_ok=True)
+    else:
+      emitterListPath.write_bytes(emitterList.encode("latin1"))
   except (OSError, ValueError) as error:
     raise ToolError(f"{type(error).__name__}: {error}") from error
-  return summary | {"path": str(archivePath)}
+  return summary | {"path": str(archivePath), "emitterList": str(emitterListPath) if emitterList is not None else None}
 
 
 def passArrays(passes):
@@ -897,9 +1121,36 @@ async def cleanupMesh(context: Context, objectName: str, mergeDistance: float = 
 
 
 @guardedTool()
+async def placeLights(context: Context, lights: list[dict], collection: str | None = "lights"):
+  """Place zone lights: point lights [{name, position [x,y,z], color [r,g,b] 0-1 as the client stores it, radius (reach in units)}] in
+  `collection`. exportZone writes them into the zone's .zon; the preview does not draw lights yet. The asset catalog's light styles
+  (findAssets kind light) give the colors and radii client zones use for torches, braziers, fill light, and the rest."""
+  return await callBridge(context, "placeLights", {"lights": lights, "collection": collection})
+
+
+@guardedTool()
+async def placeEmitters(context: Context, emitters: list[dict], collection: str | None = "emitters"):
+  """Place particle emitters: [{name, position [x,y,z], definition (the client emitter definition index), lifespan (the list's lifespan
+  field; 4000000 on most of the client's emitters)}] as empties in `collection`. exportZone writes them to <zone>_EnvironmentEmitters.txt
+  beside the archive; the preview does not draw them yet. The asset catalog (findAssets kind emitter) says what each definition shows
+  and under which names client zones place it."""
+  return await callBridge(context, "placeEmitters", {"emitters": [emitter | {"alwaysVisible": None} for emitter in emitters], "collection": collection})
+
+
+@guardedTool()
 async def createMaterial(context: Context, name: str, diffuseTexture: str, normalTexture: str | None = None, cutout: bool = False, alphaThreshold: float = 0.5):
-  """A Phase 1 material: diffuse texture (absolute path), optional normal map, no shine; cutout makes the diffuse alpha a hard alpha test for foliage cards."""
-  return await callBridge(context, "createMaterial", {"name": name, "diffuseTexture": diffuseTexture, "normalTexture": normalTexture, "cutout": cutout, "alphaThreshold": alphaThreshold})
+  """A Phase 1 material: diffuse texture, optional normal map, no shine; cutout makes the diffuse alpha a hard alpha test for foliage
+  cards. A texture is an absolute path or a catalog texture id (texture/<name>@<hash>), which uses the catalog's extracted file."""
+
+  def texturePath(texture):
+    if texture is None or not texture.startswith("texture/"):
+      return texture
+    asset = catalogCall(catalog.requireAsset, texture)
+    if "file" not in asset["measured"]:
+      raise ToolError(f"{texture} has no readable file: {asset['measured'].get('problem')}")
+    return asset["measured"]["file"]
+
+  return await callBridge(context, "createMaterial", {"name": name, "diffuseTexture": texturePath(diffuseTexture), "normalTexture": texturePath(normalTexture), "cutout": cutout, "alphaThreshold": alphaThreshold})
 
 
 @guardedTool(description="Assign a material to the selected faces of a mesh, adding a material slot if needed." + selectorHelp)

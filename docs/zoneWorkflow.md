@@ -59,6 +59,10 @@ A pass holds one offset per vertex, so refining and cutting, which change the ve
 - Framing a view on given objects, walk views at eye height along a route, and before-and-after comparisons of the same view across passes.
 - Checks: props floating above or buried in the ground, route segments steeper than walkable, texture stretch and uneven texture scale, triangle and object counts.
 
+### Surfacing and lighting from the catalog
+
+Textures, light styles, and particle emitters come from the asset catalog ([assetCatalog.md](assetCatalog.md)): surveyed from client zones, looked at on contact sheets, and described once in a shared vocabulary, so a need ("red layered rock for steep faces") finds them and each use starts from how the client's own zones used them. EQ terrain zones' ecosystems are recipes for the surfacing pass: which texture goes on which slopes and heights, at what repeat.
+
 ### Later
 
-Route-aware surfacing (a material along a route at a width, with the terrain cut along its edges and a transition strip), building pieces (gable and hip roofs, openings, stairs, walls and fences that follow the ground), and a browser for client textures that shows them before they are used.
+Route-aware surfacing (a material along a route at a width, with the terrain cut along its edges and a transition strip) and building pieces (gable and hip roofs, openings, stairs, walls and fences that follow the ground).

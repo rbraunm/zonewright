@@ -167,3 +167,30 @@ class WorldFile:
 
   def meshes(self):
     return [self.mesh(fragment) for fragment in self.fragmentsOfType(0x36)]
+
+  def lightDefinition(self, definitionFragment):
+    """A light source definition (0x1B): its frames' levels and RGB colors (0-1), which the client steps through to flicker."""
+    body = definitionFragment.body
+    flags, frameCount = struct.unpack_from("<II", body, 4)
+    position = 12 + (4 if flags & 0x1 else 0) + (4 if flags & 0x2 else 0)
+    levels = None
+    if flags & 0x4:
+      levels = list(struct.unpack_from(f"<{frameCount}f", body, position))
+      position += 4 * frameCount
+    if not flags & 0x10:
+      raise ValueError(f"{self.sourceName}: light definition {definitionFragment.index} '{definitionFragment.name}' stores no colors")
+    colors = [tuple(struct.unpack_from("<3f", body, position + 12 * frame)) for frame in range(frameCount)]
+    position += 12 * frameCount
+    if position != len(body):
+      raise ValueError(f"{self.sourceName}: light definition {definitionFragment.index} used {position} of {len(body)} bytes")
+    return {"name": definitionFragment.name, "levels": levels, "colors": colors}
+
+  def pointLights(self):
+    """lights.wld's point lights (0x28 through 0x1C to 0x1B): position, radius, and the definition's frames."""
+    lights = []
+    for fragment in self.fragmentsOfType(0x28):
+      sourceReference, _, x, y, z, radius = struct.unpack_from("<iI4f", fragment.body, 4)
+      definitionReference = struct.unpack_from("<i", self.fragment(sourceReference, 0x1C).body, 4)[0]
+      definition = self.lightDefinition(self.fragment(definitionReference, 0x1B))
+      lights.append({"name": definition["name"], "position": (x, y, z), "radius": radius, "color": definition["colors"][0], "frames": len(definition["colors"])})
+    return lights

@@ -404,3 +404,49 @@ def pick(sourceScene, zone, view, pixel):
     }
   finally:
     preview.remove()
+
+
+thumbnailSide = 256
+# Neutral daylight for looking at a model on its own: a grey ambient and a white sun from the front right, no fog.
+thumbnailZone = {
+  "ambientColor": [0.5, 0.5, 0.5], "specialAmbientColor": [0.0, 0.0, 0.0], "bounceColor": [0.0, 0.0, 0.0], "sunColor": [0.55, 0.55, 0.55],
+  "sunAzimuthDegrees": 135.0, "sunElevationDegrees": 45.0, "fogColor": [0.3, 0.33, 0.37], "fogStart": 0.0, "fogEnd": 1000000.0, "fogDensity": 0.0,
+  "newEngineZone": False,
+}
+# EQ models face +X: seen from in front, to the right, and above.
+thumbnailViewDirection = mathutils.Vector((1.0, -0.8, 0.6)).normalized()
+
+
+def renderModelThumbnails(models, outputFolder):
+  """One square render per model ([{folder}]), drawn as the client draws it in neutral daylight and framed to fit from three-quarters
+  above; returns the files in order."""
+  scratch = bpy.data.scenes.new(previewName + "Models")
+  written = []
+  try:
+    for index, model in enumerate(models):
+      modelObject = bridgeModels.modelObject(model["folder"], f"{previewName}Model{index}", 1, (0, 0, 0), 0)
+      scratch.collection.objects.link(modelObject)
+      preview = PreviewScene(scratch, thumbnailZone)
+      try:
+        preview.scene.render.resolution_x = preview.scene.render.resolution_y = thumbnailSide
+        corners = [modelObject.matrix_world @ mathutils.Vector(corner) for corner in modelObject.evaluated_get(preview.depsgraph()).bound_box]
+        center = sum(corners, mathutils.Vector()) / len(corners)
+        radius = max(max((corner - center).length for corner in corners), 0.01)
+        distance = radius / math.sin(math.radians(verticalFieldOfViewDegrees / 2)) * 1.05
+        preview.camera.location = center + thumbnailViewDirection * distance
+        preview.camera.rotation_mode = "QUATERNION"
+        preview.camera.rotation_quaternion = lookRotation(-thumbnailViewDirection)
+        preview.camera.data.clip_start = distance / 100
+        preview.camera.data.clip_end = distance + 2 * radius
+        outputPath = os.path.join(outputFolder, f"model{index}.png")
+        preview.scene.render.filepath = outputPath
+        bpy.ops.render.render(write_still=True, scene=preview.scene.name)
+        written.append({"file": outputPath, "radius": round(radius, 2)})
+      finally:
+        preview.remove()
+        mesh = modelObject.data
+        bpy.data.objects.remove(modelObject)
+        bpy.data.meshes.remove(mesh)
+  finally:
+    bpy.data.scenes.remove(scratch)
+  return {"thumbnails": written}

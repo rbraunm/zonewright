@@ -42,11 +42,11 @@ class ToolSession:
     assert len(texts) == 1
     return json.loads(texts[0])
 
-  async def expectImage(self, toolName, arguments=None):
+  async def expectImage(self, toolName, arguments=None, mimeType="image/png"):
     result, _ = await self.call(toolName, arguments)
     assert result.is_error is False, [content.text for content in result.content if content.type == "text"]
     assert [content.type for content in result.content] == ["image", "text"]
-    assert result.content[0].mime_type == "image/png"
+    assert result.content[0].mime_type == mimeType
     return base64.b64decode(result.content[0].data), json.loads(result.content[1].text)
 
   async def expectError(self, toolName, arguments=None):

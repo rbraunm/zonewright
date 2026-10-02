@@ -98,7 +98,8 @@ def parseModel(modelBytes, sourceName):
 
 
 def parseZone(zoneBytes, sourceName):
-  """EQGZ .zon: model names and object placements. Version 2 appends per-vertex baked light to each object."""
+  """EQGZ .zon: model names, object placements, region names, and lights (name, position, RGB 0-1, radius). Version 2 appends per-vertex
+  baked light to each object."""
   if zoneBytes[:4] != b"EQGZ":
     raise ValueError(f"{sourceName}: not an EQGZ zone")
   version, stringLength, modelCount, objectCount, regionCount, lightCount = struct.unpack_from("<6I", zoneBytes, 4)
@@ -132,10 +133,14 @@ def parseZone(zoneBytes, sourceName):
   for _ in range(regionCount):
     regionNames.append(readString(stringTable, struct.unpack_from("<I", zoneBytes, position)[0]))
     position += zoneRegionBytes
-  position += lightCount * zoneLightBytes
+  lights = []
+  for _ in range(lightCount):
+    nameOffset, x, y, z, red, green, blue, radius = struct.unpack_from("<I7f", zoneBytes, position)
+    lights.append({"name": readString(stringTable, nameOffset), "position": (x, y, z), "color": (red, green, blue), "radius": radius})
+    position += zoneLightBytes
   if position != len(zoneBytes):
     raise ValueError(f"{sourceName}: zone data ends at {position} of {len(zoneBytes)} bytes")
-  return {"version": version, "modelNames": modelNames, "placements": placements, "regionNames": regionNames, "lightCount": lightCount}
+  return {"version": version, "modelNames": modelNames, "placements": placements, "regionNames": regionNames, "lights": lights}
 
 
 def placementMatrix(placement):

@@ -73,6 +73,28 @@ def zoneSource(clientRoot, zoneName):
   raise ValueError(f"Zone '{zoneName}' has no classic (WLD), EQ terrain, or EQG variant in the client; it has {sorted(variants)}")
 
 
+def zoneLights(clientRoot, zoneName):
+  """The lights a client zone places: lights.wld's point lights for a classic zone, the .zon's for an EQG zone (the loose one when the
+  client has it); None for an EQ terrain zone, whose lights are not read."""
+  source = zoneSource(clientRoot, zoneName)
+  if source["format"] == "wld":
+    archive = eqArchive.EQArchive(source["archive"])
+    return eqWorldFile.WorldFile(archive.read("lights.wld"), f"{source['archive'].name}:lights.wld").pointLights() if "lights.wld" in archive.entries else []
+  if source["format"] == "eqgz":
+    zonBytes = source["zonPath"].read_bytes() if "zonPath" in source else eqArchive.EQArchive(source["archive"]).read(source["zon"])
+    return eqgFiles.parseZone(zonBytes, zoneName)["lights"]
+  return None
+
+
+def zoneFileLights(archivePath):
+  """The lights in an EQG zone archive's one .zon."""
+  archive = eqArchive.EQArchive(archivePath)
+  zoneFiles = [name for name in archive.entries if name.endswith(".zon")]
+  if len(zoneFiles) != 1:
+    raise ValueError(f"{archivePath.name} holds {len(zoneFiles)} .zon files; a zone archive holds one")
+  return eqgFiles.parseZone(archive.read(zoneFiles[0]), zoneFiles[0])["lights"]
+
+
 def buildZone(clientRoot, cacheRoot, zoneName):
   """Write a zone into a cache folder as one mesh, reusing one built from the same client files. An object no archive the zone loads
   defines is left out, as the client draws nothing for it, and listed."""

@@ -7,6 +7,7 @@ import os
 import bpy
 
 import bridgeDressing
+import bridgeEnvironment
 import bridgeExport
 import bridgePasses
 import bridgeModels
@@ -232,7 +233,8 @@ commands = {
   "renderView": (renderView, False),
   "pick": (pick, False),
   "renderPasses": (renderPasses, False),
-} | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands | bridgeModels.commands | bridgeExport.commands | bridgePasses.commands
+  "renderModelThumbnails": (bridgeViews.renderModelThumbnails, False),
+} | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands | bridgeModels.commands | bridgeExport.commands | bridgePasses.commands | bridgeEnvironment.commands
 
 
 def dispatch(command, arguments):

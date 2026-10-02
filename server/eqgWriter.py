@@ -133,9 +133,9 @@ def modelBytes(kind, materials, positions, normals, uvs, triangles, triangleMate
   return header + bytes(strings.data) + bytes(materialRecords) + vertices.tobytes() + triangleRecords.tobytes()
 
 
-def zoneBytes(modelNames, placements):
+def zoneBytes(modelNames, placements, lights):
   """An EQGZ zone, version 1: model file names, then placements (model, name, position, heading about Z, then the turns about Y and X,
-  in radians, and one scale); no regions or lights."""
+  in radians, and one scale), no regions, then lights (name, position, RGB 0-1, radius)."""
   strings = StringTable()
   modelOffsets = [strings.offset(name) for name in modelNames]
   modelIndex = {name: index for index, name in enumerate(modelNames)}
@@ -143,8 +143,13 @@ def zoneBytes(modelNames, placements):
   for placement in placements:
     records += struct.pack("<iI7f", modelIndex[placement["model"]], strings.offset(placement["name"]), *placement["position"],
       *placement["rotation"], placement["scale"])
-  header = b"EQGZ" + struct.pack("<6I", zoneVersion, len(strings.data), len(modelNames), len(placements), 0, 0)
-  return header + bytes(strings.data) + struct.pack(f"<{len(modelOffsets)}I", *modelOffsets) + bytes(records)
+  lightRecords = bytearray()
+  for light in lights:
+    if light["radius"] <= 0 or not all(0 <= component <= 1 for component in light["color"]):
+      raise ValueError(f"Light '{light['name']}' needs a positive radius and RGB in 0-1, got {light['radius']} and {list(light['color'])}")
+    lightRecords += struct.pack("<I7f", strings.offset(light["name"]), *light["position"], *light["color"], light["radius"])
+  header = b"EQGZ" + struct.pack("<6I", zoneVersion, len(strings.data), len(modelNames), len(placements), 0, len(lights))
+  return header + bytes(strings.data) + struct.pack(f"<{len(modelOffsets)}I", *modelOffsets) + bytes(records) + bytes(lightRecords)
 
 
 def litBytes(colors):
