@@ -7,6 +7,7 @@ import mathutils
 import numpy
 
 import bridgeMeshAccess
+import bridgePasses
 
 roundShapes = ("cylinder", "cone", "sphere")
 eulerModes = ("XYZ", "XZY", "YXZ", "YZX", "ZXY", "ZYX")
@@ -158,6 +159,8 @@ def joinObjects(names, into):
   if any(len(sceneObject.modifiers) for sceneObject in sceneObjects):
     raise ValueError("Apply or remove modifiers before joining; join merges the base meshes")
   for sceneObject in sceneObjects:
+    bridgeMeshAccess.requireNoShapingPasses(sceneObject, "join it")
+  for sceneObject in sceneObjects:
     if sceneObject.data.users > 1:
       sceneObject.data = sceneObject.data.copy()
   with bpy.context.temp_override(active_object=target, object=target, selected_objects=sceneObjects, selected_editable_objects=sceneObjects):
@@ -252,6 +255,7 @@ def getObjectDetail(name):
       "worldUnitsPerTextureRepeat": uvDensity(sceneObject),
       "vertexGroups": [group.name for group in sceneObject.vertex_groups],
       "sharedMeshUsers": mesh.users,
+      "shapingPasses": bridgePasses.passList(sceneObject),
     }
   if sceneObject.instance_type == "COLLECTION" and sceneObject.instance_collection is not None:
     detail["instanceCollection"] = sceneObject.instance_collection.name

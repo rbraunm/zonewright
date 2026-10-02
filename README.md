@@ -75,6 +75,8 @@ Edits address parts of a mesh with selectors instead of an interactive selection
 | | `extrudeFaces`, `insetFaces`, `bevelEdges`, `subdivide` | Topology edits on selected faces or edges |
 | | `booleanCut` | Cuts openings with a cutter mesh; refuses a cut that would erase the mesh |
 | | `decimate` / `cleanupMesh` | Triangle reduction; merging, degenerate removal, and consistent normals |
+| Iterating | `addShapingPass` / `setShapingPass` | Shaping goes into a named pass on the mesh (a shape key) that can be turned up or down (-1 to 2), muted, or made active later, so one step is revised without redoing the others; export writes the passes combined |
+| | `removeShapingPass` / `collapseShapingPasses` | Take a pass out, or fold the passes into the base so faces can change again (tools that change faces refuse while passes exist) |
 | Surfacing | `createMaterial` | Diffuse texture, optional normal map, no shine; optional alpha-tested cutout |
 | | `assignMaterial` | Material on selected faces |
 | | `projectUVs` | Planar or box projection at a set number of world units per texture repeat |

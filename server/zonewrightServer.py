@@ -758,7 +758,7 @@ async def measure(context: Context, points: list[list[float]], snapToSurface: bo
   return await callBridge(context, "measure", {"points": points, "snapToSurface": snapToSurface})
 
 
-@guardedTool(description="Move the selected vertices of a mesh by `offset` [x, y, z] world units. With `falloff` {center, radius, curve: constant|linear|smooth|sharp} the move fades with distance from the center; this is the precise, fine-detail edit." + selectorHelp)
+@guardedTool(description="Move the selected vertices of a mesh by `offset` [x, y, z] world units. With `falloff` {center, radius, curve: constant|linear|smooth|sharp} the move fades with distance from the center; this is the precise, fine-detail edit. With shaping passes, the move goes into the active pass." + selectorHelp)
 async def moveVertices(context: Context, objectName: str, selector: dict, offset: list[float], falloff: dict | None = None):
   return await callBridge(context, "moveVertices", {"objectName": objectName, "selector": selector, "offset": offset, "falloff": falloff})
 
@@ -768,7 +768,7 @@ async def sculptAtPoint(
   context: Context, objectName: str, mode: str, center: list[float], radius: float, strength: float,
   falloff: str = "smooth", direction: list[float] | None = None, iterations: int = 1,
 ):
-  """Sculpt a mesh within `radius` of `center`: raise, lower, or crease (strength in units, along the region's average normal or `direction`); smooth or flatten (strength a fraction 0 to 1; smooth repeats `iterations` times). Falloff curve: constant, linear, smooth, sharp."""
+  """Sculpt a mesh within `radius` of `center`: raise, lower, or crease (strength in units, along the region's average normal or `direction`); smooth or flatten (strength a fraction 0 to 1; smooth repeats `iterations` times). Falloff curve: constant, linear, smooth, sharp. With shaping passes, the change goes into the active pass."""
   return await callBridge(context, "sculptAtPoint", {"objectName": objectName, "mode": mode, "center": center, "radius": radius, "strength": strength, "falloff": falloff, "direction": direction, "iterations": iterations})
 
 
@@ -777,8 +777,34 @@ async def sculptAlongPath(
   context: Context, objectName: str, mode: str, path: list[list[float]], radius: float, strength: float,
   falloff: str = "smooth", direction: list[float] | None = None, iterations: int = 1, profile: list[list[float]] | None = None, conformRim: bool = True,
 ):
-  """Sculpt along a polyline path [[x,y,z], ...] within `radius`: raise, lower, crease, smooth, flatten as in sculptAtPoint, or carve, which cuts vertically down to the path's own heights shaped by `profile` [[lateralFraction, heightAboveFloor], ...] from 0 (center) to 1 (edge); carve strength is a fraction. With conformRim (needs rising profile heights), vertices just outside the cut slide onto the rim contour so the edge follows the profile rather than the grid."""
+  """Sculpt along a polyline path [[x,y,z], ...] within `radius`: raise, lower, crease, smooth, flatten as in sculptAtPoint, or carve, which cuts vertically down to the path's own heights shaped by `profile` [[lateralFraction, heightAboveFloor], ...] from 0 (center) to 1 (edge); carve strength is a fraction. With conformRim (needs rising profile heights), vertices just outside the cut slide onto the rim contour so the edge follows the profile rather than the grid. With shaping passes, the change goes into the active pass."""
   return await callBridge(context, "sculptAlongPath", {"objectName": objectName, "mode": mode, "path": path, "radius": radius, "strength": strength, "falloff": falloff, "direction": direction, "iterations": iterations, "profile": profile, "conformRim": conformRim})
+
+
+@guardedTool()
+async def addShapingPass(context: Context, objectName: str, name: str):
+  """Add a named shaping pass to a mesh and make it active: vertex moves and sculpting go into the active pass, which can later be
+  turned up or down, muted, removed, or collapsed, so a shaping step is revised without redoing the others. Tools that change faces
+  (delete, extrude, inset, bevel, subdivide, cut, decimate, join) refuse while a mesh has passes; collapse them first."""
+  return await callBridge(context, "addShapingPass", {"objectName": objectName, "name": name})
+
+
+@guardedTool()
+async def setShapingPass(context: Context, objectName: str, name: str, strength: float | None = None, muted: bool | None = None, makeActive: bool = False):
+  """Change a shaping pass: its strength (-1 to 2: 0.5 halves what it holds, -1 inverts it), muted, or makeActive so shaping goes into it."""
+  return await callBridge(context, "setShapingPass", {"objectName": objectName, "name": name, "strength": strength, "muted": muted, "makeActive": makeActive})
+
+
+@guardedTool()
+async def removeShapingPass(context: Context, objectName: str, name: str):
+  """Remove a shaping pass and what it holds; the other passes keep theirs."""
+  return await callBridge(context, "removeShapingPass", {"objectName": objectName, "name": name})
+
+
+@guardedTool()
+async def collapseShapingPasses(context: Context, objectName: str):
+  """Make a mesh's shape as it is seen (its passes combined) its new base and drop the passes, so its faces can change again."""
+  return await callBridge(context, "collapseShapingPasses", {"objectName": objectName})
 
 
 @guardedTool(description="Delete the selected faces of a mesh, with edges and vertices left unused; for example the terrain inside a rock that should form its own cave floor ({\"insideObject\": \"rockName\"})." + selectorHelp)

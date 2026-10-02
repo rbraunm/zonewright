@@ -55,25 +55,51 @@ def localDirection(sceneObject, worldVector):
   return numpy.array(sceneObject.matrix_world.to_3x3().inverted() @ mathutils.Vector(worldVector))
 
 
+def hasShapingPasses(sceneObject):
+  return sceneObject.data.shape_keys is not None
+
+
+def requireNoShapingPasses(sceneObject, action):
+  if hasShapingPasses(sceneObject):
+    raise ValueError(f"'{sceneObject.name}' has shaping passes, which hold one offset per vertex; collapse them (collapseShapingPasses) before you {action}")
+
+
+@contextlib.contextmanager
+def shapedMesh(sceneObject):
+  """The mesh as it is seen: its own data, or with shaping passes, the passes combined (Blender's shape key mix)."""
+  if not hasShapingPasses(sceneObject):
+    yield sceneObject.data
+    return
+  if sceneObject.modifiers:
+    raise ValueError(f"'{sceneObject.name}' has shaping passes and modifiers; passes combine before modifiers, so apply or remove the modifiers")
+  bpy.context.view_layer.update()
+  evaluated = sceneObject.evaluated_get(bpy.context.evaluated_depsgraph_get())
+  mesh = evaluated.to_mesh()
+  try:
+    yield mesh
+  finally:
+    evaluated.to_mesh_clear()
+
+
 def readVertexArrays(sceneObject):
-  mesh = sceneObject.data
-  count = len(mesh.vertices)
-  coordinates = numpy.empty(count * 3)
-  mesh.vertices.foreach_get("co", coordinates)
-  normals = numpy.empty(count * 3)
-  mesh.vertices.foreach_get("normal", normals)
+  with shapedMesh(sceneObject) as mesh:
+    count = len(mesh.vertices)
+    coordinates = numpy.empty(count * 3)
+    mesh.vertices.foreach_get("co", coordinates)
+    normals = numpy.empty(count * 3)
+    mesh.vertices.foreach_get("normal", normals)
   return worldPositions(sceneObject, coordinates.reshape(-1, 3)), worldDirections(sceneObject, normals.reshape(-1, 3))
 
 
 def readFaceArrays(sceneObject):
-  mesh = sceneObject.data
-  count = len(mesh.polygons)
-  centers = numpy.empty(count * 3)
-  mesh.polygons.foreach_get("center", centers)
-  normals = numpy.empty(count * 3)
-  mesh.polygons.foreach_get("normal", normals)
-  materialIndices = numpy.empty(count, dtype=numpy.int32)
-  mesh.polygons.foreach_get("material_index", materialIndices)
+  with shapedMesh(sceneObject) as mesh:
+    count = len(mesh.polygons)
+    centers = numpy.empty(count * 3)
+    mesh.polygons.foreach_get("center", centers)
+    normals = numpy.empty(count * 3)
+    mesh.polygons.foreach_get("normal", normals)
+    materialIndices = numpy.empty(count, dtype=numpy.int32)
+    mesh.polygons.foreach_get("material_index", materialIndices)
   return worldPositions(sceneObject, centers.reshape(-1, 3)), worldDirections(sceneObject, normals.reshape(-1, 3)), materialIndices
 
 
@@ -168,6 +194,9 @@ def loadBMesh(sceneObject):
 
 
 def storeBMesh(meshEditor, sceneObject):
+  if hasShapingPasses(sceneObject):
+    meshEditor.free()
+    requireNoShapingPasses(sceneObject, "change its faces")
   meshEditor.normal_update()
   meshEditor.to_mesh(sceneObject.data)
   meshEditor.free()

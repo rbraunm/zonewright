@@ -7,6 +7,7 @@ import mathutils
 import numpy
 
 import bridgeMeshAccess
+import bridgePasses
 
 falloffCurves = ("constant", "linear", "smooth", "sharp")
 sculptModes = ("raise", "lower", "smooth", "flatten", "crease", "carve")
@@ -29,7 +30,12 @@ def falloffWeights(normalizedDistances, curve):
 
 
 def writeWorldPositions(sceneObject, worldPositions):
-  sceneObject.data.vertices.foreach_set("co", bridgeMeshAccess.localPositions(sceneObject, worldPositions).ravel())
+  """Move the mesh as seen; with shaping passes, the move goes into the active pass."""
+  localPositions = bridgeMeshAccess.localPositions(sceneObject, worldPositions)
+  if bridgeMeshAccess.hasShapingPasses(sceneObject):
+    bridgePasses.writeIntoActivePass(sceneObject, localPositions)
+    return
+  sceneObject.data.vertices.foreach_set("co", localPositions.ravel())
   sceneObject.data.update()
 
 
@@ -281,6 +287,7 @@ def booleanCut(objectName, cutterName, operation, keepCutter):
     raise ValueError(f"operation must be one of {list(booleanOperations)}, got '{operation}'")
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   cutter = bridgeMeshAccess.requireMeshObject(cutterName)
+  bridgeMeshAccess.requireNoShapingPasses(sceneObject, "cut it")
   requireNoModifiers(sceneObject)
   before = bridgeMeshAccess.meshCounts(sceneObject)
   modifier = sceneObject.modifiers.new("zonewrightBoolean", "BOOLEAN")
@@ -300,6 +307,7 @@ def decimate(objectName, ratio):
   if not 0 < ratio < 1:
     raise ValueError(f"ratio must be in (0, 1), got {ratio}")
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  bridgeMeshAccess.requireNoShapingPasses(sceneObject, "decimate it")
   requireNoModifiers(sceneObject)
   before = bridgeMeshAccess.meshCounts(sceneObject)
   modifier = sceneObject.modifiers.new("zonewrightDecimate", "DECIMATE")
