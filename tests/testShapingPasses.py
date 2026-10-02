@@ -97,3 +97,20 @@ def testExportWritesTheTerrainWithItsPassesCombined(stageBlenderServer, tmp_path
   stageBlenderServer.session(steps)
   terrain = eqgFiles.parseModel(eqArchive.EQArchive(archivePath).read("ter_passplot.ter"), "ter_passplot.ter")
   assert round(float(terrain["vertices"][:, 2].max()), 4) == 3.0
+
+
+def testViewsSeeAPassShapedJustBefore(stageBlenderServer):
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [64, 64], "spacing": 8, "location": [0, 0, 0]})
+    await session.expectSuccess("setZoneProperties", {
+      "ambientColor": [0.3, 0.3, 0.3], "specialAmbientColor": [0, 0, 0], "bounceColor": [0, 0, 0], "sunColor": [0.5, 0.5, 0.5],
+      "sunAzimuthDegrees": 135, "sunElevationDegrees": 45, "fogColor": [0.5, 0.5, 0.5], "fogStart": 30, "fogEnd": 200, "fogDensity": 0.33,
+      "newEngineZone": False,
+    })
+    await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "pit"})
+    await session.expectSuccess("sculptAtPoint", {"objectName": "ground", "mode": "lower", "center": [0, 0, 0], "radius": 20, "strength": 10, "direction": [0, 0, 1]})
+    _, description = await session.expectImage("renderView", {"view": {"map": {"center": [0, 0], "width": 64}}, "shading": "layout"})
+    return description
+
+  assert stageBlenderServer.session(steps)["heightRange"] == [-10.0, 0.0]

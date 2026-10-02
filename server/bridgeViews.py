@@ -190,7 +190,9 @@ def placeCamera(preview, view, figureModel):
 
 
 def sceneCorners(preview):
-  corners = [sceneObject.matrix_world @ mathutils.Vector(corner) for sceneObject in preview.scene.objects if sceneObject.type == "MESH" for corner in sceneObject.bound_box]
+  """Bounding box corners of the meshes as evaluated: an object's own bound_box lags behind a shaping pass changed since the last evaluation."""
+  depsgraph = preview.depsgraph()
+  corners = [sceneObject.matrix_world @ mathutils.Vector(corner) for sceneObject in preview.scene.objects if sceneObject.type == "MESH" for corner in sceneObject.evaluated_get(depsgraph).bound_box]
   if not corners:
     raise ValueError("The scene has no meshes")
   return corners
