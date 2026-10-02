@@ -63,7 +63,14 @@ The Eastern Wastes shot at `-1994.17, 3027.87` matches in heading but sits about
 
 ## Calibration
 
-`calibrateShot` renders a screenshot's view as passes (lit, texture, normal, baked light, share, position), groups pixels by surface direction, and solves the classic lighting formula for the ambient, sun, and bounce colors and sun direction that best explain the screenshot's color over the texture's in each group (medians, so glows and misregistered edges do not steer it). Special ambient adds exactly like ambient where every surface takes the full share of scene light, so the fit folds it into ambient. The two Plane of Knowledge shots are night shots: they measure a blue night light near (0.47, 0.50, 0.73) on walls.
+`calibrateShot` renders a screenshot's view as passes (lit, texture, normal, baked light, share, distance) and solves the classic lighting and fog formula over a sample of the pixels: for each sun direction (and, without the zone header, each fog start and end at the client's density), the ambient, sun, bounce (and fog) colors are linear in every pixel and are solved by least squares per channel. Two ambiguities are settled by convention, not measured:
+
+- Special ambient adds exactly like ambient where every surface takes the full share of scene light, so it is folded into ambient.
+- A sun from one direction lights exactly as a bounce from the opposite one, so the sun is searched above the horizon and light from below is bounce.
+
+Where no surface in view is fully fogged, a slightly nearer fog end with a slightly darker fog color draws nearly the same image, so a fitted fog is only as precise as the shot allows. The passes come back premultiplied by coverage and with negative values clamped to 0: the normal pass is encoded as normal * 0.5 + 0.5, and colors are divided by coverage before fitting.
+
+Results: the two Plane of Knowledge night shots redraw within about 11-13 levels of 255 on average (no sky drawn), and the Eastern Wastes day shot, with its fog fitted (start near 0, end near 1900), within about 16.
 
 ## To do
 

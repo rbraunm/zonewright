@@ -472,19 +472,27 @@ async def importZone(context: Context, zone: str, collection: str | None = None)
 
 
 def passArrays(passes):
-  return {name: numpy.load(path) for name, path in passes.items()}
+  """Render passes as arrays, their colors no longer premultiplied by coverage as a transparent render stores them."""
+  arrays = {}
+  for name, path in passes.items():
+    array = numpy.load(path)
+    coverage = array[..., 3:4]
+    array[..., :3] = numpy.where(coverage > 0, array[..., :3] / numpy.maximum(coverage, 1e-6), 0)
+    arrays[name] = array
+  return arrays
 
 
 @guardedTool()
 async def calibrateShot(
-  context: Context, screenshotPath: str, zone: str, newEngineZone: bool, fogColor: list[float], fogStart: float, fogEnd: float,
-  fogDensity: float = 0.0, discardUnsavedChanges: bool = False,
+  context: Context, screenshotPath: str, zone: str, newEngineZone: bool, fogColor: list[float] | None = None, fogStart: float | None = None,
+  fogEnd: float | None = None, fogDensity: float | None = None, discardUnsavedChanges: bool = False,
 ):
   """Calibrate the renderer against a live client screenshot named <zone>,<loc y>,<loc x>,<loc z>,<compass heading>,<pitch>.jpg (see the
   calibrate-renderer skill). Opens a new file (discarding unsaved changes only with discardUnsavedChanges), imports zone (the client's
   zone file name), renders the screenshot's view, fits the scene light (ambient, sun, bounce, sun direction) that best explains the
-  screenshot under the client's lighting, renders with it, and returns the screenshot beside the render. Fog comes from the zone
-  header (the live dumps' zoneHeaders; density 0 for a zone whose FogOnOff is 0). Each run is kept under the tooling root's
+  screenshot under the client's lighting, renders with it, and returns the screenshot beside the render. Give the fog from the zone
+  header (the live dumps' zoneHeaders; density 0 for a zone whose FogOnOff is 0), all four values; with none given, the fog's start,
+  end, and color are fitted with the light, at the client's density. Each run is kept under the tooling root's
   calibration folder with its fit and mean pixel difference, and getToolingStatus lists the latest per screenshot."""
   try:
     shot = eqCalibration.parseShotName(screenshotPath)
@@ -492,25 +500,34 @@ async def calibrateShot(
     raise ToolError(str(error)) from error
   if not Path(screenshotPath).is_file():
     raise ToolError(f"No screenshot at {screenshotPath}")
+  fogGiven = [value is not None for value in (fogColor, fogStart, fogEnd, fogDensity)]
+  if any(fogGiven) and not all(fogGiven):
+    raise ToolError("Give all of fogColor, fogStart, fogEnd, and fogDensity (the zone header's fog), or none to fit the fog")
   view = eqCalibration.shotView(shot)
   await callBridge(context, "newFile", {"discardUnsavedChanges": discardUnsavedChanges})
   imported = await placeZone(context, zone, None)
   neutral = {"ambientColor": [1, 1, 1], "specialAmbientColor": [0, 0, 0], "bounceColor": [0, 0, 0], "sunColor": [0, 0, 0], "sunAzimuthDegrees": 0, "sunElevationDegrees": 45}
-  environment = {"fogColor": fogColor, "fogStart": fogStart, "fogEnd": fogEnd, "fogDensity": fogDensity, "newEngineZone": newEngineZone}
+  if all(fogGiven):
+    environment = {"fogColor": fogColor, "fogStart": fogStart, "fogEnd": fogEnd, "fogDensity": fogDensity, "newEngineZone": newEngineZone}
+  else:
+    environment = {"fogColor": [0, 0, 0], "fogStart": 0, "fogEnd": 100000, "fogDensity": 0, "newEngineZone": newEngineZone}
   await callBridge(context, "setZoneProperties", {"updates": neutral | environment})
   runFolder = toolingRoot / "calibration" / Path(screenshotPath).stem / datetime.datetime.now(datetime.UTC).strftime("%Y%m%d-%H%M%S")
   runFolder.mkdir(parents=True, exist_ok=True)
-  measured = passArrays((await callBridge(context, "renderPasses", {"view": view, "outputFolder": str(runFolder), "passNames": ["lit", "base", "normal", "baked", "share"]}))["passes"])
+  measured = passArrays((await callBridge(context, "renderPasses", {"view": view, "outputFolder": str(runFolder), "passNames": ["lit", "base", "normal", "baked", "share", "distance"]}))["passes"])
   height, width = measured["lit"].shape[:2]
   screen = await anyio.to_thread.run_sync(eqCalibration.screenshotPixels, screenshotPath, width, height)
+  givenFog = {"fogStart": fogStart, "fogEnd": fogEnd, "fogDensity": fogDensity} if all(fogGiven) else None
   try:
-    fit = eqCalibration.fitLighting(eqCalibration.surfaceGroups(screen, measured))
+    fit = await anyio.to_thread.run_sync(eqCalibration.fitScene, screen, measured, givenFog)
   except ValueError as error:
     raise ToolError(str(error)) from error
-  lighting = {key: fit[key] for key in ("ambientColor", "specialAmbientColor", "bounceColor", "sunColor", "sunAzimuthDegrees", "sunElevationDegrees")}
-  await callBridge(context, "setZoneProperties", {"updates": lighting})
+  lightingKeys = ("ambientColor", "specialAmbientColor", "bounceColor", "sunColor", "sunAzimuthDegrees", "sunElevationDegrees")
+  if givenFog is None:
+    environment |= {key: fit[key] for key in ("fogColor", "fogStart", "fogEnd", "fogDensity")}
+  await callBridge(context, "setZoneProperties", {"updates": {key: fit[key] for key in lightingKeys} | environment})
   rendered = passArrays((await callBridge(context, "renderPasses", {"view": view, "outputFolder": str(runFolder), "passNames": ["lit"]}))["passes"])["lit"]
-  background = numpy.concatenate([numpy.array(fogColor), [1.0]])
+  background = numpy.concatenate([numpy.array(environment["fogColor"]), [1.0]])
   composited = rendered * rendered[..., 3:4] + background * (1 - rendered[..., 3:4])
   image, difference = eqCalibration.comparison(screen, numpy.concatenate([composited[..., :3], rendered[..., 3:4]], axis=2))
   comparePath = runFolder / "compare.png"

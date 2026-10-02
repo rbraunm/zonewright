@@ -22,10 +22,11 @@ The owner keeps live client screenshots in `C:\Games\Steam\steamapps\common\Ever
 |---|---|
 | `screenshotPath` | The screenshot's full path |
 | `zone` | The client zone file name (`poknowledge`, `eastwastes`) |
-| `newEngineZone`, `fogColor`, `fogStart`, `fogEnd`, `fogDensity` | The zone header's values: the live dumps' `fields\zoneHeaders.tsv` (the first of its four fog sets); `fogDensity` 0 when its `FogOnOff` is 0, else the client's 0.33 |
+| `newEngineZone` | The zone header's `NewEngineZone` (the live dumps' `fields\zoneHeaders.tsv`) |
+| `fogColor`, `fogStart`, `fogEnd`, `fogDensity` | The zone header's fog: the first of `zoneHeaders.tsv`'s four fog sets, `fogDensity` 0 when its `FogOnOff` is 0, else the client's 0.33. Give all four or none: with none (a zone the dumps lack, like Eastern Wastes), the fog is fitted with the light |
 | `discardUnsavedChanges` | It opens a new file; this discards the open one's unsaved changes |
 
-It imports the zone, renders the screenshot's view as passes, fits the scene light (ambient, sun, bounce, sun direction) that best explains the screenshot, renders with it, and returns the screenshot beside the render. The result gives the fit, its `ratioResidual` (the median color-over-texture error it could not explain), and `meanPixelDifference` (0-255 over drawn pixels). Each run is kept under `%LOCALAPPDATA%\zonewright\calibration\<screenshot>\<time>` with its passes, comparison, and `result.json`; `getToolingStatus` lists every screenshot's latest run, so a renderer change shows as a better or worse difference.
+It imports the zone, renders the screenshot's view as passes, fits the scene light (ambient, sun, bounce, sun direction, and the fog when not given) that best explains the screenshot, renders with it, and returns the screenshot beside the render. The result gives the fit, its `residual` (the root mean square color error it could not explain, 0-1), and `meanPixelDifference` (0-255 over drawn pixels). Each run is kept under `%LOCALAPPDATA%\zonewright\calibration\<screenshot>\<time>` with its passes, comparison, and `result.json`; `getToolingStatus` lists every screenshot's latest run, so a renderer change shows as a better or worse difference.
 
 ## Reading a comparison
 

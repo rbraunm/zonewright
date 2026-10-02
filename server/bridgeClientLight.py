@@ -8,15 +8,16 @@ import bpy
 
 groupName = "eqClientLight"
 # Raised whenever buildGroup changes, so a group saved in an older .blend is rebuilt in place.
-groupVersion = 2
+groupVersion = 3
 bakedAttribute = "eqColor"
 normalAttribute = "eqNormal"
 # RegionOldA.fxo's fFogRange: the fog ramp spans ten units of density between fog start and end.
 fogRange = 10.0
 environmentColors = ("ambientColor", "specialAmbientColor", "bounceColor", "sunColor", "fogColor")
 environmentValues = ("fogStart", "fogEnd", "fogDensity")
-# What the group outputs: the drawn color, or one of its inputs for calibration (bridgeViews.renderPasses).
-passes = ("lit", "base", "normal", "baked", "share", "position")
+# What the group outputs: the drawn color, or one of its inputs for calibration (bridgeViews.renderPasses). The render keeps only values
+# of 0 or more, so the normal pass holds normal * 0.5 + 0.5; the distance pass holds the distance from the camera.
+passes = ("lit", "base", "normal", "baked", "share", "distance")
 
 
 def towardSun(azimuthDegrees, elevationDegrees):
@@ -102,8 +103,14 @@ def buildGroup(tree):
     tree.links.new(inputs["Share"], shareColor.inputs[axis])
   selected = next(socket for socket in fogged.outputs if socket.type == "RGBA")
   passSelect = build.value("passSelect")
-  position = build.node("ShaderNodeNewGeometry").outputs["Position"]
-  for index, passOutput in enumerate((inputs["Base"], inputs["Normal"], inputs["Baked"], shareColor.outputs["Vector"], position), 1):
+  halves = build.node("ShaderNodeCombineXYZ")
+  for axis in "XYZ":
+    halves.inputs[axis].default_value = 0.5
+  encodedNormal = build.vectorMath("ADD", build.scale(inputs["Normal"], build.math("ADD", 0.5, 0.0)), halves.outputs["Vector"])
+  distanceColor = build.node("ShaderNodeCombineXYZ")
+  for axis in "XYZ":
+    tree.links.new(distance, distanceColor.inputs[axis])
+  for index, passOutput in enumerate((inputs["Base"], encodedNormal, inputs["Baked"], shareColor.outputs["Vector"], distanceColor.outputs["Vector"]), 1):
     choose = build.node("ShaderNodeMix", data_type="RGBA")
     colorInputs = [socket for socket in choose.inputs if socket.type == "RGBA"]
     tree.links.new(build.math("COMPARE", passSelect, float(index)), choose.inputs["Factor"])
