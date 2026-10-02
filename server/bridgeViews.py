@@ -167,10 +167,18 @@ def placeCamera(preview, view, figureModel):
   if viewKeys == {"map"}:
     return placeMapCamera(preview, view["map"])
   if viewKeys == {"standAt", "headingDegrees", "pitchDegrees"}:
-    standAt = mathutils.Vector(view["standAt"])
-    groundHit = preview.rayCast(standAt + mathutils.Vector((0, 0, 1)), mathutils.Vector((0, 0, -1)), groundSearchDistance)
-    if groundHit is None:
-      raise ValueError(f"No ground within {groundSearchDistance} units below {list(standAt)}")
+    standAt = view["standAt"]
+    if len(standAt) == 2:
+      bottom, top = sceneHeightRange(preview)
+      groundHit = preview.rayCast(mathutils.Vector((*standAt, top + mapClearance)), mathutils.Vector((0, 0, -1)), top - bottom + 2 * mapClearance)
+      if groundHit is None:
+        raise ValueError(f"No ground below {list(standAt)}")
+    elif len(standAt) == 3:
+      groundHit = preview.rayCast(mathutils.Vector(standAt) + mathutils.Vector((0, 0, 1)), mathutils.Vector((0, 0, -1)), groundSearchDistance)
+      if groundHit is None:
+        raise ValueError(f"No ground within {groundSearchDistance} units below {list(standAt)}")
+    else:
+      raise ValueError(f"standAt is [x, y] or [x, y, z], got {standAt!r}")
     eye = groundHit[0] + mathutils.Vector((0, 0, eyeHeight))
     forward = headingPitchForward(view["headingDegrees"], view["pitchDegrees"])
     camera.location, camera.rotation_quaternion = eye, lookRotation(forward)

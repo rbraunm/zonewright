@@ -194,10 +194,11 @@ def testEyeLevelViewPlacesFigureAndPickMeasuresTheGround(stageBlenderServer):
     _, description = await session.expectImage("renderView", {"view": eyeLevelView})
     picked = await session.expectSuccess("pick", {"view": eyeLevelView, "pixel": pixel})
     sky = await session.expectSuccess("pick", {"view": eyeLevelView, "pixel": [480, 10]})
-    return description, picked, sky
+    _, fromAbove = await session.expectImage("renderView", {"view": eyeLevelView | {"standAt": [0, 0]}})
+    return description, picked, sky, fromAbove
 
-  description, picked, sky = stageBlenderServer.session(steps)
-  assert description["eye"] == [0.0, 0.0, eyeHeight]
+  description, picked, sky, fromAbove = stageBlenderServer.session(steps)
+  assert description["eye"] == [0.0, 0.0, eyeHeight] and fromAbove["eye"] == [0.0, 0.0, eyeHeight]
   assert description["figure"] == [1.5, 15.0, 0.0]
   depression = math.atan((pixel[1] + 0.5 - renderHeight / 2) / (renderHeight / 2) * math.tan(math.radians(verticalFieldOfViewDegrees / 2)))
   assert picked["hit"] is True
