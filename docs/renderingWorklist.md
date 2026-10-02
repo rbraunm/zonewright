@@ -36,7 +36,7 @@ Blender-built zones drawn as the client would draw them depend on these.
 
 ## Validation
 
-Rules the renderer uses that are not yet confirmed against the RoF2 client itself. Code traces read what the DLL does but can miss a step. Calibration screenshots so far come from the live client, which has moved on since RoF2. Each of these needs RoF2 evidence: screenshots taken in the RoF2 client on Peridot, its `Logs\dbg.txt` (the graphics DLL logs there, including every baked light it ignores), or a read of the running client.
+Rules the renderer uses that are not yet confirmed against the RoF2 client itself. Code traces read what the DLL does but can miss a step. Calibration screenshots so far come from the live client, which has moved on since RoF2. Each of these needs RoF2 evidence: screenshots taken in the RoF2 client on Peridot, its `Logs\dbg.txt` (the graphics DLL logs there, including every baked light it ignores), or a read of the running client. MQPeridotEmu's `/peridotemu dump` (`PhoenixCampfire/mqperidotemu`) reads the running client: the zone in MQ2PeridotLive's dump format, plus the graphics camera (position, orientation, view angle, clip planes, projection scales), every actor in the scene (definition, position, orientation, scale, and a simple actor's vertex and baked light counts), and the engine's property tree (sky, fog colors, time of day). A dump taken with a screenshot settles most of the rules below.
 
 - **Which variant a zone loads.** Some zones ship both a classic `.s3d` and an EQG `.eqg` with a `.zon` (`arena`, `tutorialb`, ...); the import takes the classic one, an untested choice.
 - **Which `.zon` an EQG zone loads,** and so the Guild Lobby's objects and baked light (see clientRendering.md, EQG zones).
