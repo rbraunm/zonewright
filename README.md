@@ -59,7 +59,7 @@ Nothing runs stale code. Every tool checks the server's own loaded source files 
 
 ### Artist toolkit
 
-Edits address parts of a mesh with selectors instead of an interactive selection: `{"all": true}`, `{"sphere": {center, radius}}`, `{"box": {minimum, maximum}}`, `{"cylinder": {center: [x, y], radius, bottom, top}}`, `{"facing": {direction, withinDegrees}}`, `{"material": name}`, `{"vertexGroup": name}`, `{"insideObject": closedMeshName}`, and `{"and": [...]}`, `{"or": [...]}`, `{"not": selector}`. Shapes test vertex positions in world units, or face centers for face operations. A selector that matches nothing is an error.
+Edits address parts of a mesh with selectors instead of an interactive selection: `{"all": true}`, `{"sphere": {center, radius}}`, `{"box": {minimum, maximum}}`, `{"cylinder": {center: [x, y], radius, bottom, top}}`, `{"facing": {direction, withinDegrees}}`, `{"slope": {minimumDegrees, maximumDegrees}}` (0 flat, 90 vertical, over 90 overhanging), `{"height": {minimum, maximum}}`, `{"nearPath": {path, radius}}`, `{"material": name}`, `{"vertexGroup": name}`, `{"insideObject": closedMeshName}`, and `{"and": [...]}`, `{"or": [...]}`, `{"not": selector}`. Shapes test vertex positions in world units, or face centers for face operations. A selector that matches nothing is an error.
 
 | Activity | Tool | Does |
 |---|---|---|
@@ -75,6 +75,8 @@ Edits address parts of a mesh with selectors instead of an interactive selection
 | | `extrudeFaces`, `insetFaces`, `bevelEdges`, `subdivide` | Topology edits on selected faces or edges |
 | | `booleanCut` | Cuts openings with a cutter mesh; refuses a cut that would erase the mesh |
 | | `decimate` / `cleanupMesh` | Triangle reduction; merging, degenerate removal, and consistent normals |
+| Breaking up | `warp` | Moves vertices by smooth noise (sideways, along the surface, or freely) so round and straight shapes stop being regular; seeded, masked, with a fade from the mask's edge |
+| | `roughen` | Fractal noise of a chosen feature size and amplitude along each vertex's normal (sideways on walls) or straight up; seeded, masked, faded; used coarse first, then finer, each in its own pass |
 | Iterating | `addShapingPass` / `setShapingPass` | Shaping goes into a named pass on the mesh (a shape key) that can be turned up or down (-1 to 2), muted, or made active later, so one step is revised without redoing the others; export writes the passes combined |
 | | `removeShapingPass` / `collapseShapingPasses` | Take a pass out, or fold the passes into the base so faces can change again (tools that change faces refuse while passes exist) |
 | Surfacing | `createMaterial` | Diffuse texture, optional normal map, no shine; optional alpha-tested cutout |

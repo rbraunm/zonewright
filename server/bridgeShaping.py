@@ -4,6 +4,8 @@ import math
 import bmesh
 import bpy
 import mathutils
+import mathutils.kdtree
+import mathutils.noise
 import numpy
 
 import bridgeMeshAccess
@@ -14,6 +16,11 @@ sculptModes = ("raise", "lower", "smooth", "flatten", "crease", "carve")
 fractionModes = ("smooth", "flatten", "carve")
 booleanOperations = ("DIFFERENCE", "UNION", "INTERSECT")
 creasePinch = 0.25
+noiseBasis = "PERLIN_ORIGINAL"
+maximumOctaves = 8
+roughenDirections = ("normal", "up")
+# horizontal keeps heights, surface moves along the surface, full moves in every direction.
+warpPlanes = ("horizontal", "surface", "full")
 
 
 def falloffWeights(normalizedDistances, curve):
@@ -51,23 +58,6 @@ def moveVertices(objectName, selector, offset, falloff):
   displacement = weights[:, None] * bridgeMeshAccess.toArray(offset)
   writeWorldPositions(sceneObject, positions + displacement)
   return {"movedVertices": int((weights > 0).sum()), "largestMove": round(float(numpy.linalg.norm(displacement, axis=1).max()), 3)}
-
-
-def distancesToPolyline(points, path, horizontal):
-  """Distance from each point to a polyline, the interpolated path height at the nearest spot, and that nearest spot."""
-  pathArray = bridgeMeshAccess.toArray(path)
-  axes = slice(0, 2) if horizontal else slice(0, 3)
-  starts, ends = pathArray[:-1], pathArray[1:]
-  segments = ends[:, axes] - starts[:, axes]
-  lengths = numpy.maximum((segments * segments).sum(1), 1e-12)
-  offsets = points[:, None, axes] - starts[None, :, axes]
-  along = numpy.clip((offsets * segments[None]).sum(2) / lengths[None], 0, 1)
-  nearest = starts[None, :, axes] + along[:, :, None] * segments[None]
-  distances = numpy.linalg.norm(points[:, None, axes] - nearest, axis=2)
-  closest = distances.argmin(1)
-  rows = numpy.arange(len(points))
-  heights = starts[closest, 2] + along[rows, closest] * (ends[closest, 2] - starts[closest, 2])
-  return distances[rows, closest], heights, nearest[rows, closest]
 
 
 def vertexNeighbourAverages(sceneObject, positions):
@@ -152,7 +142,7 @@ def medianEdgeLength(sceneObject, positions, vertexMask):
 
 def carveAlongPath(sceneObject, positions, affected, strength, path, radius, profileArray, conformRim):
   """Lower vertices to the path floor plus the profile height; with conformRim, untouched vertices just outside the cut slide sideways onto the rim contour so the edge follows the profile instead of the grid."""
-  lateral, floors, nearest = distancesToPolyline(positions, path, horizontal=True)
+  lateral, floors, nearest = bridgeMeshAccess.distancesToPolyline(positions, path, horizontal=True)
   targets = floors + numpy.interp(numpy.clip(lateral / radius, 0, 1), profileArray[:, 0], profileArray[:, 1])
   updated = positions.copy()
   lowered = affected & (positions[:, 2] > targets)
@@ -183,7 +173,7 @@ def sculptAlongPath(objectName, mode, path, radius, strength, falloff, direction
 
   return sculpt(
     objectName, mode,
-    lambda positions: distancesToPolyline(positions, path, horizontal)[0],
+    lambda positions: bridgeMeshAccess.distancesToPolyline(positions, path, horizontal)[0],
     nearestPoints, radius, strength, falloff, direction, iterations,
     lambda sceneObject, positions, affected, carveStrength: carveAlongPath(sceneObject, positions, affected, carveStrength, path, radius, profileArray, conformRim),
   )
@@ -329,6 +319,84 @@ def cleanupMesh(objectName, mergeDistance, recalculateNormals):
   return {"before": before, "after": after, "mergedVertices": before["vertices"] - after["vertices"]}
 
 
+def maskWeights(sceneObject, selector, fadeDistance, positions):
+  """1 inside the selection and 0 outside; with fadeDistance, rising smoothly from the selection's edge over that distance, so a
+  masked change leaves no step at the edge."""
+  if fadeDistance < 0:
+    raise ValueError(f"fadeDistance must be non-negative, got {fadeDistance}")
+  mask = bridgeMeshAccess.evaluateSelector(selector, sceneObject, "vertices")
+  bridgeMeshAccess.requireSelection(mask, selector, sceneObject, "vertices")
+  weights = mask.astype(numpy.float64)
+  outside = positions[~mask]
+  if fadeDistance == 0 or len(outside) == 0:
+    return weights
+  tree = mathutils.kdtree.KDTree(len(outside))
+  for index, point in enumerate(outside):
+    tree.insert(point, index)
+  tree.balance()
+  inside = numpy.flatnonzero(mask)
+  ramp = numpy.clip(numpy.array([tree.find(positions[index])[2] for index in inside]) / fadeDistance, 0, 1)
+  weights[inside] = ramp * ramp * (3 - 2 * ramp)
+  return weights
+
+
+def noiseSamplePoints(positions, featureSize, seed):
+  if featureSize <= 0:
+    raise ValueError(f"featureSize must be positive, got {featureSize}")
+  return positions / featureSize + numpy.random.default_rng(seed).uniform(-1000, 1000, 3)
+
+
+def fractalNoise(points, octaves, roughness):
+  """Perlin noise summed over octaves, each twice the frequency of the last and `roughness` times its amplitude, normalized to the
+  first octave's range."""
+  total = numpy.zeros(len(points))
+  amplitude, frequency, weightSum = 1.0, 1.0, 0.0
+  for _ in range(octaves):
+    total += amplitude * numpy.array([mathutils.noise.noise(mathutils.Vector(point * frequency), noise_basis=noiseBasis) for point in points])
+    weightSum += amplitude
+    amplitude *= roughness
+    frequency *= 2
+  return total / weightSum
+
+
+def moveSummary(positions, updated):
+  moved = numpy.linalg.norm(updated - positions, axis=1)
+  return {"affectedVertices": int((moved > 1e-9).sum()), "largestMove": round(float(moved.max()), 3), "meanMove": round(float(moved[moved > 1e-9].mean()) if (moved > 1e-9).any() else 0.0, 3)}
+
+
+def roughen(objectName, featureSize, amplitude, octaves, roughness, seed, direction, selector, fadeDistance):
+  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  if amplitude <= 0 or not 1 <= octaves <= maximumOctaves or not 0 < roughness <= 1:
+    raise ValueError(f"amplitude must be positive, octaves 1 to {maximumOctaves}, and roughness in (0, 1]")
+  if direction not in roughenDirections:
+    raise ValueError(f"direction must be one of {list(roughenDirections)}, got '{direction}'")
+  positions, normals = bridgeMeshAccess.readVertexArrays(sceneObject)
+  weights = maskWeights(sceneObject, selector, fadeDistance, positions)
+  values = fractalNoise(noiseSamplePoints(positions, featureSize, seed), octaves, roughness)
+  pushDirections = normals if direction == "normal" else numpy.broadcast_to((0.0, 0.0, 1.0), normals.shape)
+  updated = positions + (amplitude * values * weights)[:, None] * pushDirections
+  writeWorldPositions(sceneObject, updated)
+  return moveSummary(positions, updated)
+
+
+def warp(objectName, featureSize, amplitude, seed, plane, selector, fadeDistance):
+  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  if amplitude <= 0:
+    raise ValueError(f"amplitude must be positive, got {amplitude}")
+  if plane not in warpPlanes:
+    raise ValueError(f"plane must be one of {list(warpPlanes)}, got '{plane}'")
+  positions, normals = bridgeMeshAccess.readVertexArrays(sceneObject)
+  weights = maskWeights(sceneObject, selector, fadeDistance, positions)
+  vectors = numpy.array([list(mathutils.noise.noise_vector(mathutils.Vector(point), noise_basis=noiseBasis)) for point in noiseSamplePoints(positions, featureSize, seed)])
+  if plane == "horizontal":
+    vectors[:, 2] = 0
+  elif plane == "surface":
+    vectors -= (vectors * normals).sum(1)[:, None] * normals
+  updated = positions + amplitude * weights[:, None] * vectors
+  writeWorldPositions(sceneObject, updated)
+  return moveSummary(positions, updated)
+
+
 commands = {
   "moveVertices": (moveVertices, True),
   "sculptAtPoint": (sculptAtPoint, True),
@@ -341,4 +409,6 @@ commands = {
   "booleanCut": (booleanCut, True),
   "decimate": (decimate, True),
   "cleanupMesh": (cleanupMesh, True),
+  "roughen": (roughen, True),
+  "warp": (warp, True),
 }

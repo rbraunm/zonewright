@@ -691,7 +691,7 @@ async def pick(context: Context, view: dict, pixel: list[int]):
 selectorHelp = (
   " A selector picks part of a mesh by world position or surface: {\"all\": true}, {\"sphere\": {\"center\": [x,y,z], \"radius\": r}},"
   " {\"box\": {\"minimum\": [x,y,z], \"maximum\": [x,y,z]}}, {\"cylinder\": {\"center\": [x,y], \"radius\": r, \"bottom\": z, \"top\": z}},"
-  " {\"facing\": {\"direction\": [x,y,z], \"withinDegrees\": d}}, {\"material\": name}, {\"vertexGroup\": name}, {\"insideObject\": closedMeshName},"
+  " {\"facing\": {\"direction\": [x,y,z], \"withinDegrees\": d}}, {\"slope\": {\"minimumDegrees\": a, \"maximumDegrees\": b}} (0 flat, 90 vertical, over 90 overhanging), {\"height\": {\"minimum\": z, \"maximum\": z}}, {\"nearPath\": {\"path\": [[x,y,z], ...], \"radius\": r}} (horizontal distance), {\"material\": name}, {\"vertexGroup\": name}, {\"insideObject\": closedMeshName},"
   " {\"and\": [selectors]}, {\"or\": [selectors]}, {\"not\": selector}. Shapes test vertex positions, or face centers for face operations."
   " A selector that matches nothing is an error."
 )
@@ -805,6 +805,37 @@ async def removeShapingPass(context: Context, objectName: str, name: str):
 async def collapseShapingPasses(context: Context, objectName: str):
   """Make a mesh's shape as it is seen (its passes combined) its new base and drop the passes, so its faces can change again."""
   return await callBridge(context, "collapseShapingPasses", {"objectName": objectName})
+
+
+@guardedTool(description=(
+  "Roughen the selected vertices of a mesh with fractal noise: bumps about `featureSize` units across, up to `amplitude` units, along"
+  " each vertex's normal (`direction` normal: sideways on a wall, so cliffs break up too) or straight up. `octaves` (1-8) add finer"
+  " noise, each twice as fine and `roughness` times as strong. The same `seed` gives the same noise. `fadeDistance` ramps the effect"
+  " in from the selection's edge so a mask leaves no step. Use it in its own shaping pass, coarse first (large featureSize, few octaves),"
+  " then finer, turning each pass up or down after looking." + selectorHelp))
+async def roughen(
+  context: Context, objectName: str, featureSize: float, amplitude: float, octaves: int = 4, roughness: float = 0.5, seed: int = 0,
+  direction: str = "normal", selector: dict = allSelector, fadeDistance: float = 0.0,
+):
+  return await callBridge(context, "roughen", {
+    "objectName": objectName, "featureSize": featureSize, "amplitude": amplitude, "octaves": octaves, "roughness": roughness, "seed": seed,
+    "direction": direction, "selector": selector, "fadeDistance": fadeDistance,
+  })
+
+
+@guardedTool(description=(
+  "Warp the selected vertices of a mesh: move them by smooth noise about `featureSize` units across, up to `amplitude` units, so round"
+  " and straight shapes (a sculpted cone hill, a carved channel) stop being regular. `plane` horizontal keeps heights and bends the shape"
+  " sideways; surface moves along the surface; full moves in every direction. The same `seed` gives the same warp; `fadeDistance` ramps"
+  " it in from the selection's edge. Use it in its own shaping pass." + selectorHelp))
+async def warp(
+  context: Context, objectName: str, featureSize: float, amplitude: float, seed: int = 0, plane: str = "horizontal",
+  selector: dict = allSelector, fadeDistance: float = 0.0,
+):
+  return await callBridge(context, "warp", {
+    "objectName": objectName, "featureSize": featureSize, "amplitude": amplitude, "seed": seed, "plane": plane, "selector": selector,
+    "fadeDistance": fadeDistance,
+  })
 
 
 @guardedTool(description="Delete the selected faces of a mesh, with edges and vertices left unused; for example the terrain inside a rock that should form its own cave floor ({\"insideObject\": \"rockName\"})." + selectorHelp)

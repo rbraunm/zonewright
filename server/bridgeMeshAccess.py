@@ -7,7 +7,7 @@ import bpy
 import mathutils
 import numpy
 
-selectorKeys = ("all", "sphere", "box", "cylinder", "facing", "material", "vertexGroup", "insideObject", "and", "or", "not")
+selectorKeys = ("all", "sphere", "box", "cylinder", "facing", "slope", "height", "nearPath", "material", "vertexGroup", "insideObject", "and", "or", "not")
 
 
 def requireObject(name):
@@ -79,6 +79,25 @@ def shapedMesh(sceneObject):
     yield mesh
   finally:
     evaluated.to_mesh_clear()
+
+
+def distancesToPolyline(points, path, horizontal):
+  """Distance from each point to a polyline, the interpolated path height at the nearest spot, and that nearest spot."""
+  pathArray = toArray(path)
+  if pathArray.ndim != 2 or pathArray.shape[1] != 3 or len(pathArray) < 2:
+    raise ValueError(f"A path is at least two [x, y, z] points, got {path!r}")
+  axes = slice(0, 2) if horizontal else slice(0, 3)
+  starts, ends = pathArray[:-1], pathArray[1:]
+  segments = ends[:, axes] - starts[:, axes]
+  lengths = numpy.maximum((segments * segments).sum(1), 1e-12)
+  offsets = points[:, None, axes] - starts[None, :, axes]
+  along = numpy.clip((offsets * segments[None]).sum(2) / lengths[None], 0, 1)
+  nearest = starts[None, :, axes] + along[:, :, None] * segments[None]
+  distances = numpy.linalg.norm(points[:, None, axes] - nearest, axis=2)
+  closest = distances.argmin(1)
+  rows = numpy.arange(len(points))
+  heights = starts[closest, 2] + along[rows, closest] * (ends[closest, 2] - starts[closest, 2])
+  return distances[rows, closest], heights, nearest[rows, closest]
 
 
 def readVertexArrays(sceneObject):
@@ -153,6 +172,14 @@ def evaluateSelector(selector, sceneObject, elementKind):
     direction = toArray(value["direction"])
     direction = direction / numpy.linalg.norm(direction)
     return normals @ direction >= math.cos(math.radians(value["withinDegrees"]))
+  if key == "slope":
+    # 0 is flat ground, 90 a vertical wall, beyond 90 an overhang.
+    slopes = numpy.degrees(numpy.arccos(numpy.clip(normals[:, 2], -1, 1)))
+    return (slopes >= value["minimumDegrees"]) & (slopes <= value["maximumDegrees"])
+  if key == "height":
+    return (positions[:, 2] >= value["minimum"]) & (positions[:, 2] <= value["maximum"])
+  if key == "nearPath":
+    return distancesToPolyline(positions, value["path"], horizontal=True)[0] <= value["radius"]
   if key == "material":
     slotIndex = materialSlotIndex(sceneObject, value)
     if elementKind == "faces":
