@@ -91,9 +91,19 @@ Each ecosystem on a tile has a 32x32 color map and detail mask (A8R8G8B8, no mip
 ### Objects
 
 - **Placements:** a tile's placements give a model (`.mod`, with `.lod` levels the client switches by distance), the ecosystem that placed it, a position from its own tile's origin with z above the ground beneath it, turns in degrees, and a scale. Most have z 0; hand-placed rocks sink a few units.
-- **Object groups (`.tog`):** place their members' models relative to the group, each with a `.lit` file of baked light per vertex. The Neighborhood's zone-out wall, whose `.lit` holds 2175 colors for 1788 vertices, shows in screenshots as an object without baked light, so a `.lit` that does not fit its model is not applied.
+- **Object groups (`.tog`):** place their members' models relative to the group, each with a `.lit` file of baked light per vertex. The client ignores baked light whose count differs from the model's vertices (`0x100548d0` logs "LIT data has %d vertices, expected it to have %d vertices for %s, so LIT data is being ignored!"), so the Neighborhood's zone-out wall, whose `.lit` holds 2175 colors for 1788 vertices, draws without it.
 
 Neighborhood calibration: the two day shots redraw within about 13.5 and 16.6 levels of 255, using the zone's header fog and the doors, ground items, and NPCs of the bristle behavior recording at each shot's moment. The Peridot server's door table agrees with the live dump for the gate in the second shot (`OBJ_GUILDGATE`, door 134). NPC equipment, radial flora (grass cards near the camera), the sky, and level-of-detail models are not drawn yet.
+
+## EQG zones
+
+An EQG zone is an `.eqg` archive whose `.zon` (EQGZ) places one `.ter` terrain mesh and many `.mod` objects. This is the export format. The import that draws client EQG zones is the first item of the [worklist](renderingWorklist.md). What is traced so far:
+
+- **Which `.zon` loads (`0x10066230`):** the client first opens a loose `<archive>.zon` beside the `.eqg`. If it exists, that file is the zone: version 2 (`0x10065430`), or an EQ terrain zone. Otherwise the archive's own `.zon` loads, which must be version 1 (`0x10064da0`). In this client, all 166 loose `.zon` files are version 2. Of the 37 inside archives, 36 are version 1; the one version 2 file inside an archive cannot load that way.
+- **Baked light:** a version 1 placement takes it from `<placement name>.lit` in the archive (magic `EQGP`, a count, then a D3DCOLOR per vertex). A version 2 placement carries it inline. Either way it reaches the model instance (`0x100548d0`), which ignores it unless its count equals the model's vertex count. The Guild Lobby's version 2 `.zon` fits 133 of its 250 placements, and not its terrain (57912 colors for 61096 vertices).
+- **Placements:** model names lose their extension and take `_ACTORDEF`. Rotations are radians, turned into 512ths of a turn as (field 1, -field 2, field 3) times 512 / 2pi. A light's position reads as (field 2, -field 1, field 3).
+- **Effects:** a material's shader name selects the effect family by mesh kind: `Opaque_MaxCB1.fx` draws zone terrain with `SPL\RegionCB1`, placed objects with `SModelCB1`, and skinned models with `SkinMeshCB1`. `RegionCB1`'s vertex shader lights each vertex exactly as `RegionOldA` does (baked RGB plus share times scene light, special ambient, and three point lights). Its normal map adds only point light 0.
+- **Objects without baked light:** these take a different light setup per draw (`0x1009d670`), with the scene's ambient sources folded into one constant. This path is not traced yet.
 
 ## Camera
 

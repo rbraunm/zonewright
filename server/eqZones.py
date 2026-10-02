@@ -158,8 +158,8 @@ def parseObjectGroup(togText, sourceName):
 
 
 def litColors(litBytes, vertexCount, sourceName):
-  """A .lit file's baked light per vertex, or None for one whose count differs from the model's vertices: the Neighborhood's zone-out
-  wall, whose file holds 2175 colors for 1788 vertices, shows in screenshots as an object without baked light."""
+  """A .lit file's baked light per vertex, or None for one whose count differs from the model's vertices, which the client ignores
+  (EQGraphicsDX9.dll 0x100548d0)."""
   count = struct.unpack_from("<I", litBytes, 0)[0]
   if len(litBytes) != 4 + 4 * count:
     raise ValueError(f"{sourceName}: {count} colors in {len(litBytes)} bytes")
