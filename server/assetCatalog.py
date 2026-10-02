@@ -5,12 +5,16 @@ vocabulary. The tooling root's catalog folder holds what the client regenerates 
 thumbnails, and the measurements of zone archives outside the client. A source's measured facts are rebuilt when its files' SHA-256 or
 the survey's version changes; descriptions stay until rewritten. Texture and model ids carry a hash of the content, so a description
 follows the asset across every zone that ships it."""
+import concurrent.futures
 import hashlib
 import json
+import multiprocessing
 import re
 
 import assetSurvey
 import assetVocabulary
+import eqModels
+import machineProfile
 import zoneSurvey
 
 # Facts that differ between the sources an asset appears in; everything else is a property of the asset itself.
@@ -48,22 +52,69 @@ class AssetCatalog:
     return all((assetSurvey.textureFolder(self.cacheRoot, facts["sha256"]) / facts["fileName"]).is_file() and assetSurvey.thumbnailPath(self.cacheRoot, facts["sha256"]).is_file()
       for facts in surveyed["assets"].values() if facts["kind"] == "texture" and "fileName" in facts)
 
+  def isCurrent(self, sourceKey, fileHashes):
+    path = self.sourcePath(sourceKey)
+    if not path.is_file():
+      return False
+    cached = json.loads(path.read_text(encoding="utf-8"))
+    return cached["surveyVersion"] == assetSurvey.surveyVersion and cached["fileHashes"] == fileHashes and self.texturesPresent(cached)
+
+  def store(self, sourceKey, surveyed, fileHashes):
+    path = self.sourcePath(sourceKey)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(surveyed | {"surveyVersion": assetSurvey.surveyVersion, "fileHashes": fileHashes}, indent=1, sort_keys=True), encoding="utf-8")
+    self.mergedAssets = None
+
+  def surveyZones(self, clientRoot, modelCacheRoot, zoneNames, refresh, reportProgress):
+    """The measured lane for many client zones, the stale ones surveyed in parallel worker processes. Returns per zone whether it was
+    surveyed, already current, or why it could not be read."""
+    outcomes, fileHashes = {}, {}
+    sourcePaths = {}
+    for zoneName in zoneNames:
+      try:
+        sourcePaths[zoneName] = assetSurvey.clientZoneSourcePaths(clientRoot, zoneName)
+      except ValueError as error:
+        outcomes[zoneName] = {"error": str(error)}
+    reportProgress(0, None, "checking zone file hashes")
+    cache = zoneSurvey.SurveyCache(self.toolingRoot)
+    hashes = zoneSurvey.hashFiles([path for paths in sourcePaths.values() for path in paths], cache, False)
+    cache.save()
+    for zoneName, paths in sourcePaths.items():
+      fileHashes[zoneName] = {path.name.lower(): hashes[path] for path in paths}
+    stale = [zoneName for zoneName in sourcePaths if refresh or not self.isCurrent(f"zone:{zoneName}", fileHashes[zoneName])]
+    outcomes |= {zoneName: {"current": True} for zoneName in sourcePaths if zoneName not in stale}
+    # Workers resolve classic objects through the model index; building it once here keeps them from racing to write it.
+    eqModels.loadIndex(clientRoot, modelCacheRoot)
+
+    def record(zoneName, outcome):
+      if "error" in outcome:
+        outcomes[zoneName] = outcome
+      else:
+        self.store(f"zone:{zoneName}", outcome["survey"], fileHashes[zoneName])
+        outcomes[zoneName] = {"surveyed": True}
+
+    if len(stale) == 1:
+      record(stale[0], assetSurvey.surveyClientZoneInWorker(clientRoot, modelCacheRoot, self.cacheRoot, stale[0]))
+      reportProgress(1, 1, f"surveyed zone:{stale[0]}")
+    elif stale:
+      with concurrent.futures.ProcessPoolExecutor(min(machineProfile.workerCount(), len(stale)), mp_context=multiprocessing.get_context("spawn")) as pool:
+        futures = {pool.submit(assetSurvey.surveyClientZoneInWorker, clientRoot, modelCacheRoot, self.cacheRoot, zoneName): zoneName for zoneName in stale}
+        for done, future in enumerate(concurrent.futures.as_completed(futures), start=1):
+          record(futures[future], future.result())
+          reportProgress(done, len(stale), f"surveyed zone:{futures[future]}")
+    return dict(sorted(outcomes.items()))
+
   def survey(self, surveyFunction, sourceKey, sourcePaths, refresh):
     """The measured lane for one source, rebuilt when its files' SHA-256 or the survey's version changed, or when this machine lacks
     the textures extracted from it."""
-    path = self.sourcePath(sourceKey)
     fileHashes = self.fileHashes(sourcePaths)
-    if path.is_file() and not refresh:
-      cached = json.loads(path.read_text(encoding="utf-8"))
-      if cached["surveyVersion"] == assetSurvey.surveyVersion and cached["fileHashes"] == fileHashes and self.texturesPresent(cached):
-        return cached
-    surveyed = surveyFunction() | {"surveyVersion": assetSurvey.surveyVersion, "fileHashes": fileHashes}
+    if not refresh and self.isCurrent(sourceKey, fileHashes):
+      return json.loads(self.sourcePath(sourceKey).read_text(encoding="utf-8"))
+    surveyed = surveyFunction()
     if self.fileHashes(sourcePaths) != fileHashes:
       raise ValueError(f"{sourceKey}: its files changed while it was surveyed; survey it again")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(surveyed, indent=1, sort_keys=True), encoding="utf-8")
-    self.mergedAssets = None
-    return surveyed
+    self.store(sourceKey, surveyed, fileHashes)
+    return json.loads(self.sourcePath(sourceKey).read_text(encoding="utf-8"))
 
   def withFilePaths(self, facts):
     """A texture's facts with where this machine keeps its extracted file and thumbnail."""

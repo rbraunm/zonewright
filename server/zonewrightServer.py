@@ -303,35 +303,8 @@ def catalogCall(function, *arguments):
     raise ToolError(f"{type(error).__name__}: {error}") from error
 
 
-@guardedTool()
-async def surveyAssets(context: Context, zone: str | None = None, folder: str | None = None, path: str | None = None, refresh: bool = False):
-  """Survey one source's graphical assets into the asset catalog's measured lane: a client zone (the textures of the archives it loads
-  for its own geometry and objects, with how the zone uses each: area share, world units per texture repeat, slopes, shaders, paired
-  textures; its placed models; its light styles; its emitters; an EQ terrain zone's ecosystems), a client folder of loose images
-  (Resources/Sky, Resources/WaterSwap, Resources/Precipitation, EnvEmitterEffects), or an EQG zone archive at an absolute `path`, such as
-  one exportZone wrote. Each texture is written out readable, with a thumbnail, under the tooling root; a client source's measurements
-  are kept in the repository's catalog folder to be committed. Cached until the source's files change. Returns counts and the most-used
-  textures; findAssets, viewTextures, viewModels, and getAsset read the rest, and describeAssets writes what they are."""
-  if sum(value is not None for value in (zone, folder, path)) != 1:
-    raise ToolError("Survey one source: a zone, a folder, or a path")
-  clientRoot = zoneSources.resolveClientRoot()
-  if zone is not None:
-    zoneName = zone.lower()
-    key, sourcePaths = f"zone:{zoneName}", catalogCall(assetSurvey.clientZoneSourcePaths, clientRoot, zoneName)
-    surveyFunction = lambda: assetSurvey.surveyClientZone(clientRoot, toolingRoot / "models", catalog.cacheRoot, zoneName)
-  elif folder is not None:
-    key, sourcePaths = f"folder:{folder}", catalogCall(assetSurvey.looseFolderPaths, clientRoot, folder)
-    surveyFunction = lambda: assetSurvey.surveyLooseFolder(clientRoot, catalog.cacheRoot, folder)
-  else:
-    archivePath = Path(path)
-    if not archivePath.is_absolute() or archivePath.suffix.lower() != ".eqg" or not archivePath.is_file():
-      raise ToolError(f"'{path}' is not an absolute path to an existing .eqg file")
-    key, sourcePaths = f"file:{archivePath}", assetSurvey.zoneFileSourcePaths(archivePath)
-    surveyFunction = lambda: assetSurvey.surveyZoneFile(clientRoot, catalog.cacheRoot, archivePath)
-  reportProgress = progressReporter(context)
-  await anyio.to_thread.run_sync(reportProgress, 0, 1, f"surveying {key}")
-  surveyed = await anyio.to_thread.run_sync(catalogCall, catalog.survey, surveyFunction, key, sourcePaths, refresh)
-  await anyio.to_thread.run_sync(reportProgress, 1, 1, f"surveyed {key}")
+def sourceSummary(key, surveyed):
+  """Counts per asset kind for a surveyed source, its problems, and its most-used textures."""
   interpretations = catalog.interpretations()
   kinds = {}
   for assetID, facts in surveyed["assets"].items():
@@ -344,6 +317,48 @@ async def surveyAssets(context: Context, zone: str | None = None, folder: str | 
     "unreadable": [assetID for assetID, facts in surveyed["assets"].items() if "problem" in facts],
     "mostUsedTextures": [{"id": asset["id"], "described": asset["id"] in interpretations} | {field: asset["sources"][key]["uses"][field] for field in ("areaShare", "unitsPerRepeat", "slopeShares")} for asset in used[:15]],
   }
+
+
+@guardedTool()
+async def surveyAssets(
+  context: Context, zones: list[str] | None = None, allZones: bool = False, folder: str | None = None, path: str | None = None, refresh: bool = False,
+):
+  """Survey graphical assets into the asset catalog's measured lane: client zones (`zones`, or `allZones`; stale ones are surveyed in
+  parallel, and a zone the parsers cannot read is reported with why), each with the textures of the archives it loads
+  for its own geometry and objects, with how the zone uses each: area share, world units per texture repeat, slopes, shaders, paired
+  textures; its placed models; its light styles; its emitters; an EQ terrain zone's ecosystems), a client folder of loose images
+  (Resources/Sky, Resources/WaterSwap, Resources/Precipitation, EnvEmitterEffects), or an EQG zone archive at an absolute `path`, such as
+  one exportZone wrote. Each texture is written out readable, with a thumbnail, under the tooling root; a client source's measurements
+  are kept in the repository's catalog folder to be committed. Cached until the source's files change. For one source, returns its counts
+  and most-used textures; for many zones, what became of each. findAssets, viewTextures, viewModels, and getAsset read the rest, and
+  describeAssets writes what they are."""
+  if sum((zones is not None, allZones, folder is not None, path is not None)) != 1:
+    raise ToolError("Survey zones, allZones, a folder, or a path")
+  clientRoot = zoneSources.resolveClientRoot()
+  if zones is not None or allZones:
+    zoneNames = sorted({variant["zone"] for variant in zoneSources.discoverZones(clientRoot).values()}) if allZones else [zone.lower() for zone in zones]
+    outcomes = await anyio.to_thread.run_sync(catalogCall, catalog.surveyZones, clientRoot, toolingRoot / "models", zoneNames, refresh, progressReporter(context))
+    if len(zoneNames) == 1 and "error" not in outcomes[zoneNames[0]]:
+      key = f"zone:{zoneNames[0]}"
+      return sourceSummary(key, json.loads(catalog.sourcePath(key).read_text(encoding="utf-8")))
+    return {
+      "zones": len(outcomes), "surveyed": sum("surveyed" in outcome for outcome in outcomes.values()), "current": sum("current" in outcome for outcome in outcomes.values()),
+      "errors": {zoneName: outcome["error"] for zoneName, outcome in outcomes.items() if "error" in outcome},
+    }
+  if folder is not None:
+    key, sourcePaths = f"folder:{folder}", catalogCall(assetSurvey.looseFolderPaths, clientRoot, folder)
+    surveyFunction = lambda: assetSurvey.surveyLooseFolder(clientRoot, catalog.cacheRoot, folder)
+  else:
+    archivePath = Path(path)
+    if not archivePath.is_absolute() or archivePath.suffix.lower() != ".eqg" or not archivePath.is_file():
+      raise ToolError(f"'{path}' is not an absolute path to an existing .eqg file")
+    key, sourcePaths = f"file:{archivePath}", assetSurvey.zoneFileSourcePaths(archivePath)
+    surveyFunction = lambda: assetSurvey.surveyZoneFile(clientRoot, catalog.cacheRoot, archivePath)
+  reportProgress = progressReporter(context)
+  await anyio.to_thread.run_sync(reportProgress, 0, 1, f"surveying {key}")
+  surveyed = await anyio.to_thread.run_sync(catalogCall, catalog.survey, surveyFunction, key, sourcePaths, refresh)
+  await anyio.to_thread.run_sync(reportProgress, 1, 1, f"surveyed {key}")
+  return sourceSummary(key, surveyed)
 
 
 @guardedTool(description="Search the asset catalog: compact entries (measured facts and descriptions) for the assets that match." + findHelp)

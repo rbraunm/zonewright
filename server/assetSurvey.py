@@ -6,6 +6,7 @@ import colorsys
 import collections
 import hashlib
 import io
+import os
 import re
 import struct
 
@@ -125,6 +126,22 @@ def thumbnailPath(cacheRoot, digest):
   return cacheRoot / "thumbnails" / f"{digest[:12]}.png"
 
 
+def writeOnce(path, data):
+  """Write a content-addressed file unless it exists. Parallel surveys write the same image at once, so each writes its own temporary
+  file and renames it into place; when another got there first, its identical file stands."""
+  if path.is_file():
+    return
+  path.parent.mkdir(parents=True, exist_ok=True)
+  temporary = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+  temporary.write_bytes(data)
+  try:
+    os.replace(temporary, path)
+  except PermissionError:
+    if not path.is_file():
+      raise
+    temporary.unlink()
+
+
 class TextureStore:
   """Readable texture files and thumbnails under the tooling root's catalog folder, one per distinct content; the measured facts name
   only the file, so they read the same on every machine."""
@@ -135,17 +152,15 @@ class TextureStore:
   def store(self, textureName, rawBytes):
     digest = shortHash(rawBytes)
     fileName, readable = eqTextures.readableTexture(textureName, rawBytes)
-    folder = textureFolder(self.cacheRoot, digest)
-    if not (folder / fileName).is_file():
-      folder.mkdir(parents=True, exist_ok=True)
-      (folder / fileName).write_bytes(readable)
+    writeOnce(textureFolder(self.cacheRoot, digest) / fileName, readable)
     facts, rgba = imageFacts(textureName, readable)
     thumbnail = thumbnailPath(self.cacheRoot, digest)
     if not thumbnail.is_file():
-      thumbnail.parent.mkdir(parents=True, exist_ok=True)
       image = Image.fromarray(rgba, "RGBA")
       image.thumbnail((thumbnailSide, thumbnailSide))
-      image.save(thumbnail)
+      encoded = io.BytesIO()
+      image.save(encoded, "PNG")
+      writeOnce(thumbnail, encoded.getvalue())
     return f"texture/{textureName}@{digest[:8]}", {"kind": "texture", "name": textureName, "sha256": digest, "fileName": fileName} | facts
 
 
@@ -393,6 +408,14 @@ def surveyClientZone(clientRoot, cacheRoot, catalogRoot, zoneName):
   assets = storeTextures(TextureStore(catalogRoot), archives, textureUses(geometry), materialUses, wldMaterials, layerUses)
   assets |= models | lightFacts(zoneName, lights or []) | emitterFacts(zoneName, emitters)
   return {"source": f"zone:{zoneName}", "zone": zoneName, "format": source["format"], "archives": [path.name.lower() for path in archivePaths], "assets": assets, "problems": problems}
+
+
+def surveyClientZoneInWorker(clientRoot, modelCacheRoot, catalogCacheRoot, zoneName):
+  """Runs in a worker process. A zone these parsers cannot read is reported rather than stopping the others."""
+  try:
+    return {"survey": surveyClientZone(clientRoot, modelCacheRoot, catalogCacheRoot, zoneName)}
+  except (ValueError, KeyError, struct.error) as parseError:
+    return {"error": f"{type(parseError).__name__}: {parseError}"}
 
 
 def surveyLooseFolder(clientRoot, catalogRoot, folder):

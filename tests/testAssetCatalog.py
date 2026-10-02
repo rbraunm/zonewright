@@ -27,16 +27,16 @@ def catalogFile(server, sourceKey):
 
 def testSurveyMeasuresAZonesTexturesLightsAndEmittersAndCachesThem(stageServer):
   server = stageCatalogServer(stageServer)
-  surveyed, progressMessages = server.callToolExpectingSuccess("surveyAssets", {"zone": classicZone})
+  surveyed, progressMessages = server.callToolExpectingSuccess("surveyAssets", {"zones": [classicZone]})
   measured = catalogFile(server, f"zone:{classicZone}")
   modified = measured[0].stat().st_mtime_ns
-  again, _ = server.callToolExpectingSuccess("surveyAssets", {"zone": classicZone})
+  again, _ = server.callToolExpectingSuccess("surveyAssets", {"zones": [classicZone]})
   lights, _ = server.callToolExpectingSuccess("findAssets", {"kind": "light", "source": classicZone})
   emitters, _ = server.callToolExpectingSuccess("findAssets", {"kind": "emitter", "source": classicZone})
   textures, _ = server.callToolExpectingSuccess("findAssets", {"kind": "texture", "source": classicZone, "sortBy": "areaShare", "limit": 500})
   tiling, _ = server.callToolExpectingSuccess("findAssets", {"kind": "texture", "source": classicZone, "tiles": True, "limit": 500})
   assert surveyed["source"] == f"zone:{classicZone}" and surveyed["format"] == "wld" and surveyed["problems"] == []
-  assert progressMessages == [f"surveying zone:{classicZone}", f"surveyed zone:{classicZone}"]
+  assert progressMessages == ["checking zone file hashes", f"surveyed zone:{classicZone}"]
   # The second survey reads the cached measurement: same answer, file untouched.
   assert again == surveyed and len(measured) == 1 and measured[0].stat().st_mtime_ns == modified
   # Grouping lights into styles and emitters into definitions keeps every one the zone's files place.
@@ -53,13 +53,25 @@ def testSurveyMeasuresAZonesTexturesLightsAndEmittersAndCachesThem(stageServer):
   assert str(server.toolingRoot) not in kept and str(server.repositoryPath) not in kept
   assert all(len(digest) == 64 for digest in json.loads(kept)["fileHashes"].values())
   shutil.rmtree(server.toolingRoot / "catalog" / "textures")
-  server.callToolExpectingSuccess("surveyAssets", {"zone": classicZone})
+  server.callToolExpectingSuccess("surveyAssets", {"zones": [classicZone]})
   assert Path(top["file"]).is_file() and measured[0].read_text(encoding="utf-8") == kept
+
+
+def testManyZonesAreSurveyedInParallelAndAnUnreadableOneIsReported(stageServer):
+  server = stageCatalogServer(stageServer)
+  first, progressMessages = server.callToolExpectingSuccess("surveyAssets", {"zones": [classicZone, "arena", eqgZone]})
+  second, _ = server.callToolExpectingSuccess("surveyAssets", {"zones": [classicZone, "arena", eqgZone]})
+  lights, _ = server.callToolExpectingSuccess("findAssets", {"kind": "light", "source": eqgZone})
+  assert first["zones"] == 3 and first["surveyed"] == 2 and first["current"] == 0
+  assert list(first["errors"]) == ["arena"] and "ships both a classic and an EQG version" in first["errors"]["arena"]
+  assert progressMessages[0] == "checking zone file hashes" and sorted(progressMessages[1:]) == [f"surveyed zone:{classicZone}", f"surveyed zone:{eqgZone}"]
+  assert second["surveyed"] == 0 and second["current"] == 2 and second["errors"] == first["errors"]
+  assert sum(style["count"] for style in lights["assets"]) == 6
 
 
 def testDescriptionsUseTheVocabularyAndAreFoundByWhatTheySay(stageServer):
   server = stageCatalogServer(stageServer)
-  server.callToolExpectingSuccess("surveyAssets", {"zone": eqgZone})
+  server.callToolExpectingSuccess("surveyAssets", {"zones": [eqgZone]})
   textures, _ = server.callToolExpectingSuccess("findAssets", {"kind": "texture", "source": eqgZone, "sortBy": "areaShare", "limit": 2})
   textureID = textures["assets"][0]["id"]
   base = {"id": textureID, "category": "grass", "tags": {"color": ["green"], "use": ["terrainFlat"]}, "description": "Dark mossy forest floor with roots.", "usage": "Flat shaded ground under trees; repeat about every 40 units."}
@@ -89,7 +101,7 @@ def testDescriptionsUseTheVocabularyAndAreFoundByWhatTheySay(stageServer):
 
 def testTextureSheetIsNumberedInTheOrderAsked(stageBlenderServer):
   async def steps(session):
-    await session.expectSuccess("surveyAssets", {"zone": eqgZone})
+    await session.expectSuccess("surveyAssets", {"zones": [eqgZone]})
     textures = await session.expectSuccess("findAssets", {"kind": "texture", "source": eqgZone, "sortBy": "name", "limit": 3})
     ids = [asset["id"] for asset in textures["assets"]]
     image, description = await session.expectImage("viewTextures", {"ids": ids, "columns": 2, "tiled": True}, "image/jpeg")
@@ -115,7 +127,7 @@ result = {'lights': len(lights), 'emitters': len(emitters), 'radii': sorted({rou
     await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
     imported = await session.expectSuccess("importZone", {"zone": eqgZone})
     placed = await session.expectSuccess("runPython", {"code": readEnvironment})
-    await session.expectSuccess("surveyAssets", {"zone": eqgZone})
+    await session.expectSuccess("surveyAssets", {"zones": [eqgZone]})
     styles = await session.expectSuccess("findAssets", {"kind": "light", "source": eqgZone})
     definitions = await session.expectSuccess("findAssets", {"kind": "emitter", "source": eqgZone})
     return imported, placed["result"], styles, definitions
@@ -177,7 +189,7 @@ result = {'light': [light.name, [round(value, 4) for value in light.location], [
 def testModelSheetDrawsEachModel(stageBlenderServer):
   async def steps(session):
     await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
-    await session.expectSuccess("surveyAssets", {"zone": eqgZone})
+    await session.expectSuccess("surveyAssets", {"zones": [eqgZone]})
     models = await session.expectSuccess("findAssets", {"kind": "model", "source": eqgZone, "text": "obj_tree", "sortBy": "name", "limit": 2})
     image, description = await session.expectImage("viewModels", {"ids": [asset["id"] for asset in models["assets"]], "columns": 2}, "image/jpeg")
     summary = await session.expectSuccess("getSceneSummary")
