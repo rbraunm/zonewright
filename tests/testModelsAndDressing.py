@@ -98,12 +98,17 @@ def testCarveConformSlidesRimVerticesOntoTheContour(stageBlenderServer):
     await session.expectSuccess("sculptAlongPath", {"objectName": "ground", "mode": "carve", "path": path, "radius": 40, "strength": 1, "profile": profile})
     after = (await session.expectSuccess("runPython", {"code": readVertices}))["result"]
     nonRising = await session.expectError("sculptAlongPath", {"objectName": "ground", "mode": "carve", "path": path, "radius": 40, "strength": 1, "profile": [[0, 0], [0.5, 10], [1, 10]]})
-    return before, after, nonRising
+    # A slanted cut running off the terrain: sliding toward it would push border vertices below it out past the border.
+    await session.expectSuccess("createTerrainGrid", {"name": "crossed", "size": [200, 200], "spacing": 10, "location": [0, 300, 0]})
+    await session.expectSuccess("sculptAlongPath", {"objectName": "crossed", "mode": "carve", "path": [[-160, 240, -20], [160, 360, -20]], "radius": 40, "strength": 1, "profile": profile})
+    crossed = (await session.expectSuccess("runPython", {"code": readVertices.replace("'ground'", "'crossed'")}))["result"]
+    return before, after, nonRising, crossed
 
-  before, after, nonRising = stageBlenderServer.session(steps)
+  before, after, nonRising, crossed = stageBlenderServer.session(steps)
   rimLateral = 40 * (0.5 + 0.5 * (20 - 10) / (30 - 10))
   slid = [(old, new) for old, new in zip(before, after) if new[2] == 0 and (abs(new[0] - old[0]) > 1e-6 or abs(new[1] - old[1]) > 1e-6)]
   assert slid
   for _, new in slid:
     assert abs(abs(new[0] - new[1]) / math.sqrt(2) - rimLateral) < 1e-3
   assert "conformRim needs profile heights that rise" in nonRising
+  assert max(abs(x) for x, _, _ in crossed) == 100 and max(abs(y) for _, y, _ in crossed) == 100

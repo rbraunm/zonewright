@@ -144,7 +144,7 @@ def medianEdgeLength(sceneObject, positions, vertexMask):
 
 
 def carveAlongPath(sceneObject, positions, affected, strength, path, radius, profileArray, conformRim):
-  """Lower vertices to the path floor plus the profile height; with conformRim, untouched vertices just outside the cut slide sideways onto the rim contour so the edge follows the profile instead of the grid."""
+  """Lower vertices to the path floor plus the profile height; with conformRim, untouched vertices just outside the cut slide sideways onto the rim contour so the edge follows the profile instead of the grid. The mesh's open edge never slides, so a cut running off the terrain keeps its border."""
   lateral, floors, nearest = bridgeMeshAccess.distancesToPolyline(positions, path, horizontal=True)
   targets = floors + numpy.interp(numpy.clip(lateral / radius, 0, 1), profileArray[:, 0], profileArray[:, 1])
   updated = positions.copy()
@@ -155,7 +155,7 @@ def carveAlongPath(sceneObject, positions, affected, strength, path, radius, pro
     contourLateral = numpy.interp(heightsAboveFloor, profileArray[:, 1], profileArray[:, 0]) * radius
     slide = contourLateral - lateral
     maximumSlide = 0.75 * medianEdgeLength(sceneObject, positions, lowered)
-    sliding = affected & ~lowered & (heightsAboveFloor > profileArray[0, 1]) & (heightsAboveFloor < profileArray[-1, 1]) & (slide < 0) & (-slide <= maximumSlide) & (lateral > 0)
+    sliding = affected & ~lowered & (heightsAboveFloor > profileArray[0, 1]) & (heightsAboveFloor < profileArray[-1, 1]) & (slide < 0) & (-slide <= maximumSlide) & (lateral > 0) & ~bridgeMeshAccess.boundaryVertexMask(sceneObject)
     outward = (positions[sliding, :2] - nearest[sliding]) / lateral[sliding, None]
     updated[sliding, :2] += outward * slide[sliding, None]
   return updated

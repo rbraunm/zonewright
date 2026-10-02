@@ -149,6 +149,19 @@ def faceLoops(sceneObject):
   return loopTotals, loopVertices
 
 
+def boundaryVertexMask(sceneObject):
+  """Vertices on the mesh's open edge: on an edge only one face uses."""
+  mesh = sceneObject.data
+  loopEdges = numpy.empty(len(mesh.loops), dtype=numpy.int64)
+  mesh.loops.foreach_get("edge_index", loopEdges)
+  faceUses = numpy.bincount(loopEdges, minlength=len(mesh.edges))
+  edges = numpy.empty(len(mesh.edges) * 2, dtype=numpy.int64)
+  mesh.edges.foreach_get("vertices", edges)
+  mask = numpy.zeros(len(mesh.vertices), dtype=bool)
+  mask[edges.reshape(-1, 2)[faceUses == 1].ravel()] = True
+  return mask
+
+
 def faceVertexIndices(sceneObject):
   loopTotals, loopVertices = faceLoops(sceneObject)
   return numpy.split(loopVertices, numpy.cumsum(loopTotals)[:-1])
