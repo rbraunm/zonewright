@@ -17,6 +17,9 @@ fractionModes = ("smooth", "flatten", "carve")
 booleanOperations = ("DIFFERENCE", "UNION", "INTERSECT")
 creasePinch = 0.25
 noiseBasis = "PERLIN_ORIGINAL"
+# The standard deviation of a PERLIN_ORIGINAL sample, and of each component of its noise vector, measured over 20000 random points;
+# dividing by it makes an amplitude the typical move.
+noiseSpread = 0.278
 maximumOctaves = 8
 roughenDirections = ("normal", "up")
 # horizontal keeps heights, surface moves along the surface, full moves in every direction.
@@ -347,16 +350,16 @@ def noiseSamplePoints(positions, featureSize, seed):
 
 
 def fractalNoise(points, octaves, roughness):
-  """Perlin noise summed over octaves, each twice the frequency of the last and `roughness` times its amplitude, normalized to the
-  first octave's range."""
+  """Perlin noise summed over octaves, each twice the frequency of the last and `roughness` times its amplitude, scaled to a standard
+  deviation of 1. The octaves are nearly independent, so their spreads add in quadrature."""
   total = numpy.zeros(len(points))
-  amplitude, frequency, weightSum = 1.0, 1.0, 0.0
+  amplitude, frequency, squareSum = 1.0, 1.0, 0.0
   for _ in range(octaves):
     total += amplitude * numpy.array([mathutils.noise.noise(mathutils.Vector(point * frequency), noise_basis=noiseBasis) for point in points])
-    weightSum += amplitude
+    squareSum += amplitude * amplitude
     amplitude *= roughness
     frequency *= 2
-  return total / weightSum
+  return total / (noiseSpread * math.sqrt(squareSum))
 
 
 def moveSummary(positions, updated):
@@ -392,6 +395,7 @@ def warp(objectName, featureSize, amplitude, seed, plane, selector, fadeDistance
     vectors[:, 2] = 0
   elif plane == "surface":
     vectors -= (vectors * normals).sum(1)[:, None] * normals
+  vectors /= noiseSpread * math.sqrt(3 if plane == "full" else 2)
   updated = positions + amplitude * weights[:, None] * vectors
   writeWorldPositions(sceneObject, updated)
   return moveSummary(positions, updated)

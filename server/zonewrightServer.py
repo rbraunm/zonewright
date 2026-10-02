@@ -808,8 +808,8 @@ async def collapseShapingPasses(context: Context, objectName: str):
 
 
 @guardedTool(description=(
-  "Roughen the selected vertices of a mesh with fractal noise: bumps about `featureSize` units across, up to `amplitude` units, along"
-  " each vertex's normal (`direction` normal: sideways on a wall, so cliffs break up too) or straight up. `octaves` (1-8) add finer"
+  "Roughen the selected vertices of a mesh with fractal noise: bumps about `featureSize` units across, moving vertices `amplitude` units"
+  " as a typical (root mean square) move, the largest about three times that, along each vertex's normal (`direction` normal: sideways on a wall, so cliffs break up too) or straight up. `octaves` (1-8) add finer"
   " noise, each twice as fine and `roughness` times as strong. The same `seed` gives the same noise. `fadeDistance` ramps the effect"
   " in from the selection's edge so a mask leaves no step. Use it in its own shaping pass, coarse first (large featureSize, few octaves),"
   " then finer, turning each pass up or down after looking." + selectorHelp))
@@ -824,7 +824,8 @@ async def roughen(
 
 
 @guardedTool(description=(
-  "Warp the selected vertices of a mesh: move them by smooth noise about `featureSize` units across, up to `amplitude` units, so round"
+  "Warp the selected vertices of a mesh: move them by smooth noise about `featureSize` units across, `amplitude` units as a typical (root"
+  " mean square) move and the largest about three times that, so round"
   " and straight shapes (a sculpted cone hill, a carved channel) stop being regular. `plane` horizontal keeps heights and bends the shape"
   " sideways; surface moves along the surface; full moves in every direction. The same `seed` gives the same warp; `fadeDistance` ramps"
   " it in from the selection's edge. Use it in its own shaping pass." + selectorHelp))

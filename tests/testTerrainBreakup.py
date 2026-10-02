@@ -67,9 +67,9 @@ def testRoughenFollowsTheSurfaceStaysInItsMaskAndRepeatsBySeed(stageBlenderServe
   inside = numpy.hypot(before[:, 0], before[:, 1]) <= 40
   moves = first - before
   assert numpy.array_equal(first, second) and not numpy.allclose(first, third)
-  # On flat ground the normal is up: only heights change, only inside the mask, and within the amplitude.
+  # On flat ground the normal is up: only heights change, and only inside the mask.
   assert numpy.abs(moves[:, :2]).max() < 1e-9 and numpy.abs(moves[~inside]).max() < 1e-9
-  assert 0 < numpy.abs(moves[inside, 2]).max() <= 6 and summary["affectedVertices"] == int((numpy.abs(moves[:, 2]) > 1e-9).sum())
+  assert numpy.abs(moves[inside, 2]).max() > 0 and summary["affectedVertices"] == int((numpy.abs(moves[:, 2]) > 1e-9).sum())
   # With a fade, vertices on the mask's edge stay put and the change grows inward.
   edgeRing = inside & (numpy.hypot(before[:, 0], before[:, 1]) > 32)
   assert numpy.abs((third - before)[edgeRing, 2]).max() < numpy.abs((third - before)[inside & ~edgeRing, 2]).max()
@@ -93,9 +93,8 @@ def testWarpBendsShapesSidewaysAndCanBeTakenBack(stageBlenderServer):
 
   cone, warped, muted = stageBlenderServer.session(steps)
   moves = warped - cone
-  # Horizontal warp keeps every height and moves vertices sideways, up to the amplitude on each axis.
-  assert numpy.abs(moves[:, 2]).max() < 1e-9
-  assert 1 < numpy.abs(moves[:, :2]).max() <= 10
+  # Horizontal warp keeps every height and moves vertices sideways.
+  assert numpy.abs(moves[:, 2]).max() < 1e-9 and numpy.abs(moves[:, :2]).max() > 1
 
   def radiusSpreads(vertices):
     """For each height the raised cone gives several vertices, how far apart their distances from the center lie."""
@@ -109,3 +108,22 @@ def testWarpBendsShapesSidewaysAndCanBeTakenBack(stageBlenderServer):
   assert numpy.median(radiusSpreads(warped)) > 1
   # Muting the warp pass gives the round cone back.
   assert numpy.allclose(muted, cone)
+
+
+def testAmplitudeIsTheTypicalMove(stageBlenderServer):
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    await newGrid(session, "rough", 1024, 8)
+    await newGrid(session, "warped", 1024, 8)
+    before = await worldVertices(session, "rough")
+    # A feature size that is no multiple of the spacing, so the vertices sample the noise at many phases.
+    await session.expectSuccess("roughen", {"objectName": "rough", "featureSize": 17, "amplitude": 3, "octaves": 3, "seed": 2})
+    await session.expectSuccess("warp", {"objectName": "warped", "featureSize": 17, "amplitude": 3, "seed": 2})
+    return before, await worldVertices(session, "rough"), await worldVertices(session, "warped")
+
+  before, rough, warped = stageBlenderServer.session(steps)
+  roughMoves = (rough - before)[:, 2]
+  warpMoves = numpy.linalg.norm((warped - before)[:, :2], axis=1)
+  # Over thousands of bumps, the root mean square move is the amplitude.
+  assert abs(numpy.sqrt(numpy.mean(roughMoves ** 2)) - 3) < 0.3
+  assert abs(numpy.sqrt(numpy.mean(warpMoves ** 2)) - 3) < 0.3
