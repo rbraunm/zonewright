@@ -112,6 +112,30 @@ def testCarveWidensAlongThePathWithRadii(stageBlenderServer):
   assert round(min(z for x, y, z in vertices if abs(y) < 1e-3 and -80 <= x <= 80), 3) == -20
 
 
+def testFillRaisesGroundToAProfileAndLeavesHigherGround(stageBlenderServer):
+  readVertices = "result = [list(vertex.co) for vertex in bpy.data.objects['ground'].data.vertices]"
+  fill = {"objectName": "ground", "mode": "fill", "path": [[0, 0, 0]], "radius": 40, "strength": 1, "profile": [[0, 30], [0.5, 30], [1, 0]]}
+
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [200, 200], "spacing": 10, "location": [0, 0, 0]})
+    await session.expectSuccess("moveVertices", {"objectName": "ground", "selector": {"sphere": {"center": [0, 0, 0], "radius": 1}}, "offset": [0, 0, 50]})
+    conformed = await session.expectError("sculptAlongPath", fill | {"conformRim": True})
+    atPoint = await session.expectError("sculptAtPoint", {"objectName": "ground", "mode": "fill", "center": [0, 0, 0], "radius": 40, "strength": 1})
+    await session.expectSuccess("sculptAlongPath", fill)
+    return conformed, atPoint, (await session.expectSuccess("runPython", {"code": readVertices}))["result"]
+
+  conformed, atPoint, vertices = stageBlenderServer.session(steps)
+  assert "only carve takes it" in conformed and "use sculptAlongPath, whose path can be a single point" in atPoint
+
+  def heightAt(x, y):
+    return next(round(z, 3) for vx, vy, z in vertices if abs(vx - x) < 1e-3 and abs(vy - y) < 1e-3)
+
+  # The raised center stays above the fill; the cap is 30 out to radius 20, then falls evenly to the ground at radius 40.
+  assert heightAt(0, 0) == 50 and heightAt(10, 0) == 30 and heightAt(20, 0) == 30 and heightAt(30, 0) == 15 and heightAt(40, 0) == 0
+  assert heightAt(50, 0) == 0
+
+
 def testCarveConformSlidesRimVerticesOntoTheContour(stageBlenderServer):
   path = [[-100, -100, -20], [100, 100, -20]]
   profile = [[0, 0], [0.5, 10], [1, 30]]

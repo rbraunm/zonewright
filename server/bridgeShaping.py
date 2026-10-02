@@ -12,8 +12,10 @@ import bridgeMeshAccess
 import bridgePasses
 
 falloffCurves = ("constant", "linear", "smooth", "sharp")
-sculptModes = ("raise", "lower", "smooth", "flatten", "crease", "carve")
-fractionModes = ("smooth", "flatten", "carve")
+sculptModes = ("raise", "lower", "smooth", "flatten", "crease", "carve", "fill")
+fractionModes = ("smooth", "flatten", "carve", "fill")
+# carve lowers ground to a cross-section profile along a path; fill raises it to one.
+profileModes = ("carve", "fill")
 booleanOperations = ("DIFFERENCE", "UNION", "INTERSECT")
 creasePinch = 0.25
 noiseBasis = "PERLIN_ORIGINAL"
@@ -76,7 +78,7 @@ def vertexNeighbourAverages(sceneObject, positions):
   return numpy.divide(sums, counts[:, None], out=positions.copy(), where=counts[:, None] > 0)
 
 
-def sculpt(objectName, mode, strokeFractions, nearestPoints, strength, curve, direction, iterations, carve):
+def sculpt(objectName, mode, strokeFractions, nearestPoints, strength, curve, direction, iterations, profileStroke):
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   if mode not in sculptModes:
     raise ValueError(f"mode must be one of {list(sculptModes)}, got '{mode}'")
@@ -108,15 +110,15 @@ def sculpt(objectName, mode, strokeFractions, nearestPoints, strength, curve, di
     heights = (positions - centroid) @ pushDirection
     updated -= strength * weights[:, None] * heights[:, None] * pushDirection
   else:
-    updated = carve(sceneObject, positions, affected, strength)
+    updated = profileStroke(sceneObject, positions, affected, strength)
   moved = numpy.linalg.norm(updated - positions, axis=1)
   writeWorldPositions(sceneObject, updated)
-  return {"affectedVertices": int((moved > 1e-9).sum()), "largestMove": round(float(moved.max()), 3)}
+  return {"affectedVertices": int((moved > 1e-9).sum()), "largestMove": round(float(moved.max()), 3), "foldedFaces": bridgeMeshAccess.foldedFaceCount(sceneObject, positions, updated)}
 
 
 def sculptAtPoint(objectName, mode, center, radius, strength, falloff, direction, iterations):
-  if mode == "carve":
-    raise ValueError("carve follows a path; use sculptAlongPath")
+  if mode in profileModes:
+    raise ValueError(f"{mode} shapes a cross-section profile; use sculptAlongPath, whose path can be a single point")
   if radius <= 0:
     raise ValueError(f"radius must be positive, got {radius}")
   centerArray = bridgeMeshAccess.toArray(center)
@@ -145,35 +147,43 @@ def medianEdgeLength(sceneObject, positions, vertexMask):
   return float(numpy.median(numpy.linalg.norm(positions[edges[:, 0]] - positions[edges[:, 1]], axis=1)))
 
 
-def carveAlongPath(sceneObject, positions, affected, strength, path, radii, profileArray, conformRim):
-  """Lower vertices to the path floor plus the profile height; with conformRim, untouched vertices just outside the cut slide sideways onto the rim contour so the edge follows the profile instead of the grid. The mesh's open edge never slides, so a cut running off the terrain keeps its border."""
+def profileAlongPath(sceneObject, positions, affected, strength, path, radii, profileArray, mode, conformRim):
+  """Move vertices toward the path floor plus the profile height: carve lowers those above it, fill raises those below it. With
+  conformRim (carve only), untouched vertices just outside the cut slide sideways onto the rim contour so the edge follows the profile
+  instead of the grid. The mesh's open edge never slides, so a cut running off the terrain keeps its border."""
   fractions, floors, radiiHere, nearest = bridgeMeshAccess.strokeAlongPath(positions, path, radii, horizontal=True)
   lateral = fractions * radiiHere
   targets = floors + numpy.interp(numpy.clip(fractions, 0, 1), profileArray[:, 0], profileArray[:, 1])
   updated = positions.copy()
-  lowered = affected & (positions[:, 2] > targets)
-  updated[lowered, 2] -= strength * (positions[lowered, 2] - targets[lowered])
+  moving = affected & ((positions[:, 2] > targets) if mode == "carve" else (positions[:, 2] < targets))
+  updated[moving, 2] -= strength * (positions[moving, 2] - targets[moving])
   if conformRim:
     heightsAboveFloor = positions[:, 2] - floors
     contourLateral = numpy.interp(heightsAboveFloor, profileArray[:, 1], profileArray[:, 0]) * radiiHere
     slide = contourLateral - lateral
-    maximumSlide = 0.75 * medianEdgeLength(sceneObject, positions, lowered)
-    sliding = affected & ~lowered & (heightsAboveFloor > profileArray[0, 1]) & (heightsAboveFloor < profileArray[-1, 1]) & (slide < 0) & (-slide <= maximumSlide) & (lateral > 0) & ~bridgeMeshAccess.boundaryVertexMask(sceneObject)
+    maximumSlide = 0.75 * medianEdgeLength(sceneObject, positions, moving)
+    sliding = affected & ~moving & (heightsAboveFloor > profileArray[0, 1]) & (heightsAboveFloor < profileArray[-1, 1]) & (slide < 0) & (-slide <= maximumSlide) & (lateral > 0) & ~bridgeMeshAccess.boundaryVertexMask(sceneObject)
     outward = (positions[sliding, :2] - nearest[sliding]) / lateral[sliding, None]
     updated[sliding, :2] += outward * slide[sliding, None]
   return updated
 
 
 def sculptAlongPath(objectName, mode, path, radius, radii, strength, falloff, direction, iterations, profile, conformRim):
-  if len(path) < 2:
-    raise ValueError("A path needs at least two points")
   if (radius is None) == (radii is None):
     raise ValueError("Give either radius (the whole stroke) or radii (one per path point)")
   strokeRadii = [radius] * len(path) if radii is None else radii
-  if (mode == "carve") != (profile is not None):
-    raise ValueError("carve needs a profile, and only carve takes one")
-  horizontal = mode == "carve"
-  profileArray = validatedProfile(profile, conformRim) if mode == "carve" else None
+  if (mode in profileModes) != (profile is not None):
+    raise ValueError(f"{' and '.join(profileModes)} need a profile, and only they take one")
+  if len(path) == 1 and mode in profileModes:
+    path, strokeRadii = path * 2, list(strokeRadii) * 2
+  if len(path) < 2:
+    raise ValueError(f"A path needs at least two points (one for {' or '.join(profileModes)})")
+  if conformRim is None:
+    conformRim = mode == "carve"
+  if conformRim and mode != "carve":
+    raise ValueError("conformRim slides a carve's rim; only carve takes it")
+  horizontal = mode in profileModes
+  profileArray = validatedProfile(profile, conformRim) if mode in profileModes else None
 
   def nearestPoints(positions):
     pathArray = bridgeMeshAccess.toArray(path)
@@ -184,7 +194,7 @@ def sculptAlongPath(objectName, mode, path, radius, radii, strength, falloff, di
     objectName, mode,
     lambda positions: bridgeMeshAccess.strokeAlongPath(positions, path, strokeRadii, horizontal)[0],
     nearestPoints, strength, falloff, direction, iterations,
-    lambda sceneObject, positions, affected, carveStrength: carveAlongPath(sceneObject, positions, affected, carveStrength, path, strokeRadii, profileArray, conformRim),
+    lambda sceneObject, positions, affected, profileStrength: profileAlongPath(sceneObject, positions, affected, profileStrength, path, strokeRadii, profileArray, mode, conformRim),
   )
 
 
@@ -368,9 +378,13 @@ def fractalNoise(points, octaves, roughness):
   return total / (noiseSpread * math.sqrt(squareSum))
 
 
-def moveSummary(positions, updated):
+def moveSummary(sceneObject, positions, updated):
   moved = numpy.linalg.norm(updated - positions, axis=1)
-  return {"affectedVertices": int((moved > 1e-9).sum()), "largestMove": round(float(moved.max()), 3), "meanMove": round(float(moved[moved > 1e-9].mean()) if (moved > 1e-9).any() else 0.0, 3)}
+  return {
+    "affectedVertices": int((moved > 1e-9).sum()), "largestMove": round(float(moved.max()), 3),
+    "meanMove": round(float(moved[moved > 1e-9].mean()) if (moved > 1e-9).any() else 0.0, 3),
+    "foldedFaces": bridgeMeshAccess.foldedFaceCount(sceneObject, positions, updated),
+  }
 
 
 def roughen(objectName, featureSize, amplitude, octaves, roughness, seed, direction, selector, fadeDistance):
@@ -385,7 +399,7 @@ def roughen(objectName, featureSize, amplitude, octaves, roughness, seed, direct
   pushDirections = normals if direction == "normal" else numpy.broadcast_to((0.0, 0.0, 1.0), normals.shape)
   updated = positions + (amplitude * values * weights)[:, None] * pushDirections
   writeWorldPositions(sceneObject, updated)
-  return moveSummary(positions, updated)
+  return moveSummary(sceneObject, positions, updated)
 
 
 def warp(objectName, featureSize, amplitude, seed, plane, selector, fadeDistance):
@@ -404,7 +418,7 @@ def warp(objectName, featureSize, amplitude, seed, plane, selector, fadeDistance
   vectors /= noiseSpread * math.sqrt(3 if plane == "full" else 2)
   updated = positions + amplitude * weights[:, None] * vectors
   writeWorldPositions(sceneObject, updated)
-  return moveSummary(positions, updated)
+  return moveSummary(sceneObject, positions, updated)
 
 
 commands = {

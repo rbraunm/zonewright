@@ -216,9 +216,15 @@ def applyLayoutShading(preview, bandHeight):
   geometry = nodes.new("ShaderNodeNewGeometry")
   height = nodes.new("ShaderNodeSeparateXYZ")
   links.new(geometry.outputs["Position"], height.inputs["Vector"])
+  # Snapping to the nearest band rather than the band below keeps flat ground at a round height (a multiple of bandHeight) from
+  # flickering between two bands with the GPU's rounding.
+  halfBandUp = nodes.new("ShaderNodeMath")
+  halfBandUp.operation = "ADD"
+  links.new(height.outputs["Z"], halfBandUp.inputs[0])
+  halfBandUp.inputs[1].default_value = bandHeight / 2
   banded = nodes.new("ShaderNodeMath")
   banded.operation = "SNAP"
-  links.new(height.outputs["Z"], banded.inputs[0])
+  links.new(halfBandUp.outputs["Value"], banded.inputs[0])
   banded.inputs[1].default_value = bandHeight
   fraction = nodes.new("ShaderNodeMapRange")
   links.new(banded.outputs["Value"], fraction.inputs["Value"])

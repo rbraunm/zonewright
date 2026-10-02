@@ -789,9 +789,9 @@ async def sculptAtPoint(
 @guardedTool()
 async def sculptAlongPath(
   context: Context, objectName: str, mode: str, path: list[list[float]], strength: float, radius: float | None = None, radii: list[float] | None = None,
-  falloff: str = "smooth", direction: list[float] | None = None, iterations: int = 1, profile: list[list[float]] | None = None, conformRim: bool = True,
+  falloff: str = "smooth", direction: list[float] | None = None, iterations: int = 1, profile: list[list[float]] | None = None, conformRim: bool | None = None,
 ):
-  """Sculpt along a polyline path [[x,y,z], ...] within `radius`, or within `radii` (one per path point, the stroke widening or narrowing evenly between them, so one stroke carves a canyon that pinches to a gorge): raise, lower, crease, smooth, flatten as in sculptAtPoint, or carve, which cuts vertically down to the path's own heights shaped by `profile` [[lateralFraction, heightAboveFloor], ...] from 0 (center) to 1 (edge); carve strength is a fraction. With conformRim (needs rising profile heights), vertices just outside the cut slide onto the rim contour so the edge follows the profile rather than the grid; the mesh's open edge stays put. With shaping passes, the change goes into the active pass."""
+  """Sculpt along a polyline path [[x,y,z], ...] within `radius`, or within `radii` (one per path point, the stroke widening or narrowing evenly between them, so one stroke carves a canyon that pinches to a gorge): raise, lower, crease, smooth, flatten as in sculptAtPoint; carve, which cuts vertically down to the path's own heights shaped by `profile` [[lateralFraction, heightAboveFloor], ...] from 0 (center) to 1 (edge); or fill, which raises ground up to such a profile (a mesa: a flat cap, a cliff, a slope at the base). carve and fill strength is a fraction, and their path can be a single point (a pit or a butte). With conformRim (carve only, on by default; needs rising profile heights), vertices just outside the cut slide onto the rim contour so the edge follows the profile rather than the grid; the mesh's open edge stays put. Results count foldedFaces: faces the move turned over, a sign it was too strong for the mesh's spacing. With shaping passes, the change goes into the active pass."""
   return await callBridge(context, "sculptAlongPath", {"objectName": objectName, "mode": mode, "path": path, "radius": radius, "radii": radii, "strength": strength, "falloff": falloff, "direction": direction, "iterations": iterations, "profile": profile, "conformRim": conformRim})
 
 
@@ -838,7 +838,7 @@ async def roughen(
 
 
 @guardedTool(description=(
-  "Warp the selected vertices of a mesh: move them by smooth noise about `featureSize` units across, `amplitude` units as a typical (root"
+  "Warp the selected vertices of a mesh (the result counts foldedFaces, faces turned over: too much warp for the spacing): move them by smooth noise about `featureSize` units across, `amplitude` units as a typical (root"
   " mean square) move and the largest about three times that, so round"
   " and straight shapes (a sculpted cone hill, a carved channel) stop being regular. `plane` horizontal keeps heights and bends the shape"
   " sideways; surface moves along the surface; full moves in every direction. The same `seed` gives the same warp; `fadeDistance` ramps"

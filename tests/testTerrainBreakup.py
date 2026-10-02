@@ -110,6 +110,20 @@ def testWarpBendsShapesSidewaysAndCanBeTakenBack(stageBlenderServer):
   assert numpy.allclose(muted, cone)
 
 
+def testWarpCountsTheFacesItTurnsOver(stageBlenderServer):
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    await newGrid(session, "gentle")
+    await newGrid(session, "violent")
+    gentle = await session.expectSuccess("warp", {"objectName": "gentle", "featureSize": 64, "amplitude": 2, "seed": 4})
+    violent = await session.expectSuccess("warp", {"objectName": "violent", "featureSize": 16, "amplitude": 12, "seed": 4})
+    return gentle, violent
+
+  gentle, violent = stageBlenderServer.session(steps)
+  # Moves far smaller than the 8-unit spacing keep every face facing up; moves larger than the spacing, varying over two cells, fold some.
+  assert gentle["foldedFaces"] == 0 and violent["foldedFaces"] > 0
+
+
 def testAmplitudeIsTheTypicalMove(stageBlenderServer):
   async def steps(session):
     await session.expectSuccess("newFile", {"discardUnsavedChanges": True})

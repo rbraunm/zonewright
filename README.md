@@ -70,7 +70,7 @@ Edits address parts of a mesh with selectors instead of an interactive selection
 | | `organize` | Renames, parents (world transform kept), collections |
 | | `joinObjects` | Merges meshes into one object, such as a trunk and canopy into one tree |
 | Shaping | `moveVertices` | Moves selected vertices, optionally fading with distance from a center: the fine-detail edit |
-| | `sculptAtPoint` / `sculptAlongPath` | Raise, lower, crease, smooth, flatten around a point or along a path, whose width can change from point to point (`radii`); carve cuts down to a path's heights through a cross-section profile, sliding the vertices just outside the cut onto the rim contour (`conformRim`) |
+| | `sculptAtPoint` / `sculptAlongPath` | Raise, lower, crease, smooth, flatten around a point or along a path, whose width can change from point to point (`radii`); fill raises ground to a cross-section profile (mesas, buttes; a one-point path makes a round one); carve cuts down to a path's heights through a cross-section profile, sliding the vertices just outside the cut onto the rim contour (`conformRim`) |
 | | `deleteFaces` | Removes selected faces, such as the terrain inside a rock that forms its own cave floor |
 | | `extrudeFaces`, `insetFaces`, `bevelEdges`, `subdivide` | Topology edits on selected faces or edges |
 | | `booleanCut` | Cuts openings with a cutter mesh; refuses a cut that would erase the mesh |

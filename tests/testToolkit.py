@@ -93,7 +93,7 @@ def testSculptRaiseCarveSmoothAndCrease(stageBlenderServer):
   assert smoothed[0] < 10.0
   assert carved == [-5.0, 0.0, 0.0]
   assert creased[0] == -4.0
-  assert "carve needs a profile" in carveWithoutProfile
+  assert "carve and fill need a profile" in carveWithoutProfile
   assert "flatten strength is a fraction in (0, 1]" in fractionTooBig
 
 

@@ -174,6 +174,23 @@ def boundaryVertexMask(sceneObject):
   return mask
 
 
+def faceNormals(sceneObject, positions):
+  """Each face's normal scaled by its area (Newell's method), from the given vertex positions."""
+  loopTotals, loopVertices = faceLoops(sceneObject)
+  repeatedTotals = numpy.repeat(loopTotals, loopTotals)
+  loopStarts = numpy.repeat(numpy.cumsum(loopTotals) - loopTotals, loopTotals)
+  nextLoops = loopStarts + (numpy.arange(len(loopVertices)) - loopStarts + 1) % repeatedTotals
+  crosses = numpy.cross(positions[loopVertices], positions[loopVertices[nextLoops]])
+  normals = numpy.zeros((len(loopTotals), 3))
+  numpy.add.at(normals, numpy.repeat(numpy.arange(len(loopTotals)), loopTotals), crosses)
+  return normals / 2
+
+
+def foldedFaceCount(sceneObject, before, after):
+  """Faces a move turned over: their normal now points against where it pointed."""
+  return int(((faceNormals(sceneObject, before) * faceNormals(sceneObject, after)).sum(1) < 0).sum())
+
+
 def faceVertexIndices(sceneObject):
   loopTotals, loopVertices = faceLoops(sceneObject)
   return numpy.split(loopVertices, numpy.cumsum(loopTotals)[:-1])
