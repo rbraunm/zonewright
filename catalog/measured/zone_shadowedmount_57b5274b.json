@@ -1,0 +1,3350 @@
+{
+ "archives": [
+  "shadowedmount.eqg"
+ ],
+ "assets": {
+  "ecosystem/shadowedmount/dirtpath": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_dark.dds",
+     "detailMap": "evil_rock.dds",
+     "detailRepeat": 25,
+     "detailUnitsPerRepeat": 7.7,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "dirtpath",
+     "normalMap": "moors_dirt_path_10n.dds",
+     "normalRepeat": 25,
+     "normalUnitsPerRepeat": 7.7,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "dirtpath",
+   "zone": "shadowedmount"
+  },
+  "ecosystem/shadowedmount/dying": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage2_desert.dds",
+     "detailMap": "di_moors_grass_dead.dds",
+     "detailRepeat": 15,
+     "detailUnitsPerRepeat": 12.8,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "grass",
+     "normalMap": "moors_grass_6n.dds",
+     "normalRepeat": 10,
+     "normalUnitsPerRepeat": 19.2,
+     "slopeTolerance": 1
+    },
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage2_desert.dds",
+     "detailMap": "di_moors_rock2.dds",
+     "detailRepeat": 5,
+     "detailUnitsPerRepeat": 38.4,
+     "heightTolerance": 250.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 2000.0,
+     "maxSlope": 90,
+     "minHeight": 200.0,
+     "minSlope": 50,
+     "name": "rock",
+     "normalMap": "di_moors_rock2_12n.dds",
+     "normalRepeat": 5,
+     "normalUnitsPerRepeat": 38.4,
+     "slopeTolerance": 40
+    }
+   ],
+   "name": "dying",
+   "zone": "shadowedmount"
+  },
+  "ecosystem/shadowedmount/farmland": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage2_rock.dds",
+     "detailMap": "moors_grassb.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "grass",
+     "normalMap": "moors_grass_6n.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 1
+    },
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage2_rock.dds",
+     "detailMap": "coverage_lighte.dds",
+     "detailRepeat": 3,
+     "detailUnitsPerRepeat": 64.0,
+     "heightTolerance": 25.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 15000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 25,
+     "name": "slope",
+     "normalMap": "di_moors_rock2_12n.dds",
+     "normalRepeat": 3,
+     "normalUnitsPerRepeat": 64.0,
+     "slopeTolerance": 25
+    }
+   ],
+   "name": "farmland",
+   "zone": "shadowedmount"
+  },
+  "ecosystem/shadowedmount/forest": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage2_desert.dds",
+     "detailMap": "moors_grassb.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "grass",
+     "normalMap": "moors_grass_6n.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 1
+    },
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage2_desert.dds",
+     "detailMap": "coverage_lighte.dds",
+     "detailRepeat": 3,
+     "detailUnitsPerRepeat": 64.0,
+     "heightTolerance": 250.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 5000.0,
+     "maxSlope": 90,
+     "minHeight": 150.0,
+     "minSlope": 40,
+     "name": "rock",
+     "normalMap": "di_moors_rock2_12n.dds",
+     "normalRepeat": 3,
+     "normalUnitsPerRepeat": 64.0,
+     "slopeTolerance": 55
+    }
+   ],
+   "name": "forest",
+   "zone": "shadowedmount"
+  },
+  "ecosystem/shadowedmount/grassland": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_lightd.dds",
+     "detailMap": "purple_grass.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "grass",
+     "normalMap": "moors_grass_6n.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 1
+    },
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_dark.dds",
+     "detailMap": "evil_rock.dds",
+     "detailRepeat": 3,
+     "detailUnitsPerRepeat": 64.0,
+     "heightTolerance": 250.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 5000.0,
+     "maxSlope": 90,
+     "minHeight": 100.0,
+     "minSlope": 40,
+     "name": "rock",
+     "normalMap": "di_moors_rock2_12n.dds",
+     "normalRepeat": 5,
+     "normalUnitsPerRepeat": 38.4,
+     "slopeTolerance": 55
+    }
+   ],
+   "name": "grassland",
+   "zone": "shadowedmount"
+  },
+  "ecosystem/shadowedmount/lightdirt": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage2_desert.dds",
+     "detailMap": "di_moors__farm_dirt_lt.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "lightdirt",
+     "normalMap": "moors__farm_dirt_10n.dds",
+     "normalRepeat": 15,
+     "normalUnitsPerRepeat": 12.8,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "lightdirt",
+   "zone": "shadowedmount"
+  },
+  "ecosystem/shadowedmount/mesarock": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_lightd.dds",
+     "detailMap": "lava_flow.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 20.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 2000.0,
+     "maxSlope": 90,
+     "minHeight": 150.0,
+     "minSlope": 0,
+     "name": "flattop",
+     "normalMap": "di_moors_rock2_12n.dds",
+     "normalRepeat": 10,
+     "normalUnitsPerRepeat": 19.2,
+     "slopeTolerance": 10
+    }
+   ],
+   "name": "mesarock",
+   "zone": "shadowedmount"
+  },
+  "ecosystem/shadowedmount/pools": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_lightd.dds",
+     "detailMap": "moors_grassb.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 13,
+     "name": "grass",
+     "normalMap": "moors_grass_6n.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 20
+    },
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_lightd.dds",
+     "detailMap": "di_moors_rock2.dds",
+     "detailRepeat": 5,
+     "detailUnitsPerRepeat": 38.4,
+     "heightTolerance": 300.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 2000.0,
+     "maxSlope": 90,
+     "minHeight": 200.0,
+     "minSlope": 50,
+     "name": "rock",
+     "normalMap": "di_moors_rock2_12n.dds",
+     "normalRepeat": 5,
+     "normalUnitsPerRepeat": 38.4,
+     "slopeTolerance": 40
+    },
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "moss_path.dds",
+     "detailMap": "riverrocks.dds",
+     "detailRepeat": 20,
+     "detailUnitsPerRepeat": 9.6,
+     "heightTolerance": 5.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 2.0,
+     "maxSlope": 20,
+     "minHeight": -500.0,
+     "minSlope": 0,
+     "name": "moss_underwater",
+     "normalMap": "moors_dirt_path_10n.dds",
+     "normalRepeat": 20,
+     "normalUnitsPerRepeat": 9.6,
+     "slopeTolerance": 55
+    }
+   ],
+   "name": "pools",
+   "zone": "shadowedmount"
+  },
+  "ecosystem/shadowedmount/rocky": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage2_desert.dds",
+     "detailMap": "coverage_lighte.dds",
+     "detailRepeat": 5,
+     "detailUnitsPerRepeat": 38.4,
+     "heightTolerance": 30.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": 0.0,
+     "minSlope": 0,
+     "name": "rocks",
+     "normalMap": "di_moors_rock2_12n.dds",
+     "normalRepeat": 5,
+     "normalUnitsPerRepeat": 38.4,
+     "slopeTolerance": 1
+    },
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_lightd.dds",
+     "detailMap": "riverrocks.dds",
+     "detailRepeat": 10,
+     "detailUnitsPerRepeat": 19.2,
+     "heightTolerance": 25.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 450.0,
+     "maxSlope": 25,
+     "minHeight": -1000.0,
+     "minSlope": 0,
+     "name": "dirt",
+     "normalMap": "moors_dirt_path_10n.dds",
+     "normalRepeat": 10,
+     "normalUnitsPerRepeat": 19.2,
+     "slopeTolerance": 20
+    },
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_lightd.dds",
+     "detailMap": "moors_grassb.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 300.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 800.0,
+     "maxSlope": 15,
+     "minHeight": 490.0,
+     "minSlope": 0,
+     "name": "grasstop",
+     "normalMap": "moors_grass_6n.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 40
+    }
+   ],
+   "name": "rocky",
+   "zone": "shadowedmount"
+  },
+  "ecosystem/shadowedmount/swamp": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage2_desert.dds",
+     "detailMap": "di_moors_grass_dead.dds",
+     "detailRepeat": 10,
+     "detailUnitsPerRepeat": 19.2,
+     "heightTolerance": 30.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": -90.0,
+     "maxSlope": 45,
+     "minHeight": -10000.0,
+     "minSlope": 20,
+     "name": "mud",
+     "normalMap": "moors_grass_6n.dds",
+     "normalRepeat": 10,
+     "normalUnitsPerRepeat": 19.2,
+     "slopeTolerance": 10
+    }
+   ],
+   "name": "swamp",
+   "zone": "shadowedmount"
+  },
+  "model/obj_evilrock.mod@4a521e57": {
+   "archive": "shadowedmount.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_dark.dds",
+      "e_TextureDiffuse0": "evil_rock.dds",
+      "e_TextureNormal0": "di_moors_rock_dirt_12n.dds"
+     }
+    }
+   ],
+   "name": "obj_evilrock.mod",
+   "placements": 4680,
+   "scaleRange": [
+    0.2,
+    7.94
+   ],
+   "sha256": "4a521e57c0c103d5b8b6b33e11b062159ff1c74dfa53b2056be07c97a5d9e354",
+   "size": [
+    9.3,
+    7.3,
+    5.2
+   ],
+   "skinned": false,
+   "triangles": 68
+  },
+  "model/obj_evilrockspire.mod@faabb720": {
+   "archive": "shadowedmount.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_dark.dds",
+      "e_TextureDiffuse0": "evil_rock.dds",
+      "e_TextureNormal0": "di_moors_rock_dirt_12n.dds"
+     }
+    }
+   ],
+   "name": "obj_evilrockspire.mod",
+   "placements": 24,
+   "scaleRange": [
+    0.501,
+    2.001
+   ],
+   "sha256": "faabb72040769c6b929e6b3f9379ee6064a8278fab6189c8583e1c6832264db3",
+   "size": [
+    139.8,
+    134.8,
+    295.7
+   ],
+   "skinned": false,
+   "triangles": 192
+  },
+  "model/obp_dahliabush.mod@5918c3b8": {
+   "archive": "shadowedmount.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Chroma_MPLBasicAT.fx",
+     "textures": {
+      "e_TextureDiffuse0": "chocolate-dahlia.dds"
+     }
+    }
+   ],
+   "name": "obp_dahliabush.mod",
+   "placements": 1,
+   "scaleRange": [
+    3.001,
+    3.001
+   ],
+   "sha256": "5918c3b8bbc54774105265d2cc0ff34924cb2e912e9f40eff0a10e8e5e2156f1",
+   "size": [
+    5.5,
+    5.6,
+    3.8
+   ],
+   "skinned": false,
+   "triangles": 48
+  },
+  "model/obp_deadtree_card.mod@33196f09": {
+   "archive": "shadowedmount.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Alpha_MPLBasicA.fx",
+     "textures": {
+      "e_TextureDiffuse0": "deadtree_card.dds"
+     }
+    }
+   ],
+   "name": "obp_deadtree_card.mod",
+   "placements": 161,
+   "scaleRange": [
+    1.018,
+    3.495
+   ],
+   "sha256": "33196f09a2855d03079007825e3562b8d866b32e691702cec5547b691e63427d",
+   "size": [
+    37.5,
+    37.5,
+    37.1
+   ],
+   "skinned": false,
+   "triangles": 16
+  },
+  "model/obp_seaplant.mod@02cacfe3": {
+   "archive": "shadowedmount.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Chroma_MPLBasicAT.fx",
+     "textures": {
+      "e_TextureDiffuse0": "seaplant.dds"
+     }
+    }
+   ],
+   "name": "obp_seaplant.mod",
+   "placements": 521,
+   "scaleRange": [
+    0.805,
+    2.499
+   ],
+   "sha256": "02cacfe3df684cd6f68e6a35ac2b794493bc0414a581dc1bcb71ed17d3b0176b",
+   "size": [
+    10.2,
+    10.5,
+    10.4
+   ],
+   "skinned": false,
+   "triangles": 336
+  },
+  "model/obp_vsmokecard.mod@f5f17262": {
+   "archive": "shadowedmount.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MaxWaterFall.fx",
+     "textures": {
+      "e_TextureDiffuse0": "volcano_smoke.dds"
+     }
+    }
+   ],
+   "name": "obp_vsmokecard.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "f5f172626793f738d0cc796012c393ed2ec1f03f55adf48614a3cc6a247205e7",
+   "size": [
+    2843.0,
+    2785.1,
+    4170.8
+   ],
+   "skinned": false,
+   "triangles": 624
+  },
+  "texture/ab_dg_youngtreebranches2.dds@3c70be2b": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.184,
+   "colorName": "tan",
+   "contrast": 0.063,
+   "fileName": "ab_dg_youngtreebranches2.dds",
+   "format": "DXT5",
+   "height": 512,
+   "kind": "texture",
+   "meanColor": [
+    46,
+    44,
+    36
+   ],
+   "name": "ab_dg_youngtreebranches2.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.04,
+   "seamRatios": [
+    5.25,
+    7.51
+   ],
+   "sha256": "3c70be2b22d28a3b3d026aa5c32012e59881238403ab267709f0fcf76408901d",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.84,
+   "width": 512
+  },
+  "texture/ab_spiked_bush_c.dds@4fe6706e": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.271,
+   "colorName": "green",
+   "contrast": 0.052,
+   "fileName": "ab_spiked_bush_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    46,
+    72,
+    37
+   ],
+   "name": "ab_spiked_bush_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.233,
+   "seamRatios": [
+    0.02,
+    0.18
+   ],
+   "sha256": "4fe6706e63cc8d28eabcdb8193426808f04f29ffc70afdb11ff55ed3eb46f065",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.673,
+   "width": 256
+  },
+  "texture/adl_rckwall01.dds@9f5a71e9": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.319,
+   "colorName": "tan",
+   "contrast": 0.093,
+   "fileName": "adl_rckwall01.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    83,
+    85,
+    60
+   ],
+   "name": "adl_rckwall01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.66,
+    0.86
+   ],
+   "sha256": "9f5a71e9838cf6c0eb167123d04851af2cd6d612edbad265c50fd8fb85fcc6bf",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/adl_rckwall01_n.dds@2a985e3a": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.547,
+   "colorName": "blue",
+   "contrast": 0.084,
+   "fileName": "adl_rckwall01_n.dds",
+   "format": "XRGB24",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    127,
+    127,
+    236
+   ],
+   "name": "adl_rckwall01_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.73,
+    0.86
+   ],
+   "sha256": "2a985e3a585b8a8984ab82b5d961a16b4a7fd0b80fa789f063ebabdaea4f03b6",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/bogus_n.dds@a25be00c": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 1.0,
+   "colorName": "white",
+   "contrast": 0.0,
+   "fileName": "bogus_n.dds",
+   "format": "DXT1",
+   "height": 8,
+   "kind": "texture",
+   "meanColor": [
+    255,
+    255,
+    255
+   ],
+   "name": "bogus_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    null,
+    null
+   ],
+   "sha256": "a25be00cd5654ffa1995a281eee0ea30be5c80d7833bdb661c5a161dca179707",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 8
+  },
+  "texture/branches_grn.dds@bae61e69": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.116,
+   "colorName": "green",
+   "contrast": 0.032,
+   "fileName": "branches_grn.dds",
+   "format": "DXT3",
+   "height": 512,
+   "kind": "texture",
+   "meanColor": [
+    47,
+    59,
+    30
+   ],
+   "name": "branches_grn.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.0,
+    0.0
+   ],
+   "sha256": "bae61e69b3ce67c761aaac137ebda9a96b5c741c743a78681cfaec46ba599180",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.929,
+   "width": 512
+  },
+  "texture/cover_b.dds@984eabb6": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.301,
+   "colorName": "brown",
+   "contrast": 0.048,
+   "fileName": "cover_b.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    83,
+    75,
+    68
+   ],
+   "name": "cover_b.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.5,
+    0.88
+   ],
+   "sha256": "984eabb675b147b5517f588641b870577c4b800e0b645b5e9293d7e987e00761",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/coverage.dds@a2e764e8": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.485,
+   "colorName": "grey",
+   "contrast": 0.043,
+   "fileName": "coverage.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    126,
+    124,
+    118
+   ],
+   "name": "coverage.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.05,
+    1.13
+   ],
+   "sha256": "a2e764e8b5cc669ffc538f5f660629162b8dca06f4c63f7af38997d919c495c7",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/coverage2_desert.dds@e058c35f": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.654,
+   "colorName": "tan",
+   "contrast": 0.055,
+   "ecosystemLayers": [
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 12.8,
+     "ecosystem": "dying",
+     "layer": "grass",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 19.2
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 38.4,
+     "ecosystem": "dying",
+     "layer": "rock",
+     "maxHeight": 2000.0,
+     "maxSlope": 90,
+     "minHeight": 200.0,
+     "minSlope": 50,
+     "normalUnitsPerRepeat": 38.4
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "forest",
+     "layer": "grass",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "forest",
+     "layer": "rock",
+     "maxHeight": 5000.0,
+     "maxSlope": 90,
+     "minHeight": 150.0,
+     "minSlope": 40,
+     "normalUnitsPerRepeat": 64.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "lightdirt",
+     "layer": "lightdirt",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 12.8
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 38.4,
+     "ecosystem": "rocky",
+     "layer": "rocks",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": 0.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 38.4
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 19.2,
+     "ecosystem": "swamp",
+     "layer": "mud",
+     "maxHeight": -90.0,
+     "maxSlope": 45,
+     "minHeight": -10000.0,
+     "minSlope": 20,
+     "normalUnitsPerRepeat": 19.2
+    }
+   ],
+   "fileName": "coverage2_desert.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    174,
+    167,
+    145
+   ],
+   "name": "coverage2_desert.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.91,
+    0.85
+   ],
+   "sha256": "e058c35f16892c40a64ed9b1894853a3f71bf83a309de69babaf70794a326a38",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/coverage2_rock.dds@03e7ee88": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.447,
+   "colorName": "grey",
+   "contrast": 0.079,
+   "ecosystemLayers": [
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "farmland",
+     "layer": "grass",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "farmland",
+     "layer": "slope",
+     "maxHeight": 15000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 25,
+     "normalUnitsPerRepeat": 64.0
+    }
+   ],
+   "fileName": "coverage2_rock.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    113,
+    115,
+    115
+   ],
+   "name": "coverage2_rock.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.91,
+    0.94
+   ],
+   "sha256": "03e7ee88a1ad60f03fb8ca862c2728be67199211cb8e8727d3991db99cdfe799",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/coverage4.dds@ca1774a1": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.504,
+   "colorName": "grey",
+   "contrast": 0.109,
+   "fileName": "coverage4.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    130,
+    128,
+    130
+   ],
+   "name": "coverage4.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.8,
+    1.22
+   ],
+   "sha256": "ca1774a12f431c227e17bfc434d2c8531f399fdbf887034eabedf515b321232c",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/coverage_bamboo.dds@5d874cf9": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.513,
+   "colorName": "grey",
+   "contrast": 0.072,
+   "fileName": "coverage_bamboo.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    132,
+    130,
+    132
+   ],
+   "name": "coverage_bamboo.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.89,
+    0.92
+   ],
+   "sha256": "5d874cf9df147e238b88316cdea0f8096025975993b62d578b2197ea881a2f66",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/coverage_base.dds@80a3d927": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.468,
+   "colorName": "grey",
+   "contrast": 0.06,
+   "fileName": "coverage_base.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    120,
+    119,
+    119
+   ],
+   "name": "coverage_base.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.93,
+    1.02
+   ],
+   "sha256": "80a3d927110ec1603dfc4580e84cafc98c71ff77d3c87e4cb44922d9f3432739",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/coverage_dark.dds@4a153cdf": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.329,
+   "colorName": "grey",
+   "contrast": 0.104,
+   "ecosystemLayers": [
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 7.7,
+     "ecosystem": "dirtpath",
+     "layer": "dirtpath",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 7.7
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "grassland",
+     "layer": "rock",
+     "maxHeight": 5000.0,
+     "maxSlope": 90,
+     "minHeight": 100.0,
+     "minSlope": 40,
+     "normalUnitsPerRepeat": 38.4
+    }
+   ],
+   "fileName": "coverage_dark.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_evilrock.mod": 4680,
+     "obj_evilrockspire.mod": 24
+    },
+    "partners": {
+     "di_moors_rock_dirt_12n.dds": 2,
+     "evil_rock.dds": 2
+    },
+    "roles": {
+     "e_TextureCoverage0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    84,
+    84,
+    82
+   ],
+   "name": "coverage_dark.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.85,
+    0.97
+   ],
+   "sha256": "4a153cdf8ce6b554adcf264a9108dee83b1d3a595f2135d7f2e7d772e1c22465",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/coverage_gen.dds@04649d48": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.497,
+   "colorName": "grey",
+   "contrast": 0.062,
+   "fileName": "coverage_gen.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    130,
+    126,
+    120
+   ],
+   "name": "coverage_gen.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.62,
+    1.91
+   ],
+   "sha256": "04649d481341d85fc67f01b21c035aeb0237ba825056730d42748270f90e6417",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/coverage_light_b.dds@6d154f85": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.392,
+   "colorName": "grey",
+   "contrast": 0.023,
+   "fileName": "coverage_light_b.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    101,
+    100,
+    101
+   ],
+   "name": "coverage_light_b.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.89,
+    1.0
+   ],
+   "sha256": "6d154f85e4c786a7eaa3f804278103697b7a891de764d46be79afc75c351759c",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/coverage_lightd.dds@826b98b9": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.671,
+   "colorName": "grey",
+   "contrast": 0.077,
+   "ecosystemLayers": [
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "grassland",
+     "layer": "grass",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "mesarock",
+     "layer": "flattop",
+     "maxHeight": 2000.0,
+     "maxSlope": 90,
+     "minHeight": 150.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 19.2
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "pools",
+     "layer": "grass",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 13,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 38.4,
+     "ecosystem": "pools",
+     "layer": "rock",
+     "maxHeight": 2000.0,
+     "maxSlope": 90,
+     "minHeight": 200.0,
+     "minSlope": 50,
+     "normalUnitsPerRepeat": 38.4
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 19.2,
+     "ecosystem": "rocky",
+     "layer": "dirt",
+     "maxHeight": 450.0,
+     "maxSlope": 25,
+     "minHeight": -1000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 19.2
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "rocky",
+     "layer": "grasstop",
+     "maxHeight": 800.0,
+     "maxSlope": 15,
+     "minHeight": 490.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    }
+   ],
+   "fileName": "coverage_lightd.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    171,
+    171,
+    170
+   ],
+   "name": "coverage_lightd.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.97,
+    1.08
+   ],
+   "sha256": "826b98b9eef1b9f88c697931fb66e0e48309c566ba957600fe734fb82073ae0a",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/coverage_lighte.dds@8c539532": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.571,
+   "colorName": "tan",
+   "contrast": 0.075,
+   "ecosystemLayers": [
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "farmland",
+     "layer": "slope",
+     "maxHeight": 15000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 25,
+     "normalUnitsPerRepeat": 64.0
+    },
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "forest",
+     "layer": "rock",
+     "maxHeight": 5000.0,
+     "maxSlope": 90,
+     "minHeight": 150.0,
+     "minSlope": 40,
+     "normalUnitsPerRepeat": 64.0
+    },
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 38.4,
+     "ecosystem": "rocky",
+     "layer": "rocks",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": 0.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 38.4
+    }
+   ],
+   "fileName": "coverage_lighte.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    148,
+    149,
+    122
+   ],
+   "name": "coverage_lighte.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.17,
+    1.28
+   ],
+   "sha256": "8c539532047c5b2424ae37c86791afd01498f62a7783d68ac0c85619fc9d7706",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/coveragem.dds@cd2ca3dc": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.456,
+   "colorName": "grey",
+   "contrast": 0.038,
+   "fileName": "coveragem.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    118,
+    116,
+    118
+   ],
+   "name": "coveragem.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.93,
+    0.81
+   ],
+   "sha256": "cd2ca3dcebdbd32f5bc6bac014cc1d6a06b5846cee24abe9d7bed3ff43e8e040",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/deadtree_card.dds@8c555182": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.04,
+   "colorName": "black",
+   "contrast": 0.023,
+   "fileName": "deadtree_card.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obp_deadtree_card.mod": 161
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Alpha_MPLBasicA.fx": 1
+    }
+   },
+   "meanColor": [
+    15,
+    10,
+    8
+   ],
+   "name": "deadtree_card.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.162,
+   "seamRatios": [
+    0.99,
+    1.99
+   ],
+   "sha256": "8c5551825242f864016d2d256bae4d1b39d0ee185ca73db95531ed0149cb86b1",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.815,
+   "uses": {
+    "areaShare": 0.0396,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 1.0
+    },
+    "surfaces": {
+     "translucent": 1.0
+    },
+    "unitsPerRepeat": 88.9
+   },
+   "width": 256
+  },
+  "texture/di_bark_moss.dds@d32bf50f": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.164,
+   "colorName": "green",
+   "contrast": 0.072,
+   "fileName": "di_bark_moss.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    42,
+    45,
+    25
+   ],
+   "name": "di_bark_moss.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.96,
+    1.17
+   ],
+   "sha256": "d32bf50ff02abfa6b233e203fa72d955b5650b88a5d55d02aecb82ca894d8c68",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_fp_ext_stonewall_6n.dds@2dbd967e": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.553,
+   "colorName": "blue",
+   "contrast": 0.07,
+   "fileName": "di_fp_ext_stonewall_6n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    245
+   ],
+   "name": "di_fp_ext_stonewall_6n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.18,
+    1.08
+   ],
+   "sha256": "2dbd967e3a4171202294000e7d0fb07b30b9731ea4d1ec1e3a007b68b6afee36",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_fp_ext_stonewalla01_c.dds@236466e0": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.212,
+   "colorName": "grey",
+   "contrast": 0.114,
+   "fileName": "di_fp_ext_stonewalla01_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    56,
+    54,
+    49
+   ],
+   "name": "di_fp_ext_stonewalla01_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.14,
+    2.25
+   ],
+   "sha256": "236466e0fb9189b281168bd81ccd07c148eaf23eb661009b2d77c25279edc624",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_fp_ext_street_cobble1.dds@3500328c": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.265,
+   "colorName": "brown",
+   "contrast": 0.062,
+   "fileName": "di_fp_ext_street_cobble1.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    71,
+    67,
+    59
+   ],
+   "name": "di_fp_ext_street_cobble1.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.29,
+    1.04
+   ],
+   "sha256": "3500328c806bda6a1de59c08c75bfca451f2aa92d75c3c8311c5f60ef1259ba4",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_fp_ext_street_cobble1_10n.dds@9c1998b4": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.557,
+   "colorName": "blue",
+   "contrast": 0.067,
+   "fileName": "di_fp_ext_street_cobble1_10n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    249
+   ],
+   "name": "di_fp_ext_street_cobble1_10n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.18,
+    0.99
+   ],
+   "sha256": "9c1998b4b056a3ca7bb6db35385251f27934a822eb243bb855b4df6742aa4438",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_fp_ext_stucco_lite.dds@de7a9942": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.609,
+   "colorName": "grey",
+   "contrast": 0.076,
+   "fileName": "di_fp_ext_stucco_lite.dds",
+   "format": "ARGB16",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    159,
+    154,
+    152
+   ],
+   "name": "di_fp_ext_stucco_lite.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.04,
+    1.15
+   ],
+   "sha256": "de7a9942348731dbb3036bfd2022080a0dbb1a9cd0c40c08901096c38e746647",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_fp_militia_door_ornate.dds@f4e7ee8c": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.141,
+   "colorName": "brown",
+   "contrast": 0.074,
+   "fileName": "di_fp_militia_door_ornate.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    49,
+    32,
+    20
+   ],
+   "name": "di_fp_militia_door_ornate.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.66,
+    0.42
+   ],
+   "sha256": "f4e7ee8cf9673f4ff478722606701b3c48909af01fdf906a92a9f3b46bf9c812",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_fp_militia_door_ornate_10ns.dds@6564c395": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.557,
+   "colorName": "blue",
+   "contrast": 0.054,
+   "fileName": "di_fp_militia_door_ornate_10ns.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    125,
+    214
+   ],
+   "name": "di_fp_militia_door_ornate_10ns.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.145,
+   "seamRatios": [
+    2.58,
+    0.09
+   ],
+   "sha256": "6564c3956fb0b6a56c89e2285f95dce9075403b25a1bb992976b12d81eb9f09e",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.989,
+   "width": 256
+  },
+  "texture/di_moors__farm_dirt_dk.dds@92e294ce": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.206,
+   "colorName": "brown",
+   "contrast": 0.038,
+   "fileName": "di_moors__farm_dirt_dk.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    66,
+    50,
+    28
+   ],
+   "name": "di_moors__farm_dirt_dk.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.016,
+   "seamRatios": [
+    0.95,
+    1.28
+   ],
+   "sha256": "92e294ce665dc60fd91d6b9bcc9e97890b8736641d52e54ac992dec3e62b310e",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_moors__farm_dirt_lt.dds@d758a38e": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.343,
+   "colorName": "brown",
+   "contrast": 0.043,
+   "ecosystemLayers": [
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "lightdirt",
+     "layer": "lightdirt",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 12.8
+    }
+   ],
+   "fileName": "di_moors__farm_dirt_lt.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    104,
+    86,
+    54
+   ],
+   "name": "di_moors__farm_dirt_lt.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.016,
+   "seamRatios": [
+    1.0,
+    1.24
+   ],
+   "sha256": "d758a38ed75ec78fa0cfd1419f417330affd4398c3774a87798de65416f7cb66",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_moors_dirt_path.dds@f8d5ced0": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.436,
+   "colorName": "tan",
+   "contrast": 0.097,
+   "fileName": "di_moors_dirt_path.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    121,
+    113,
+    78
+   ],
+   "name": "di_moors_dirt_path.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.68,
+    1.13
+   ],
+   "sha256": "f8d5ced041c1a6edeb120df2a83aa814132d907944a3e8ff41641d3876d28037",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_moors_flora01.dds@2d8a2557": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.08,
+   "colorName": "black",
+   "contrast": 0.049,
+   "fileName": "di_moors_flora01.dds",
+   "format": "ARGB32",
+   "height": 512,
+   "kind": "texture",
+   "meanColor": [
+    29,
+    13,
+    10
+   ],
+   "name": "di_moors_flora01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.254,
+   "seamRatios": [
+    6.61,
+    8.47
+   ],
+   "sha256": "2d8a2557def91522151786e24f408b51c8a454f0710de4af0e68896359ae38ee",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.855,
+   "width": 512
+  },
+  "texture/di_moors_rock2_12n.dds@14fb9be0": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.069,
+   "ecosystemLayers": [
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 38.4,
+     "ecosystem": "dying",
+     "layer": "rock",
+     "maxHeight": 2000.0,
+     "maxSlope": 90,
+     "minHeight": 200.0,
+     "minSlope": 50,
+     "normalUnitsPerRepeat": 38.4
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "farmland",
+     "layer": "slope",
+     "maxHeight": 15000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 25,
+     "normalUnitsPerRepeat": 64.0
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "forest",
+     "layer": "rock",
+     "maxHeight": 5000.0,
+     "maxSlope": 90,
+     "minHeight": 150.0,
+     "minSlope": 40,
+     "normalUnitsPerRepeat": 64.0
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "grassland",
+     "layer": "rock",
+     "maxHeight": 5000.0,
+     "maxSlope": 90,
+     "minHeight": 100.0,
+     "minSlope": 40,
+     "normalUnitsPerRepeat": 38.4
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "mesarock",
+     "layer": "flattop",
+     "maxHeight": 2000.0,
+     "maxSlope": 90,
+     "minHeight": 150.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 19.2
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 38.4,
+     "ecosystem": "pools",
+     "layer": "rock",
+     "maxHeight": 2000.0,
+     "maxSlope": 90,
+     "minHeight": 200.0,
+     "minSlope": 50,
+     "normalUnitsPerRepeat": 38.4
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 38.4,
+     "ecosystem": "rocky",
+     "layer": "rocks",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": 0.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 38.4
+    }
+   ],
+   "fileName": "di_moors_rock2_12n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    248
+   ],
+   "name": "di_moors_rock2_12n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.98,
+    1.08
+   ],
+   "sha256": "14fb9be022af97122317f31b76e48fbbdd28dd54d022f5037a20604696a4d149",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_moors_rock_dirt.dds@3033def1": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.287,
+   "colorName": "tan",
+   "contrast": 0.02,
+   "fileName": "di_moors_rock_dirt.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    78,
+    75,
+    51
+   ],
+   "name": "di_moors_rock_dirt.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.16,
+    1.12
+   ],
+   "sha256": "3033def13272f745a4daef70fafe616193bd649a2e538d08a0b19b39a890a872",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_moors_rock_dirt_12n.dds@40f79b94": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.038,
+   "fileName": "di_moors_rock_dirt_12n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_evilrock.mod": 4680,
+     "obj_evilrockspire.mod": 24
+    },
+    "partners": {
+     "coverage_dark.dds": 2,
+     "evil_rock.dds": 2
+    },
+    "roles": {
+     "e_TextureNormal0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    127,
+    127,
+    253
+   ],
+   "name": "di_moors_rock_dirt_12n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.46,
+    1.72
+   ],
+   "sha256": "40f79b944b87b8354668558aba902c48ad0be7585101ae9299fa1e34ba4c2a12",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_morel_ext_stone_6n.dds@0d6dc8db": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.557,
+   "colorName": "blue",
+   "contrast": 0.024,
+   "fileName": "di_morel_ext_stone_6n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    254
+   ],
+   "name": "di_morel_ext_stone_6n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.0,
+    1.06
+   ],
+   "sha256": "0d6dc8dbce45caa3c2ed44ab70b356687293fa726d8b16f106667c335b860c0a",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_og_roof_thatched.dds@9853a57f": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.386,
+   "colorName": "grey",
+   "contrast": 0.048,
+   "fileName": "di_og_roof_thatched.dds",
+   "format": "DXT5",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    97,
+    98,
+    107
+   ],
+   "name": "di_og_roof_thatched.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.39,
+    0.91
+   ],
+   "sha256": "9853a57f389825aabd0e71d4bc4093d5f730b35e4e838b93908955fde7fa9650",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 128
+  },
+  "texture/di_tak__ruin_grnd_plain_n.dds@c403d09d": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.557,
+   "colorName": "blue",
+   "contrast": 0.02,
+   "fileName": "di_tak__ruin_grnd_plain_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    127,
+    255
+   ],
+   "name": "di_tak__ruin_grnd_plain_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.49,
+    1.44
+   ],
+   "sha256": "c403d09dd66e3e89880270cce765f07ab8108003910a390bf2f00a6024109bcb",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/env_noswap_cave.dds@e45e1416": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.294,
+   "colorName": "grey",
+   "contrast": 0.099,
+   "fileName": "env_noswap_cave.dds",
+   "format": "DXT5",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    74,
+    76,
+    70
+   ],
+   "name": "env_noswap_cave.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.11,
+    0.61
+   ],
+   "sha256": "e45e14160573dfc28bd3ef81a92640798539422fbc5ec820a6d4e9175173692f",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 128
+  },
+  "texture/erosion_ov_tile.dds@c28efeed": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.347,
+   "colorName": "tan",
+   "contrast": 0.08,
+   "fileName": "erosion_ov_tile.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    90,
+    90,
+    76
+   ],
+   "name": "erosion_ov_tile.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.82,
+    1.05
+   ],
+   "sha256": "c28efeed56a6dde74216639ec22fdfc559a37aa435b249049a053443e18333fa",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/evil_rock.dds@4b412971": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.099,
+   "colorName": "black",
+   "contrast": 0.056,
+   "ecosystemLayers": [
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 7.7,
+     "ecosystem": "dirtpath",
+     "layer": "dirtpath",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 7.7
+    },
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "grassland",
+     "layer": "rock",
+     "maxHeight": 5000.0,
+     "maxSlope": 90,
+     "minHeight": 100.0,
+     "minSlope": 40,
+     "normalUnitsPerRepeat": 38.4
+    }
+   ],
+   "fileName": "evil_rock.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_evilrock.mod": 4680,
+     "obj_evilrockspire.mod": 24
+    },
+    "partners": {
+     "coverage_dark.dds": 2,
+     "di_moors_rock_dirt_12n.dds": 2
+    },
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    26,
+    25,
+    26
+   ],
+   "name": "evil_rock.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.88,
+    0.97
+   ],
+   "sha256": "4b412971708a09a0b571215211bce81f221de3a464061216e8bd40256f39014b",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0487,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.033,
+     "overhang": 0.305,
+     "slope": 0.082,
+     "steep": 0.232,
+     "vertical": 0.348
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 20.7
+   },
+   "width": 256
+  },
+  "texture/evil_rock_1.dds@f380987f": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.279,
+   "colorName": "grey",
+   "contrast": 0.126,
+   "fileName": "evil_rock_1.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    73,
+    70,
+    74
+   ],
+   "name": "evil_rock_1.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.87,
+    0.97
+   ],
+   "sha256": "f380987f5e0b64105d25bcccde5d253cb43d8d665d8c07ad11fabc5de05a13fb",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/ew_guild_bench_c.dds@e7d13224": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.449,
+   "colorName": "grey",
+   "contrast": 0.068,
+   "fileName": "ew_guild_bench_c.dds",
+   "format": "DXT5",
+   "height": 512,
+   "kind": "texture",
+   "meanColor": [
+    116,
+    114,
+    112
+   ],
+   "name": "ew_guild_bench_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.97,
+    1.2
+   ],
+   "sha256": "e7d1322448b212c84bfbc0dbc8cab4e86bc3e16e953e22a4141bba8f67d13196",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 512
+  },
+  "texture/ew_guild_bench_n.dds@a8505e18": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.559,
+   "colorName": "blue",
+   "contrast": 0.017,
+   "fileName": "ew_guild_bench_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    255
+   ],
+   "name": "ew_guild_bench_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.89,
+    0.89
+   ],
+   "sha256": "a8505e18fc54048f263c663c0fd42fd82fbd6ae77a9d47c48fd6cf2776e50f6d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/fp_coverage_ov.dds@7d2136e7": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.356,
+   "colorName": "grey",
+   "contrast": 0.086,
+   "fileName": "fp_coverage_ov.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    93,
+    90,
+    88
+   ],
+   "name": "fp_coverage_ov.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.87,
+    1.08
+   ],
+   "sha256": "7d2136e7b70090132e74c0301e833379c9f3912a310b412a987a4769b7fefb19",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/fprt_generic_ceiling.dds@ed612482": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.519,
+   "colorName": "grey",
+   "contrast": 0.158,
+   "fileName": "fprt_generic_ceiling.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    136,
+    131,
+    128
+   ],
+   "name": "fprt_generic_ceiling.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.99,
+    1.05
+   ],
+   "sha256": "ed612482dc4fb31676d52796737245f4cea5321eea0e6ed97c86c656fbfbea5c",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/fprt_generic_ceiling_8n.dds@2601670c": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.024,
+   "fileName": "fprt_generic_ceiling_8n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    253
+   ],
+   "name": "fprt_generic_ceiling_8n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.52,
+    0.86
+   ],
+   "sha256": "2601670cee49b44841d5cf8e39bb82ae1b3a11b0e76abc5e7953d176c117d9c8",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hp_wood_smootha01_c.dds@e7d13224": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.449,
+   "colorName": "grey",
+   "contrast": 0.068,
+   "fileName": "hp_wood_smootha01_c.dds",
+   "format": "DXT5",
+   "height": 512,
+   "kind": "texture",
+   "meanColor": [
+    116,
+    114,
+    112
+   ],
+   "name": "hp_wood_smootha01_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.97,
+    1.2
+   ],
+   "sha256": "e7d1322448b212c84bfbc0dbc8cab4e86bc3e16e953e22a4141bba8f67d13196",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 512
+  },
+  "texture/hp_wood_smootha01_n.dds@ad48b128": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.557,
+   "colorName": "blue",
+   "contrast": 0.019,
+   "fileName": "hp_wood_smootha01_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    254
+   ],
+   "name": "hp_wood_smootha01_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.74,
+    0.74
+   ],
+   "sha256": "ad48b128508812f5c90c30b93a7b0131bb620a81d48a194c537f22cf3857cd9d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/iron_gate.dds@f0d84f84": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.381,
+   "colorName": "grey",
+   "contrast": 0.15,
+   "fileName": "iron_gate.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    48,
+    48,
+    45
+   ],
+   "name": "iron_gate.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.163,
+   "seamRatios": [
+    0.19,
+    2.9
+   ],
+   "sha256": "f0d84f8465c3c1042643087cfb76fe77fcd58464d8dac48041b198d9dc48a4c8",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.659,
+   "width": 256
+  },
+  "texture/lava_flow.dds@e2f2ff03": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.508,
+   "colorName": "orange",
+   "contrast": 0.099,
+   "ecosystemLayers": [
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "mesarock",
+     "layer": "flattop",
+     "maxHeight": 2000.0,
+     "maxSlope": 90,
+     "minHeight": 150.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 19.2
+    }
+   ],
+   "fileName": "lava_flow.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    224,
+    101,
+    31
+   ],
+   "name": "lava_flow.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.88,
+    1.04
+   ],
+   "sha256": "e2f2ff034f2b25a2acb7c52110c7018f3f90e53d15cfffd50c54281f95e97967",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/moors__farm_dirt_10n.dds@ce9b913f": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.555,
+   "colorName": "blue",
+   "contrast": 0.055,
+   "ecosystemLayers": [
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "lightdirt",
+     "layer": "lightdirt",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 12.8
+    }
+   ],
+   "fileName": "moors__farm_dirt_10n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    251
+   ],
+   "name": "moors__farm_dirt_10n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.016,
+   "seamRatios": [
+    1.52,
+    1.96
+   ],
+   "sha256": "ce9b913fd60ffc3d78ec3e155d528aaabb16480ea0f4500c269d8bcd5d3c6995",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/moors_dirt_path_10n.dds@a5697040": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.062,
+   "ecosystemLayers": [
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 7.7,
+     "ecosystem": "dirtpath",
+     "layer": "dirtpath",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 7.7
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 9.6,
+     "ecosystem": "pools",
+     "layer": "moss_underwater",
+     "maxHeight": 2.0,
+     "maxSlope": 20,
+     "minHeight": -500.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 9.6
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 19.2,
+     "ecosystem": "rocky",
+     "layer": "dirt",
+     "maxHeight": 450.0,
+     "maxSlope": 25,
+     "minHeight": -1000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 19.2
+    }
+   ],
+   "fileName": "moors_dirt_path_10n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    250
+   ],
+   "name": "moors_dirt_path_10n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.84,
+    1.65
+   ],
+   "sha256": "a5697040b84ec582c0d33d0f39cb8113e65233cb9ccc3de2be4a3e7e95c761ea",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/moors_grass_6n.dds@f2edc224": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.555,
+   "colorName": "blue",
+   "contrast": 0.06,
+   "ecosystemLayers": [
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 12.8,
+     "ecosystem": "dying",
+     "layer": "grass",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 19.2
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "farmland",
+     "layer": "grass",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "forest",
+     "layer": "grass",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "grassland",
+     "layer": "grass",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "pools",
+     "layer": "grass",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 13,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "rocky",
+     "layer": "grasstop",
+     "maxHeight": 800.0,
+     "maxSlope": 15,
+     "minHeight": 490.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 19.2,
+     "ecosystem": "swamp",
+     "layer": "mud",
+     "maxHeight": -90.0,
+     "maxSlope": 45,
+     "minHeight": -10000.0,
+     "minSlope": 20,
+     "normalUnitsPerRepeat": 19.2
+    }
+   ],
+   "fileName": "moors_grass_6n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    250
+   ],
+   "name": "moors_grass_6n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.53,
+    1.65
+   ],
+   "sha256": "f2edc2247da809c25b631fa6fa6a6431cb954cbc30dc5a35d168123b90222427",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/plh_stucco_beams_c.dds@1e211155": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.429,
+   "colorName": "brown",
+   "contrast": 0.206,
+   "fileName": "plh_stucco_beams_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    116,
+    109,
+    94
+   ],
+   "name": "plh_stucco_beams_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.69,
+    0.92
+   ],
+   "sha256": "1e211155602ad980d4b99fd31a7d14ca0d7b21989d9388e4ee19872a8f0d0be0",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/plh_stucco_beams_n.dds@2755b931": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.552,
+   "colorName": "blue",
+   "contrast": 0.045,
+   "fileName": "plh_stucco_beams_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    126,
+    127,
+    249
+   ],
+   "name": "plh_stucco_beams_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.53,
+    0.81
+   ],
+   "sha256": "2755b931a18e6aa5fb74133f241f7fd57afd4677442c119999594a849eba7084",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/purple_grass.dds@162d5e79": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.091,
+   "colorName": "red",
+   "contrast": 0.05,
+   "ecosystemLayers": [
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "grassland",
+     "layer": "grass",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    }
+   ],
+   "fileName": "purple_grass.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    46,
+    14,
+    12
+   ],
+   "name": "purple_grass.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.06,
+    1.08
+   ],
+   "sha256": "162d5e79c2a57a12a397514c35bc7013000e45ab32388e0153a91a2dd430f448",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/radl_purple_grass.dds@18572d8c": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.182,
+   "colorName": "red",
+   "contrast": 0.01,
+   "fileName": "radl_purple_grass.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    89,
+    29,
+    22
+   ],
+   "name": "radl_purple_grass.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.18,
+   "seamRatios": [
+    5.11,
+    4.94
+   ],
+   "sha256": "18572d8c30f4abd424824d1c4a36c038efd5ab71c4e00553c43ac7649a05485b",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.916,
+   "width": 256
+  },
+  "texture/rockface_n.dds@4efffe63": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.558,
+   "colorName": "blue",
+   "contrast": 0.038,
+   "fileName": "rockface_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    253
+   ],
+   "name": "rockface_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.48,
+    0.88
+   ],
+   "sha256": "4efffe639a0b29711085141301ce5cde893d635fdfb18c824b34146f336ef0e7",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/seaplant.dds@73cdb497": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.137,
+   "colorName": "brown",
+   "contrast": 0.066,
+   "fileName": "seaplant.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obp_seaplant.mod": 521
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Chroma_MPLBasicAT.fx": 1
+    }
+   },
+   "meanColor": [
+    66,
+    41,
+    26
+   ],
+   "name": "seaplant.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.062,
+   "seamRatios": [
+    0.05,
+    0.09
+   ],
+   "sha256": "73cdb49738b194f206bfb94a3ec37f3001956de224eb4ab28b97990ab25434bb",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.807,
+   "uses": {
+    "areaShare": 0.0061,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.231,
+     "slope": 0.0,
+     "steep": 0.231,
+     "vertical": 0.538
+    },
+    "surfaces": {
+     "cutout": 1.0
+    },
+    "unitsPerRepeat": 7.3
+   },
+   "width": 256
+  },
+  "texture/stonewall.dds@e009eb30": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.528,
+   "colorName": "tan",
+   "contrast": 0.104,
+   "fileName": "stonewall.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    141,
+    134,
+    119
+   ],
+   "name": "stonewall.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.9,
+    0.93
+   ],
+   "sha256": "e009eb30b91b212457d2cfab8e8fab819314ac28b65fbf56e7b544f581f1a062",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/td_oak_branches01_c.dds@6d2c2ee2": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.132,
+   "colorName": "green",
+   "contrast": 0.076,
+   "fileName": "td_oak_branches01_c.dds",
+   "format": "DXT5",
+   "height": 512,
+   "kind": "texture",
+   "meanColor": [
+    49,
+    54,
+    27
+   ],
+   "name": "td_oak_branches01_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.172,
+   "seamRatios": [
+    0.02,
+    0.1
+   ],
+   "sha256": "6d2c2ee2a76b7adffb0de9902d5b3360289dd19e8d1f2cf366e1a54a62171e7d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.699,
+   "width": 512
+  },
+  "texture/td_pine_bark_c.dds@271aee9e": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.324,
+   "colorName": "grey",
+   "contrast": 0.085,
+   "fileName": "td_pine_bark_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    89,
+    81,
+    75
+   ],
+   "name": "td_pine_bark_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.98,
+    1.04
+   ],
+   "sha256": "271aee9e4ea8235a463bee939413c34106f4df7f1789150146fceea611d558c6",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/td_pine_bark_n.dds@be410fb1": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.553,
+   "colorName": "blue",
+   "contrast": 0.051,
+   "fileName": "td_pine_bark_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    127,
+    127,
+    250
+   ],
+   "name": "td_pine_bark_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.66,
+    0.85
+   ],
+   "sha256": "be410fb1ab9bedfb9f8615f9ffa4000f923a1c53d2109d71edf3956b42dc77c3",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/tunnel_bricks_c.dds@c61e1b9b": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.238,
+   "colorName": "grey",
+   "contrast": 0.065,
+   "fileName": "tunnel_bricks_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    60,
+    62,
+    57
+   ],
+   "name": "tunnel_bricks_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.08,
+    1.11
+   ],
+   "sha256": "c61e1b9b36a97a7d30c2c0412126b11b340b917371113d06688f5e72a25ccb39",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/tunnel_bricks_n.dds@7b121ecb": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.555,
+   "colorName": "blue",
+   "contrast": 0.07,
+   "fileName": "tunnel_bricks_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    127,
+    128,
+    250
+   ],
+   "name": "tunnel_bricks_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.96,
+    0.7
+   ],
+   "sha256": "7b121ecbb564b248a16bad6d5636855cbc435bd8ad6c2432be01ed6344a05977",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/volcano_smoke.dds@a376793d": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.49,
+   "colorName": "grey",
+   "contrast": 0.087,
+   "fileName": "volcano_smoke.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obp_vsmokecard.mod": 1
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MaxWaterFall.fx": 1
+    }
+   },
+   "meanColor": [
+    125,
+    121,
+    117
+   ],
+   "name": "volcano_smoke.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.644,
+   "seamRatios": [
+    1.2,
+    0.76
+   ],
+   "sha256": "a376793df6aec525925f17a5ee1a6d3a43283e6ed2e49ccbe9eda3bb0a79eade",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.326,
+   "uses": {
+    "areaShare": 0.5225,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.038,
+     "overhang": 0.458,
+     "slope": 0.211,
+     "steep": 0.209,
+     "vertical": 0.084
+    },
+    "surfaces": {
+     "water": 1.0
+    },
+    "unitsPerRepeat": 1218.1
+   },
+   "width": 256
+  },
+  "texture/window.dds@8b3d5fe1": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.441,
+   "colorName": "grey",
+   "contrast": 0.212,
+   "fileName": "window.dds",
+   "format": "DXT5",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    61,
+    64,
+    67
+   ],
+   "name": "window.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.071,
+   "seamRatios": [
+    1.37,
+    2.81
+   ],
+   "sha256": "8b3d5fe17e85725e36f0d74004b64426818cce56f2ddce77f06b15b2b9a79df1",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.561,
+   "width": 256
+  },
+  "texture/window_n.dds@af71a093": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.476,
+   "colorName": "blue",
+   "contrast": 0.116,
+   "fileName": "window_n.dds",
+   "format": "ARGB32",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    110,
+    112,
+    202
+   ],
+   "name": "window_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.658,
+   "seamRatios": [
+    1.86,
+    2.38
+   ],
+   "sha256": "af71a0934a5b2f4a0bf864151c18ec4eaca4e579af9e4686bbd224554b7056ed",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 1.0,
+   "width": 256
+  },
+  "texture/wood_shingle.dds@1a73ecdf": {
+   "archives": [
+    "shadowedmount.eqg"
+   ],
+   "brightness": 0.388,
+   "colorName": "brown",
+   "contrast": 0.078,
+   "fileName": "wood_shingle.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    115,
+    94,
+    79
+   ],
+   "name": "wood_shingle.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.54,
+    1.36
+   ],
+   "sha256": "1a73ecdf05598ced78bd573c0d8a5d914dc70078c224ed6650c3115f4440b809",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  }
+ },
+ "fileHashes": {
+  "shadowedmount.eqg": "ade3c9d370e8609743acbdc99ce0dd6c4f8a23bd6028f6a9f639620b2cb4304d"
+ },
+ "format": "eqtzp",
+ "problems": [
+  "This EQ terrain zone's lights are not read"
+ ],
+ "source": "zone:shadowedmount",
+ "surveyVersion": 4,
+ "zone": "shadowedmount"
+}

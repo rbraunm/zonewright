@@ -1,0 +1,1875 @@
+{
+ "archives": [
+  "gus_anims.eqg",
+  "cryptofshade.eqg"
+ ],
+ "assets": {
+  "ecosystem/cryptofshade/beach_sand": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_light_a.dds",
+     "detailMap": "di_ro_sand_dune.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "base",
+     "normalMap": "di_ro_sand_dune_6n.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "beach_sand",
+   "zone": "cryptofshade"
+  },
+  "ecosystem/cryptofshade/bertoxxulous": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage.dds",
+     "detailMap": "ground_bertoxxulous.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "base",
+     "normalMap": "ground_path_n.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "bertoxxulous",
+   "zone": "cryptofshade"
+  },
+  "ecosystem/cryptofshade/camp": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage.dds",
+     "detailMap": "ground_camp.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "base",
+     "normalMap": "ground_path_n.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "camp",
+   "zone": "cryptofshade"
+  },
+  "ecosystem/cryptofshade/carrion": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage.dds",
+     "detailMap": "di_hill_leaves_fallen.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "base",
+     "normalMap": "di_hill_leaves_fallen_14n.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "carrion",
+   "zone": "cryptofshade"
+  },
+  "ecosystem/cryptofshade/cliff": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage.dds",
+     "detailMap": "av_rock19_c.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "bass",
+     "normalMap": "av_rock19_n.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "cliff",
+   "zone": "cryptofshade"
+  },
+  "ecosystem/cryptofshade/cliffside": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage.dds",
+     "detailMap": "cliffside_c.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "cliffside",
+     "normalMap": "cliffside_c.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "cliffside",
+   "zone": "cryptofshade"
+  },
+  "ecosystem/cryptofshade/crypt": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage.dds",
+     "detailMap": "ground_crypt.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "base",
+     "normalMap": "ground_path_n.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "crypt",
+   "zone": "cryptofshade"
+  },
+  "ecosystem/cryptofshade/decay": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage.dds",
+     "detailMap": "ground_decay.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "base",
+     "normalMap": "ground_path_n.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 1
+    },
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage.dds",
+     "detailMap": "hos_crypt_walls_c.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": -600.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "cliffside",
+     "normalMap": "hos_crypt_walls_n.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "decay",
+   "zone": "cryptofshade"
+  },
+  "ecosystem/cryptofshade/defiled": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage.dds",
+     "detailMap": "ground_defiled.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "base",
+     "normalMap": "ground_path_n.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "defiled",
+   "zone": "cryptofshade"
+  },
+  "ecosystem/cryptofshade/elvencity": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage.dds",
+     "detailMap": "ground_elvencity.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "base",
+     "normalMap": "ground_path_n.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "elvencity",
+   "zone": "cryptofshade"
+  },
+  "ecosystem/cryptofshade/elvendefenses": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage.dds",
+     "detailMap": "ground_elvendefenses.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "base",
+     "normalMap": "ground_path_n.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "elvendefenses",
+   "zone": "cryptofshade"
+  },
+  "ecosystem/cryptofshade/erollisi": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage.dds",
+     "detailMap": "di_hill_leaves_fallen.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "base",
+     "normalMap": "di_hill_leaves_fallen_14n.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "erollisi",
+   "zone": "cryptofshade"
+  },
+  "ecosystem/cryptofshade/farm": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage.dds",
+     "detailMap": "hillsofshade_farm_c.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "base_farm",
+     "normalMap": "hillsofshade_farm_n.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "farm",
+   "zone": "cryptofshade"
+  },
+  "ecosystem/cryptofshade/gnarled": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_light_a.dds",
+     "detailMap": "di_hill_ground_flower.dds",
+     "detailRepeat": 24,
+     "detailUnitsPerRepeat": 8.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "base",
+     "normalMap": "di_hill_ground_flower_10n.dds",
+     "normalRepeat": 24,
+     "normalUnitsPerRepeat": 8.0,
+     "slopeTolerance": 1
+    },
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage.dds",
+     "detailMap": "di_hill_grass_muddy.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 12,
+     "name": "grass",
+     "normalMap": "di_hill_grass_muddy.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "gnarled",
+   "zone": "cryptofshade"
+  },
+  "ecosystem/cryptofshade/grass": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage.dds",
+     "detailMap": "di_hill_grass_muddy.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "base",
+     "normalMap": "ground_grass_10n.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "grass",
+   "zone": "cryptofshade"
+  },
+  "ecosystem/cryptofshade/loping": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage.dds",
+     "detailMap": "ground_loping.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "base",
+     "normalMap": "ground_path_n.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "loping",
+   "zone": "cryptofshade"
+  },
+  "ecosystem/cryptofshade/path": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage.dds",
+     "detailMap": "di_hill_ground_path_mud.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "path",
+     "normalMap": "di_hill_ground_path_mud_8n.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 1
+    },
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage.dds",
+     "detailMap": "di_hill_ground_path_rocky.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 3,
+     "name": "path_alt",
+     "normalMap": "di_hill_ground_path_rocky_8n.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "path",
+   "zone": "cryptofshade"
+  },
+  "ecosystem/cryptofshade/port": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage.dds",
+     "detailMap": "ground_port.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "base",
+     "normalMap": "ground_path_n.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "port",
+   "zone": "cryptofshade"
+  },
+  "ecosystem/cryptofshade/prelude": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage.dds",
+     "detailMap": "ground_prelude.dds",
+     "detailRepeat": 12,
+     "detailUnitsPerRepeat": 16.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "base",
+     "normalMap": "ground_path_n.dds",
+     "normalRepeat": 12,
+     "normalUnitsPerRepeat": 16.0,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "prelude",
+   "zone": "cryptofshade"
+  },
+  "emitter/57": {
+   "kind": "emitter",
+   "name": "57",
+   "zones": {
+    "cryptofshade": {
+     "count": 122,
+     "examplePositions": [
+      [
+       -242.1,
+       794.3,
+       -47.6
+      ],
+      [
+       -258.1,
+       935.1,
+       -57.0
+      ],
+      [
+       -222.6,
+       973.1,
+       -64.4
+      ]
+     ],
+     "lifespans": [
+      4000000
+     ],
+     "names": {
+      "torch_121": 1,
+      "torch_122": 1,
+      "torch_123": 1,
+      "torch_124": 1,
+      "torch_125": 1
+     }
+    }
+   }
+  },
+  "emitter/58": {
+   "kind": "emitter",
+   "name": "58",
+   "zones": {
+    "cryptofshade": {
+     "count": 6,
+     "examplePositions": [
+      [
+       -424.6,
+       892.1,
+       -36.1
+      ],
+      [
+       -424.6,
+       917.6,
+       -35.9
+      ],
+      [
+       -881.2,
+       -1397.0,
+       -639.6
+      ]
+     ],
+     "lifespans": [
+      4000000
+     ],
+     "names": {
+      "brazier02": 1,
+      "brazier03": 1,
+      "brazier04": 1,
+      "torch_103": 1,
+      "torch_104": 1
+     }
+    }
+   }
+  },
+  "emitter/74": {
+   "kind": "emitter",
+   "name": "74",
+   "zones": {
+    "cryptofshade": {
+     "count": 10,
+     "examplePositions": [
+      [
+       -394.6,
+       668.1,
+       -74.2
+      ],
+      [
+       -421.7,
+       667.9,
+       -74.1
+      ],
+      [
+       -276.0,
+       504.6,
+       -104.6
+      ]
+     ],
+     "lifespans": [
+      4000000
+     ],
+     "names": {
+      "torchBig05": 1,
+      "torchBig06": 1,
+      "torchBig07": 1,
+      "torch_116": 1,
+      "torch_117": 1
+     }
+    }
+   }
+  },
+  "texture/ab_blockmoss_c.dds@99a11c66": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.236,
+   "colorName": "green",
+   "contrast": 0.067,
+   "fileName": "ab_blockmoss_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    58,
+    63,
+    51
+   ],
+   "name": "ab_blockmoss_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.99,
+    0.92
+   ],
+   "sha256": "99a11c6632d77e0e566cb64b2d98efa64432805d4838393a5de47a835f588d51",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/ab_blockmoss_n.dds@29eafa11": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.554,
+   "colorName": "blue",
+   "contrast": 0.094,
+   "fileName": "ab_blockmoss_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    245
+   ],
+   "name": "ab_blockmoss_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.92,
+    0.9
+   ],
+   "sha256": "29eafa113754f016b33a02cc387142e521b3de10171d5a117d9152c698c6cd46",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/av_rock19_c.dds@a4d8fd89": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.464,
+   "colorName": "tan",
+   "contrast": 0.041,
+   "ecosystemLayers": [
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "cliff",
+     "layer": "bass",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    }
+   ],
+   "fileName": "av_rock19_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    142,
+    112,
+    86
+   ],
+   "name": "av_rock19_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.68,
+    1.04
+   ],
+   "sha256": "a4d8fd891766adf61aa8b1a07aba4e3b81dfe70e8e88ad0d1d67d8249758b512",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/av_rock19_n.dds@74f4223b": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.551,
+   "colorName": "blue",
+   "contrast": 0.092,
+   "ecosystemLayers": [
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "cliff",
+     "layer": "bass",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    }
+   ],
+   "fileName": "av_rock19_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    239
+   ],
+   "name": "av_rock19_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.94,
+    1.11
+   ],
+   "sha256": "74f4223bda412cbd36d8171f81b6c23a84340be887c5cbf31d825c69d003a2c8",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 1.0,
+   "width": 256
+  },
+  "texture/av_urntall01_c.dds@bee9bedb": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.251,
+   "colorName": "grey",
+   "contrast": 0.081,
+   "fileName": "av_urntall01_c.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    64,
+    64,
+    61
+   ],
+   "name": "av_urntall01_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    2.41,
+    5.4
+   ],
+   "sha256": "bee9bedb2f1a21e402c034f994d16d060dddded109799b2639d3ef7a5ba65402",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/av_urntall01_n.dds@df31ad3a": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.548,
+   "colorName": "blue",
+   "contrast": 0.078,
+   "fileName": "av_urntall01_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    127,
+    232
+   ],
+   "name": "av_urntall01_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.25,
+    1.37
+   ],
+   "sha256": "df31ad3a74ce8a59fd269f64bc58e3003359f1c62fda9ba922cc4b9ef61df392",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 1.0,
+   "width": 256
+  },
+  "texture/coverage.dds@8c2b1f5a": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.321,
+   "colorName": "grey",
+   "contrast": 0.086,
+   "ecosystemLayers": [
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "bertoxxulous",
+     "layer": "base",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "camp",
+     "layer": "base",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "carrion",
+     "layer": "base",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "cliff",
+     "layer": "bass",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "cliffside",
+     "layer": "cliffside",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "crypt",
+     "layer": "base",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "decay",
+     "layer": "base",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "decay",
+     "layer": "cliffside",
+     "maxHeight": -600.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "defiled",
+     "layer": "base",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "elvencity",
+     "layer": "base",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "elvendefenses",
+     "layer": "base",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "erollisi",
+     "layer": "base",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "farm",
+     "layer": "base_farm",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "gnarled",
+     "layer": "grass",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 12,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "grass",
+     "layer": "base",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "loping",
+     "layer": "base",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "path",
+     "layer": "path",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "path",
+     "layer": "path_alt",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 3,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "port",
+     "layer": "base",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "prelude",
+     "layer": "base",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    }
+   ],
+   "fileName": "coverage.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    84,
+    82,
+    75
+   ],
+   "name": "coverage.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.016,
+   "seamRatios": [
+    1.02,
+    0.99
+   ],
+   "sha256": "8c2b1f5ab141c23b9a3827f608442f9d7bedfea2b09ed074e0dec4147f25cfc7",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/coverage_tombstone.dds@d55f79f4": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.361,
+   "colorName": "grey",
+   "contrast": 0.098,
+   "fileName": "coverage_tombstone.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    93,
+    91,
+    93
+   ],
+   "name": "coverage_tombstone.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.8,
+    1.21
+   ],
+   "sha256": "d55f79f4f6f47831578783e585f6dfaa314c5fa3222f340c574cb68f2adee1c0",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/crypt_roots_hanging_c.dds@436d6e8a": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.3,
+   "colorName": "grey",
+   "contrast": 0.249,
+   "fileName": "crypt_roots_hanging_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    156,
+    138,
+    135
+   ],
+   "name": "crypt_roots_hanging_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.232,
+   "seamRatios": [
+    0.37,
+    3.19
+   ],
+   "sha256": "436d6e8a8da9d48fbe18152243172d5ee73c6b4b5c5274e8fcb663b83cc22711",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.612,
+   "width": 256
+  },
+  "texture/crypt_roots_hanging_n.dds@7ad167ae": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.544,
+   "colorName": "blue",
+   "contrast": 0.114,
+   "fileName": "crypt_roots_hanging_n.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    119,
+    131,
+    215
+   ],
+   "name": "crypt_roots_hanging_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.232,
+   "seamRatios": [
+    0.56,
+    1.23
+   ],
+   "sha256": "7ad167ae3031b920784fca27d713187ac26efbecdcd754886bc45289bc2235ac",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.612,
+   "width": 256
+  },
+  "texture/di_cr_tile_trim01_dk.dds@bcf6e9bb": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.251,
+   "colorName": "green",
+   "contrast": 0.086,
+   "fileName": "di_cr_tile_trim01_dk.dds",
+   "format": "DXT5",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    60,
+    69,
+    48
+   ],
+   "name": "di_cr_tile_trim01_dk.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.14,
+    1.07
+   ],
+   "sha256": "bcf6e9bb6e1e305756fc3ea8dc29094ae73709371f5d4b85019a78df9409edde",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_cr_tile_trim01_dk_10n.dds@7b19f45c": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.108,
+   "fileName": "di_cr_tile_trim01_dk_10n.dds",
+   "format": "ARGB32",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    129,
+    243
+   ],
+   "name": "di_cr_tile_trim01_dk_10n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.27,
+    1.43
+   ],
+   "sha256": "7b19f45ca403b29278e47e0a68501a9793c90846ee5d2ded05de18638502c3a0",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/dockwood.dds@0e8ac8b8": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.247,
+   "colorName": "brown",
+   "contrast": 0.087,
+   "fileName": "dockwood.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    71,
+    63,
+    41
+   ],
+   "name": "dockwood.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.29,
+    1.3
+   ],
+   "sha256": "0e8ac8b8cd0b00d9cc4497c8124b04e866313f99ea44dbf6643fee7372a2c8f8",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/dockwood_10n.dds@760a996f": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.555,
+   "colorName": "blue",
+   "contrast": 0.074,
+   "fileName": "dockwood_10n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    250
+   ],
+   "name": "dockwood_10n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.58,
+    2.49
+   ],
+   "sha256": "760a996f345edd698f01136b7a88f36f08f89758f927336e42c12751dec3fb77",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/ew_coals_hot_c.dds@8ca928c0": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.129,
+   "colorName": "red",
+   "contrast": 0.053,
+   "fileName": "ew_coals_hot_c.dds",
+   "format": "DXT5",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    85,
+    9,
+    20
+   ],
+   "name": "ew_coals_hot_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.47,
+    1.2
+   ],
+   "sha256": "8ca928c073f7e42a6054fb207a2cff6d13ba13195b8e9890dd4e84e4d12174c0",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 128
+  },
+  "texture/ew_coals_hot_n.dds@8a484f80": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.48,
+   "colorName": "tan",
+   "contrast": 0.098,
+   "fileName": "ew_coals_hot_n.dds",
+   "format": "ARGB32",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    79
+   ],
+   "name": "ew_coals_hot_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": false,
+   "partialAlphaShare": 1.0,
+   "seamRatios": [
+    1.05,
+    1.0
+   ],
+   "sha256": "8a484f80c684f3eabea2ea96666c8cd5f34534eed946f1228d4d6f750d820bb9",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 1.0,
+   "width": 128
+  },
+  "texture/hos_crypt_concrete_c.dds@fbc78a62": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.224,
+   "colorName": "grey",
+   "contrast": 0.086,
+   "fileName": "hos_crypt_concrete_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    56,
+    59,
+    51
+   ],
+   "name": "hos_crypt_concrete_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.92,
+    0.87
+   ],
+   "sha256": "fbc78a6278e33b3de5e0d88f73228eda61ea3d01474d0ccb44b3653d2342e2c5",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hos_crypt_concrete_n.dds@4eb819dd": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.554,
+   "colorName": "blue",
+   "contrast": 0.041,
+   "fileName": "hos_crypt_concrete_n.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    127,
+    128,
+    251
+   ],
+   "name": "hos_crypt_concrete_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.977,
+   "seamRatios": [
+    1.5,
+    1.19
+   ],
+   "sha256": "4eb819dd72f2388b93191c601759ec184bb772473d4f40638b17e3482b8ee584",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.058,
+   "width": 256
+  },
+  "texture/hos_crypt_dirt_c.dds@c152809d": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.186,
+   "colorName": "brown",
+   "contrast": 0.056,
+   "fileName": "hos_crypt_dirt_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    53,
+    46,
+    38
+   ],
+   "name": "hos_crypt_dirt_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.01,
+    1.01
+   ],
+   "sha256": "c152809dfb8247b95870b28c4c47d907644f986d95eac58cbe8b768042bffaea",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hos_crypt_dirt_n.dds@da856f8b": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.547,
+   "colorName": "blue",
+   "contrast": 0.133,
+   "fileName": "hos_crypt_dirt_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    127,
+    127,
+    234
+   ],
+   "name": "hos_crypt_dirt_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.99,
+    0.99
+   ],
+   "sha256": "da856f8bbc401586b0bcee8b0c7cc7b977ca439a6f7748c4c2040aa25cf54b2a",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hos_crypt_rock_c.dds@a8d7eb17": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.234,
+   "colorName": "grey",
+   "contrast": 0.038,
+   "fileName": "hos_crypt_rock_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    59,
+    61,
+    58
+   ],
+   "name": "hos_crypt_rock_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.84,
+    0.98
+   ],
+   "sha256": "a8d7eb174daa321ae2e2c40035fc19adaa4e6e70cf0b1eb5e738e7b65db44851",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hos_crypt_rock_n.dds@4afcec97": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.053,
+   "fileName": "hos_crypt_rock_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    252
+   ],
+   "name": "hos_crypt_rock_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.73,
+    0.93
+   ],
+   "sha256": "4afcec97ae467a5d65d52f692270c4b959eeb69ad506d68bd07f1b8febc40768",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hos_crypt_walls_c.dds@ba5bba3e": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.203,
+   "colorName": "brown",
+   "contrast": 0.084,
+   "ecosystemLayers": [
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "decay",
+     "layer": "cliffside",
+     "maxHeight": -600.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    }
+   ],
+   "fileName": "hos_crypt_walls_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    69,
+    46,
+    35
+   ],
+   "name": "hos_crypt_walls_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.02,
+    0.71
+   ],
+   "sha256": "ba5bba3e32ce06ebe7de0e9b6bb1f9e9bb2c8773a5fc011f92a25d7b149d59c6",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hos_crypt_walls_n.dds@a4e9239c": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.542,
+   "colorName": "blue",
+   "contrast": 0.121,
+   "ecosystemLayers": [
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 16.0,
+     "ecosystem": "decay",
+     "layer": "cliffside",
+     "maxHeight": -600.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 16.0
+    }
+   ],
+   "fileName": "hos_crypt_walls_n.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    126,
+    128,
+    223
+   ],
+   "name": "hos_crypt_walls_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.99,
+    0.8
+   ],
+   "sha256": "a4e9239c5aa8d9a15a5c8bc0e1281865ba96f0357975c125625f5d9a1f33df42",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hp_bonehand.dds@891e83f8": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.448,
+   "colorName": "brown",
+   "contrast": 0.121,
+   "fileName": "hp_bonehand.dds",
+   "format": "DXT5",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    127,
+    112,
+    92
+   ],
+   "name": "hp_bonehand.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.0,
+    0.09
+   ],
+   "sha256": "891e83f89f8065bbe1e205f5d3054d5772c8b6b5781aec07b094411deb77b4bb",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 128
+  },
+  "texture/hp_skull06_c.dds@46f717ed": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.377,
+   "colorName": "brown",
+   "contrast": 0.171,
+   "fileName": "hp_skull06_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    126,
+    115,
+    98
+   ],
+   "name": "hp_skull06_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.026,
+   "seamRatios": [
+    0.63,
+    4.72
+   ],
+   "sha256": "46f717ed5ce928b61a9f1b3f7804216c970eb0ae77f553e291d0868194a7ba45",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.313,
+   "width": 256
+  },
+  "texture/hp_skull07_c2.dds@fe6d17b8": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.549,
+   "colorName": "tan",
+   "contrast": 0.12,
+   "fileName": "hp_skull07_c2.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    152,
+    138,
+    115
+   ],
+   "name": "hp_skull07_c2.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.016,
+   "seamRatios": [
+    0.93,
+    3.13
+   ],
+   "sha256": "fe6d17b8eb3dda738fcdbc20a83afb771ee4347b5e739b0255a5c8212e8ea480",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hp_skullbones_c.dds@25be89dd": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.465,
+   "colorName": "tan",
+   "contrast": 0.08,
+   "fileName": "hp_skullbones_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    129,
+    117,
+    99
+   ],
+   "name": "hp_skullbones_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.016,
+   "seamRatios": [
+    1.34,
+    1.48
+   ],
+   "sha256": "25be89ddd025694c74114cd3e1ab8175178f03ec7caa44fcad3ef8069cbe763b",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/old_metal_c.dds@fc3bfce1": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.261,
+   "colorName": "brown",
+   "contrast": 0.033,
+   "fileName": "old_metal_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    84,
+    62,
+    42
+   ],
+   "name": "old_metal_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.94,
+    0.96
+   ],
+   "sha256": "fc3bfce1087c6aa9ca5a213e9c6a9999a752721d7c6e6a7ec11aaa11e1b02477",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/old_metal_n.dds@01e7a07f": {
+   "archives": [
+    "cryptofshade.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.036,
+   "fileName": "old_metal_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    253
+   ],
+   "name": "old_metal_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.11,
+    1.21
+   ],
+   "sha256": "01e7a07fe072c17662049e800e55405ccec5bb035c821f8c7827f5bf3bc064e1",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  }
+ },
+ "fileHashes": {
+  "cryptofshade.eqg": "81e85923b7a5bdb1b31f9048256d774ff1e416ba9d1decdc9fa4e110b99e31cc",
+  "cryptofshade_environmentemitters.txt": "f91041aad17ddb1f8f66889a31278d2eddeef5ec9864cf6cfa458f5314a6dac9",
+  "gus_anims.eqg": "d001b8c9771ab00a1e1783fce10040e1fd2e1dc961f86715844d092baae02092"
+ },
+ "format": "eqtzp",
+ "problems": [
+  "This EQ terrain zone's lights are not read"
+ ],
+ "source": "zone:cryptofshade",
+ "surveyVersion": 4,
+ "zone": "cryptofshade"
+}

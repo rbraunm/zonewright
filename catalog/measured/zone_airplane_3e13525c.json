@@ -1,0 +1,2635 @@
+{
+ "archives": [
+  "airplane_obj.s3d",
+  "airplane.s3d"
+ ],
+ "assets": {
+  "light/airplane/r200_82821e": {
+   "colors": [
+    {
+     "count": 1,
+     "rgb": [
+      0.51,
+      0.51,
+      0.118
+     ]
+    }
+   ],
+   "count": 1,
+   "examplePositions": [
+    [
+     1338.6,
+     607.1,
+     -762.9
+    ]
+   ],
+   "flickerFrames": 1,
+   "kind": "light",
+   "name": "r200_82821e",
+   "names": [
+    "L0_LDEF"
+   ],
+   "radii": [
+    200.0
+   ],
+   "shareOfZoneLights": 0.5,
+   "zone": "airplane"
+  },
+  "light/airplane/r250_82821e": {
+   "colors": [
+    {
+     "count": 1,
+     "rgb": [
+      0.51,
+      0.51,
+      0.118
+     ]
+    }
+   ],
+   "count": 1,
+   "examplePositions": [
+    [
+     -1034.1,
+     -796.9,
+     1093.1
+    ]
+   ],
+   "flickerFrames": 1,
+   "kind": "light",
+   "name": "r250_82821e",
+   "names": [
+    "L1_LDEF"
+   ],
+   "radii": [
+    250.0
+   ],
+   "shareOfZoneLights": 0.5,
+   "zone": "airplane"
+  },
+  "model/airmill_actordef@airplane_obj": {
+   "archive": "airplane_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "airmill_actordef",
+   "placements": 1
+  },
+  "model/airmills_actordef@airplane_obj": {
+   "archive": "airplane_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "airmills_actordef",
+   "placements": 2
+  },
+  "model/avioutpost_actordef@airplane_obj": {
+   "archive": "airplane_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "avioutpost_actordef",
+   "placements": 3
+  },
+  "model/bookcase_actordef@airplane_obj": {
+   "archive": "airplane_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "bookcase_actordef",
+   "placements": 3
+  },
+  "model/campfire_actordef@airplane_obj": {
+   "archive": "airplane_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "campfire_actordef",
+   "placements": 1
+  },
+  "model/chair3d_actordef@airplane_obj": {
+   "archive": "airplane_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "chair3d_actordef",
+   "placements": 4
+  },
+  "model/faybar1_actordef@airplane_obj": {
+   "archive": "airplane_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "faybar1_actordef",
+   "placements": 2
+  },
+  "model/gear_actordef@airplane_obj": {
+   "archive": "airplane_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "gear_actordef",
+   "placements": 1
+  },
+  "model/grate_actordef@airplane_obj": {
+   "archive": "airplane_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "grate_actordef",
+   "placements": 1
+  },
+  "model/roundtable_actordef@airplane_obj": {
+   "archive": "airplane_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "roundtable_actordef",
+   "placements": 2
+  },
+  "model/wmbase_actordef@airplane_obj": {
+   "archive": "airplane_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "wmbase_actordef",
+   "placements": 6
+  },
+  "texture/acol1.bmp@9265c7a3": {
+   "archives": [
+    "airplane.s3d"
+   ],
+   "brightness": 0.403,
+   "colorName": "green",
+   "contrast": 0.143,
+   "fileName": "acol1.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    103,
+    107,
+    83
+   ],
+   "name": "acol1.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.59,
+    1.45
+   ],
+   "sha256": "9265c7a37fcbd7a2119033df18a84009c337be471ef414b93550b2405f75dff9",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0019,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 1.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 20.2
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/acol2.bmp@e27ec82f": {
+   "archives": [
+    "airplane.s3d"
+   ],
+   "brightness": 0.428,
+   "colorName": "tan",
+   "contrast": 0.194,
+   "fileName": "acol2.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    113,
+    112,
+    86
+   ],
+   "name": "acol2.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.96,
+    0.73
+   ],
+   "sha256": "e27ec82f50c2d5cccee58c7ba3dff123d8b7eea990ba891c79240138adaac83a",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0003,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 1.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 26.9
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/acol2s.bmp@5ee84b2b": {
+   "archives": [
+    "airplane.s3d"
+   ],
+   "brightness": 0.413,
+   "colorName": "grey",
+   "contrast": 0.179,
+   "fileName": "acol2s.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    102,
+    109,
+    95
+   ],
+   "name": "acol2s.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.84,
+    0.78
+   ],
+   "sha256": "5ee84b2bdfecbca1cc6ae5877bf3247660def53cae5737f280fcf23bb9a8e225",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0002,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 1.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 22.8
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/airshaft.bmp@a098e74c": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.234,
+   "colorName": "brown",
+   "contrast": 0.202,
+   "fileName": "airshaft.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    73,
+    56,
+    43
+   ],
+   "name": "airshaft.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.08,
+    0.01
+   ],
+   "sha256": "a098e74c2d75c03c988e5c11540e1c69c320e532c64369388096974b82dde23d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/airshaft1.bmp@9a4bcb71": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.286,
+   "colorName": "brown",
+   "contrast": 0.213,
+   "fileName": "airshaft1.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    90,
+    68,
+    53
+   ],
+   "name": "airshaft1.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.1,
+    0.02
+   ],
+   "sha256": "9a4bcb71dad4767aa5183a058a11012ff2e1962a96ac0130cc47b59743adda77",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/airshaft1s.bmp@3f803f8a": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.273,
+   "colorName": "grey",
+   "contrast": 0.205,
+   "fileName": "airshaft1s.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    73,
+    67,
+    74
+   ],
+   "name": "airshaft1s.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.09,
+    0.02
+   ],
+   "sha256": "3f803f8ab7faa66a16ec4a4dc76580d89032a890aed56f2efaacfee9b292618e",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/airshafts.bmp@07cdb481": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.213,
+   "colorName": "grey",
+   "contrast": 0.198,
+   "fileName": "airshafts.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    53,
+    53,
+    62
+   ],
+   "name": "airshafts.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.02,
+    0.04
+   ],
+   "sha256": "07cdb48129cc9c38f1f401a0674d46153ff0d9d5267d92fed10191dbd11ab9f6",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/airwmbld.bmp@a848c756": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.185,
+   "colorName": "tan",
+   "contrast": 0.292,
+   "fileName": "airwmbld.bmp.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    169,
+    150,
+    103
+   ],
+   "name": "airwmbld.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.43,
+    2.73
+   ],
+   "sha256": "a848c75637d77f0dd876c00a8de09844741d6d9e93e3f9c2038ff5e316d6d1a9",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.685,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/airwmbld1.bmp@a2bb2065": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.176,
+   "colorName": "tan",
+   "contrast": 0.284,
+   "fileName": "airwmbld1.bmp.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    147,
+    144,
+    122
+   ],
+   "name": "airwmbld1.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.39,
+    2.33
+   ],
+   "sha256": "a2bb20659eed8052febb711bc168a3c8d60af7e264220248cf50d860686ea7dd",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.686,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/airwmbldside.bmp@156625c3": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.627,
+   "colorName": "tan",
+   "contrast": 0.155,
+   "fileName": "airwmbldside.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    177,
+    161,
+    112
+   ],
+   "name": "airwmbldside.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.17,
+    3.03
+   ],
+   "sha256": "156625c3abe57157cfcb6a69b7d6ef60aae257e1ac751c38fb7fd38c323964ed",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 32,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/airwmbldside1.bmp@a2ea01d6": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.604,
+   "colorName": "tan",
+   "contrast": 0.175,
+   "fileName": "airwmbldside1.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    161,
+    156,
+    128
+   ],
+   "name": "airwmbldside1.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.19,
+    2.94
+   ],
+   "sha256": "a2ea01d6b55455addeebdd4ef2c84af40d5cc819a2d26ffd25e97c84b9a18f8d",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 32,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/avibark.bmp@0237abde": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.178,
+   "colorName": "brown",
+   "contrast": 0.063,
+   "fileName": "avibark.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    51,
+    45,
+    36
+   ],
+   "name": "avibark.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.0,
+    1.04
+   ],
+   "sha256": "0237abde63b6b16fb23de7996962d413a9fda1678b191bf38ad89357105f1ba8",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/avibranch.bmp@632c4970": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.234,
+   "colorName": "yellow",
+   "contrast": 0.057,
+   "fileName": "avibranch.bmp.dds",
+   "format": "DXT5",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    56,
+    54,
+    32
+   ],
+   "name": "avibranch.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.11,
+    2.11
+   ],
+   "sha256": "632c4970f80759469c9757dd324eabf5f00652d84c55477a017e9d3cc51d3cbd",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.561,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000013": 1
+    }
+   }
+  },
+  "texture/aviflat.bmp@36ded4ee": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.392,
+   "colorName": "green",
+   "contrast": 0.111,
+   "fileName": "aviflat.bmp.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    91,
+    113,
+    72
+   ],
+   "name": "aviflat.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.61,
+    0.31
+   ],
+   "sha256": "36ded4ee8e71ce454cfe7bb3fb3f817cc536d84c507f60c777cad1651d8fc89f",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.179,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000013": 1
+    }
+   }
+  },
+  "texture/avihut.bmp@e8baa9bb": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.164,
+   "colorName": "brown",
+   "contrast": 0.029,
+   "fileName": "avihut.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    65,
+    38,
+    0
+   ],
+   "name": "avihut.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.44,
+    1.44
+   ],
+   "sha256": "e8baa9bb24f75d71703a85529428acff98d976dc2735fa8755470995c51e1019",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/avilogo.bmp@870d51b3": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.151,
+   "colorName": "brown",
+   "contrast": 0.09,
+   "fileName": "avilogo.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    43,
+    37,
+    33
+   ],
+   "name": "avilogo.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.86,
+    1.35
+   ],
+   "sha256": "870d51b3a64d45847162f1c83dcedee683f82c2977fd0da01e4c3ebae18ce5bd",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/befloor.bmp@789b8d74": {
+   "archives": [
+    "airplane.s3d"
+   ],
+   "brightness": 0.65,
+   "colorName": "tan",
+   "contrast": 0.177,
+   "fileName": "befloor.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    178,
+    163,
+    146
+   ],
+   "name": "befloor.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    12.28,
+    13.55
+   ],
+   "sha256": "789b8d7419d5eefd718fccf8ec177a27f283220ca2d9b66bb62fa688be61e54f",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0012,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 39.5
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/bewall.bmp@0bc6bca2": {
+   "archives": [
+    "airplane.s3d"
+   ],
+   "brightness": 0.29,
+   "colorName": "grey",
+   "contrast": 0.147,
+   "fileName": "bewall.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    77,
+    74,
+    67
+   ],
+   "name": "bewall.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.01,
+    0.14
+   ],
+   "sha256": "0bc6bca2b39eb6f2bac04c23c48b204ca977ce41b4d79671964b4aa63591175a",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0026,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 1.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 49.9
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/bookcase1.bmp@7d810042": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.186,
+   "colorName": "brown",
+   "contrast": 0.117,
+   "fileName": "bookcase1.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    70,
+    40,
+    28
+   ],
+   "name": "bookcase1.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    4.79,
+    4.94
+   ],
+   "sha256": "7d81004269b9d27dc12a15589a8648597849fcd8eb5fba6f74036fbdd2e6a0b8",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/burnmetal.bmp@8d39c088": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.204,
+   "colorName": "red",
+   "contrast": 0.087,
+   "fileName": "burnmetal.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    60,
+    49,
+    48
+   ],
+   "name": "burnmetal.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    2.16,
+    1.01
+   ],
+   "sha256": "8d39c0883b3abecd9b25c19a719e979a782b705aa49dcfdce8574027bf55fcc3",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/canwall1.bmp@acc2b333": {
+   "archives": [
+    "airplane.s3d"
+   ],
+   "brightness": 0.335,
+   "colorName": "brown",
+   "contrast": 0.093,
+   "fileName": "canwall1.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    108,
+    83,
+    43
+   ],
+   "name": "canwall1.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.64,
+    0.86
+   ],
+   "sha256": "acc2b3331e702ad9d21b090341229599dbcb3bc3c776746693cc1e5f53a90db9",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.5982,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.897,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.103
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 323.5
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/chmet.bmp@7bef8202": {
+   "archives": [
+    "airplane.s3d"
+   ],
+   "brightness": 0.336,
+   "colorName": "blue",
+   "contrast": 0.1,
+   "fileName": "chmet.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    77,
+    87,
+    105
+   ],
+   "name": "chmet.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.84,
+    0.64
+   ],
+   "sha256": "7bef82026b2fc63edc2ffcd181e15cfdb91f57e80515e6f997f81f1d1c61c1da",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0641,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.03,
+     "overhang": 0.211,
+     "slope": 0.126,
+     "steep": 0.056,
+     "vertical": 0.576
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 50.0
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/corgear.bmp@920fe3d8": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.217,
+   "colorName": "red",
+   "contrast": 0.09,
+   "fileName": "corgear.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    66,
+    51,
+    50
+   ],
+   "name": "corgear.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.65,
+    0.61
+   ],
+   "sha256": "920fe3d89f7968dad612a77f70b2a11612c172bac5111bd9b20334a9bd8ca404",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/corgear3.bmp@45588d07": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.12,
+   "colorName": "red",
+   "contrast": 0.051,
+   "fileName": "corgear3.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    48,
+    24,
+    23
+   ],
+   "name": "corgear3.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.95,
+    1.19
+   ],
+   "sha256": "45588d0710e641b79525e934e6405324773b3c563567cf2eb7311a894f713443",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/darktabsid.bmp@86f9b4b9": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.156,
+   "colorName": "brown",
+   "contrast": 0.083,
+   "fileName": "darktabsid.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    46,
+    38,
+    35
+   ],
+   "name": "darktabsid.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    2.53,
+    0.71
+   ],
+   "sha256": "86f9b4b9e3a53a77f43c410e2ca83e2504ac6d0eae2bd0accf8b42a442eeb655",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/darktabtop.bmp@3502c4c1": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.148,
+   "colorName": "red",
+   "contrast": 0.031,
+   "fileName": "darktabtop.bmp.dds",
+   "format": "DXT1",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    43,
+    36,
+    35
+   ],
+   "name": "darktabtop.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    2.94,
+    1.79
+   ],
+   "sha256": "3502c4c1094bdd3c583e10d82c02eafcab948d93f51402590c7cf95f8375940c",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/dshaft.bmp@e80a5e62": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.169,
+   "colorName": "yellow",
+   "contrast": 0.103,
+   "fileName": "dshaft.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    47,
+    44,
+    28
+   ],
+   "name": "dshaft.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    4.44,
+    0.83
+   ],
+   "sha256": "e80a5e6296b8d2df739de498c2dd35d54973868d6e8844266a5d9800c82e6a55",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 2
+    }
+   }
+  },
+  "texture/dshaft1.bmp@43729838": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.173,
+   "colorName": "brown",
+   "contrast": 0.101,
+   "fileName": "dshaft1.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    48,
+    44,
+    35
+   ],
+   "name": "dshaft1.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    6.53,
+    1.5
+   ],
+   "sha256": "43729838ba43416e3ab61b00fe3c1f446dba4114825d892634e10c44065764bb",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 2
+    }
+   }
+  },
+  "texture/fbar1.bmp@e6e6ee47": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.257,
+   "colorName": "brown",
+   "contrast": 0.155,
+   "fileName": "fbar1.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    88,
+    60,
+    35
+   ],
+   "name": "fbar1.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.1,
+    6.34
+   ],
+   "sha256": "e6e6ee4762bb19f1838bb89714004154a34d78e1f6cb1997b5f01d947fd8f2f7",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/fire1.bmp@864dc80b": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.4,
+   "colorName": "orange",
+   "contrast": 0.331,
+   "fileName": "fire1.bmp.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    161,
+    115,
+    75
+   ],
+   "name": "fire1.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    5.32,
+    0.23
+   ],
+   "sha256": "864dc80bb649954b29896b3caf09716a39ebd94596eece3e6b00849206c2776b",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.181,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x8000000b": 2
+    }
+   }
+  },
+  "texture/fire2.bmp@ce1baf04": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.376,
+   "colorName": "orange",
+   "contrast": 0.328,
+   "fileName": "fire2.bmp.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    155,
+    110,
+    74
+   ],
+   "name": "fire2.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.87,
+    0.31
+   ],
+   "sha256": "ce1baf042176fa1441621120b67f458f13942df2e87dc0af91cf9f9907c9317d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.201,
+   "width": 256
+  },
+  "texture/fire3.bmp@63bac111": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.397,
+   "colorName": "orange",
+   "contrast": 0.333,
+   "fileName": "fire3.bmp.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    162,
+    119,
+    81
+   ],
+   "name": "fire3.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.62,
+    0.12
+   ],
+   "sha256": "63bac111d63db61281d5958de5b4195371460d56c9f944c2adcec00d4608cf04",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.21,
+   "width": 256
+  },
+  "texture/fire4.bmp@b356c6b3": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.384,
+   "colorName": "orange",
+   "contrast": 0.33,
+   "fileName": "fire4.bmp.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    152,
+    108,
+    72
+   ],
+   "name": "fire4.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.04,
+    0.08
+   ],
+   "sha256": "b356c6b327f7b178a1a7e523b3c2839cddca5273ff6cd4b8e8bc28c53c13388a",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.166,
+   "width": 256
+  },
+  "texture/firewood.bmp@8bfa243c": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.159,
+   "colorName": "brown",
+   "contrast": 0.067,
+   "fileName": "firewood.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    59,
+    35,
+    22
+   ],
+   "name": "firewood.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.54,
+    1.61
+   ],
+   "sha256": "8bfa243c084f435446856139837ef74c59b18df0023a7e4e1203c8db5bb60e2e",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/justdirt.bmp@c0ea8769": {
+   "archives": [
+    "airplane.s3d"
+   ],
+   "brightness": 0.224,
+   "colorName": "brown",
+   "contrast": 0.082,
+   "fileName": "justdirt.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    74,
+    51,
+    42
+   ],
+   "name": "justdirt.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.05,
+    1.09
+   ],
+   "sha256": "c0ea8769f8efb743e8f74b1937e45925229a95e5a71988a4ddf52a0b5416ee34",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.2957,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.752,
+     "overhang": 0.0,
+     "slope": 0.248,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 157.1
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/logbark.bmp@5e852f59": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.296,
+   "colorName": "brown",
+   "contrast": 0.107,
+   "fileName": "logbark.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    86,
+    73,
+    61
+   ],
+   "name": "logbark.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.31,
+    1.42
+   ],
+   "sha256": "5e852f59f0062d03128dfe24abf841386fb0b625b432e2c85520501ea06179e5",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/logtop.bmp@f4574f2f": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.296,
+   "colorName": "brown",
+   "contrast": 0.201,
+   "fileName": "logtop.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    81,
+    74,
+    68
+   ],
+   "name": "logtop.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.72,
+    1.66
+   ],
+   "sha256": "f4574f2f35c30ea10d958073a23312d7aa56f461170ccb707686631cfe3df8fb",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/lwall.bmp@5f42a90a": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.586,
+   "colorName": "grey",
+   "contrast": 0.077,
+   "fileName": "lwall.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    150,
+    151,
+    141
+   ],
+   "name": "lwall.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.43,
+    0.86
+   ],
+   "sha256": "5f42a90a1f39a762bc1619a179db33bf70698353bab1da415dc674f07956c213",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0089,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.202,
+     "overhang": 0.476,
+     "slope": 0.009,
+     "steep": 0.0,
+     "vertical": 0.312
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 70.2
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 2
+    }
+   }
+  },
+  "texture/lwall.bmp@9f5a8f8e": {
+   "archives": [
+    "airplane.s3d"
+   ],
+   "brightness": 0.587,
+   "colorName": "grey",
+   "contrast": 0.077,
+   "fileName": "lwall.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    150,
+    151,
+    141
+   ],
+   "name": "lwall.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.45,
+    0.88
+   ],
+   "sha256": "9f5a8f8e965ad81d00aadc7a194c3f525b095e8e43acdea6ac17b5dea39c8b4f",
+   "shadowed": true,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/lwall1.bmp@5e8338c9": {
+   "archives": [
+    "airplane_obj.s3d",
+    "airplane.s3d"
+   ],
+   "brightness": 0.551,
+   "colorName": "grey",
+   "contrast": 0.137,
+   "fileName": "lwall1.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    143,
+    142,
+    127
+   ],
+   "name": "lwall1.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.87,
+    0.39
+   ],
+   "sha256": "5e8338c90a65aa218a357afe5a782dd89feaef1f38c224dbd46898e907142059",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0012,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.102,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.898
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 3.6
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 2
+    }
+   }
+  },
+  "texture/lwall2.bmp@4e8649f9": {
+   "archives": [
+    "airplane_obj.s3d",
+    "airplane.s3d"
+   ],
+   "brightness": 0.536,
+   "colorName": "grey",
+   "contrast": 0.14,
+   "fileName": "lwall2.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    141,
+    138,
+    121
+   ],
+   "name": "lwall2.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.91,
+    0.49
+   ],
+   "sha256": "4e8649f9c3976ce029fe747b62e84457c1b24108330b104f5fb8b5c9ce58cce9",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0011,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.025,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.975
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 75.0
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/lwall3.bmp@c4a3df7c": {
+   "archives": [
+    "airplane_obj.s3d",
+    "airplane.s3d"
+   ],
+   "brightness": 0.525,
+   "colorName": "tan",
+   "contrast": 0.143,
+   "fileName": "lwall3.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    139,
+    135,
+    115
+   ],
+   "name": "lwall3.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.84,
+    0.36
+   ],
+   "sha256": "c4a3df7c7b53950f21d956d0c9326a309edb2132e6f72acc4e36cd9d11406965",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0035,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 244.9
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/lwall4.bmp@4e90b6d4": {
+   "archives": [
+    "airplane_obj.s3d",
+    "airplane.s3d"
+   ],
+   "brightness": 0.521,
+   "colorName": "tan",
+   "contrast": 0.144,
+   "fileName": "lwall4.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    139,
+    133,
+    114
+   ],
+   "name": "lwall4.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.86,
+    0.35
+   ],
+   "sha256": "4e90b6d4b78c0511afa3ba21958a9e3491c64918f41d78d623e0d16e67f148ad",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0023,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.021,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.979
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 99.5
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/lwall5.bmp@799bff40": {
+   "archives": [
+    "airplane_obj.s3d",
+    "airplane.s3d"
+   ],
+   "brightness": 0.516,
+   "colorName": "tan",
+   "contrast": 0.136,
+   "fileName": "lwall5.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    144,
+    131,
+    99
+   ],
+   "name": "lwall5.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.04,
+    1.48
+   ],
+   "sha256": "799bff4074451b2ee1389cc50f5c6c550d0e1e52d1cfbf05a638afd5105d2305",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0016,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.066,
+     "overhang": 0.706,
+     "slope": 0.0,
+     "steep": 0.073,
+     "vertical": 0.155
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 38.3
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 2
+    }
+   }
+  },
+  "texture/nerth2.bmp@c00b4cb6": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.177,
+   "colorName": "red",
+   "contrast": 0.108,
+   "fileName": "nerth2.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    97,
+    26,
+    5
+   ],
+   "name": "nerth2.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    4.62,
+    7.79
+   ],
+   "sha256": "c00b4cb69136b485b9db5a9e8b199eeb07ade703e1547ece33e397e90ac88793",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 128,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/palette.bmp@eea4fdba": {
+   "archives": [
+    "airplane.s3d"
+   ],
+   "brightness": 0.849,
+   "colorName": "white",
+   "contrast": 0.088,
+   "fileName": "palette.bmp.dds",
+   "format": "DXT1",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    216,
+    216,
+    223
+   ],
+   "name": "palette.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.59,
+    0.61
+   ],
+   "sha256": "eea4fdbaeddde6c6b7e5f7d9c2b053bd18baf810ee0d490c64c628c1d55a7354",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 128
+  },
+  "texture/paltopg.bmp@60064f46": {
+   "archives": [
+    "airplane_obj.s3d",
+    "airplane.s3d"
+   ],
+   "brightness": 0.38,
+   "colorName": "yellow",
+   "contrast": 0.278,
+   "fileName": "paltopg.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    109,
+    100,
+    53
+   ],
+   "name": "paltopg.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.8,
+    0.39
+   ],
+   "sha256": "60064f4637ffa4926241a798f6e15340726a87e4a1268ecd9e99464691283159",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0014,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.246,
+     "slope": 0.0,
+     "steep": 0.43,
+     "vertical": 0.323
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 41.6
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/paltops.bmp@e459a6cf": {
+   "archives": [
+    "airplane_obj.s3d",
+    "airplane.s3d"
+   ],
+   "brightness": 0.282,
+   "colorName": "blue",
+   "contrast": 0.259,
+   "fileName": "paltops.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    70,
+    70,
+    90
+   ],
+   "name": "paltops.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.76,
+    0.29
+   ],
+   "sha256": "e459a6cf33fe13f11be44a864e2f2a17ef864d5b78ec19f7e316883acf15a565",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0009,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.268,
+     "slope": 0.169,
+     "steep": 0.198,
+     "vertical": 0.365
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 31.8
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/rtabltop.bmp@a2ef5005": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.253,
+   "colorName": "brown",
+   "contrast": 0.077,
+   "fileName": "rtabltop.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    108,
+    49,
+    27
+   ],
+   "name": "rtabltop.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.86,
+    2.4
+   ],
+   "sha256": "a2ef50059375e826863263d0b80af6ea23cedb2099e001f518c3677443057f03",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sandbefloor.bmp@1566515a": {
+   "archives": [
+    "airplane.s3d"
+   ],
+   "brightness": 0.52,
+   "colorName": "tan",
+   "contrast": 0.153,
+   "fileName": "sandbefloor.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    147,
+    130,
+    109
+   ],
+   "name": "sandbefloor.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    10.14,
+    9.11
+   ],
+   "sha256": "1566515a6dd5913eb88e8f30480751945cee88fef3d0caf3ea66d079870abfe2",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 45.9
+   },
+   "width": 128,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sandbewall.bmp@fade0471": {
+   "archives": [
+    "airplane.s3d"
+   ],
+   "brightness": 0.304,
+   "colorName": "brown",
+   "contrast": 0.14,
+   "fileName": "sandbewall.bmp.dds",
+   "format": "DXT1",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    82,
+    77,
+    67
+   ],
+   "name": "sandbewall.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.81,
+    1.11
+   ],
+   "sha256": "fade04711c11507385ee0c06eb03189a8d44b5c79f569e029712adb48fa0139c",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0004,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 1.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 84.2
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/stumptop.bmp@00ab1164": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.3,
+   "colorName": "brown",
+   "contrast": 0.123,
+   "fileName": "stumptop.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    102,
+    71,
+    38
+   ],
+   "name": "stumptop.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.46,
+    2.87
+   ],
+   "sha256": "00ab1164576c58854f7f065e112714c3acbc76584e973204b6cd7e3f54ae69a4",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x553": 1
+    }
+   }
+  },
+  "texture/tableside.bmp@2f28ed28": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.206,
+   "colorName": "red",
+   "contrast": 0.075,
+   "fileName": "tableside.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    82,
+    42,
+    29
+   ],
+   "name": "tableside.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.6,
+    0.54
+   ],
+   "sha256": "2f28ed28bb09bcb8efefd6e5e79de4dfe26a5f72790d565e048bec42427478da",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/twall.bmp@90f3861f": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.475,
+   "colorName": "grey",
+   "contrast": 0.069,
+   "fileName": "twall.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    122,
+    122,
+    113
+   ],
+   "name": "twall.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.39,
+    0.85
+   ],
+   "sha256": "90f3861fb4d6d2b3ef37ad2679cca53d5e719b72b40c811f4c751056629b355b",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0075,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.315,
+     "overhang": 0.342,
+     "slope": 0.03,
+     "steep": 0.004,
+     "vertical": 0.31
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 79.6
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/twall.bmp@e7f1bedf": {
+   "archives": [
+    "airplane.s3d"
+   ],
+   "brightness": 0.475,
+   "colorName": "grey",
+   "contrast": 0.069,
+   "fileName": "twall.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    122,
+    122,
+    113
+   ],
+   "name": "twall.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.39,
+    0.86
+   ],
+   "sha256": "e7f1bedfc8494c6f9aff592d35e683ffca033412c6fc45720d7bb00c4fa53fd2",
+   "shadowed": true,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/twall1.bmp@e00cd98c": {
+   "archives": [
+    "airplane_obj.s3d",
+    "airplane.s3d"
+   ],
+   "brightness": 0.448,
+   "colorName": "grey",
+   "contrast": 0.122,
+   "fileName": "twall1.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    113,
+    116,
+    110
+   ],
+   "name": "twall1.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.74,
+    0.34
+   ],
+   "sha256": "e00cd98c0b392717b738c81dcdf356d5a1fb4fd654eec6b8dbdcd71884f13655",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0014,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.035,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.965
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 80.2
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/twall2.bmp@4c18ce55": {
+   "archives": [
+    "airplane_obj.s3d",
+    "airplane.s3d"
+   ],
+   "brightness": 0.435,
+   "colorName": "grey",
+   "contrast": 0.128,
+   "fileName": "twall2.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    109,
+    112,
+    108
+   ],
+   "name": "twall2.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.7,
+    0.38
+   ],
+   "sha256": "4c18ce55598006fb478b301f0e849665c50bc4934a9b413f2fa09d2a64d2e78b",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0008,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.035,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.965
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 71.7
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/twall4.bmp@08cfa8c9": {
+   "archives": [
+    "airplane_obj.s3d"
+   ],
+   "brightness": 0.413,
+   "colorName": "grey",
+   "contrast": 0.141,
+   "fileName": "twall4.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    102,
+    107,
+    106
+   ],
+   "name": "twall4.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.78,
+    0.27
+   ],
+   "sha256": "08cfa8c9bf80010e352a2a4d18be3d1ec6e37cd97a9934ac924a4870a4b0f996",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/twall5.bmp@51de0b24": {
+   "archives": [
+    "airplane_obj.s3d",
+    "airplane.s3d"
+   ],
+   "brightness": 0.429,
+   "colorName": "grey",
+   "contrast": 0.144,
+   "fileName": "twall5.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    107,
+    110,
+    109
+   ],
+   "name": "twall5.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.97,
+    1.4
+   ],
+   "sha256": "51de0b24c77ca259e532167b19acc5fb1f886d86993d7aee41067dba777d369c",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0033,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.032,
+     "overhang": 0.337,
+     "slope": 0.0,
+     "steep": 0.334,
+     "vertical": 0.297
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 44.4
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/waspnest.bmp@1b133505": {
+   "archives": [
+    "airplane.s3d"
+   ],
+   "brightness": 0.493,
+   "colorName": "orange",
+   "contrast": 0.338,
+   "fileName": "waspnest.bmp.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    156,
+    125,
+    50
+   ],
+   "name": "waspnest.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.66,
+    1.19
+   ],
+   "sha256": "1b133505181ffca3e0955366598a516bce132ce10b14681e0654ed6aed367ed2",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0013,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.332,
+     "slope": 0.12,
+     "steep": 0.265,
+     "vertical": 0.283
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 81.8
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  }
+ },
+ "fileHashes": {
+  "airplane.s3d": "81fd1fde0dd77083a8630124726edd261655e66e9409b954c35b3b780c575fe7",
+  "airplane_obj.s3d": "7119dc5c60feab434ccdc75256a1a52cffed0579a47d104d33877c06383dadfb"
+ },
+ "format": "wld",
+ "problems": [],
+ "source": "zone:airplane",
+ "surveyVersion": 4,
+ "zone": "airplane"
+}

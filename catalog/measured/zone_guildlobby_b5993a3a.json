@@ -1,0 +1,6530 @@
+{
+ "archives": [
+  "guildlobby.eqg"
+ ],
+ "assets": {
+  "light/guildlobby/lit_aframe": {
+   "colors": [
+    {
+     "count": 64,
+     "rgb": [
+      1.0,
+      0.953,
+      0.765
+     ]
+    }
+   ],
+   "count": 64,
+   "examplePositions": [
+    [
+     -187.4,
+     234.7,
+     8.1
+    ],
+    [
+     -198.2,
+     249.4,
+     8.1
+    ],
+    [
+     -229.9,
+     249.4,
+     8.1
+    ]
+   ],
+   "flickerFrames": 1,
+   "kind": "light",
+   "name": "lit_aframe",
+   "names": [
+    "LIT_AFrame_01",
+    "LIT_AFrame_02",
+    "LIT_AFrame_03"
+   ],
+   "radii": [
+    30.0
+   ],
+   "shareOfZoneLights": 0.309,
+   "zone": "guildlobby"
+  },
+  "light/guildlobby/lit_brazier": {
+   "colors": [
+    {
+     "count": 4,
+     "rgb": [
+      1.0,
+      0.89,
+      0.808
+     ]
+    }
+   ],
+   "count": 4,
+   "examplePositions": [
+    [
+     -22.7,
+     398.1,
+     17.5
+    ],
+    [
+     22.7,
+     398.1,
+     17.5
+    ],
+    [
+     22.7,
+     438.2,
+     17.5
+    ]
+   ],
+   "flickerFrames": 1,
+   "kind": "light",
+   "name": "lit_brazier",
+   "names": [
+    "LIT_brazier_01",
+    "LIT_brazier_02",
+    "LIT_brazier_03"
+   ],
+   "radii": [
+    50.0
+   ],
+   "shareOfZoneLights": 0.019,
+   "zone": "guildlobby"
+  },
+  "light/guildlobby/lit_candle": {
+   "colors": [
+    {
+     "count": 16,
+     "rgb": [
+      1.0,
+      0.961,
+      0.808
+     ]
+    }
+   ],
+   "count": 16,
+   "examplePositions": [
+    [
+     -300.9,
+     475.7,
+     9.7
+    ],
+    [
+     -300.9,
+     461.9,
+     9.7
+    ],
+    [
+     -300.9,
+     361.8,
+     9.7
+    ]
+   ],
+   "flickerFrames": 1,
+   "kind": "light",
+   "name": "lit_candle",
+   "names": [
+    "LIT_candle01",
+    "LIT_candle02",
+    "LIT_candle03"
+   ],
+   "radii": [
+    15.0
+   ],
+   "shareOfZoneLights": 0.077,
+   "zone": "guildlobby"
+  },
+  "light/guildlobby/lit_candle_torch": {
+   "colors": [
+    {
+     "count": 64,
+     "rgb": [
+      1.0,
+      0.961,
+      0.808
+     ]
+    }
+   ],
+   "count": 64,
+   "examplePositions": [
+    [
+     184.3,
+     512.4,
+     10.0
+    ],
+    [
+     184.3,
+     492.1,
+     10.0
+    ],
+    [
+     184.3,
+     471.8,
+     10.0
+    ]
+   ],
+   "flickerFrames": 1,
+   "kind": "light",
+   "name": "lit_candle_torch",
+   "names": [
+    "LIT_candle_torch_01",
+    "LIT_candle_torch_02",
+    "LIT_candle_torch_03"
+   ],
+   "radii": [
+    30.0
+   ],
+   "shareOfZoneLights": 0.309,
+   "zone": "guildlobby"
+  },
+  "light/guildlobby/lit_omni": {
+   "colors": [
+    {
+     "count": 44,
+     "rgb": [
+      1.0,
+      0.98,
+      0.902
+     ]
+    }
+   ],
+   "count": 44,
+   "examplePositions": [
+    [
+     159.3,
+     442.0,
+     8.1
+    ],
+    [
+     159.3,
+     395.4,
+     8.1
+    ],
+    [
+     116.5,
+     350.6,
+     8.1
+    ]
+   ],
+   "flickerFrames": 1,
+   "kind": "light",
+   "name": "lit_omni",
+   "names": [
+    "LIT_Omni01",
+    "LIT_Omni02",
+    "LIT_Omni03"
+   ],
+   "radii": [
+    60.0
+   ],
+   "shareOfZoneLights": 0.213,
+   "zone": "guildlobby"
+  },
+  "light/guildlobby/lit_table": {
+   "colors": [
+    {
+     "count": 12,
+     "rgb": [
+      1.0,
+      0.953,
+      0.765
+     ]
+    }
+   ],
+   "count": 12,
+   "examplePositions": [
+    [
+     -183.7,
+     501.3,
+     8.1
+    ],
+    [
+     -183.7,
+     481.2,
+     8.1
+    ],
+    [
+     -183.7,
+     460.1,
+     8.1
+    ]
+   ],
+   "flickerFrames": 1,
+   "kind": "light",
+   "name": "lit_table",
+   "names": [
+    "LIT_table_01",
+    "LIT_table_02",
+    "LIT_table_03"
+   ],
+   "radii": [
+    30.0
+   ],
+   "shareOfZoneLights": 0.058,
+   "zone": "guildlobby"
+  },
+  "light/guildlobby/lit_torch": {
+   "colors": [
+    {
+     "count": 3,
+     "rgb": [
+      1.0,
+      0.933,
+      0.757
+     ]
+    }
+   ],
+   "count": 3,
+   "examplePositions": [
+    [
+     -3.1,
+     16.5,
+     10.4
+    ],
+    [
+     -9.4,
+     -14.3,
+     11.8
+    ],
+    [
+     -16.4,
+     -48.4,
+     12.5
+    ]
+   ],
+   "flickerFrames": 1,
+   "kind": "light",
+   "name": "lit_torch",
+   "names": [
+    "LIT_torch01",
+    "LIT_torch02",
+    "LIT_torch03"
+   ],
+   "radii": [
+    20.0
+   ],
+   "shareOfZoneLights": 0.014,
+   "zone": "guildlobby"
+  },
+  "model/obj_altar_.mod@bd31d2b9": {
+   "archive": "guildlobby.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "altar_top_c.dds",
+      "e_TextureNormal0": "altar_top_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "altar_side_c.dds",
+      "e_TextureNormal0": "altar_side_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_medium_warm.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "altar_torch_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCBSG1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbols_c.dds",
+      "e_TextureNormal0": "symbols_g.dds"
+     }
+    }
+   ],
+   "name": "obj_altar_.mod",
+   "placements": 8,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "bd31d2b91f81741d48275670d34e059678c12e688289291b25d53da7126bde9d",
+   "size": [
+    16.0,
+    16.0,
+    9.6
+   ],
+   "skinned": false,
+   "triangles": 592
+  },
+  "model/obj_bench_guild_b_.mod@b36406c2": {
+   "archive": "guildlobby.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ew_guild_bench_c.dds",
+      "e_TextureNormal0": "ew_guild_bench_n.dds"
+     }
+    }
+   ],
+   "name": "obj_bench_guild_b_.mod",
+   "placements": 26,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "b36406c2ddc825b54877d940a1eaa3afe4ebec9a0d8870b272ae486e21cd4f4b",
+   "size": [
+    2.4,
+    12.4,
+    4.3
+   ],
+   "skinned": false,
+   "triangles": 122
+  },
+  "model/obj_brazier_guild_.mod@b11ffd79": {
+   "archive": "guildlobby.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MaxCBSG1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ew_guild_brazier_throne_c.dds",
+      "e_TextureNormal0": "ew_guild_brazier_throne_n.dds"
+     }
+    },
+    {
+     "shader": "Chroma_MaxCBS1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ew_guild_flagtorch_c.dds",
+      "e_TextureNormal0": "ew_guild_flagtorch_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCBS1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ew_guild_brazier_stand_c.dds",
+      "e_TextureNormal0": "ew_guild_brazier_stand_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCBS1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ew_guild_throne_base_c.dds",
+      "e_TextureNormal0": "ew_guild_throne_base_n.dds"
+     }
+    }
+   ],
+   "name": "obj_brazier_guild_.mod",
+   "placements": 4,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "b11ffd79ef5beb3a037325ec6d40c9deab995004618600f0f50a8972e4233316",
+   "size": [
+    8.7,
+    8.7,
+    5.6
+   ],
+   "skinned": false,
+   "triangles": 480
+  },
+  "model/obj_brazier_stand_guild_.mod@861cbdec": {
+   "archive": "guildlobby.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MaxCBSG1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ew_guild_brazier_throne_c.dds",
+      "e_TextureNormal0": "ew_guild_brazier_throne_n.dds"
+     }
+    },
+    {
+     "shader": "Chroma_MaxCBS1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ew_guild_flagtorch_c.dds",
+      "e_TextureNormal0": "ew_guild_flagtorch_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCBS1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ew_guild_brazier_stand_c.dds",
+      "e_TextureNormal0": "ew_guild_brazier_stand_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCBS1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ew_guild_throne_base_c.dds",
+      "e_TextureNormal0": "ew_guild_throne_base_n.dds"
+     }
+    }
+   ],
+   "name": "obj_brazier_stand_guild_.mod",
+   "placements": 4,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "861cbdec697813087945089d38d0d0c89491a5a52ebad8cda759308956792fec",
+   "size": [
+    9.0,
+    9.0,
+    8.9
+   ],
+   "skinned": false,
+   "triangles": 90
+  },
+  "model/obj_candle_table_.mod@be249496": {
+   "archive": "guildlobby.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "candle_torch_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "wood_c.dds"
+     }
+    }
+   ],
+   "name": "obj_candle_table_.mod",
+   "placements": 12,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "be249496fa449154df46eccf86ac0fbcc152baa7037e6cd1e9c4c5b84a66d9f5",
+   "size": [
+    3.0,
+    10.0,
+    5.5
+   ],
+   "skinned": false,
+   "triangles": 1242
+  },
+  "model/obj_candle_torch_.mod@6a2bafe9": {
+   "archive": "guildlobby.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "candle_torch_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "wood_c.dds"
+     }
+    }
+   ],
+   "name": "obj_candle_torch_.mod",
+   "placements": 63,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "6a2bafe9ffd8f46e96beea89ef12c10481b8cb42521ac0362599eeb5b766bbac",
+   "size": [
+    2.9,
+    3.2,
+    9.4
+   ],
+   "skinned": false,
+   "triangles": 1006
+  },
+  "model/obj_dragon_lamp_.mod@a9fa9054": {
+   "archive": "guildlobby.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MaxCBS1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "dragon_lamp_c.dds",
+      "e_TextureNormal0": "dragon_lamp_n.dds"
+     }
+    }
+   ],
+   "name": "obj_dragon_lamp_.mod",
+   "placements": 46,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "a9fa9054b378e9aa664e8c2f79fe6d0d0299b68d515ce1532b4606ec8cb17fe2",
+   "size": [
+    8.5,
+    8.0,
+    13.5
+   ],
+   "skinned": false,
+   "triangles": 744
+  },
+  "model/obj_framedagger.mod@57f70959": {
+   "archive": "guildlobby.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ra_woodenslats_01_c.dds",
+      "e_TextureNormal0": "ra_woodenslats_01_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ra_aframe_01_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1_2UV.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ra_aframe_02_c.dds",
+      "e_TextureNormal0": "ra_aframe_02_n.dds",
+      "e_TextureSecond0": "ra_aframe_coverage_01.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1_2UV.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ra_aframe_02_c.dds",
+      "e_TextureNormal0": "ra_aframe_02_n.dds",
+      "e_TextureSecond0": "ra_aframe_coverage_02.dds"
+     }
+    }
+   ],
+   "name": "obj_framedagger.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "57f7095915e2bcf42fc6e5a32c26e8633c1b37e960af08399379a5e9325e8a7f",
+   "size": [
+    0.8,
+    2.7,
+    0.1
+   ],
+   "skinned": false,
+   "triangles": 46
+  },
+  "model/obj_guild_torchstand_.mod@f652b671": {
+   "archive": "guildlobby.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MaxCBSG1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ew_guild_brazier_throne_c.dds",
+      "e_TextureNormal0": "ew_guild_brazier_throne_n.dds"
+     }
+    },
+    {
+     "shader": "Chroma_MaxCBS1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ew_guild_flagtorch_c.dds",
+      "e_TextureNormal0": "ew_guild_flagtorch_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCBS1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ew_guild_brazier_stand_c.dds",
+      "e_TextureNormal0": "ew_guild_brazier_stand_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCBS1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ew_guild_throne_base_c.dds",
+      "e_TextureNormal0": "ew_guild_throne_base_n.dds"
+     }
+    }
+   ],
+   "name": "obj_guild_torchstand_.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "f652b6715f41f12700f2c3f1446038305e72415d8a3f12dbc971286fe94e99ed",
+   "size": [
+    12.7,
+    12.9,
+    32.6
+   ],
+   "skinned": false,
+   "triangles": 1024
+  },
+  "model/obj_pillar_.mod@89332fe0": {
+   "archive": "guildlobby.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_pillar_c.dds",
+      "e_TextureNormal0": "marble_pillar_n.dds"
+     }
+    }
+   ],
+   "name": "obj_pillar_.mod",
+   "placements": 30,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "89332fe0acdce573ab14c0f10ad9b9740089ccf600325cc5004da38a6bbd8b68",
+   "size": [
+    14.0,
+    7.5,
+    96.0
+   ],
+   "skinned": false,
+   "triangles": 159
+  },
+  "model/obj_pillar_core_.mod@5e520d3f": {
+   "archive": "guildlobby.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_pillar_c.dds",
+      "e_TextureNormal0": "marble_pillar_n.dds"
+     }
+    }
+   ],
+   "name": "obj_pillar_core_.mod",
+   "placements": 12,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "5e520d3f86417f697b4ff4261ac15387be45dea27713048dc1aa8cf36c846834",
+   "size": [
+    14.0,
+    7.5,
+    125.6
+   ],
+   "skinned": false,
+   "triangles": 160
+  },
+  "model/obj_pillar_inner_.mod@8c6e4b48": {
+   "archive": "guildlobby.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_pillar_c.dds",
+      "e_TextureNormal0": "marble_pillar_n.dds"
+     }
+    }
+   ],
+   "name": "obj_pillar_inner_.mod",
+   "placements": 12,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "8c6e4b48975f739989e78b2c9ef6a941a715e90b0dbc622a065f6c7ee3c5d6fa",
+   "size": [
+    14.0,
+    7.5,
+    120.4
+   ],
+   "skinned": false,
+   "triangles": 160
+  },
+  "model/obj_pillar_outer_.mod@ab1161dc": {
+   "archive": "guildlobby.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_pillar_c.dds",
+      "e_TextureNormal0": "marble_pillar_n.dds"
+     }
+    }
+   ],
+   "name": "obj_pillar_outer_.mod",
+   "placements": 18,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "ab1161dc8b4a5562bdbcdb00641891ddec348ad9e718cfaa16f02a42107f4d6b",
+   "size": [
+    14.0,
+    7.5,
+    100.2
+   ],
+   "skinned": false,
+   "triangles": 159
+  },
+  "model/obj_shield_throne_guild_.mod@67bc6f1f": {
+   "archive": "guildlobby.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Chroma_MaxCBS1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ew_guild_throne_chair_c.dds",
+      "e_TextureNormal0": "ew_guild_throne_chair_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCBS1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ew_guild_throne_swordshield_c.dds",
+      "e_TextureNormal0": "ew_guild_throne_swordshield_n.dds"
+     }
+    }
+   ],
+   "name": "obj_shield_throne_guild_.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "67bc6f1f9d711420e5962c2cb0d9f9ff93d7d4db4beb08b26bee5ec1bcc543fd",
+   "size": [
+    20.2,
+    4.5,
+    26.9
+   ],
+   "skinned": false,
+   "triangles": 412
+  },
+  "model/obj_sword_throne_guild_.mod@40d80a00": {
+   "archive": "guildlobby.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Chroma_MaxCBS1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ew_guild_throne_chair_c.dds",
+      "e_TextureNormal0": "ew_guild_throne_chair_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCBS1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ew_guild_throne_swordshield_c.dds",
+      "e_TextureNormal0": "ew_guild_throne_swordshield_n.dds"
+     }
+    }
+   ],
+   "name": "obj_sword_throne_guild_.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "40d80a007e7007c9ce35a80db5e8efdb7654149f2fd5fa21b17b9f7272561ded",
+   "size": [
+    18.6,
+    7.8,
+    32.7
+   ],
+   "skinned": false,
+   "triangles": 434
+  },
+  "model/obj_throne_base_guild_.mod@c06d7921": {
+   "archive": "guildlobby.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MaxCBSG1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ew_guild_brazier_throne_c.dds",
+      "e_TextureNormal0": "ew_guild_brazier_throne_n.dds"
+     }
+    },
+    {
+     "shader": "Chroma_MaxCBS1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ew_guild_flagtorch_c.dds",
+      "e_TextureNormal0": "ew_guild_flagtorch_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCBS1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ew_guild_brazier_stand_c.dds",
+      "e_TextureNormal0": "ew_guild_brazier_stand_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCBS1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ew_guild_throne_base_c.dds",
+      "e_TextureNormal0": "ew_guild_throne_base_n.dds"
+     }
+    }
+   ],
+   "name": "obj_throne_base_guild_.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "c06d792122c9b133f0f99eb7f0b9e887c951f2a1f52f641bb7f3922a63150a5f",
+   "size": [
+    34.5,
+    34.0,
+    11.9
+   ],
+   "skinned": false,
+   "triangles": 108
+  },
+  "model/obj_throne_guild_.mod@11c3ded1": {
+   "archive": "guildlobby.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Chroma_MaxCBS1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ew_guild_throne_chair_c.dds",
+      "e_TextureNormal0": "ew_guild_throne_chair_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCBS1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ew_guild_throne_swordshield_c.dds",
+      "e_TextureNormal0": "ew_guild_throne_swordshield_n.dds"
+     }
+    }
+   ],
+   "name": "obj_throne_guild_.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "11c3ded1c3069d705596d560e47520c15fa0f3f68ba019c702c216bb321ebbda",
+   "size": [
+    16.7,
+    20.1,
+    38.4
+   ],
+   "skinned": false,
+   "triangles": 1358
+  },
+  "model/obj_treeb_.mod@38acbfa2": {
+   "archive": "guildlobby.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "bark01.dds"
+     }
+    },
+    {
+     "shader": "Chroma_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "branches02.dds"
+     }
+    },
+    {
+     "shader": "Alpha_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "leaves01.dds"
+     }
+    }
+   ],
+   "name": "obj_treeb_.mod",
+   "placements": 4,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "38acbfa29a9e10d6f2926d065de64646492dda2bdadf2c8ae3a26c43b9090178",
+   "size": [
+    16.7,
+    16.5,
+    30.8
+   ],
+   "skinned": false,
+   "triangles": 583
+  },
+  "model/obj_treec_.mod@6a934361": {
+   "archive": "guildlobby.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "bark01.dds"
+     }
+    },
+    {
+     "shader": "Chroma_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "branches01.dds"
+     }
+    },
+    {
+     "shader": "Alpha_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "leaves01.dds"
+     }
+    }
+   ],
+   "name": "obj_treec_.mod",
+   "placements": 4,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "6a934361b6555ef549d4afe1c6a84937bedeb28dc70fc7f188f61efcd44078ad",
+   "size": [
+    16.4,
+    17.4,
+    33.8
+   ],
+   "skinned": false,
+   "triangles": 421
+  },
+  "model/ter_guildlobby.ter@45eff9a4": {
+   "archive": "guildlobby.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MaxC1_2UV.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_blocks_c.dds",
+      "e_TextureSecond0": "coverage.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_medium_warm.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "floor_stone_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCE1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_black_c.dds",
+      "e_TextureEnvironment": "hotness_e.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "iron_door_c.dds",
+      "e_TextureNormal0": "iron_door_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "dragon_knocker_c.dds",
+      "e_TextureNormal0": "dragon_knocker_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_medium_carved_c.dds",
+      "e_TextureNormal0": "marble_medium_carved_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "altar_panel_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ceiling_dragon_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCBSG1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbols_c.dds",
+      "e_TextureNormal0": "symbols_g.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol01_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol02_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol03_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol04_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol05_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol06_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol07_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol08_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol09_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol10_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol11_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol12_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol13_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol14_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol15_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol16_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "portcullis_c.dds",
+      "e_TextureNormal0": "portcullis_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1_2UV.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_blocks_c.dds",
+      "e_TextureSecond0": "coverage.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_medium_warm.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "floor_stone_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCE1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_black_c.dds",
+      "e_TextureEnvironment": "hotness_e.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "iron_door_c.dds",
+      "e_TextureNormal0": "iron_door_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "dragon_knocker_c.dds",
+      "e_TextureNormal0": "dragon_knocker_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_medium_carved_c.dds",
+      "e_TextureNormal0": "marble_medium_carved_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "altar_panel_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ceiling_dragon_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCBSG1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbols_c.dds",
+      "e_TextureNormal0": "symbols_g.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol01_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol02_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol03_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol04_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol05_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol06_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol07_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol08_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol09_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol10_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol11_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol12_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol13_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol14_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol15_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol16_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "portcullis_c.dds",
+      "e_TextureNormal0": "portcullis_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1_2UV.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_blocks_c.dds",
+      "e_TextureSecond0": "coverage.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_medium_warm.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "floor_stone_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCE1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_black_c.dds",
+      "e_TextureEnvironment": "hotness_e.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "iron_door_c.dds",
+      "e_TextureNormal0": "iron_door_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "dragon_knocker_c.dds",
+      "e_TextureNormal0": "dragon_knocker_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_medium_carved_c.dds",
+      "e_TextureNormal0": "marble_medium_carved_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "altar_panel_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ceiling_dragon_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCBSG1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbols_c.dds",
+      "e_TextureNormal0": "symbols_g.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol01_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol02_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol03_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol04_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol05_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol06_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol07_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol08_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol09_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol10_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol11_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol12_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol13_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol14_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol15_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol16_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "portcullis_c.dds",
+      "e_TextureNormal0": "portcullis_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1_2UV.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_blocks_c.dds",
+      "e_TextureSecond0": "coverage.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_medium_warm.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "floor_stone_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCE1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_black_c.dds",
+      "e_TextureEnvironment": "hotness_e.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "iron_door_c.dds",
+      "e_TextureNormal0": "iron_door_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "dragon_knocker_c.dds",
+      "e_TextureNormal0": "dragon_knocker_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_medium_carved_c.dds",
+      "e_TextureNormal0": "marble_medium_carved_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "altar_panel_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ceiling_dragon_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCBSG1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbols_c.dds",
+      "e_TextureNormal0": "symbols_g.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol01_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol02_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol03_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol04_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol05_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol06_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol07_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol08_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol09_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol10_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol11_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol12_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol13_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol14_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol15_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol16_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "portcullis_c.dds",
+      "e_TextureNormal0": "portcullis_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1_2UV.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_blocks_c.dds",
+      "e_TextureSecond0": "coverage.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_medium_warm.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "floor_stone_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCE1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_black_c.dds",
+      "e_TextureEnvironment": "hotness_e.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "iron_door_c.dds",
+      "e_TextureNormal0": "iron_door_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "dragon_knocker_c.dds",
+      "e_TextureNormal0": "dragon_knocker_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_medium_carved_c.dds",
+      "e_TextureNormal0": "marble_medium_carved_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "altar_panel_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ceiling_dragon_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCBSG1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbols_c.dds",
+      "e_TextureNormal0": "symbols_g.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol01_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol02_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol03_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol04_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol05_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol06_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol07_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol08_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol09_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol10_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol11_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol12_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol13_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol14_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol15_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "symbol16_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "portcullis_c.dds",
+      "e_TextureNormal0": "portcullis_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "tunnel_bricks_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "wall_stone_trim_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "tunnel_floor_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ceiling_rock_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "pok_trim.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "cementwallb.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "marble_medium_gray.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "cementwallc.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "iron_door_c.dds",
+      "e_TextureNormal0": "iron_door_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "brace_c.dds",
+      "e_TextureNormal0": "brace_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "brace_c.dds",
+      "e_TextureNormal0": "brace_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "brace_c.dds",
+      "e_TextureNormal0": "brace_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "brace_c.dds",
+      "e_TextureNormal0": "brace_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCB1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "brace_c.dds",
+      "e_TextureNormal0": "brace_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1_2UV.fx",
+     "textures": {
+      "e_TextureDiffuse0": "statue_c.dds",
+      "e_TextureSecond0": "marble_light_warm.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1_2UV.fx",
+     "textures": {
+      "e_TextureDiffuse0": "statue_c.dds",
+      "e_TextureSecond0": "marble_light_warm.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1_2UV.fx",
+     "textures": {
+      "e_TextureDiffuse0": "statue_c.dds",
+      "e_TextureSecond0": "marble_light_warm.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxC1_2UV.fx",
+     "textures": {
+      "e_TextureDiffuse0": "statue_c.dds",
+      "e_TextureSecond0": "marble_light_warm.dds"
+     }
+    }
+   ],
+   "name": "ter_guildlobby.ter",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "45eff9a4aa965129621c7399ee6ed4d18583bb9fad2205421715e7556044839f",
+   "size": [
+    748.1,
+    642.2,
+    126.5
+   ],
+   "skinned": false,
+   "triangles": 21218
+  },
+  "texture/altar_panel_c.dds@45c29b64": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.359,
+   "colorName": "brown",
+   "contrast": 0.165,
+   "fileName": "altar_panel_c.dds",
+   "format": "DXT5",
+   "height": 512,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 5
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 5
+    }
+   },
+   "meanColor": [
+    112,
+    92,
+    33
+   ],
+   "name": "altar_panel_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.17,
+    0.15
+   ],
+   "sha256": "45c29b6496eaea09a7bfc1a07f2d9e5709901d99f653a53605b820f6c30fc7f1",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0128,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 1.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 48.5
+   },
+   "width": 256
+  },
+  "texture/altar_side_c.dds@125ce1d9": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.421,
+   "colorName": "grey",
+   "contrast": 0.055,
+   "fileName": "altar_side_c.dds",
+   "format": "DXT5",
+   "height": 128,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_altar_.mod": 8
+    },
+    "partners": {
+     "altar_side_n.dds": 1
+    },
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MaxCB1.fx": 1
+    }
+   },
+   "meanColor": [
+    109,
+    107,
+    104
+   ],
+   "name": "altar_side_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.21,
+    1.97
+   ],
+   "sha256": "125ce1d99eec01f25d2225a04786acbfb6c57bbeb3ddbe0ed05ca3c172b79d9a",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0005,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.102,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.898
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 2.9
+   },
+   "width": 128
+  },
+  "texture/altar_side_n.dds@4c676f9a": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.558,
+   "colorName": "blue",
+   "contrast": 0.037,
+   "fileName": "altar_side_n.dds",
+   "format": "DXT5",
+   "height": 128,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_altar_.mod": 8
+    },
+    "partners": {
+     "altar_side_c.dds": 1
+    },
+    "roles": {
+     "e_TextureNormal0": 1
+    },
+    "shaders": {
+     "Opaque_MaxCB1.fx": 1
+    }
+   },
+   "meanColor": [
+    129,
+    127,
+    254
+   ],
+   "name": "altar_side_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.13,
+    0.24
+   ],
+   "sha256": "4c676f9a8c4925db2eb712205b3f734be550dcf4a9ca7cada4c74d227e6f2620",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 128
+  },
+  "texture/altar_top_c.dds@5431e1f3": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.492,
+   "colorName": "grey",
+   "contrast": 0.082,
+   "fileName": "altar_top_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_altar_.mod": 8
+    },
+    "partners": {
+     "altar_top_n.dds": 1
+    },
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MaxCB1.fx": 1
+    }
+   },
+   "meanColor": [
+    127,
+    125,
+    122
+   ],
+   "name": "altar_top_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.44,
+    0.46
+   ],
+   "sha256": "5431e1f316c9939f97a9871ecbcb93ed74410674fec53172f12839d9380affd2",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0004,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 8.8
+   },
+   "width": 256
+  },
+  "texture/altar_top_n.dds@d5e21169": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.052,
+   "fileName": "altar_top_n.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_altar_.mod": 8
+    },
+    "partners": {
+     "altar_top_c.dds": 1
+    },
+    "roles": {
+     "e_TextureNormal0": 1
+    },
+    "shaders": {
+     "Opaque_MaxCB1.fx": 1
+    }
+   },
+   "meanColor": [
+    128,
+    128,
+    251
+   ],
+   "name": "altar_top_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.0,
+    0.0
+   ],
+   "sha256": "d5e21169c46f0c86b6cb411fa0f50e79b5341fb7c188f5e8015d0265d4b9bc5c",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/altar_torch_c.dds@e81e2756": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.357,
+   "colorName": "grey",
+   "contrast": 0.137,
+   "fileName": "altar_torch_c.dds",
+   "format": "DXT5",
+   "height": 128,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_altar_.mod": 8
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 1
+    }
+   },
+   "meanColor": [
+    87,
+    93,
+    93
+   ],
+   "name": "altar_torch_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    3.16,
+    1.54
+   ],
+   "sha256": "e81e2756570597c86d650685b615b244344ad779b277bcab8de2adbc311bb79c",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0002,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.117,
+     "overhang": 0.095,
+     "slope": 0.005,
+     "steep": 0.098,
+     "vertical": 0.685
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 0.8
+   },
+   "width": 128
+  },
+  "texture/bark01.dds@3a398eb6": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.21,
+   "colorName": "brown",
+   "contrast": 0.102,
+   "fileName": "bark01.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_treeb_.mod": 4,
+     "obj_treec_.mod": 4
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 2
+    }
+   },
+   "meanColor": [
+    63,
+    50,
+    44
+   ],
+   "name": "bark01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.42,
+    0.46
+   ],
+   "sha256": "3a398eb6d6a22a13ad8acb7fdf36904d402e02e3c8b7078d7437d81a36817ae7",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0004,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.06,
+     "slope": 0.007,
+     "steep": 0.045,
+     "vertical": 0.888
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 4.1
+   },
+   "width": 256
+  },
+  "texture/bark02.dds@edf9f5fc": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.227,
+   "colorName": "brown",
+   "contrast": 0.055,
+   "fileName": "bark02.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    70,
+    55,
+    43
+   ],
+   "name": "bark02.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.43,
+    1.11
+   ],
+   "sha256": "edf9f5fca86d81c3ffaadc5e558748ab95c47e379576cc34ced0ea38e456435d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/bogus_n.dds@434592a7": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.55,
+   "colorName": "blue",
+   "contrast": 0.0,
+   "fileName": "bogus_n.dds",
+   "format": "DXT5",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    115,
+    142,
+    198
+   ],
+   "name": "bogus_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    null,
+    null
+   ],
+   "sha256": "434592a73bb1aad0ca75b7545bf2f80409d6c8e538b59a60c3f118899a770453",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 64
+  },
+  "texture/brace_c.dds@b17ef4e6": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.494,
+   "colorName": "tan",
+   "contrast": 0.14,
+   "fileName": "brace_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {
+     "brace_n.dds": 5
+    },
+    "roles": {
+     "e_TextureDiffuse0": 5
+    },
+    "shaders": {
+     "Opaque_MaxCB1.fx": 5
+    }
+   },
+   "meanColor": [
+    139,
+    121,
+    115
+   ],
+   "name": "brace_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    5.89,
+    3.64
+   ],
+   "sha256": "b17ef4e68ec1d693b2dab566fb6a08d1b38a8ab6e1ec974346bf114a0ea1e745",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0009,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.162,
+     "slope": 0.046,
+     "steep": 0.031,
+     "vertical": 0.761
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 3.7
+   },
+   "width": 256
+  },
+  "texture/brace_n.dds@4da982ed": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.557,
+   "colorName": "blue",
+   "contrast": 0.028,
+   "fileName": "brace_n.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {
+     "brace_c.dds": 5
+    },
+    "roles": {
+     "e_TextureNormal0": 5
+    },
+    "shaders": {
+     "Opaque_MaxCB1.fx": 5
+    }
+   },
+   "meanColor": [
+    128,
+    127,
+    254
+   ],
+   "name": "brace_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.65,
+    1.16
+   ],
+   "sha256": "4da982ed326131eeb7775e26fb52bab37bc2fa1633b53b2407b7bcb05981f3b6",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/branches01.dds@dfb385d9": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.107,
+   "colorName": "brown",
+   "contrast": 0.032,
+   "fileName": "branches01.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_treec_.mod": 4
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Chroma_MaxC1.fx": 1
+    }
+   },
+   "meanColor": [
+    63,
+    46,
+    28
+   ],
+   "name": "branches01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.074,
+   "seamRatios": [
+    0.24,
+    0.1
+   ],
+   "sha256": "dfb385d9096f2371f5dd8b9fa89611ee4ba34e55c2f09a2d57b6a6621cd9f394",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.925,
+   "uses": {
+    "areaShare": 0.0015,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.15,
+     "slope": 0.011,
+     "steep": 0.138,
+     "vertical": 0.701
+    },
+    "surfaces": {
+     "cutout": 1.0
+    },
+    "unitsPerRepeat": 12.8
+   },
+   "width": 256
+  },
+  "texture/branches02.dds@d1c8695b": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.121,
+   "colorName": "brown",
+   "contrast": 0.031,
+   "fileName": "branches02.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_treeb_.mod": 4
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Chroma_MaxC1.fx": 1
+    }
+   },
+   "meanColor": [
+    60,
+    48,
+    42
+   ],
+   "name": "branches02.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.051,
+   "seamRatios": [
+    0.0,
+    0.0
+   ],
+   "sha256": "d1c8695b5deed1b10209626d83f0e7363ac8a8f62f00113820ef318e617b7822",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.905,
+   "uses": {
+    "areaShare": 0.0028,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.181,
+     "slope": 0.0,
+     "steep": 0.181,
+     "vertical": 0.637
+    },
+    "surfaces": {
+     "cutout": 1.0
+    },
+    "unitsPerRepeat": 8.6
+   },
+   "width": 256
+  },
+  "texture/candle_torch_c.dds@db478168": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.259,
+   "colorName": "grey",
+   "contrast": 0.179,
+   "fileName": "candle_torch_c.dds",
+   "format": "DXT5",
+   "height": 128,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_candle_table_.mod": 12,
+     "obj_candle_torch_.mod": 63
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 2
+    }
+   },
+   "meanColor": [
+    68,
+    66,
+    59
+   ],
+   "name": "candle_torch_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    5.27,
+    3.87
+   ],
+   "sha256": "db478168387c41aaaa0f641326c4f8f39797dc673caebcc9d449b664742bbb0c",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0012,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.187,
+     "overhang": 0.179,
+     "slope": 0.062,
+     "steep": 0.045,
+     "vertical": 0.527
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 1.6
+   },
+   "width": 128
+  },
+  "texture/ceiling_dragon_c.dds@8126763a": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.296,
+   "colorName": "red",
+   "contrast": 0.145,
+   "fileName": "ceiling_dragon_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 5
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 5
+    }
+   },
+   "meanColor": [
+    85,
+    72,
+    68
+   ],
+   "name": "ceiling_dragon_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.16,
+    0.18
+   ],
+   "sha256": "8126763a6a8f5941e6ecb44d8604bf76657e02116bac59a505ede3248e76788a",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.002,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 1.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 53.4
+   },
+   "width": 512
+  },
+  "texture/ceiling_rock_c.dds@74657073": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.218,
+   "colorName": "brown",
+   "contrast": 0.07,
+   "fileName": "ceiling_rock_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 1
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 1
+    }
+   },
+   "meanColor": [
+    61,
+    55,
+    46
+   ],
+   "name": "ceiling_rock_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.2,
+    0.88
+   ],
+   "sha256": "7465707332efb0e3bbe14f04c3f61a902564d8802e362811d7352cc8a1789590",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0017,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.666,
+     "slope": 0.0,
+     "steep": 0.03,
+     "vertical": 0.304
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 7.9
+   },
+   "width": 256
+  },
+  "texture/cementwallb.dds@0eef742f": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.577,
+   "colorName": "grey",
+   "contrast": 0.073,
+   "fileName": "cementwallb.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 1
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 1
+    }
+   },
+   "meanColor": [
+    152,
+    147,
+    137
+   ],
+   "name": "cementwallb.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.87,
+    2.73
+   ],
+   "sha256": "0eef742f48708943ec54cd728d631f876425125b24f1208f2f35dcb0d732cb08",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/cementwallc.dds@caf6cb1d": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.579,
+   "colorName": "grey",
+   "contrast": 0.065,
+   "fileName": "cementwallc.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 1
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 1
+    }
+   },
+   "meanColor": [
+    152,
+    147,
+    138
+   ],
+   "name": "cementwallc.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.36,
+    3.13
+   ],
+   "sha256": "caf6cb1d2b106499d7041f16fecc21dfb7c32bdf3190cb6745ef5ee691c1b0f3",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/coverage.dds@2977f0f2": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.857,
+   "colorName": "white",
+   "contrast": 0.048,
+   "fileName": "coverage.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {
+     "marble_blocks_c.dds": 5
+    },
+    "roles": {
+     "e_TextureSecond0": 5
+    },
+    "shaders": {
+     "Opaque_MaxC1_2UV.fx": 5
+    }
+   },
+   "meanColor": [
+    222,
+    218,
+    211
+   ],
+   "name": "coverage.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.95,
+    0.91
+   ],
+   "sha256": "2977f0f273271593feb549909f64d6bc8ab5769a2c08957cb3dec320bcfee017",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/dragon_knocker_c.dds@a57e4d79": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.215,
+   "colorName": "brown",
+   "contrast": 0.088,
+   "fileName": "dragon_knocker_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {
+     "dragon_knocker_n.dds": 5
+    },
+    "roles": {
+     "e_TextureDiffuse0": 5
+    },
+    "shaders": {
+     "Opaque_MaxCB1.fx": 5
+    }
+   },
+   "meanColor": [
+    62,
+    53,
+    47
+   ],
+   "name": "dragon_knocker_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.57,
+    1.73
+   ],
+   "sha256": "a57e4d7931515908f1184afdb87bdc512bb0acb169934fb25e61b328ce3e1973",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/dragon_knocker_n.dds@387d6c8d": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.558,
+   "colorName": "blue",
+   "contrast": 0.025,
+   "fileName": "dragon_knocker_n.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {
+     "dragon_knocker_c.dds": 5
+    },
+    "roles": {
+     "e_TextureNormal0": 5
+    },
+    "shaders": {
+     "Opaque_MaxCB1.fx": 5
+    }
+   },
+   "meanColor": [
+    128,
+    128,
+    254
+   ],
+   "name": "dragon_knocker_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.14,
+    1.04
+   ],
+   "sha256": "387d6c8d66aa4f1af684f3fe21e64518cb100c65d8128b94c629677d4e6794d8",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/dragon_lamp_c.dds@e88d1121": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.155,
+   "colorName": "brown",
+   "contrast": 0.14,
+   "fileName": "dragon_lamp_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_dragon_lamp_.mod": 46
+    },
+    "partners": {
+     "dragon_lamp_n.dds": 1
+    },
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MaxCBS1.fx": 1
+    }
+   },
+   "meanColor": [
+    46,
+    38,
+    32
+   ],
+   "name": "dragon_lamp_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    4.22,
+    3.22
+   ],
+   "sha256": "e88d11218fa49ddca18665d1a3bd3cbbb6d485b1d7f4e7c9d40e81117309c09e",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0054,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.047,
+     "overhang": 0.288,
+     "slope": 0.127,
+     "steep": 0.095,
+     "vertical": 0.442
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 15.8
+   },
+   "width": 256
+  },
+  "texture/dragon_lamp_n.dds@efa22879": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.557,
+   "colorName": "blue",
+   "contrast": 0.036,
+   "fileName": "dragon_lamp_n.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_dragon_lamp_.mod": 46
+    },
+    "partners": {
+     "dragon_lamp_c.dds": 1
+    },
+    "roles": {
+     "e_TextureNormal0": 1
+    },
+    "shaders": {
+     "Opaque_MaxCBS1.fx": 1
+    }
+   },
+   "meanColor": [
+    128,
+    127,
+    254
+   ],
+   "name": "dragon_lamp_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.72,
+    1.21
+   ],
+   "sha256": "efa2287956ea8162482b79538730552e848a7a7110f4562166b32a7a90471564",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/ew_guild_bench_c.dds@ba2bb0b0": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.33,
+   "colorName": "grey",
+   "contrast": 0.081,
+   "fileName": "ew_guild_bench_c.dds",
+   "format": "DXT3",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_bench_guild_b_.mod": 26
+    },
+    "partners": {
+     "ew_guild_bench_n.dds": 1
+    },
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MaxCB1.fx": 1
+    }
+   },
+   "meanColor": [
+    87,
+    84,
+    80
+   ],
+   "name": "ew_guild_bench_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.04,
+    1.3
+   ],
+   "sha256": "ba2bb0b068e38fa7986790a8672220200ecbd39a48291e19cd328f730353cced",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0024,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.168,
+     "overhang": 0.186,
+     "slope": 0.003,
+     "steep": 0.009,
+     "vertical": 0.635
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 4.0
+   },
+   "width": 256
+  },
+  "texture/ew_guild_bench_n.dds@a8505e18": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.559,
+   "colorName": "blue",
+   "contrast": 0.017,
+   "fileName": "ew_guild_bench_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_bench_guild_b_.mod": 26
+    },
+    "partners": {
+     "ew_guild_bench_c.dds": 1
+    },
+    "roles": {
+     "e_TextureNormal0": 1
+    },
+    "shaders": {
+     "Opaque_MaxCB1.fx": 1
+    }
+   },
+   "meanColor": [
+    128,
+    128,
+    255
+   ],
+   "name": "ew_guild_bench_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.89,
+    0.89
+   ],
+   "sha256": "a8505e18fc54048f263c663c0fd42fd82fbd6ae77a9d47c48fd6cf2776e50f6d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/ew_guild_brazier_stand_c.dds@c59f078a": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.323,
+   "colorName": "brown",
+   "contrast": 0.172,
+   "fileName": "ew_guild_brazier_stand_c.dds",
+   "format": "DXT3",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_brazier_guild_.mod": 4,
+     "obj_brazier_stand_guild_.mod": 4,
+     "obj_guild_torchstand_.mod": 1,
+     "obj_throne_base_guild_.mod": 1
+    },
+    "partners": {
+     "ew_guild_brazier_stand_n.dds": 4
+    },
+    "roles": {
+     "e_TextureDiffuse0": 4
+    },
+    "shaders": {
+     "Opaque_MaxCBS1.fx": 4
+    }
+   },
+   "meanColor": [
+    93,
+    80,
+    64
+   ],
+   "name": "ew_guild_brazier_stand_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.14,
+    10.28
+   ],
+   "sha256": "c59f078a9fdd70f711814814c6424da5f258314c53f226b7e207b52fe64c0536",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0011,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.259,
+     "overhang": 0.167,
+     "slope": 0.022,
+     "steep": 0.0,
+     "vertical": 0.551
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 8.0
+   },
+   "width": 256
+  },
+  "texture/ew_guild_brazier_stand_n.dds@489efaf6": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.558,
+   "colorName": "blue",
+   "contrast": 0.106,
+   "fileName": "ew_guild_brazier_stand_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_brazier_guild_.mod": 4,
+     "obj_brazier_stand_guild_.mod": 4,
+     "obj_guild_torchstand_.mod": 1,
+     "obj_throne_base_guild_.mod": 1
+    },
+    "partners": {
+     "ew_guild_brazier_stand_c.dds": 4
+    },
+    "roles": {
+     "e_TextureNormal0": 4
+    },
+    "shaders": {
+     "Opaque_MaxCBS1.fx": 4
+    }
+   },
+   "meanColor": [
+    128,
+    129,
+    249
+   ],
+   "name": "ew_guild_brazier_stand_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.162,
+   "seamRatios": [
+    1.08,
+    0.61
+   ],
+   "sha256": "489efaf6f942ad60725db6aa6e65d87d6d7932143f13926149ac02ba2427de36",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.904,
+   "width": 256
+  },
+  "texture/ew_guild_brazier_throne_c.dds@d1e52cea": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.206,
+   "colorName": "brown",
+   "contrast": 0.065,
+   "fileName": "ew_guild_brazier_throne_c.dds",
+   "format": "DXT3",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_brazier_guild_.mod": 4,
+     "obj_brazier_stand_guild_.mod": 4,
+     "obj_guild_torchstand_.mod": 1,
+     "obj_throne_base_guild_.mod": 1
+    },
+    "partners": {
+     "ew_guild_brazier_throne_n.dds": 4
+    },
+    "roles": {
+     "e_TextureDiffuse0": 4
+    },
+    "shaders": {
+     "Opaque_MaxCBSG1.fx": 4
+    }
+   },
+   "meanColor": [
+    61,
+    51,
+    39
+   ],
+   "name": "ew_guild_brazier_throne_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.15,
+    1.4
+   ],
+   "sha256": "d1e52cea7117157b8196cbbed31b7f45db4064f14764ee32febe72e7669568d5",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0007,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.057,
+     "overhang": 0.42,
+     "slope": 0.272,
+     "steep": 0.12,
+     "vertical": 0.13
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 5.4
+   },
+   "width": 256
+  },
+  "texture/ew_guild_brazier_throne_n.dds@7cd3d58a": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.447,
+   "colorName": "yellow",
+   "contrast": 0.053,
+   "fileName": "ew_guild_brazier_throne_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_brazier_guild_.mod": 4,
+     "obj_brazier_stand_guild_.mod": 4,
+     "obj_guild_torchstand_.mod": 1,
+     "obj_throne_base_guild_.mod": 1
+    },
+    "partners": {
+     "ew_guild_brazier_throne_c.dds": 4
+    },
+    "roles": {
+     "e_TextureNormal0": 4
+    },
+    "shaders": {
+     "Opaque_MaxCBSG1.fx": 4
+    }
+   },
+   "meanColor": [
+    128,
+    129,
+    31
+   ],
+   "name": "ew_guild_brazier_throne_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.892,
+   "seamRatios": [
+    0.84,
+    0.92
+   ],
+   "sha256": "7cd3d58a0c7e00bcd04f58594168bbbad34ed4af1008a91f344723e4d9254796",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.955,
+   "width": 256
+  },
+  "texture/ew_guild_flagtorch_c.dds@540c8cb9": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.288,
+   "colorName": "brown",
+   "contrast": 0.211,
+   "fileName": "ew_guild_flagtorch_c.dds",
+   "format": "DXT3",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_brazier_guild_.mod": 4,
+     "obj_brazier_stand_guild_.mod": 4,
+     "obj_guild_torchstand_.mod": 1,
+     "obj_throne_base_guild_.mod": 1
+    },
+    "partners": {
+     "ew_guild_flagtorch_n.dds": 4
+    },
+    "roles": {
+     "e_TextureDiffuse0": 4
+    },
+    "shaders": {
+     "Chroma_MaxCBS1.fx": 4
+    }
+   },
+   "meanColor": [
+    98,
+    91,
+    75
+   ],
+   "name": "ew_guild_flagtorch_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.03,
+   "seamRatios": [
+    2.5,
+    4.88
+   ],
+   "sha256": "540c8cb9bafbc7d873effe84e9e566df860ebea949f0aafc70fd1ebaf44bc998",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.202,
+   "uses": {
+    "areaShare": 0.0005,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.02,
+     "overhang": 0.031,
+     "slope": 0.007,
+     "steep": 0.021,
+     "vertical": 0.92
+    },
+    "surfaces": {
+     "cutout": 1.0
+    },
+    "unitsPerRepeat": 9.1
+   },
+   "width": 256
+  },
+  "texture/ew_guild_flagtorch_n.dds@fcc1dc56": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.052,
+   "fileName": "ew_guild_flagtorch_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_brazier_guild_.mod": 4,
+     "obj_brazier_stand_guild_.mod": 4,
+     "obj_guild_torchstand_.mod": 1,
+     "obj_throne_base_guild_.mod": 1
+    },
+    "partners": {
+     "ew_guild_flagtorch_c.dds": 4
+    },
+    "roles": {
+     "e_TextureNormal0": 4
+    },
+    "shaders": {
+     "Chroma_MaxCBS1.fx": 4
+    }
+   },
+   "meanColor": [
+    126,
+    122,
+    239
+   ],
+   "name": "ew_guild_flagtorch_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.414,
+   "seamRatios": [
+    0.68,
+    1.37
+   ],
+   "sha256": "fcc1dc56e578b9420fbdbe47980c074a264c2de3a6fa5fe8bba225ef313fa61f",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.996,
+   "width": 256
+  },
+  "texture/ew_guild_throne_base_c.dds@97b87ded": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.35,
+   "colorName": "brown",
+   "contrast": 0.158,
+   "fileName": "ew_guild_throne_base_c.dds",
+   "format": "DXT3",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_brazier_guild_.mod": 4,
+     "obj_brazier_stand_guild_.mod": 4,
+     "obj_guild_torchstand_.mod": 1,
+     "obj_throne_base_guild_.mod": 1
+    },
+    "partners": {
+     "ew_guild_throne_base_n.dds": 4
+    },
+    "roles": {
+     "e_TextureDiffuse0": 4
+    },
+    "shaders": {
+     "Opaque_MaxCBS1.fx": 4
+    }
+   },
+   "meanColor": [
+    100,
+    87,
+    72
+   ],
+   "name": "ew_guild_throne_base_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.77,
+    1.3
+   ],
+   "sha256": "97b87ded1e196b8dbdc38b767a243e1e283c8867a46cc61dbec3190436125a76",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0021,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.521,
+     "overhang": 0.052,
+     "slope": 0.051,
+     "steep": 0.035,
+     "vertical": 0.342
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 11.7
+   },
+   "width": 256
+  },
+  "texture/ew_guild_throne_base_n.dds@310d3ae0": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.553,
+   "colorName": "blue",
+   "contrast": 0.133,
+   "fileName": "ew_guild_throne_base_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_brazier_guild_.mod": 4,
+     "obj_brazier_stand_guild_.mod": 4,
+     "obj_guild_torchstand_.mod": 1,
+     "obj_throne_base_guild_.mod": 1
+    },
+    "partners": {
+     "ew_guild_throne_base_c.dds": 4
+    },
+    "roles": {
+     "e_TextureNormal0": 4
+    },
+    "shaders": {
+     "Opaque_MaxCBS1.fx": 4
+    }
+   },
+   "meanColor": [
+    127,
+    129,
+    241
+   ],
+   "name": "ew_guild_throne_base_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.282,
+   "seamRatios": [
+    1.22,
+    2.08
+   ],
+   "sha256": "310d3ae01145ba5266280d8eb45c33fd4cc70d682e746556a7996e543cef7247",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.893,
+   "width": 256
+  },
+  "texture/ew_guild_throne_chair_c.dds@d206e67a": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.25,
+   "colorName": "brown",
+   "contrast": 0.143,
+   "fileName": "ew_guild_throne_chair_c.dds",
+   "format": "DXT3",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_shield_throne_guild_.mod": 1,
+     "obj_sword_throne_guild_.mod": 1,
+     "obj_throne_guild_.mod": 1
+    },
+    "partners": {
+     "ew_guild_throne_chair_n.dds": 3
+    },
+    "roles": {
+     "e_TextureDiffuse0": 3
+    },
+    "shaders": {
+     "Chroma_MaxCBS1.fx": 3
+    }
+   },
+   "meanColor": [
+    78,
+    61,
+    40
+   ],
+   "name": "ew_guild_throne_chair_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.019,
+   "seamRatios": [
+    1.96,
+    1.43
+   ],
+   "sha256": "d206e67a6c52fd837185266e49a596eef670b4f3d4d115910f9a18348203939b",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.02,
+   "uses": {
+    "areaShare": 0.0016,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.093,
+     "overhang": 0.163,
+     "slope": 0.085,
+     "steep": 0.041,
+     "vertical": 0.618
+    },
+    "surfaces": {
+     "cutout": 1.0
+    },
+    "unitsPerRepeat": 24.7
+   },
+   "width": 256
+  },
+  "texture/ew_guild_throne_chair_n.dds@7f699218": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.552,
+   "colorName": "blue",
+   "contrast": 0.089,
+   "fileName": "ew_guild_throne_chair_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_shield_throne_guild_.mod": 1,
+     "obj_sword_throne_guild_.mod": 1,
+     "obj_throne_guild_.mod": 1
+    },
+    "partners": {
+     "ew_guild_throne_chair_c.dds": 3
+    },
+    "roles": {
+     "e_TextureNormal0": 3
+    },
+    "shaders": {
+     "Chroma_MaxCBS1.fx": 3
+    }
+   },
+   "meanColor": [
+    129,
+    132,
+    223
+   ],
+   "name": "ew_guild_throne_chair_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.15,
+   "seamRatios": [
+    1.14,
+    0.89
+   ],
+   "sha256": "7f6992188f8e2671bb5a16a3a280d6ab1d8ae464255ae69238edc7bfd6878bd6",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.93,
+   "width": 256
+  },
+  "texture/ew_guild_throne_swordshield_c.dds@a67c1bcc": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.239,
+   "colorName": "brown",
+   "contrast": 0.189,
+   "fileName": "ew_guild_throne_swordshield_c.dds",
+   "format": "DXT3",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_shield_throne_guild_.mod": 1,
+     "obj_sword_throne_guild_.mod": 1,
+     "obj_throne_guild_.mod": 1
+    },
+    "partners": {
+     "ew_guild_throne_swordshield_n.dds": 3
+    },
+    "roles": {
+     "e_TextureDiffuse0": 3
+    },
+    "shaders": {
+     "Opaque_MaxCBS1.fx": 3
+    }
+   },
+   "meanColor": [
+    72,
+    58,
+    43
+   ],
+   "name": "ew_guild_throne_swordshield_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.8,
+    2.58
+   ],
+   "sha256": "a67c1bccb1afae2719d56075af5a8a3e84801f9b1d397f2f42202830818cf589",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0006,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.094,
+     "slope": 0.017,
+     "steep": 0.076,
+     "vertical": 0.812
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 20.1
+   },
+   "width": 256
+  },
+  "texture/ew_guild_throne_swordshield_n.dds@e582db70": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.553,
+   "colorName": "blue",
+   "contrast": 0.069,
+   "fileName": "ew_guild_throne_swordshield_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_shield_throne_guild_.mod": 1,
+     "obj_sword_throne_guild_.mod": 1,
+     "obj_throne_guild_.mod": 1
+    },
+    "partners": {
+     "ew_guild_throne_swordshield_c.dds": 3
+    },
+    "roles": {
+     "e_TextureNormal0": 3
+    },
+    "shaders": {
+     "Opaque_MaxCBS1.fx": 3
+    }
+   },
+   "meanColor": [
+    125,
+    128,
+    231
+   ],
+   "name": "ew_guild_throne_swordshield_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.503,
+   "seamRatios": [
+    0.73,
+    0.69
+   ],
+   "sha256": "e582db70b60ec28e4357cba4bd63fe72261c7e5c3cada2c4a534f84120b34847",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.957,
+   "width": 256
+  },
+  "texture/floor_stone_c.dds@66b28e19": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.508,
+   "colorName": "grey",
+   "contrast": 0.05,
+   "fileName": "floor_stone_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 5
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 5
+    }
+   },
+   "meanColor": [
+    126,
+    132,
+    124
+   ],
+   "name": "floor_stone_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.05,
+    1.16
+   ],
+   "sha256": "66b28e19d3bb37ff934829f5395abf051eb18a730d7a9a046b71b206a73c92d1",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.109,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 11.9
+   },
+   "width": 256
+  },
+  "texture/guildlobby_lm.dds@c9a1be25": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.37,
+   "colorName": "grey",
+   "contrast": 0.153,
+   "fileName": "guildlobby_lm.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    96,
+    94,
+    93
+   ],
+   "name": "guildlobby_lm.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    3.99,
+    3.93
+   ],
+   "sha256": "c9a1be2535742669c167db89e9e97627adcfdda4d66acc5c6bcd6866740121fd",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hotness_e.dds@f04bdfc6": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.185,
+   "colorName": "brown",
+   "contrast": 0.099,
+   "fileName": "hotness_e.dds",
+   "format": "DXT5",
+   "height": 64,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {
+     "marble_black_c.dds": 5
+    },
+    "roles": {
+     "e_TextureEnvironment": 5
+    },
+    "shaders": {
+     "Opaque_MaxCE1.fx": 5
+    }
+   },
+   "meanColor": [
+    80,
+    36,
+    19
+   ],
+   "name": "hotness_e.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.72,
+    4.16
+   ],
+   "sha256": "f04bdfc680ee8f92932ec9d71077e4b5e0f69e725d6a2b588447d2915f4594af",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 64
+  },
+  "texture/iron_door_c.dds@dbbda7d3": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.233,
+   "colorName": "brown",
+   "contrast": 0.112,
+   "fileName": "iron_door_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 6
+    },
+    "partners": {
+     "iron_door_n.dds": 6
+    },
+    "roles": {
+     "e_TextureDiffuse0": 6
+    },
+    "shaders": {
+     "Opaque_MaxCB1.fx": 6
+    }
+   },
+   "meanColor": [
+    66,
+    57,
+    53
+   ],
+   "name": "iron_door_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.61,
+    0.41
+   ],
+   "sha256": "dbbda7d30e479d09535b66e8db1b43d26a765cb37a473118605475c5c3b12011",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.003,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 1.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 4.0
+   },
+   "width": 256
+  },
+  "texture/iron_door_n.dds@fc648874": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.56,
+   "colorName": "blue",
+   "contrast": 0.016,
+   "fileName": "iron_door_n.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 6
+    },
+    "partners": {
+     "iron_door_c.dds": 6
+    },
+    "roles": {
+     "e_TextureNormal0": 6
+    },
+    "shaders": {
+     "Opaque_MaxCB1.fx": 6
+    }
+   },
+   "meanColor": [
+    129,
+    128,
+    255
+   ],
+   "name": "iron_door_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.46,
+    0.47
+   ],
+   "sha256": "fc648874389424977505bacee795909dfa079334f21b8530a6fd3a79f3810745",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/lamps_plus.dds@b14a5f86": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.211,
+   "colorName": "brown",
+   "contrast": 0.162,
+   "fileName": "lamps_plus.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    59,
+    53,
+    46
+   ],
+   "name": "lamps_plus.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    3.47,
+    5.5
+   ],
+   "sha256": "b14a5f869d1d12c4ba781b89e97668bfdccc1f8734b724d00d62b374353d59cf",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/leaves01.dds@aa76a0af": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.174,
+   "colorName": "yellow",
+   "contrast": 0.07,
+   "fileName": "leaves01.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_treeb_.mod": 4,
+     "obj_treec_.mod": 4
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Alpha_MaxC1.fx": 2
+    }
+   },
+   "meanColor": [
+    73,
+    80,
+    32
+   ],
+   "name": "leaves01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.174,
+   "seamRatios": [
+    0.03,
+    0.02
+   ],
+   "sha256": "aa76a0af6d05515b570eb2bb310468365d74b260b2d9ec440e8430ffd03396f1",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.781,
+   "uses": {
+    "areaShare": 0.0162,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.026,
+     "overhang": 0.412,
+     "slope": 0.242,
+     "steep": 0.144,
+     "vertical": 0.176
+    },
+    "surfaces": {
+     "translucent": 1.0
+    },
+    "unitsPerRepeat": 11.4
+   },
+   "width": 256
+  },
+  "texture/leaves_sakura.dds@32c68eea": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.227,
+   "colorName": "red",
+   "contrast": 0.127,
+   "fileName": "leaves_sakura.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    120,
+    61,
+    54
+   ],
+   "name": "leaves_sakura.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.142,
+   "seamRatios": [
+    0.0,
+    0.0
+   ],
+   "sha256": "32c68eea221c2657c6f768a032966b226df4b2cdd2829bbf435ee9a42ebf6a13",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.665,
+   "width": 256
+  },
+  "texture/marble_black_c.dds@f031c213": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.076,
+   "colorName": "black",
+   "contrast": 0.034,
+   "fileName": "marble_black_c.dds",
+   "format": "DXT5",
+   "height": 128,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {
+     "hotness_e.dds": 5
+    },
+    "roles": {
+     "e_TextureDiffuse0": 5
+    },
+    "shaders": {
+     "Opaque_MaxCE1.fx": 5
+    }
+   },
+   "meanColor": [
+    19,
+    19,
+    20
+   ],
+   "name": "marble_black_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.98,
+    1.08
+   ],
+   "sha256": "f031c21334b545d6291c71530006897bc276b80fa5be957f5ea66a4ab959aaaf",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0086,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.988,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.012
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 12.1
+   },
+   "width": 128
+  },
+  "texture/marble_blocks_c.dds@14bff94f": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.507,
+   "colorName": "grey",
+   "contrast": 0.036,
+   "fileName": "marble_blocks_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {
+     "coverage.dds": 5
+    },
+    "roles": {
+     "e_TextureDiffuse0": 5
+    },
+    "shaders": {
+     "Opaque_MaxC1_2UV.fx": 5
+    }
+   },
+   "meanColor": [
+    131,
+    129,
+    123
+   ],
+   "name": "marble_blocks_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    3.16,
+    5.54
+   ],
+   "sha256": "14bff94f37259e83354dadf5875eaeabb8a34431f1ff566074c710eb2b11a3b6",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.3475,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.014,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.986
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 7.6
+   },
+   "width": 256
+  },
+  "texture/marble_light_warm.dds@d02a5fd6": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.924,
+   "colorName": "white",
+   "contrast": 0.024,
+   "fileName": "marble_light_warm.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 4
+    },
+    "partners": {
+     "statue_c.dds": 4
+    },
+    "roles": {
+     "e_TextureSecond0": 4
+    },
+    "shaders": {
+     "Opaque_MaxC1_2UV.fx": 4
+    }
+   },
+   "meanColor": [
+    246,
+    233,
+    218
+   ],
+   "name": "marble_light_warm.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.82,
+    0.89
+   ],
+   "sha256": "d02a5fd6983c06a742a6d1ea6061bccf23bef20c50c0d93f2fb1309f46627c00",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/marble_medium_carved_c.dds@2342c9dd": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.318,
+   "colorName": "red",
+   "contrast": 0.048,
+   "fileName": "marble_medium_carved_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {
+     "marble_medium_carved_n.dds": 5
+    },
+    "roles": {
+     "e_TextureDiffuse0": 5
+    },
+    "shaders": {
+     "Opaque_MaxCB1.fx": 5
+    }
+   },
+   "meanColor": [
+    97,
+    76,
+    69
+   ],
+   "name": "marble_medium_carved_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.32,
+    0.22
+   ],
+   "sha256": "2342c9dddbdf8ddde8a4236237af9298c9936e348b6a8c5dd54b1793f8c86320",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0481,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.16,
+     "slope": 0.145,
+     "steep": 0.013,
+     "vertical": 0.683
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 9.9
+   },
+   "width": 256
+  },
+  "texture/marble_medium_carved_n.dds@d55880e2": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.557,
+   "colorName": "blue",
+   "contrast": 0.014,
+   "fileName": "marble_medium_carved_n.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {
+     "marble_medium_carved_c.dds": 5
+    },
+    "roles": {
+     "e_TextureNormal0": 5
+    },
+    "shaders": {
+     "Opaque_MaxCB1.fx": 5
+    }
+   },
+   "meanColor": [
+    128,
+    127,
+    255
+   ],
+   "name": "marble_medium_carved_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.27,
+    0.21
+   ],
+   "sha256": "d55880e2085f733a9acd70fac5cdf3476443e10563cb8ba6521fe7022d334a56",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/marble_medium_gray.dds@20686fcd": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.319,
+   "colorName": "grey",
+   "contrast": 0.011,
+   "fileName": "marble_medium_gray.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 1
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 1
+    }
+   },
+   "meanColor": [
+    87,
+    79,
+    78
+   ],
+   "name": "marble_medium_gray.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.89,
+    1.05
+   ],
+   "sha256": "20686fcd1d1cda0de23e626c7e8b388043f832b258b2094aab7497f71b09fae8",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/marble_medium_warm.dds@e346d0db": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.314,
+   "colorName": "red",
+   "contrast": 0.012,
+   "fileName": "marble_medium_warm.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_altar_.mod": 8,
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 6
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 6
+    }
+   },
+   "meanColor": [
+    95,
+    74,
+    71
+   ],
+   "name": "marble_medium_warm.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.93,
+    1.1
+   ],
+   "sha256": "e346d0dbdd0c876633e768641cec29a8a7aa1d7443ef927a295483bb6fe90dfd",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.3083,
+    "objectShare": 0.004,
+    "slopeShares": {
+     "flat": 0.244,
+     "overhang": 0.523,
+     "slope": 0.031,
+     "steep": 0.0,
+     "vertical": 0.203
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 12.1
+   },
+   "width": 256
+  },
+  "texture/marble_pillar_c.dds@4f897e9b": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.509,
+   "colorName": "tan",
+   "contrast": 0.132,
+   "fileName": "marble_pillar_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_pillar_.mod": 30,
+     "obj_pillar_core_.mod": 12,
+     "obj_pillar_inner_.mod": 12,
+     "obj_pillar_outer_.mod": 18
+    },
+    "partners": {
+     "marble_pillar_n.dds": 4
+    },
+    "roles": {
+     "e_TextureDiffuse0": 4
+    },
+    "shaders": {
+     "Opaque_MaxCB1.fx": 4
+    }
+   },
+   "meanColor": [
+    153,
+    122,
+    110
+   ],
+   "name": "marble_pillar_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.04,
+    0.0
+   ],
+   "sha256": "4f897e9bfd388c981318b50c079dc7d633a6902edd353661250ec1dc76c77bab",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0876,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.062,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.937
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 8.4
+   },
+   "width": 256
+  },
+  "texture/marble_pillar_n.dds@855c7675": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.557,
+   "colorName": "blue",
+   "contrast": 0.044,
+   "fileName": "marble_pillar_n.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_pillar_.mod": 30,
+     "obj_pillar_core_.mod": 12,
+     "obj_pillar_inner_.mod": 12,
+     "obj_pillar_outer_.mod": 18
+    },
+    "partners": {
+     "marble_pillar_c.dds": 4
+    },
+    "roles": {
+     "e_TextureNormal0": 4
+    },
+    "shaders": {
+     "Opaque_MaxCB1.fx": 4
+    }
+   },
+   "meanColor": [
+    128,
+    128,
+    252
+   ],
+   "name": "marble_pillar_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.0,
+    0.6
+   ],
+   "sha256": "855c767592ad6439fc36305379eefdc8c9c19fed9ac2a43f43a0a6caed2cbbbd",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/pok_trim.dds@42c62443": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.262,
+   "colorName": "grey",
+   "contrast": 0.113,
+   "fileName": "pok_trim.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 1
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 1
+    }
+   },
+   "meanColor": [
+    68,
+    67,
+    60
+   ],
+   "name": "pok_trim.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.07,
+    1.59
+   ],
+   "sha256": "42c624436bd8763ad2f50677fcd767d5d1487e95ac33a9083c0d9b1ecd9c4b85",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/portcullis_c.dds@bace0c76": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.2,
+   "colorName": "brown",
+   "contrast": 0.07,
+   "fileName": "portcullis_c.dds",
+   "format": "DXT5",
+   "height": 128,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {
+     "portcullis_n.dds": 5
+    },
+    "roles": {
+     "e_TextureDiffuse0": 5
+    },
+    "shaders": {
+     "Opaque_MaxCB1.fx": 5
+    }
+   },
+   "meanColor": [
+    58,
+    49,
+    40
+   ],
+   "name": "portcullis_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    2.77,
+    1.88
+   ],
+   "sha256": "bace0c76066974afde695b560fa1283717c1caa44c1919d7e9fee527c68a3227",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0002,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.081,
+     "overhang": 0.262,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.657
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 4.3
+   },
+   "width": 128
+  },
+  "texture/portcullis_n.dds@1cbfda9a": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.013,
+   "fileName": "portcullis_n.dds",
+   "format": "DXT5",
+   "height": 128,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {
+     "portcullis_c.dds": 5
+    },
+    "roles": {
+     "e_TextureNormal0": 5
+    },
+    "shaders": {
+     "Opaque_MaxCB1.fx": 5
+    }
+   },
+   "meanColor": [
+    127,
+    127,
+    255
+   ],
+   "name": "portcullis_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.28,
+    1.06
+   ],
+   "sha256": "1cbfda9a31e20246d1d5f3e94ec842ea420229d7e1793f65afe21a7f8b466f89",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 128
+  },
+  "texture/ra_aframe_01_c.dds@e974c9d6": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.367,
+   "colorName": "brown",
+   "contrast": 0.182,
+   "fileName": "ra_aframe_01_c.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_framedagger.mod": 1
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 1
+    }
+   },
+   "meanColor": [
+    123,
+    85,
+    62
+   ],
+   "name": "ra_aframe_01_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    3.87,
+    2.82
+   ],
+   "sha256": "e974c9d6d0d553095a75c6582cbb984aac20aa7e63beaddd4d647ae7c049648c",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.466,
+     "slope": 0.133,
+     "steep": 0.377,
+     "vertical": 0.025
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 0.7
+   },
+   "width": 256
+  },
+  "texture/ra_aframe_02_c.dds@a1e9ac35": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.591,
+   "colorName": "tan",
+   "contrast": 0.066,
+   "fileName": "ra_aframe_02_c.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_framedagger.mod": 2
+    },
+    "partners": {
+     "ra_aframe_02_n.dds": 2,
+     "ra_aframe_coverage_01.dds": 1,
+     "ra_aframe_coverage_02.dds": 1
+    },
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Opaque_MaxCB1_2UV.fx": 2
+    }
+   },
+   "meanColor": [
+    171,
+    147,
+    116
+   ],
+   "name": "ra_aframe_02_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    2.41,
+    2.31
+   ],
+   "sha256": "a1e9ac35610dce6e8d5bceac0ef15b86a528650a16af88be0e6ba57eb3cea42c",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/ra_aframe_02_n.dds@29859b58": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.558,
+   "colorName": "blue",
+   "contrast": 0.02,
+   "fileName": "ra_aframe_02_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_framedagger.mod": 2
+    },
+    "partners": {
+     "ra_aframe_02_c.dds": 2,
+     "ra_aframe_coverage_01.dds": 1,
+     "ra_aframe_coverage_02.dds": 1
+    },
+    "roles": {
+     "e_TextureNormal0": 2
+    },
+    "shaders": {
+     "Opaque_MaxCB1_2UV.fx": 2
+    }
+   },
+   "meanColor": [
+    128,
+    128,
+    254
+   ],
+   "name": "ra_aframe_02_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.0,
+    0.0
+   ],
+   "sha256": "29859b5860f66755c94c6e7c097ea0ccc2fbfe34aefd93e61f0dc4b588b90b66",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 1.0,
+   "width": 256
+  },
+  "texture/ra_aframe_coverage_01.dds@9c5e1fe4": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.459,
+   "colorName": "grey",
+   "contrast": 0.087,
+   "fileName": "ra_aframe_coverage_01.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_framedagger.mod": 1
+    },
+    "partners": {
+     "ra_aframe_02_c.dds": 1,
+     "ra_aframe_02_n.dds": 1
+    },
+    "roles": {
+     "e_TextureSecond0": 1
+    },
+    "shaders": {
+     "Opaque_MaxCB1_2UV.fx": 1
+    }
+   },
+   "meanColor": [
+    121,
+    115,
+    115
+   ],
+   "name": "ra_aframe_coverage_01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.0,
+    0.01
+   ],
+   "sha256": "9c5e1fe430b8bd169600fb96c497887876eee64e2e8dacc5e7faa53b96302839",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/ra_aframe_coverage_02.dds@f57b0042": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.431,
+   "colorName": "grey",
+   "contrast": 0.111,
+   "fileName": "ra_aframe_coverage_02.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_framedagger.mod": 1
+    },
+    "partners": {
+     "ra_aframe_02_c.dds": 1,
+     "ra_aframe_02_n.dds": 1
+    },
+    "roles": {
+     "e_TextureSecond0": 1
+    },
+    "shaders": {
+     "Opaque_MaxCB1_2UV.fx": 1
+    }
+   },
+   "meanColor": [
+    113,
+    109,
+    109
+   ],
+   "name": "ra_aframe_coverage_02.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.02,
+    0.0
+   ],
+   "sha256": "f57b00424ebe24cbbf68cd0da23e9401cc073776891d2bf6c9911804e17b9fe3",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/ra_woodenslats_01_c.dds@4bec73ca": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.317,
+   "colorName": "grey",
+   "contrast": 0.045,
+   "fileName": "ra_woodenslats_01_c.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_framedagger.mod": 1
+    },
+    "partners": {
+     "ra_woodenslats_01_n.dds": 1
+    },
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MaxCB1.fx": 1
+    }
+   },
+   "meanColor": [
+    83,
+    79,
+    85
+   ],
+   "name": "ra_woodenslats_01_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.09,
+    1.23
+   ],
+   "sha256": "4bec73caf2e343c8840fb5dc761e685296897177dbd7b9e262e230cbd990ebde",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/ra_woodenslats_01_n.dds@e161da79": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.548,
+   "colorName": "blue",
+   "contrast": 0.076,
+   "fileName": "ra_woodenslats_01_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_framedagger.mod": 1
+    },
+    "partners": {
+     "ra_woodenslats_01_c.dds": 1
+    },
+    "roles": {
+     "e_TextureNormal0": 1
+    },
+    "shaders": {
+     "Opaque_MaxCB1.fx": 1
+    }
+   },
+   "meanColor": [
+    128,
+    128,
+    230
+   ],
+   "name": "ra_woodenslats_01_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.01,
+    0.96
+   ],
+   "sha256": "e161da7972cd4e53e546a9b7f4371a22ac5ffd18bba6a561a30e917533b8b088",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 1.0,
+   "width": 256
+  },
+  "texture/statue_c.dds@5d929f6e": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.293,
+   "colorName": "grey",
+   "contrast": 0.139,
+   "fileName": "statue_c.dds",
+   "format": "DXT5",
+   "height": 512,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 4
+    },
+    "partners": {
+     "marble_light_warm.dds": 4
+    },
+    "roles": {
+     "e_TextureDiffuse0": 4
+    },
+    "shaders": {
+     "Opaque_MaxC1_2UV.fx": 4
+    }
+   },
+   "meanColor": [
+    76,
+    75,
+    68
+   ],
+   "name": "statue_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    9.26,
+    6.13
+   ],
+   "sha256": "5d929f6ef034ac41636ec17fa7a7a7574f07c01e414ff082d81fedd9eca40e93",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0281,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.005,
+     "overhang": 0.329,
+     "slope": 0.129,
+     "steep": 0.084,
+     "vertical": 0.453
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 93.5
+   },
+   "width": 256
+  },
+  "texture/symbol01_c.dds@e30e8401": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.259,
+   "colorName": "grey",
+   "contrast": 0.217,
+   "fileName": "symbol01_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 5
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 5
+    }
+   },
+   "meanColor": [
+    59,
+    69,
+    69
+   ],
+   "name": "symbol01_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.59,
+    0.79
+   ],
+   "sha256": "e30e840100fba5696e97f63e81651553ad8169ed3da83cab171f547963e4a3c9",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 12.0
+   },
+   "width": 256
+  },
+  "texture/symbol02_c.dds@738a3053": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.274,
+   "colorName": "teal",
+   "contrast": 0.226,
+   "fileName": "symbol02_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 5
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 5
+    }
+   },
+   "meanColor": [
+    63,
+    72,
+    76
+   ],
+   "name": "symbol02_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.67,
+    0.88
+   ],
+   "sha256": "738a3053fc5c547dc678d779e7a01bf32975564f89705549e0239291b5aa1e9d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 12.0
+   },
+   "width": 256
+  },
+  "texture/symbol03_c.dds@3b347141": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.292,
+   "colorName": "grey",
+   "contrast": 0.223,
+   "fileName": "symbol03_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 5
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 5
+    }
+   },
+   "meanColor": [
+    68,
+    77,
+    76
+   ],
+   "name": "symbol03_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.59,
+    0.77
+   ],
+   "sha256": "3b347141cf1814fadd178b7db59da57f947aa2a2841692206928a270d3810561",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 12.0
+   },
+   "width": 256
+  },
+  "texture/symbol04_c.dds@12bcf525": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.231,
+   "colorName": "grey",
+   "contrast": 0.19,
+   "fileName": "symbol04_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 5
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 5
+    }
+   },
+   "meanColor": [
+    61,
+    59,
+    55
+   ],
+   "name": "symbol04_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.64,
+    0.88
+   ],
+   "sha256": "12bcf525cfc73b12145344c9b1b50df0616cea0ef1e0e5ca94b92e77fdebc846",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 12.0
+   },
+   "width": 256
+  },
+  "texture/symbol05_c.dds@bb160729": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.263,
+   "colorName": "grey",
+   "contrast": 0.211,
+   "fileName": "symbol05_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 5
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 5
+    }
+   },
+   "meanColor": [
+    62,
+    69,
+    71
+   ],
+   "name": "symbol05_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.47,
+    0.74
+   ],
+   "sha256": "bb160729ebf1003488ca2abc59925fa4e1a7ae721d236390602d9f567586f4d5",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 12.0
+   },
+   "width": 256
+  },
+  "texture/symbol06_c.dds@219a8181": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.266,
+   "colorName": "teal",
+   "contrast": 0.202,
+   "fileName": "symbol06_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 5
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 5
+    }
+   },
+   "meanColor": [
+    60,
+    72,
+    68
+   ],
+   "name": "symbol06_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.65,
+    0.87
+   ],
+   "sha256": "219a81815fc749bd8dcc68967934a8c446462e28b84fe03f79280c010fd765a7",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 12.0
+   },
+   "width": 256
+  },
+  "texture/symbol07_c.dds@7201bcca": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.273,
+   "colorName": "grey",
+   "contrast": 0.229,
+   "fileName": "symbol07_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 5
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 5
+    }
+   },
+   "meanColor": [
+    66,
+    73,
+    65
+   ],
+   "name": "symbol07_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.58,
+    0.79
+   ],
+   "sha256": "7201bccae026dae72b8caa4298ae71b695e6cb5154ff95b4f965cdb7d95060bb",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 12.0
+   },
+   "width": 256
+  },
+  "texture/symbol08_c.dds@3de8ea9e": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.314,
+   "colorName": "grey",
+   "contrast": 0.247,
+   "fileName": "symbol08_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 5
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 5
+    }
+   },
+   "meanColor": [
+    75,
+    83,
+    79
+   ],
+   "name": "symbol08_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.58,
+    0.84
+   ],
+   "sha256": "3de8ea9ec99c36557e3a5b8cc3af1ccd133f8e95ded4bceef29c2d497f251285",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 12.0
+   },
+   "width": 256
+  },
+  "texture/symbol09_c.dds@003b92ff": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.267,
+   "colorName": "grey",
+   "contrast": 0.209,
+   "fileName": "symbol09_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 5
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 5
+    }
+   },
+   "meanColor": [
+    68,
+    68,
+    66
+   ],
+   "name": "symbol09_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.64,
+    0.86
+   ],
+   "sha256": "003b92ff47aa6e733cfbdf838160c4cbbd0cf7ef651af195d402ddc847025dcd",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 12.0
+   },
+   "width": 256
+  },
+  "texture/symbol10_c.dds@c5b4df22": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.306,
+   "colorName": "green",
+   "contrast": 0.238,
+   "fileName": "symbol10_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 5
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 5
+    }
+   },
+   "meanColor": [
+    67,
+    84,
+    76
+   ],
+   "name": "symbol10_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.58,
+    0.8
+   ],
+   "sha256": "c5b4df22b2bbbed58f82ed35ff9f571782e24721dde8b27f8b50fef829032560",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 12.0
+   },
+   "width": 256
+  },
+  "texture/symbol11_c.dds@9c9b39fe": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.235,
+   "colorName": "blue",
+   "contrast": 0.182,
+   "fileName": "symbol11_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 5
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 5
+    }
+   },
+   "meanColor": [
+    55,
+    61,
+    66
+   ],
+   "name": "symbol11_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.62,
+    0.87
+   ],
+   "sha256": "9c9b39fee9474d533a70822f5cbab6cb6f90336d552e0a5acad6d9278caee32e",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 12.0
+   },
+   "width": 256
+  },
+  "texture/symbol12_c.dds@89b08f78": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.302,
+   "colorName": "teal",
+   "contrast": 0.241,
+   "fileName": "symbol12_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 5
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 5
+    }
+   },
+   "meanColor": [
+    64,
+    82,
+    82
+   ],
+   "name": "symbol12_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.57,
+    0.82
+   ],
+   "sha256": "89b08f781d7ead181374e61d43e4f96be6ab131ad42f0f300ee1695dfa4a7b89",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 12.1
+   },
+   "width": 256
+  },
+  "texture/symbol13_c.dds@f47510f2": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.253,
+   "colorName": "grey",
+   "contrast": 0.197,
+   "fileName": "symbol13_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 5
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 5
+    }
+   },
+   "meanColor": [
+    65,
+    65,
+    59
+   ],
+   "name": "symbol13_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.52,
+    0.82
+   ],
+   "sha256": "f47510f24bee3312aef257d91ce3e87721f171ce5f612d2790afb4c30353a461",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 12.1
+   },
+   "width": 256
+  },
+  "texture/symbol14_c.dds@02841a9e": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.291,
+   "colorName": "grey",
+   "contrast": 0.242,
+   "fileName": "symbol14_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 5
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 5
+    }
+   },
+   "meanColor": [
+    68,
+    77,
+    75
+   ],
+   "name": "symbol14_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.57,
+    0.82
+   ],
+   "sha256": "02841a9edee06eb1a498516cf893839c88e606f831a04ceb956355051e4cb89a",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 12.0
+   },
+   "width": 256
+  },
+  "texture/symbol15_c.dds@500317dd": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.226,
+   "colorName": "teal",
+   "contrast": 0.187,
+   "fileName": "symbol15_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 5
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 5
+    }
+   },
+   "meanColor": [
+    50,
+    62,
+    58
+   ],
+   "name": "symbol15_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.55,
+    0.81
+   ],
+   "sha256": "500317dd8271dd22247b6faa6911374a20ee682f2d2eee5af71ee62f20bbb1f1",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 12.0
+   },
+   "width": 256
+  },
+  "texture/symbol16_c.dds@3e133afd": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.276,
+   "colorName": "green",
+   "contrast": 0.234,
+   "fileName": "symbol16_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 5
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 5
+    }
+   },
+   "meanColor": [
+    60,
+    76,
+    70
+   ],
+   "name": "symbol16_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.63,
+    0.87
+   ],
+   "sha256": "3e133afd591b40bad2d94a383dd8c7bd0736828139bef2755d7ff0f86bfc07aa",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 12.0
+   },
+   "width": 256
+  },
+  "texture/symbols_c.dds@6c68b3ca": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.566,
+   "colorName": "grey",
+   "contrast": 0.122,
+   "fileName": "symbols_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_altar_.mod": 8,
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {
+     "symbols_g.dds": 6
+    },
+    "roles": {
+     "e_TextureDiffuse0": 6
+    },
+    "shaders": {
+     "Opaque_MaxCBSG1.fx": 6
+    }
+   },
+   "meanColor": [
+    147,
+    146,
+    130
+   ],
+   "name": "symbols_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.13,
+    0.68
+   ],
+   "sha256": "6c68b3ca91326a07aede8ad3d8ab83593b4845bd6726eb88d6cac90bcb6dccfc",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0005,
+    "objectShare": 0.103,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.062,
+     "slope": 0.062,
+     "steep": 0.0,
+     "vertical": 0.876
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 5.1
+   },
+   "width": 256
+  },
+  "texture/symbols_g.dds@d3dcd2f2": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.459,
+   "colorName": "yellow",
+   "contrast": 0.029,
+   "fileName": "symbols_g.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_altar_.mod": 8,
+     "ter_guildlobby.ter": 5
+    },
+    "partners": {
+     "symbols_c.dds": 6
+    },
+    "roles": {
+     "e_TextureNormal0": 6
+    },
+    "shaders": {
+     "Opaque_MaxCBSG1.fx": 6
+    }
+   },
+   "meanColor": [
+    128,
+    127,
+    37
+   ],
+   "name": "symbols_g.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.234,
+   "seamRatios": [
+    0.15,
+    0.26
+   ],
+   "sha256": "d3dcd2f25e9878c11b1a0b204ae38bfe83c52521ba5d1534968177a4f03a11d9",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 1.0,
+   "width": 256
+  },
+  "texture/tunnel_bricks_c.dds@c61e1b9b": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.238,
+   "colorName": "grey",
+   "contrast": 0.065,
+   "fileName": "tunnel_bricks_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 1
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 1
+    }
+   },
+   "meanColor": [
+    60,
+    62,
+    57
+   ],
+   "name": "tunnel_bricks_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.08,
+    1.11
+   ],
+   "sha256": "c61e1b9b36a97a7d30c2c0412126b11b340b917371113d06688f5e72a25ccb39",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0007,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 1.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 4.6
+   },
+   "width": 256
+  },
+  "texture/tunnel_floor_c.dds@3960ff25": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.335,
+   "colorName": "green",
+   "contrast": 0.07,
+   "fileName": "tunnel_floor_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 1
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 1
+    }
+   },
+   "meanColor": [
+    85,
+    88,
+    73
+   ],
+   "name": "tunnel_floor_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.94,
+    0.98
+   ],
+   "sha256": "3960ff253f226e0d63b38b247751c9d8ffa006c0cf56b6981765348a892ee985",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0009,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 8.5
+   },
+   "width": 256
+  },
+  "texture/wall_stone_blocks_c.dds@30d6ff66": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.265,
+   "colorName": "grey",
+   "contrast": 0.066,
+   "fileName": "wall_stone_blocks_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    71,
+    66,
+    64
+   ],
+   "name": "wall_stone_blocks_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.39,
+    1.38
+   ],
+   "sha256": "30d6ff66cb3215929311018b3229228ac1c9e6a8c8b455066f45941e685c5191",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/wall_stone_trim_c.dds@edda5cd7": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.256,
+   "colorName": "grey",
+   "contrast": 0.076,
+   "fileName": "wall_stone_trim_c.dds",
+   "format": "DXT1",
+   "height": 128,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_guildlobby.ter": 1
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 1
+    }
+   },
+   "meanColor": [
+    64,
+    66,
+    63
+   ],
+   "name": "wall_stone_trim_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.19,
+    1.56
+   ],
+   "sha256": "edda5cd7e20b26cf07ca903bbdbd7b5fd335bf3cfcf4cc3ec9a3c5b8ceafd266",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0002,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.722,
+     "overhang": 0.157,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.121
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 2.7
+   },
+   "width": 128
+  },
+  "texture/wood_c.dds@591d6397": {
+   "archives": [
+    "guildlobby.eqg"
+   ],
+   "brightness": 0.448,
+   "colorName": "tan",
+   "contrast": 0.04,
+   "fileName": "wood_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_candle_table_.mod": 12,
+     "obj_candle_torch_.mod": 63
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Opaque_MaxC1.fx": 2
+    }
+   },
+   "meanColor": [
+    131,
+    111,
+    88
+   ],
+   "name": "wood_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.84,
+    0.68
+   ],
+   "sha256": "591d6397afc877a0819f0468dbb5aca550c50afee8bb25536c2d5b6cac0db8c5",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0009,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.397,
+     "overhang": 0.397,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.206
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 4.0
+   },
+   "width": 256
+  }
+ },
+ "fileHashes": {
+  "guildlobby.eqg": "363299c1d1dd812536ded12ca234fbe3cd318057ed39b2ca754273c5f5e32a40",
+  "guildlobby.zon": "f1f47023efc0bff8e603974c7b67899fb68e5217e8fe4ae499b5070e88846f1b"
+ },
+ "format": "eqgz",
+ "problems": [],
+ "source": "zone:guildlobby",
+ "surveyVersion": 4,
+ "zone": "guildlobby"
+}

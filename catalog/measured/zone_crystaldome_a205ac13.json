@@ -1,0 +1,480 @@
+{
+ "archives": [
+  "crystaldome.eqg"
+ ],
+ "assets": {
+  "model/obj_crystl_prpldome_impass_a.mod@5a4c7ff0": {
+   "archive": "crystaldome.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Alpha_MPLBasicA.fx",
+     "textures": {
+      "e_TextureDiffuse0": "crystaldome_purp_alt_a.dds"
+     }
+    }
+   ],
+   "name": "obj_crystl_prpldome_impass_a.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "5a4c7ff03b5b63e93e379c648d045889965b735613ecd34fa825389564e4a9e8",
+   "size": [
+    278.0,
+    278.0,
+    137.8
+   ],
+   "skinned": false,
+   "triangles": 3552
+  },
+  "model/obj_crystl_prpldome_impass_b.mod@be73aaee": {
+   "archive": "crystaldome.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "crystaldome_purp_c.dds"
+     }
+    }
+   ],
+   "name": "obj_crystl_prpldome_impass_b.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "be73aaeecc77729a92280cea016bdf15c8a37f27e7dfd2ca43bda4a634141277",
+   "size": [
+    278.0,
+    278.0,
+    137.8
+   ],
+   "skinned": false,
+   "triangles": 3552
+  },
+  "model/obj_crystl_prpldome_onewayint_a.mod@9820123b": {
+   "archive": "crystaldome.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Alpha_MPLBasicA.fx",
+     "textures": {
+      "e_TextureDiffuse0": "crystaldome_purp_alt_a.dds"
+     }
+    }
+   ],
+   "name": "obj_crystl_prpldome_onewayint_a.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "9820123bcf27b4e5112558aa439844f01150460d6b6e9738d1f8580375041de5",
+   "size": [
+    278.0,
+    278.0,
+    137.8
+   ],
+   "skinned": false,
+   "triangles": 1776
+  },
+  "model/obj_crystl_prpldome_onewayint_b.mod@f0e359b8": {
+   "archive": "crystaldome.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "crystaldome_purp_c.dds"
+     }
+    }
+   ],
+   "name": "obj_crystl_prpldome_onewayint_b.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "f0e359b8da94eb1f44da6ae087a833e00f329bd7d75e58ccefc0ed76f1ffecaa",
+   "size": [
+    278.0,
+    278.0,
+    137.8
+   ],
+   "skinned": false,
+   "triangles": 1776
+  },
+  "model/obp_crystl_prpldome_oneway_a.mod@3b745b7a": {
+   "archive": "crystaldome.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Alpha_MPLBasicA.fx",
+     "textures": {
+      "e_TextureDiffuse0": "crystaldome_purp_alt_a.dds"
+     }
+    }
+   ],
+   "name": "obp_crystl_prpldome_oneway_a.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "3b745b7af6263603e1d4a6817be3345b447a7f4c68ab309c7c28ba15999a87e8",
+   "size": [
+    278.0,
+    278.0,
+    137.8
+   ],
+   "skinned": false,
+   "triangles": 1776
+  },
+  "model/obp_crystl_prpldome_oneway_b.mod@adbf56d9": {
+   "archive": "crystaldome.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "crystaldome_purp_c.dds"
+     }
+    }
+   ],
+   "name": "obp_crystl_prpldome_oneway_b.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "adbf56d9dc9a839a42a63b5c0f687505e0e87f35d171f52740e841a01a95f6eb",
+   "size": [
+    278.0,
+    278.0,
+    137.8
+   ],
+   "skinned": false,
+   "triangles": 1776
+  },
+  "model/ter_crystaldome.ter@cb2152dc": {
+   "archive": "crystaldome.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureDiffuse0": "evil_rubble_alt_c.dds",
+      "e_TextureNormal0": "evil_rubble_alt_n.dds"
+     }
+    }
+   ],
+   "name": "ter_crystaldome.ter",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "cb2152dc093171b1b94036f41e2bbc20688a66dbe9e534756157a42718307582",
+   "size": [
+    756.8,
+    1000.5,
+    0.0
+   ],
+   "skinned": false,
+   "triangles": 200
+  },
+  "texture/crystaldome_purp_a.dds@5ebb68ae": {
+   "archives": [
+    "crystaldome.eqg"
+   ],
+   "brightness": 0.218,
+   "colorName": "blue",
+   "contrast": 0.056,
+   "fileName": "crystaldome_purp_a.dds",
+   "format": "DXT5",
+   "height": 512,
+   "kind": "texture",
+   "meanColor": [
+    62,
+    56,
+    98
+   ],
+   "name": "crystaldome_purp_a.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.993,
+   "seamRatios": [
+    1.13,
+    1.08
+   ],
+   "sha256": "5ebb68ae518ae21e32ae5fd4a5dc1068c579b0949c662c1913640ca7c8284d42",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.559,
+   "width": 512
+  },
+  "texture/crystaldome_purp_alt_a.dds@81cb5d2c": {
+   "archives": [
+    "crystaldome.eqg"
+   ],
+   "brightness": 0.218,
+   "colorName": "blue",
+   "contrast": 0.056,
+   "fileName": "crystaldome_purp_alt_a.dds",
+   "format": "DXT5",
+   "height": 512,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_crystl_prpldome_impass_a.mod": 1,
+     "obj_crystl_prpldome_onewayint_a.mod": 1,
+     "obp_crystl_prpldome_oneway_a.mod": 1
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 3
+    },
+    "shaders": {
+     "Alpha_MPLBasicA.fx": 3
+    }
+   },
+   "meanColor": [
+    55,
+    50,
+    87
+   ],
+   "name": "crystaldome_purp_alt_a.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 1.0,
+   "seamRatios": [
+    1.13,
+    1.08
+   ],
+   "sha256": "81cb5d2c299b069fe59f95a41e00467d5fcdd136ccf0f0ae28af1882c715b01f",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 1.0,
+   "uses": {
+    "areaShare": 0.2807,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.379,
+     "slope": 0.105,
+     "steep": 0.278,
+     "vertical": 0.238
+    },
+    "surfaces": {
+     "translucent": 1.0
+    },
+    "unitsPerRepeat": 37.5
+   },
+   "width": 512
+  },
+  "texture/crystaldome_purp_c.dds@ec874448": {
+   "archives": [
+    "crystaldome.eqg"
+   ],
+   "brightness": 0.218,
+   "colorName": "blue",
+   "contrast": 0.056,
+   "fileName": "crystaldome_purp_c.dds",
+   "format": "DXT5",
+   "height": 512,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_crystl_prpldome_impass_b.mod": 1,
+     "obj_crystl_prpldome_onewayint_b.mod": 1,
+     "obp_crystl_prpldome_oneway_b.mod": 1
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 3
+    },
+    "shaders": {
+     "Opaque_MPLBasic.fx": 3
+    }
+   },
+   "meanColor": [
+    66,
+    60,
+    103
+   ],
+   "name": "crystaldome_purp_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.998,
+   "seamRatios": [
+    1.12,
+    1.08
+   ],
+   "sha256": "ec874448bdf9a92b9a2cff2e9d6b57c1dacc6b28689c40178929714efa362071",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.767,
+   "uses": {
+    "areaShare": 0.2807,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.379,
+     "slope": 0.105,
+     "steep": 0.278,
+     "vertical": 0.238
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 37.3
+   },
+   "width": 512
+  },
+  "texture/crystaldome_purp_ns.dds@ea0a03be": {
+   "archives": [
+    "crystaldome.eqg"
+   ],
+   "brightness": 0.549,
+   "colorName": "blue",
+   "contrast": 0.118,
+   "fileName": "crystaldome_purp_ns.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    127,
+    235
+   ],
+   "name": "crystaldome_purp_ns.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.996,
+   "seamRatios": [
+    1.14,
+    1.24
+   ],
+   "sha256": "ea0a03be9f13174e530fa70f5344c98d824c89db3038a846aba93f5612ee48c7",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.689,
+   "width": 256
+  },
+  "texture/evil_rubble_alt_c.dds@200c79fc": {
+   "archives": [
+    "crystaldome.eqg"
+   ],
+   "brightness": 0.327,
+   "colorName": "grey",
+   "contrast": 0.087,
+   "fileName": "evil_rubble_alt_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_crystaldome.ter": 1
+    },
+    "partners": {
+     "evil_rubble_alt_n.dds": 1
+    },
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1
+    }
+   },
+   "meanColor": [
+    88,
+    83,
+    75
+   ],
+   "name": "evil_rubble_alt_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.87,
+    0.93
+   ],
+   "sha256": "200c79fcffc0215b70cd0ab419639a4bb00cfc6f8869fed5d61974d15c84184a",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.4385,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 25.7
+   },
+   "width": 256
+  },
+  "texture/evil_rubble_alt_n.dds@473c9f3d": {
+   "archives": [
+    "crystaldome.eqg"
+   ],
+   "brightness": 0.543,
+   "colorName": "blue",
+   "contrast": 0.142,
+   "fileName": "evil_rubble_alt_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_crystaldome.ter": 1
+    },
+    "partners": {
+     "evil_rubble_alt_c.dds": 1
+    },
+    "roles": {
+     "e_TextureNormal0": 1
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1
+    }
+   },
+   "meanColor": [
+    127,
+    127,
+    224
+   ],
+   "name": "evil_rubble_alt_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.989,
+   "seamRatios": [
+    0.99,
+    1.04
+   ],
+   "sha256": "473c9f3d5dcc1d6b21b7b6ab77455946d5eda4ee30a6c175b02ebad3c21fc64c",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.568,
+   "width": 256
+  }
+ },
+ "fileHashes": {
+  "crystaldome.eqg": "3f89698ecdc6e3e69a7dfdb5c2d55bba2ad1c0f4edcd310cd79a0237ac69c672",
+  "crystaldome.zon": "0be57e4a2f1e06b3ff16174246b7084b24b3dcdf305047177f1b1250212c328d"
+ },
+ "format": "eqgz",
+ "problems": [],
+ "source": "zone:crystaldome",
+ "surveyVersion": 4,
+ "zone": "crystaldome"
+}

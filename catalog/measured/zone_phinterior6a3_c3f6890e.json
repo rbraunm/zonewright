@@ -1,0 +1,1465 @@
+{
+ "archives": [
+  "phinterior6a3.eqg"
+ ],
+ "assets": {
+  "model/obj_door_plha.mod@b154a29f": {
+   "archive": "phinterior6a3.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage.dds",
+      "e_TextureDiffuse0": "interior_stucco_c.dds",
+      "e_TextureNormal0": "interior_stucco_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage.dds",
+      "e_TextureDiffuse0": "wood_beams_c.dds",
+      "e_TextureNormal0": "wood_beams_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "plh_large_window_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage.dds",
+      "e_TextureDiffuse0": "hardwood_floor_c.dds",
+      "e_TextureNormal0": "hardwood_floor_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage.dds",
+      "e_TextureDiffuse0": "plh_interior_drwinda.dds",
+      "e_TextureNormal0": "plh_interior_drwinda_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage.dds",
+      "e_TextureDiffuse0": "plh_woodpanel01_c.dds",
+      "e_TextureNormal0": "plh_woodpanel01_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage.dds",
+      "e_TextureDiffuse0": "plh_column01_c.dds",
+      "e_TextureNormal0": "plh_column01_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage.dds",
+      "e_TextureDiffuse0": "plh_door_detail01_c.dds",
+      "e_TextureNormal0": "plh_door_detail01_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage.dds",
+      "e_TextureDiffuse0": "plh_stucco_beams_c.dds",
+      "e_TextureNormal0": "plh_stucco_beams_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage.dds",
+      "e_TextureDiffuse0": "plh_stair_detail01_c.dds",
+      "e_TextureNormal0": "plh_stair_detail01_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage.dds",
+      "e_TextureDiffuse0": "plh_stone_wall01_c.dds",
+      "e_TextureNormal0": "plh_stone_wall01_n.dds"
+     }
+    }
+   ],
+   "name": "obj_door_plha.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "b154a29f874006651a4aadc34a6bcc11dd64e318200bc927d30353af870393e9",
+   "size": [
+    15.9,
+    2.0,
+    13.0
+   ],
+   "skinned": false,
+   "triangles": 112
+  },
+  "model/ter_phinterior6a3.ter@bc69c14b": {
+   "archive": "phinterior6a3.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage.dds",
+      "e_TextureDiffuse0": "interior_stucco_c.dds",
+      "e_TextureNormal0": "interior_stucco_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage.dds",
+      "e_TextureDiffuse0": "wood_beams_c.dds",
+      "e_TextureNormal0": "wood_beams_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "plh_large_window_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage.dds",
+      "e_TextureDiffuse0": "hardwood_floor_c.dds",
+      "e_TextureNormal0": "hardwood_floor_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage.dds",
+      "e_TextureDiffuse0": "plh_interior_drwinda.dds",
+      "e_TextureNormal0": "plh_interior_drwinda_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage.dds",
+      "e_TextureDiffuse0": "plh_woodpanel01_c.dds",
+      "e_TextureNormal0": "plh_woodpanel01_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage.dds",
+      "e_TextureDiffuse0": "plh_column01_c.dds",
+      "e_TextureNormal0": "plh_column01_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage.dds",
+      "e_TextureDiffuse0": "plh_door_detail01_c.dds",
+      "e_TextureNormal0": "plh_door_detail01_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage.dds",
+      "e_TextureDiffuse0": "plh_stucco_beams_c.dds",
+      "e_TextureNormal0": "plh_stucco_beams_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage.dds",
+      "e_TextureDiffuse0": "plh_stair_detail01_c.dds",
+      "e_TextureNormal0": "plh_stair_detail01_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage.dds",
+      "e_TextureDiffuse0": "plh_stone_wall01_c.dds",
+      "e_TextureNormal0": "plh_stone_wall01_n.dds"
+     }
+    }
+   ],
+   "name": "ter_phinterior6a3.ter",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "bc69c14b6b497090d8baee68881713d9613570515b3465bbcbfedcad3aa7bcf6",
+   "size": [
+    128.0,
+    172.0,
+    48.9
+   ],
+   "skinned": false,
+   "triangles": 19620
+  },
+  "texture/coverage.dds@67581168": {
+   "archives": [
+    "phinterior6a3.eqg"
+   ],
+   "brightness": 0.477,
+   "colorName": "grey",
+   "contrast": 0.045,
+   "fileName": "coverage.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_door_plha.mod": 10,
+     "ter_phinterior6a3.ter": 10
+    },
+    "partners": {
+     "hardwood_floor_c.dds": 2,
+     "interior_stucco_c.dds": 2,
+     "interior_stucco_n.dds": 2,
+     "wood_beams_c.dds": 2,
+     "wood_beams_n.dds": 2
+    },
+    "roles": {
+     "e_TextureCoverage0": 20
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 20
+    }
+   },
+   "meanColor": [
+    122,
+    122,
+    122
+   ],
+   "name": "coverage.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.05,
+    1.11
+   ],
+   "sha256": "67581168116f2b1a56039f7a8eaeb0ac1651c340c9e5efb23afa296a0a76a39b",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hardwood_floor_c.dds@e2a72e6b": {
+   "archives": [
+    "phinterior6a3.eqg"
+   ],
+   "brightness": 0.159,
+   "colorName": "brown",
+   "contrast": 0.035,
+   "fileName": "hardwood_floor_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_door_plha.mod": 1,
+     "ter_phinterior6a3.ter": 1
+    },
+    "partners": {
+     "coverage.dds": 2,
+     "hardwood_floor_n.dds": 2
+    },
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    55,
+    37,
+    19
+   ],
+   "name": "hardwood_floor_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.64,
+    0.69
+   ],
+   "sha256": "e2a72e6b26712be6503bd5f1f268a1b1628f862b2dd62a5510b1a4d3fbd7d4fd",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.2609,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 6.0
+   },
+   "width": 256
+  },
+  "texture/hardwood_floor_n.dds@46f2c399": {
+   "archives": [
+    "phinterior6a3.eqg"
+   ],
+   "brightness": 0.555,
+   "colorName": "blue",
+   "contrast": 0.02,
+   "fileName": "hardwood_floor_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_door_plha.mod": 1,
+     "ter_phinterior6a3.ter": 1
+    },
+    "partners": {
+     "coverage.dds": 2,
+     "hardwood_floor_c.dds": 2
+    },
+    "roles": {
+     "e_TextureNormal0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    128,
+    127,
+    254
+   ],
+   "name": "hardwood_floor_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.54,
+    0.45
+   ],
+   "sha256": "46f2c3998100a0f54069a5f0cc66c23dee289014d89f874823f6678dc597b37f",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/interior_stucco_c.dds@0e61a9b4": {
+   "archives": [
+    "phinterior6a3.eqg"
+   ],
+   "brightness": 0.553,
+   "colorName": "tan",
+   "contrast": 0.06,
+   "fileName": "interior_stucco_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_door_plha.mod": 1,
+     "ter_phinterior6a3.ter": 1
+    },
+    "partners": {
+     "coverage.dds": 2,
+     "interior_stucco_n.dds": 2
+    },
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    147,
+    141,
+    124
+   ],
+   "name": "interior_stucco_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.7,
+    0.92
+   ],
+   "sha256": "0e61a9b4973e40e59c2d343724d174b13161bd6136686ea414805be14a880775",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.1187,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 1.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 7.2
+   },
+   "width": 256
+  },
+  "texture/interior_stucco_n.dds@9f30ee65": {
+   "archives": [
+    "phinterior6a3.eqg"
+   ],
+   "brightness": 0.555,
+   "colorName": "blue",
+   "contrast": 0.027,
+   "fileName": "interior_stucco_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_door_plha.mod": 1,
+     "ter_phinterior6a3.ter": 1
+    },
+    "partners": {
+     "coverage.dds": 2,
+     "interior_stucco_c.dds": 2
+    },
+    "roles": {
+     "e_TextureNormal0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    127,
+    127,
+    254
+   ],
+   "name": "interior_stucco_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.6,
+    0.81
+   ],
+   "sha256": "9f30ee6573884ed130198a686e0f38c0ffeae2a1da6d84859a1ed7bc0e94946b",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/plh_column01_c.dds@71d713e8": {
+   "archives": [
+    "phinterior6a3.eqg"
+   ],
+   "brightness": 0.104,
+   "colorName": "black",
+   "contrast": 0.061,
+   "fileName": "plh_column01_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_door_plha.mod": 1,
+     "ter_phinterior6a3.ter": 1
+    },
+    "partners": {
+     "coverage.dds": 2,
+     "plh_column01_n.dds": 2
+    },
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    36,
+    24,
+    14
+   ],
+   "name": "plh_column01_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.16,
+    0.47
+   ],
+   "sha256": "71d713e820a55d22a3927796d165b429547e1da4cd15332503f14e57641b0d40",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0302,
+    "objectShare": 0.043,
+    "slopeShares": {
+     "flat": 0.014,
+     "overhang": 0.075,
+     "slope": 0.061,
+     "steep": 0.0,
+     "vertical": 0.85
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 6.2
+   },
+   "width": 256
+  },
+  "texture/plh_column01_n.dds@98dbcfad": {
+   "archives": [
+    "phinterior6a3.eqg"
+   ],
+   "brightness": 0.553,
+   "colorName": "blue",
+   "contrast": 0.036,
+   "fileName": "plh_column01_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_door_plha.mod": 1,
+     "ter_phinterior6a3.ter": 1
+    },
+    "partners": {
+     "coverage.dds": 2,
+     "plh_column01_c.dds": 2
+    },
+    "roles": {
+     "e_TextureNormal0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    126,
+    127,
+    251
+   ],
+   "name": "plh_column01_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.47,
+    0.31
+   ],
+   "sha256": "98dbcfad0b5ae96f2753f1043310221981378a2b23918965fa242d12dabf1847",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/plh_door_detail01_c.dds@77979d3f": {
+   "archives": [
+    "phinterior6a3.eqg"
+   ],
+   "brightness": 0.14,
+   "colorName": "brown",
+   "contrast": 0.077,
+   "fileName": "plh_door_detail01_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_door_plha.mod": 1,
+     "ter_phinterior6a3.ter": 1
+    },
+    "partners": {
+     "coverage.dds": 2,
+     "plh_door_detail01_n.dds": 2
+    },
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    45,
+    34,
+    22
+   ],
+   "name": "plh_door_detail01_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.85,
+    1.1
+   ],
+   "sha256": "77979d3f92c14626edb22827cec507bbe3901b887404204971bb118d543f053a",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0488,
+    "objectShare": 0.019,
+    "slopeShares": {
+     "flat": 0.189,
+     "overhang": 0.221,
+     "slope": 0.039,
+     "steep": 0.0,
+     "vertical": 0.552
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 6.7
+   },
+   "width": 256
+  },
+  "texture/plh_door_detail01_n.dds@cd8f498b": {
+   "archives": [
+    "phinterior6a3.eqg"
+   ],
+   "brightness": 0.554,
+   "colorName": "blue",
+   "contrast": 0.03,
+   "fileName": "plh_door_detail01_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_door_plha.mod": 1,
+     "ter_phinterior6a3.ter": 1
+    },
+    "partners": {
+     "coverage.dds": 2,
+     "plh_door_detail01_c.dds": 2
+    },
+    "roles": {
+     "e_TextureNormal0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    127,
+    127,
+    253
+   ],
+   "name": "plh_door_detail01_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.5,
+    1.23
+   ],
+   "sha256": "cd8f498ba96b1e7a67685adb35143756facf3ebbf7faf9666dd085ba6cac0c79",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/plh_interior_drwinda.dds@2af81b7b": {
+   "archives": [
+    "phinterior6a3.eqg"
+   ],
+   "brightness": 0.135,
+   "colorName": "brown",
+   "contrast": 0.079,
+   "fileName": "plh_interior_drwinda.dds",
+   "format": "DXT5",
+   "height": 512,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_door_plha.mod": 1,
+     "ter_phinterior6a3.ter": 1
+    },
+    "partners": {
+     "coverage.dds": 2,
+     "plh_interior_drwinda_n.dds": 2
+    },
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    42,
+    33,
+    22
+   ],
+   "name": "plh_interior_drwinda.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.93,
+    0.89
+   ],
+   "sha256": "2af81b7b56cec16ef8f6712c71a5e97cc2218f0e4389c4d699f9e23c6a058698",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0139,
+    "objectShare": 0.098,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 1.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 18.6
+   },
+   "width": 512
+  },
+  "texture/plh_interior_drwinda_n.dds@25a199ad": {
+   "archives": [
+    "phinterior6a3.eqg"
+   ],
+   "brightness": 0.554,
+   "colorName": "blue",
+   "contrast": 0.028,
+   "fileName": "plh_interior_drwinda_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_door_plha.mod": 1,
+     "ter_phinterior6a3.ter": 1
+    },
+    "partners": {
+     "coverage.dds": 2,
+     "plh_interior_drwinda.dds": 2
+    },
+    "roles": {
+     "e_TextureNormal0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    127,
+    127,
+    253
+   ],
+   "name": "plh_interior_drwinda_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.64,
+    0.86
+   ],
+   "sha256": "25a199ada8366654ed1b4092043b98971bf8a82b44067cebf78214ac3317ff00",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/plh_large_window_c.dds@97473bde": {
+   "archives": [
+    "phinterior6a3.eqg"
+   ],
+   "brightness": 0.272,
+   "colorName": "grey",
+   "contrast": 0.099,
+   "fileName": "plh_large_window_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_door_plha.mod": 1,
+     "ter_phinterior6a3.ter": 1
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBasic.fx": 2
+    }
+   },
+   "meanColor": [
+    65,
+    72,
+    69
+   ],
+   "name": "plh_large_window_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.38,
+    1.75
+   ],
+   "sha256": "97473bdebb5a0f4cec645826d296e307d8d820548f8451b23c6a0ee9bc337c65",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0054,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 1.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 16.6
+   },
+   "width": 512
+  },
+  "texture/plh_stair_detail01_c.dds@ba3ef63f": {
+   "archives": [
+    "phinterior6a3.eqg"
+   ],
+   "brightness": 0.123,
+   "colorName": "brown",
+   "contrast": 0.034,
+   "fileName": "plh_stair_detail01_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_door_plha.mod": 1,
+     "ter_phinterior6a3.ter": 1
+    },
+    "partners": {
+     "coverage.dds": 2,
+     "plh_stair_detail01_n.dds": 2
+    },
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    43,
+    29,
+    15
+   ],
+   "name": "plh_stair_detail01_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.48,
+    2.28
+   ],
+   "sha256": "ba3ef63ff3d8113caccf582ab973aed510189722856c3625157b2dab0df58dd7",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0084,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.111,
+     "overhang": 0.16,
+     "slope": 0.07,
+     "steep": 0.123,
+     "vertical": 0.536
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 3.3
+   },
+   "width": 256
+  },
+  "texture/plh_stair_detail01_n.dds@b68288f9": {
+   "archives": [
+    "phinterior6a3.eqg"
+   ],
+   "brightness": 0.554,
+   "colorName": "blue",
+   "contrast": 0.031,
+   "fileName": "plh_stair_detail01_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_door_plha.mod": 1,
+     "ter_phinterior6a3.ter": 1
+    },
+    "partners": {
+     "coverage.dds": 2,
+     "plh_stair_detail01_c.dds": 2
+    },
+    "roles": {
+     "e_TextureNormal0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    127,
+    127,
+    253
+   ],
+   "name": "plh_stair_detail01_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.09,
+    1.08
+   ],
+   "sha256": "b68288f9f737ecb1bd0eb02c1afc69609ad01ea2fe0a5aac4dbafc24764458e3",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/plh_stone_wall01_c.dds@ec024af7": {
+   "archives": [
+    "phinterior6a3.eqg"
+   ],
+   "brightness": 0.226,
+   "colorName": "grey",
+   "contrast": 0.065,
+   "fileName": "plh_stone_wall01_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_door_plha.mod": 1,
+     "ter_phinterior6a3.ter": 1
+    },
+    "partners": {
+     "coverage.dds": 2,
+     "plh_stone_wall01_n.dds": 2
+    },
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    58,
+    58,
+    56
+   ],
+   "name": "plh_stone_wall01_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.89,
+    0.89
+   ],
+   "sha256": "ec024af72f62ff3aa828abe1aec9a54c8e2c73ad25da7e40cc940bf8013088fa",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.2241,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 1.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 6.1
+   },
+   "width": 256
+  },
+  "texture/plh_stone_wall01_n.dds@9a9a05d1": {
+   "archives": [
+    "phinterior6a3.eqg"
+   ],
+   "brightness": 0.554,
+   "colorName": "blue",
+   "contrast": 0.052,
+   "fileName": "plh_stone_wall01_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_door_plha.mod": 1,
+     "ter_phinterior6a3.ter": 1
+    },
+    "partners": {
+     "coverage.dds": 2,
+     "plh_stone_wall01_c.dds": 2
+    },
+    "roles": {
+     "e_TextureNormal0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    127,
+    127,
+    251
+   ],
+   "name": "plh_stone_wall01_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.61,
+    0.58
+   ],
+   "sha256": "9a9a05d1105abb64ab5b2d596bd1586a5a682b85307cead35ae9e5ebcfde6547",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/plh_stucco_beams_c.dds@1e211155": {
+   "archives": [
+    "phinterior6a3.eqg"
+   ],
+   "brightness": 0.429,
+   "colorName": "brown",
+   "contrast": 0.206,
+   "fileName": "plh_stucco_beams_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_door_plha.mod": 1,
+     "ter_phinterior6a3.ter": 1
+    },
+    "partners": {
+     "coverage.dds": 2,
+     "plh_stucco_beams_n.dds": 2
+    },
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    116,
+    109,
+    94
+   ],
+   "name": "plh_stucco_beams_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.69,
+    0.92
+   ],
+   "sha256": "1e211155602ad980d4b99fd31a7d14ca0d7b21989d9388e4ee19872a8f0d0be0",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0498,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 1.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 10.0
+   },
+   "width": 256
+  },
+  "texture/plh_stucco_beams_n.dds@2755b931": {
+   "archives": [
+    "phinterior6a3.eqg"
+   ],
+   "brightness": 0.552,
+   "colorName": "blue",
+   "contrast": 0.045,
+   "fileName": "plh_stucco_beams_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_door_plha.mod": 1,
+     "ter_phinterior6a3.ter": 1
+    },
+    "partners": {
+     "coverage.dds": 2,
+     "plh_stucco_beams_c.dds": 2
+    },
+    "roles": {
+     "e_TextureNormal0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    126,
+    127,
+    249
+   ],
+   "name": "plh_stucco_beams_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.53,
+    0.81
+   ],
+   "sha256": "2755b931a18e6aa5fb74133f241f7fd57afd4677442c119999594a849eba7084",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/plh_tudor_panel_light_c.dds@91963991": {
+   "archives": [
+    "phinterior6a3.eqg"
+   ],
+   "brightness": 0.232,
+   "colorName": "brown",
+   "contrast": 0.055,
+   "fileName": "plh_tudor_panel_light_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    81,
+    54,
+    29
+   ],
+   "name": "plh_tudor_panel_light_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.4,
+    0.26
+   ],
+   "sha256": "91963991bd029a6dfa2b42f1595b82855f1def33b0c4031ff75b494a8f4cb510",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/plh_tudor_panel_n.dds@b0182f02": {
+   "archives": [
+    "phinterior6a3.eqg"
+   ],
+   "brightness": 0.554,
+   "colorName": "blue",
+   "contrast": 0.047,
+   "fileName": "plh_tudor_panel_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    127,
+    127,
+    252
+   ],
+   "name": "plh_tudor_panel_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.41,
+    0.16
+   ],
+   "sha256": "b0182f028dfcf8de283a6cf35ce489502c50fc6116f3e9f91607ab3fd31fda3a",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/plh_woodpanel01_c.dds@af877201": {
+   "archives": [
+    "phinterior6a3.eqg"
+   ],
+   "brightness": 0.057,
+   "colorName": "black",
+   "contrast": 0.036,
+   "fileName": "plh_woodpanel01_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_door_plha.mod": 1,
+     "ter_phinterior6a3.ter": 1
+    },
+    "partners": {
+     "coverage.dds": 2,
+     "plh_woodpanel01_n.dds": 2
+    },
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    20,
+    13,
+    7
+   ],
+   "name": "plh_woodpanel01_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.95,
+    8.65
+   ],
+   "sha256": "af8772013397643a2bf6a5eaf7713afdc8ba33a79f26983cedec7fa9b3ca415e",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0075,
+    "objectShare": 0.136,
+    "slopeShares": {
+     "flat": 0.074,
+     "overhang": 0.159,
+     "slope": 0.11,
+     "steep": 0.005,
+     "vertical": 0.652
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 5.1
+   },
+   "width": 256
+  },
+  "texture/plh_woodpanel01_n.dds@f3edfebd": {
+   "archives": [
+    "phinterior6a3.eqg"
+   ],
+   "brightness": 0.552,
+   "colorName": "blue",
+   "contrast": 0.038,
+   "fileName": "plh_woodpanel01_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_door_plha.mod": 1,
+     "ter_phinterior6a3.ter": 1
+    },
+    "partners": {
+     "coverage.dds": 2,
+     "plh_woodpanel01_c.dds": 2
+    },
+    "roles": {
+     "e_TextureNormal0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    127,
+    126,
+    253
+   ],
+   "name": "plh_woodpanel01_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.46,
+    0.03
+   ],
+   "sha256": "f3edfebd89f31df60ad4e9efa245c752e81df7a9c12b3eb5f524218c74d7f38c",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/wood_beams_c.dds@4e68c1f0": {
+   "archives": [
+    "phinterior6a3.eqg"
+   ],
+   "brightness": 0.09,
+   "colorName": "black",
+   "contrast": 0.015,
+   "fileName": "wood_beams_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_door_plha.mod": 1,
+     "ter_phinterior6a3.ter": 1
+    },
+    "partners": {
+     "coverage.dds": 2,
+     "wood_beams_n.dds": 2
+    },
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    31,
+    21,
+    11
+   ],
+   "name": "wood_beams_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.61,
+    1.03
+   ],
+   "sha256": "4e68c1f0fd5e066578632b16b4f05901ec253efe53b4d03bc8c1802da3acf921",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.2323,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.056,
+     "overhang": 0.701,
+     "slope": 0.005,
+     "steep": 0.0,
+     "vertical": 0.237
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 10.7
+   },
+   "width": 256
+  },
+  "texture/wood_beams_n.dds@33ece1f9": {
+   "archives": [
+    "phinterior6a3.eqg"
+   ],
+   "brightness": 0.555,
+   "colorName": "blue",
+   "contrast": 0.019,
+   "fileName": "wood_beams_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_door_plha.mod": 1,
+     "ter_phinterior6a3.ter": 1
+    },
+    "partners": {
+     "coverage.dds": 2,
+     "wood_beams_c.dds": 2
+    },
+    "roles": {
+     "e_TextureNormal0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    127,
+    127,
+    253
+   ],
+   "name": "wood_beams_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.38,
+    0.86
+   ],
+   "sha256": "33ece1f902a5db1cef3954d46b87d2507c7eea24440fe2b0b4d6a008c2eaf1ea",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  }
+ },
+ "fileHashes": {
+  "phinterior6a3.eqg": "c5591fac478e0d545a9a5988c9fcbe5b6ad1280f6519af809eea10a9c40a808b",
+  "phinterior6a3.zon": "8428921526b1627fe47e87836ef8f3371e701a0e85ab01dbb54a8038b850bc1e"
+ },
+ "format": "eqgz",
+ "problems": [],
+ "source": "zone:phinterior6a3",
+ "surveyVersion": 4,
+ "zone": "phinterior6a3"
+}

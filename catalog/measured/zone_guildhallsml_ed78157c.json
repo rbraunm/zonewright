@@ -1,0 +1,2278 @@
+{
+ "archives": [
+  "guildhallsml.eqg"
+ ],
+ "assets": {
+  "model/ter_entry_room.ter@cc399428": {
+   "archive": "guildhallsml.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "sgh_plain_stone_01.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "sgh_coverage.dds",
+      "e_TextureDiffuse0": "sgh_base_brick_c.dds",
+      "e_TextureNormal0": "sgh_base_brick_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "sgh_coverage.dds",
+      "e_TextureDiffuse0": "sgh_trim_01.dds",
+      "e_TextureNormal0": "sgh_trim_n_01.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "sgh_coverage.dds",
+      "e_TextureDiffuse0": "sgh_entry_door_01.dds",
+      "e_TextureNormal0": "sgh_entry_door_n_01.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "sgh_coverage.dds",
+      "e_TextureDiffuse0": "sgh_trim_02.dds",
+      "e_TextureNormal0": "sgh_trim_n_02.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "sgh_coverage.dds",
+      "e_TextureDiffuse0": "sgh_floorstone_01.dds",
+      "e_TextureNormal0": "sgh_floorstone_n_01.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "sgh_coverage.dds",
+      "e_TextureDiffuse0": "sgh_trim_03.dds",
+      "e_TextureNormal0": "sgh_trim_n_03.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "sgh_coverage.dds",
+      "e_TextureDiffuse0": "sgh_colblk_01.dds",
+      "e_TextureNormal0": "sgh_colblk_n_01.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCBS1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "sgh_tak_dome_02.dds",
+      "e_TextureNormal0": "sgh_tak_dome_n_02.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCBS1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "sgh_metal_trim_02.dds",
+      "e_TextureNormal0": "sgh_metal_trim_n_02.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "sgh_coverage.dds",
+      "e_TextureDiffuse0": "sgh_basebricks_01.dds",
+      "e_TextureNormal0": "sgh_basebricks_n_01.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCBS1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "sgh_base_marble_c.dds",
+      "e_TextureNormal0": "sgh_base_marble_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCBS1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "sgh_marble_decor_01.dds",
+      "e_TextureNormal0": "sgh_marble_decor_n_01.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCBS1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "sgh_marble_decor_02.dds",
+      "e_TextureNormal0": "sgh_marble_decor_n_02.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MaxCBS1.fx",
+     "textures": {
+      "e_TextureDiffuse0": "sgh_floortile_01.dds",
+      "e_TextureNormal0": "sgh_floortile_n_01.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "sgh_coverage.dds",
+      "e_TextureDiffuse0": "sgh_base_blocks_c.dds",
+      "e_TextureNormal0": "sgh_base_blocks_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "sgh_coverage.dds",
+      "e_TextureDiffuse0": "sgh_walldet_c_01.dds",
+      "e_TextureNormal0": "sgh_walldet_n_01.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "sgh_coverage.dds",
+      "e_TextureDiffuse0": "sgh_metal_trim_03.dds",
+      "e_TextureNormal0": "sgh_metal_trim_n_02.dds"
+     }
+    }
+   ],
+   "name": "ter_entry_room.ter",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "cc399428a2706b1ed1773e7a823afd5bbb015cba327610aca1e2d414ca9cc38e",
+   "size": [
+    322.2,
+    478.3,
+    117.0
+   ],
+   "skinned": false,
+   "triangles": 7854
+  },
+  "texture/di_hg_roof.dds@1e742480": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.503,
+   "colorName": "grey",
+   "contrast": 0.119,
+   "fileName": "di_hg_roof.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    126,
+    129,
+    133
+   ],
+   "name": "di_hg_roof.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.13,
+    0.96
+   ],
+   "sha256": "1e742480be3cd50652d78b3c022a635a6d7693055f27f30f0bf3af01ab7b8c64",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_hg_roof_6nh.dds@7b9432ac": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.551,
+   "colorName": "blue",
+   "contrast": 0.042,
+   "fileName": "di_hg_roof_6nh.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    127,
+    126,
+    252
+   ],
+   "name": "di_hg_roof_6nh.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.03,
+    0.86
+   ],
+   "sha256": "7b9432acd162de05c4921971b284b8cd3f037f9f66448ff030c0790cdd8d109c",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_hg_stainglass.dds@ada03a5c": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.438,
+   "colorName": "grey",
+   "contrast": 0.101,
+   "fileName": "di_hg_stainglass.dds",
+   "format": "DXT5",
+   "height": 252,
+   "kind": "texture",
+   "meanColor": [
+    103,
+    115,
+    116
+   ],
+   "name": "di_hg_stainglass.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.01,
+    2.19
+   ],
+   "sha256": "ada03a5c67c60f4c9919480695dd699807f8aab5771dc2206974eda8799c8842",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_hg_stainglass_n.dds@8cc4edc7": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.034,
+   "fileName": "di_hg_stainglass_n.dds",
+   "format": "DXT5",
+   "height": 252,
+   "kind": "texture",
+   "meanColor": [
+    127,
+    127,
+    254
+   ],
+   "name": "di_hg_stainglass_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.19,
+    1.32
+   ],
+   "sha256": "8cc4edc75044e3693c791586649896add1fc72b13d6f7a86339fcdad83ac117e",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/sgh_base_blocks_c.dds@b249a4d5": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.506,
+   "colorName": "tan",
+   "contrast": 0.131,
+   "fileName": "sgh_base_blocks_c.dds",
+   "format": "DXT5",
+   "height": 512,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_base_blocks_n.dds": 1,
+     "sgh_coverage.dds": 1
+    },
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1
+    }
+   },
+   "meanColor": [
+    138,
+    128,
+    113
+   ],
+   "name": "sgh_base_blocks_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.91,
+    0.65
+   ],
+   "sha256": "b249a4d52b4f22da90a4aa91a9eb5ac662462e4a9c360b1d0591a411b981311f",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.007,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 10.7
+   },
+   "width": 512
+  },
+  "texture/sgh_base_blocks_n.dds@56265f31": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.03,
+   "fileName": "sgh_base_blocks_n.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_base_blocks_c.dds": 1,
+     "sgh_coverage.dds": 1
+    },
+    "roles": {
+     "e_TextureNormal0": 1
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1
+    }
+   },
+   "meanColor": [
+    127,
+    127,
+    254
+   ],
+   "name": "sgh_base_blocks_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.016,
+   "seamRatios": [
+    2.08,
+    0.72
+   ],
+   "sha256": "56265f3113fe527a0afeee3b5e1bfc6f9e877d5be78dea8588b7e138e0679227",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/sgh_base_brick_c.dds@2d394cbf": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.573,
+   "colorName": "grey",
+   "contrast": 0.13,
+   "fileName": "sgh_base_brick_c.dds",
+   "format": "DXT5",
+   "height": 512,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_base_brick_n.dds": 1,
+     "sgh_coverage.dds": 1
+    },
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1
+    }
+   },
+   "meanColor": [
+    154,
+    144,
+    134
+   ],
+   "name": "sgh_base_brick_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.99,
+    0.59
+   ],
+   "sha256": "2d394cbfe99fbe4387540198d4b32ff157d9238cf5ef68bce41ac58af68180f4",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.3288,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.042,
+     "overhang": 0.163,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.795
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 20.8
+   },
+   "width": 512
+  },
+  "texture/sgh_base_brick_n.dds@8f657fd8": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.559,
+   "colorName": "blue",
+   "contrast": 0.011,
+   "fileName": "sgh_base_brick_n.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_base_brick_c.dds": 1,
+     "sgh_coverage.dds": 1
+    },
+    "roles": {
+     "e_TextureNormal0": 1
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1
+    }
+   },
+   "meanColor": [
+    129,
+    128,
+    255
+   ],
+   "name": "sgh_base_brick_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.71,
+    0.0
+   ],
+   "sha256": "8f657fd84ccc1cb2945432464c5e2d50a10485f1e485bc169cecf5ef05aba52d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/sgh_base_floor_c.dds@cb950a48": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.519,
+   "colorName": "tan",
+   "contrast": 0.065,
+   "fileName": "sgh_base_floor_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    142,
+    131,
+    116
+   ],
+   "name": "sgh_base_floor_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.016,
+   "seamRatios": [
+    1.04,
+    1.15
+   ],
+   "sha256": "cb950a48eac9ba7a999357895b07bf0163a0b2541529d7b46955744d2081faf3",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/sgh_base_floor_n.dds@6858e2a1": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.557,
+   "colorName": "blue",
+   "contrast": 0.028,
+   "fileName": "sgh_base_floor_n.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    254
+   ],
+   "name": "sgh_base_floor_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.016,
+   "seamRatios": [
+    7.16,
+    5.34
+   ],
+   "sha256": "6858e2a1364c939588fe8a835862505476c43290f0782a6755eb92970fccf5ee",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/sgh_base_marble_c.dds@9350cc06": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.581,
+   "colorName": "grey",
+   "contrast": 0.055,
+   "fileName": "sgh_base_marble_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_base_marble_n.dds": 1
+    },
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MaxCBS1.fx": 1
+    }
+   },
+   "meanColor": [
+    149,
+    148,
+    146
+   ],
+   "name": "sgh_base_marble_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.03,
+    1.08
+   ],
+   "sha256": "9350cc06a1fbe6d22dc0b6d191822f5f90905cedb7a06ec6095ad7c218eb0aea",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0542,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.153,
+     "overhang": 0.159,
+     "slope": 0.03,
+     "steep": 0.012,
+     "vertical": 0.646
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 20.1
+   },
+   "width": 256
+  },
+  "texture/sgh_base_marble_n.dds@547e6a47": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.56,
+   "colorName": "blue",
+   "contrast": 0.0,
+   "fileName": "sgh_base_marble_n.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_base_marble_c.dds": 1
+    },
+    "roles": {
+     "e_TextureNormal0": 1
+    },
+    "shaders": {
+     "Opaque_MaxCBS1.fx": 1
+    }
+   },
+   "meanColor": [
+    129,
+    128,
+    255
+   ],
+   "name": "sgh_base_marble_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    null,
+    null
+   ],
+   "sha256": "547e6a47bfe79191ecef60e377c48385b93bbfa7c97ec970b9f0ecb94b55d1e5",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/sgh_base_wall_c.dds@48a00b3a": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.49,
+   "colorName": "grey",
+   "contrast": 0.098,
+   "fileName": "sgh_base_wall_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    126,
+    123,
+    118
+   ],
+   "name": "sgh_base_wall_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 1.0,
+   "seamRatios": [
+    1.05,
+    0.89
+   ],
+   "sha256": "48a00b3a60984fa9e5720f5158cc0adb165612cfab9996478ce23bc941c40177",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.467,
+   "width": 256
+  },
+  "texture/sgh_base_wall_n.dds@e9d4649a": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.557,
+   "colorName": "blue",
+   "contrast": 0.017,
+   "fileName": "sgh_base_wall_n.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    255
+   ],
+   "name": "sgh_base_wall_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.15,
+    1.1
+   ],
+   "sha256": "e9d4649ab402f20e4ecf07d2f67e3b62626daee13e7c4cbb4d6333b011444326",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/sgh_basebricks_01.dds@58da1e23": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.548,
+   "colorName": "grey",
+   "contrast": 0.053,
+   "fileName": "sgh_basebricks_01.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_basebricks_n_01.dds": 1,
+     "sgh_coverage.dds": 1
+    },
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1
+    }
+   },
+   "meanColor": [
+    146,
+    139,
+    130
+   ],
+   "name": "sgh_basebricks_01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.016,
+   "seamRatios": [
+    1.46,
+    1.7
+   ],
+   "sha256": "58da1e23743487cce3503a42b1577210efb31bb84ec3aa1717855c720b44e9e5",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0889,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.397,
+     "overhang": 0.201,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.402
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 14.2
+   },
+   "width": 256
+  },
+  "texture/sgh_basebricks_n_01.dds@dd620a8f": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.557,
+   "colorName": "blue",
+   "contrast": 0.025,
+   "fileName": "sgh_basebricks_n_01.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_basebricks_01.dds": 1,
+     "sgh_coverage.dds": 1
+    },
+    "roles": {
+     "e_TextureNormal0": 1
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1
+    }
+   },
+   "meanColor": [
+    128,
+    128,
+    255
+   ],
+   "name": "sgh_basebricks_n_01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.016,
+   "seamRatios": [
+    1.4,
+    1.31
+   ],
+   "sha256": "dd620a8f60c7fcd64a6838839c049e771502f27b9c93627d2c45404a65c6d4da",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/sgh_colblk_01.dds@f0be334d": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.607,
+   "colorName": "grey",
+   "contrast": 0.064,
+   "fileName": "sgh_colblk_01.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_colblk_n_01.dds": 1,
+     "sgh_coverage.dds": 1
+    },
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1
+    }
+   },
+   "meanColor": [
+    159,
+    155,
+    142
+   ],
+   "name": "sgh_colblk_01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.39,
+    0.79
+   ],
+   "sha256": "f0be334de097478a91e977f23fffc65688abb673297988e21f3a6f9d4c6f5dd8",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0114,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.962,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.038
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 11.5
+   },
+   "width": 256
+  },
+  "texture/sgh_colblk_n_01.dds@82328d98": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.557,
+   "colorName": "blue",
+   "contrast": 0.021,
+   "fileName": "sgh_colblk_n_01.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_colblk_01.dds": 1,
+     "sgh_coverage.dds": 1
+    },
+    "roles": {
+     "e_TextureNormal0": 1
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1
+    }
+   },
+   "meanColor": [
+    128,
+    127,
+    255
+   ],
+   "name": "sgh_colblk_n_01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.21,
+    2.18
+   ],
+   "sha256": "82328d987c4770f9ca9c6e70324a108941a0ed94eae1efabd9a2d38a536c2082",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/sgh_coverage.dds@019fbdaf": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.363,
+   "colorName": "grey",
+   "contrast": 0.031,
+   "fileName": "sgh_coverage.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 11
+    },
+    "partners": {
+     "sgh_base_brick_c.dds": 1,
+     "sgh_base_brick_n.dds": 1,
+     "sgh_entry_door_01.dds": 1,
+     "sgh_trim_01.dds": 1,
+     "sgh_trim_n_01.dds": 1
+    },
+    "roles": {
+     "e_TextureCoverage0": 11
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 11
+    }
+   },
+   "meanColor": [
+    94,
+    92,
+    94
+   ],
+   "name": "sgh_coverage.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.87,
+    1.15
+   ],
+   "sha256": "019fbdaf8bd91f2daa7e5ed9511b6f461021ff613b79c873dcd0b4bbb63e1af6",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/sgh_entry_door_01.dds@7c159e62": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.309,
+   "colorName": "brown",
+   "contrast": 0.067,
+   "fileName": "sgh_entry_door_01.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_coverage.dds": 1,
+     "sgh_entry_door_n_01.dds": 1
+    },
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1
+    }
+   },
+   "meanColor": [
+    103,
+    73,
+    49
+   ],
+   "name": "sgh_entry_door_01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.64,
+    1.98
+   ],
+   "sha256": "7c159e62fd1bc4acef300759975fac0fe559edbc6d346f15541c34af55f8f568",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0008,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 1.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 16.5
+   },
+   "width": 256
+  },
+  "texture/sgh_entry_door_n_01.dds@f4f76b94": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.555,
+   "colorName": "blue",
+   "contrast": 0.038,
+   "fileName": "sgh_entry_door_n_01.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_coverage.dds": 1,
+     "sgh_entry_door_01.dds": 1
+    },
+    "roles": {
+     "e_TextureNormal0": 1
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1
+    }
+   },
+   "meanColor": [
+    127,
+    128,
+    252
+   ],
+   "name": "sgh_entry_door_n_01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.76,
+    1.38
+   ],
+   "sha256": "f4f76b940b06468159f7dfcd4b98eaa6dd210ba51baf2d2f41081ea86fb24f4c",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/sgh_floorstone_01.dds@851085ef": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.377,
+   "colorName": "grey",
+   "contrast": 0.124,
+   "fileName": "sgh_floorstone_01.dds",
+   "format": "DXT5",
+   "height": 512,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_coverage.dds": 1,
+     "sgh_floorstone_n_01.dds": 1
+    },
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1
+    }
+   },
+   "meanColor": [
+    105,
+    101,
+    98
+   ],
+   "name": "sgh_floorstone_01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.552,
+   "seamRatios": [
+    1.16,
+    0.97
+   ],
+   "sha256": "851085efea5a3737b1db5a1aa853fbd39bcbfe4a822f9e8e9fd813061a201bfd",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.095,
+   "uses": {
+    "areaShare": 0.1085,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.887,
+     "overhang": 0.082,
+     "slope": 0.031,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 14.7
+   },
+   "width": 512
+  },
+  "texture/sgh_floorstone_n_01.dds@5b181ff2": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.036,
+   "fileName": "sgh_floorstone_n_01.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_coverage.dds": 1,
+     "sgh_floorstone_01.dds": 1
+    },
+    "roles": {
+     "e_TextureNormal0": 1
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1
+    }
+   },
+   "meanColor": [
+    127,
+    127,
+    254
+   ],
+   "name": "sgh_floorstone_n_01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.55,
+   "seamRatios": [
+    0.92,
+    1.08
+   ],
+   "sha256": "5b181ff273ba47cc5aba84f740e23a771b137abb36d41caff9dd8385ae1bb18d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.094,
+   "width": 256
+  },
+  "texture/sgh_floortile_01.dds@094859b5": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.799,
+   "colorName": "grey",
+   "contrast": 0.08,
+   "fileName": "sgh_floortile_01.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_floortile_n_01.dds": 1
+    },
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MaxCBS1.fx": 1
+    }
+   },
+   "meanColor": [
+    202,
+    206,
+    195
+   ],
+   "name": "sgh_floortile_01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.47,
+    0.44
+   ],
+   "sha256": "094859b5994a430265d1ba584fb5e41b21fbc28c54402483d334915a5cc4b595",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.007,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 17.5
+   },
+   "width": 256
+  },
+  "texture/sgh_floortile_n_01.dds@96debb8d": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.557,
+   "colorName": "blue",
+   "contrast": 0.027,
+   "fileName": "sgh_floortile_n_01.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_floortile_01.dds": 1
+    },
+    "roles": {
+     "e_TextureNormal0": 1
+    },
+    "shaders": {
+     "Opaque_MaxCBS1.fx": 1
+    }
+   },
+   "meanColor": [
+    127,
+    127,
+    255
+   ],
+   "name": "sgh_floortile_n_01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.67,
+    0.62
+   ],
+   "sha256": "96debb8d8243356251eacd19632768ffaf67deff365d5e7ab926bdfc56eb3c50",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/sgh_invs_01.dds@038a8a40": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 1.0,
+   "colorName": "white",
+   "contrast": 0.0,
+   "fileName": "sgh_invs_01.dds",
+   "format": "DXT5",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    255,
+    255,
+    255
+   ],
+   "name": "sgh_invs_01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    null,
+    null
+   ],
+   "sha256": "038a8a403166634b081693336552d447cb2820ffdc8375afe225313feaae4a70",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 1.0,
+   "width": 64
+  },
+  "texture/sgh_marble_decor_01.dds@9dcfc28e": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.644,
+   "colorName": "grey",
+   "contrast": 0.083,
+   "fileName": "sgh_marble_decor_01.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_marble_decor_n_01.dds": 1
+    },
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MaxCBS1.fx": 1
+    }
+   },
+   "meanColor": [
+    168,
+    164,
+    152
+   ],
+   "name": "sgh_marble_decor_01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.87,
+    1.06
+   ],
+   "sha256": "9dcfc28e5f99974e180ccc6d155b1b3213caf9b8984332c783c285f17b039bd2",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0794,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.302,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.698
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 22.9
+   },
+   "width": 256
+  },
+  "texture/sgh_marble_decor_02.dds@466aec75": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.574,
+   "colorName": "grey",
+   "contrast": 0.113,
+   "fileName": "sgh_marble_decor_02.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_marble_decor_n_02.dds": 1
+    },
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MaxCBS1.fx": 1
+    }
+   },
+   "meanColor": [
+    161,
+    150,
+    139
+   ],
+   "name": "sgh_marble_decor_02.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 1.0,
+   "seamRatios": [
+    2.16,
+    5.79
+   ],
+   "sha256": "466aec75f3677b8aca81fc53828bb71531f7fc9ef3e43c2ef91394c4b1b1f2e3",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.139,
+   "uses": {
+    "areaShare": 0.004,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 1.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 36.6
+   },
+   "width": 256
+  },
+  "texture/sgh_marble_decor_n_01.dds@7b875233": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.557,
+   "colorName": "blue",
+   "contrast": 0.018,
+   "fileName": "sgh_marble_decor_n_01.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_marble_decor_01.dds": 1
+    },
+    "roles": {
+     "e_TextureNormal0": 1
+    },
+    "shaders": {
+     "Opaque_MaxCBS1.fx": 1
+    }
+   },
+   "meanColor": [
+    128,
+    128,
+    255
+   ],
+   "name": "sgh_marble_decor_n_01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.98,
+    1.2
+   ],
+   "sha256": "7b87523362a7c1b99ac4033d309898856b5bdef11d4b36ff23e40b5011c2b19d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/sgh_marble_decor_n_02.dds@b42b36d9": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.557,
+   "colorName": "blue",
+   "contrast": 0.036,
+   "fileName": "sgh_marble_decor_n_02.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_marble_decor_02.dds": 1
+    },
+    "roles": {
+     "e_TextureNormal0": 1
+    },
+    "shaders": {
+     "Opaque_MaxCBS1.fx": 1
+    }
+   },
+   "meanColor": [
+    128,
+    129,
+    254
+   ],
+   "name": "sgh_marble_decor_n_02.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 1.0,
+   "seamRatios": [
+    1.13,
+    0.59
+   ],
+   "sha256": "b42b36d9af3ea0c2ada93b135e5ed1b840c4e0320061646ce9420355fb396692",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.139,
+   "width": 256
+  },
+  "texture/sgh_metal_trim_02.dds@6f52b15d": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.47,
+   "colorName": "grey",
+   "contrast": 0.116,
+   "fileName": "sgh_metal_trim_02.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_metal_trim_n_02.dds": 1
+    },
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MaxCBS1.fx": 1
+    }
+   },
+   "meanColor": [
+    113,
+    121,
+    131
+   ],
+   "name": "sgh_metal_trim_02.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    2.02,
+    1.39
+   ],
+   "sha256": "6f52b15d4d116600b47c3920d6e8498ce2c072e0cf0b9c2f47f1bb1907cec06d",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.018,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.009,
+     "overhang": 0.801,
+     "slope": 0.0,
+     "steep": 0.09,
+     "vertical": 0.1
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 23.9
+   },
+   "width": 256
+  },
+  "texture/sgh_metal_trim_03.dds@a859e535": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.245,
+   "colorName": "grey",
+   "contrast": 0.069,
+   "fileName": "sgh_metal_trim_03.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_coverage.dds": 1,
+     "sgh_metal_trim_n_02.dds": 1
+    },
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1
+    }
+   },
+   "meanColor": [
+    63,
+    62,
+    60
+   ],
+   "name": "sgh_metal_trim_03.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.97,
+    1.46
+   ],
+   "sha256": "a859e5353106f889d8d087c9f2e0514d5fa16a7ce02f3ebc96ac892b72db4964",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0003,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.246,
+     "overhang": 0.246,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.508
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 9.9
+   },
+   "width": 256
+  },
+  "texture/sgh_metal_trim_n_02.dds@cf97fd3a": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.557,
+   "colorName": "blue",
+   "contrast": 0.044,
+   "fileName": "sgh_metal_trim_n_02.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 2
+    },
+    "partners": {
+     "sgh_coverage.dds": 1,
+     "sgh_metal_trim_02.dds": 1,
+     "sgh_metal_trim_03.dds": 1
+    },
+    "roles": {
+     "e_TextureNormal0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1,
+     "Opaque_MaxCBS1.fx": 1
+    }
+   },
+   "meanColor": [
+    128,
+    128,
+    254
+   ],
+   "name": "sgh_metal_trim_n_02.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.12,
+    0.26
+   ],
+   "sha256": "cf97fd3af87d33bc3a8c5c499ddf694c1955154286151ee0d0000b7e89aef7ce",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/sgh_plain_stone_01.dds@714e5c0c": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.513,
+   "colorName": "tan",
+   "contrast": 0.048,
+   "fileName": "sgh_plain_stone_01.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MPLBasic.fx": 1
+    }
+   },
+   "meanColor": [
+    138,
+    130,
+    115
+   ],
+   "name": "sgh_plain_stone_01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.01,
+    1.2
+   ],
+   "sha256": "714e5c0ce3614e88ed99da4d1e7061131c1b66e5aaa01d2e003dc3858302b566",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0339,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.35,
+     "overhang": 0.115,
+     "slope": 0.002,
+     "steep": 0.0,
+     "vertical": 0.532
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 16.4
+   },
+   "width": 256
+  },
+  "texture/sgh_tak_dome_02.dds@af8f78a9": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.525,
+   "colorName": "grey",
+   "contrast": 0.107,
+   "fileName": "sgh_tak_dome_02.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_tak_dome_n_02.dds": 1
+    },
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MaxCBS1.fx": 1
+    }
+   },
+   "meanColor": [
+    138,
+    134,
+    127
+   ],
+   "name": "sgh_tak_dome_02.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.02,
+    0.89
+   ],
+   "sha256": "af8f78a92544156b7e9384aa5c326f9c54e3d6cc9162e12d1bb7c942dbcec321",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0736,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.881,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.119
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 23.5
+   },
+   "width": 256
+  },
+  "texture/sgh_tak_dome_n_02.dds@aace8042": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.035,
+   "fileName": "sgh_tak_dome_n_02.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_tak_dome_02.dds": 1
+    },
+    "roles": {
+     "e_TextureNormal0": 1
+    },
+    "shaders": {
+     "Opaque_MaxCBS1.fx": 1
+    }
+   },
+   "meanColor": [
+    127,
+    128,
+    253
+   ],
+   "name": "sgh_tak_dome_n_02.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.08,
+    0.84
+   ],
+   "sha256": "aace8042c68f5331c6f8a69f718a4ecabb8a131e2e999bd717f8f9c2d45a3348",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/sgh_trim_01.dds@958eff3c": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.395,
+   "colorName": "brown",
+   "contrast": 0.153,
+   "fileName": "sgh_trim_01.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_coverage.dds": 1,
+     "sgh_trim_n_01.dds": 1
+    },
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1
+    }
+   },
+   "meanColor": [
+    113,
+    100,
+    74
+   ],
+   "name": "sgh_trim_01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.08,
+    1.23
+   ],
+   "sha256": "958eff3cd14cb0b6bbda5a3c7b44057a1eea78b25ceecfc653878f095bc8af60",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0689,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.094,
+     "overhang": 0.082,
+     "slope": 0.008,
+     "steep": 0.006,
+     "vertical": 0.81
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 12.5
+   },
+   "width": 256
+  },
+  "texture/sgh_trim_02.dds@d4769f20": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.585,
+   "colorName": "grey",
+   "contrast": 0.194,
+   "fileName": "sgh_trim_02.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_coverage.dds": 1,
+     "sgh_trim_n_02.dds": 1
+    },
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1
+    }
+   },
+   "meanColor": [
+    149,
+    149,
+    150
+   ],
+   "name": "sgh_trim_02.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.32,
+    0.47
+   ],
+   "sha256": "d4769f20388a91b70c34aeb23d4d7d5fdca15da5280ffbd819f337eb39afee4e",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0762,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.004,
+     "overhang": 0.194,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.802
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 14.7
+   },
+   "width": 256
+  },
+  "texture/sgh_trim_03.dds@4e3d8954": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.512,
+   "colorName": "grey",
+   "contrast": 0.192,
+   "fileName": "sgh_trim_03.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_coverage.dds": 1,
+     "sgh_trim_n_03.dds": 1
+    },
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1
+    }
+   },
+   "meanColor": [
+    130,
+    134,
+    115
+   ],
+   "name": "sgh_trim_03.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.84,
+    2.75
+   ],
+   "sha256": "4e3d8954b191df180fcbdacfe1637eb86e15ddee8f9d8a80feb28663932af7d5",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0228,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.179,
+     "overhang": 0.044,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.777
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 13.0
+   },
+   "width": 256
+  },
+  "texture/sgh_trim_n_01.dds@4e0a9acd": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.557,
+   "colorName": "blue",
+   "contrast": 0.041,
+   "fileName": "sgh_trim_n_01.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_coverage.dds": 1,
+     "sgh_trim_01.dds": 1
+    },
+    "roles": {
+     "e_TextureNormal0": 1
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1
+    }
+   },
+   "meanColor": [
+    128,
+    128,
+    254
+   ],
+   "name": "sgh_trim_n_01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.0,
+    0.54
+   ],
+   "sha256": "4e0a9acd541dbdde5fcb9caec84919593705295222228ca338d13e48228c53cb",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/sgh_trim_n_02.dds@09c8cc8a": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.054,
+   "fileName": "sgh_trim_n_02.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_coverage.dds": 1,
+     "sgh_trim_02.dds": 1
+    },
+    "roles": {
+     "e_TextureNormal0": 1
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1
+    }
+   },
+   "meanColor": [
+    128,
+    127,
+    252
+   ],
+   "name": "sgh_trim_n_02.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.12,
+    0.45
+   ],
+   "sha256": "09c8cc8ad6a38fcf122b5bdfed41dba4838aebabf30929a4bb292eb0f5e635f2",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/sgh_trim_n_03.dds@aca1f266": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.065,
+   "fileName": "sgh_trim_n_03.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_coverage.dds": 1,
+     "sgh_trim_03.dds": 1
+    },
+    "roles": {
+     "e_TextureNormal0": 1
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1
+    }
+   },
+   "meanColor": [
+    128,
+    128,
+    250
+   ],
+   "name": "sgh_trim_n_03.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.9,
+    1.7
+   ],
+   "sha256": "aca1f266243c1840c5b2cee556fcca4e85298a45b57cf2a5b6a410b543a93b04",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/sgh_walldet_c_01.dds@593d1605": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.397,
+   "colorName": "tan",
+   "contrast": 0.082,
+   "fileName": "sgh_walldet_c_01.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_coverage.dds": 1,
+     "sgh_walldet_n_01.dds": 1
+    },
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1
+    }
+   },
+   "meanColor": [
+    106,
+    102,
+    88
+   ],
+   "name": "sgh_walldet_c_01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.96,
+    0.76
+   ],
+   "sha256": "593d1605c3b2795567fcfa5e660010365df7272289b1086070b725b844625391",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0163,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 1.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 26.0
+   },
+   "width": 256
+  },
+  "texture/sgh_walldet_n_01.dds@71d9f890": {
+   "archives": [
+    "guildhallsml.eqg"
+   ],
+   "brightness": 0.557,
+   "colorName": "blue",
+   "contrast": 0.031,
+   "fileName": "sgh_walldet_n_01.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "ter_entry_room.ter": 1
+    },
+    "partners": {
+     "sgh_coverage.dds": 1,
+     "sgh_walldet_c_01.dds": 1
+    },
+    "roles": {
+     "e_TextureNormal0": 1
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1
+    }
+   },
+   "meanColor": [
+    128,
+    127,
+    254
+   ],
+   "name": "sgh_walldet_n_01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.93,
+    0.8
+   ],
+   "sha256": "71d9f890e4c6341375a4c4cbff75f880e83b6eceeb53c938e3f7b849baa9b34d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  }
+ },
+ "fileHashes": {
+  "guildhallsml.eqg": "f33bc06d3415b07e8745bea7d7802297b3049ce7aa4d4ccdc3f3d45f9942daef",
+  "guildhallsml.zon": "c2d721bc975db78b20586366eb69bca160b12fef50541cc9285e8267d6279e3d"
+ },
+ "format": "eqgz",
+ "problems": [],
+ "source": "zone:guildhallsml",
+ "surveyVersion": 4,
+ "zone": "guildhallsml"
+}

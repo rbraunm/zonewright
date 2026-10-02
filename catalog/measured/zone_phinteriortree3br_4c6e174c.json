@@ -1,0 +1,4235 @@
+{
+ "archives": [
+  "phinteriortree3br.eqg"
+ ],
+ "assets": {
+  "model/obj_2ndflight_steps_a.mod@3f6d7cfe": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_2ndflight_steps_a.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "3f6d7cfef9a57aa165ba6fac5e24467c63f742fea86e963b0391dc07f4104c0f",
+   "size": [
+    135.1,
+    127.8,
+    47.4
+   ],
+   "skinned": false,
+   "triangles": 1274
+  },
+  "model/obj_2ndflight_steps_b.mod@7edebb93": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_2ndflight_steps_b.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "7edebb93a40975ab4f76472ccfc4c90378767ba3fc8acf8214bc216642356bbe",
+   "size": [
+    130.1,
+    135.2,
+    48.2
+   ],
+   "skinned": false,
+   "triangles": 1298
+  },
+  "model/obj_2ndflight_steps_c.mod@769527f0": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_2ndflight_steps_c.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "769527f01afd04e9f2c917d3ff1a5b360f48ade90c2b2e3cdbadfc00bb4c21f8",
+   "size": [
+    135.2,
+    130.1,
+    48.2
+   ],
+   "skinned": false,
+   "triangles": 1298
+  },
+  "model/obj_evantil_plyrhouse_door.mod@ef53d575": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evantil_plyrhouse_door.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "ef53d5752458a27b8d16da4ba6559281e6516b3b603c8aa3fac1aa1eaedfd2b3",
+   "size": [
+    6.3,
+    0.6,
+    11.4
+   ],
+   "skinned": false,
+   "triangles": 32
+  },
+  "model/obj_evantil_room_a_alt.mod@2d663698": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evantil_room_a_alt.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "2d66369826d7b387c01653e80e4d63d77404bb5e8d2f6c3f42cdcdc89cf5af9a",
+   "size": [
+    173.6,
+    178.8,
+    113.3
+   ],
+   "skinned": false,
+   "triangles": 2076
+  },
+  "model/obj_evantil_room_a_ceiling.mod@1cd8e137": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evantil_room_a_ceiling.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "1cd8e1378cbcc45d44e4515b612096259b039559acd11b6d8aa856bb35449b1c",
+   "size": [
+    129.5,
+    123.4,
+    20.4
+   ],
+   "skinned": false,
+   "triangles": 1203
+  },
+  "model/obj_evantil_room_a_root.mod@33323de9": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evantil_room_a_root.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "33323de921da7cc87237c0bd85f4c16cc155c773e6c90d7769b71b84a2f0b2b3",
+   "size": [
+    172.9,
+    179.2,
+    123.5
+   ],
+   "skinned": false,
+   "triangles": 2917
+  },
+  "model/obj_evantil_room_c.mod@388b7202": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evantil_room_c.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "388b7202850dcc5979d69d11d5612ac145fdee0b7e22c6031fba6d012e27211d",
+   "size": [
+    114.1,
+    110.7,
+    72.3
+   ],
+   "skinned": false,
+   "triangles": 2007
+  },
+  "model/obj_evantil_room_c_ceiling.mod@76a0cf83": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evantil_room_c_ceiling.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "76a0cf83cfa252c4875c32f7f6ecebe32c09bca1d2c12918cf91c759a8a5ad41",
+   "size": [
+    84.0,
+    80.0,
+    13.2
+   ],
+   "skinned": false,
+   "triangles": 1203
+  },
+  "model/obj_evantil_room_c_entry.mod@f3ca4117": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evantil_room_c_entry.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "f3ca4117e861073eb80045be32d3b63415c359fb82879e6b006f32473a6d0d15",
+   "size": [
+    49.3,
+    65.4,
+    26.6
+   ],
+   "skinned": false,
+   "triangles": 1570
+  },
+  "model/obj_evantil_room_c_stairentry.mod@5c287b14": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evantil_room_c_stairentry.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "5c287b1493125f2ffe15878f4ac96250e05f339fbfcd2e0d9094fdd32ae49c1e",
+   "size": [
+    63.2,
+    67.6,
+    29.1
+   ],
+   "skinned": false,
+   "triangles": 1903
+  },
+  "model/obj_evantil_shardheart.mod@f743ee37": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evantil_shardheart.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "f743ee37d03d95655fb0c7dd332f44b5b3e1dacb220ac7a34e89ef611aaa48f8",
+   "size": [
+    33.2,
+    24.7,
+    46.8
+   ],
+   "skinned": false,
+   "triangles": 408
+  },
+  "model/obj_evntl_2ndflight_root_a.mod@5dc12512": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evntl_2ndflight_root_a.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "5dc125120e851d17838ef6134e6e56b2f7c34d7065a47347d84d293753b3457a",
+   "size": [
+    64.7,
+    128.8,
+    54.6
+   ],
+   "skinned": false,
+   "triangles": 1646
+  },
+  "model/obj_evntl_2ndflight_root_b.mod@2a01f75a": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evntl_2ndflight_root_b.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "2a01f75ad32067b2c42b0cb30a37e36f0a77aa96b2351e815fc8467269d53ea7",
+   "size": [
+    157.1,
+    231.4,
+    103.2
+   ],
+   "skinned": false,
+   "triangles": 3132
+  },
+  "model/obj_evntl_2ndflight_root_c.mod@130887fa": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evntl_2ndflight_root_c.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "130887fae5227c20442968b2c64f867901dce1373516d0ed62e1d4e23c5b6ea3",
+   "size": [
+    74.3,
+    66.8,
+    47.2
+   ],
+   "skinned": false,
+   "triangles": 1823
+  },
+  "model/obj_evntl_firstflight_a.mod@09434482": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evntl_firstflight_a.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "094344821d00e68ea632917c2f5213ba08f394e153a02a4b28dc06fd4df81e6f",
+   "size": [
+    135.9,
+    260.6,
+    116.2
+   ],
+   "skinned": false,
+   "triangles": 2324
+  },
+  "model/obj_evntl_firstflight_arch_a.mod@39909f21": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evntl_firstflight_arch_a.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "39909f2148074d80f45124d7420cbb0b198a760a2c418e066fef4d83c2cbcec0",
+   "size": [
+    150.8,
+    236.1,
+    103.8
+   ],
+   "skinned": false,
+   "triangles": 3132
+  },
+  "model/obj_evntl_firstflight_arch_b.mod@9f680315": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evntl_firstflight_arch_b.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "9f680315074cc2f1931e02cef11b8ba63829bfb4cf33521e38f961359d87e9ae",
+   "size": [
+    75.3,
+    197.7,
+    80.3
+   ],
+   "skinned": false,
+   "triangles": 2349
+  },
+  "model/obj_evntl_firstflight_b.mod@15ea22e6": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evntl_firstflight_b.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "15ea22e6e0c7bef4b54dd1e73b08330ef2cbd364ddd957107e7cabc84473c3e5",
+   "size": [
+    260.3,
+    131.5,
+    117.7
+   ],
+   "skinned": false,
+   "triangles": 2280
+  },
+  "model/obj_evntl_room_a_entry.mod@71aa432e": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evntl_room_a_entry.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "71aa432e98720bf374c6a7af2c9f23e6c399d1747c8075ebfabb61966dace026",
+   "size": [
+    74.3,
+    66.7,
+    33.0
+   ],
+   "skinned": false,
+   "triangles": 1616
+  },
+  "model/obj_evntl_room_c_root.mod@34b1cae5": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evntl_room_c_root.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "34b1cae55499683cc183b9251348e34b9da3f606fcaaf53a7e9be52b39b44484",
+   "size": [
+    110.3,
+    64.2,
+    77.9
+   ],
+   "skinned": false,
+   "triangles": 1479
+  },
+  "model/obj_evntl_secondflight_a.mod@0ec35079": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evntl_secondflight_a.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "0ec350795e156f8cb6e24633185af33c4e6cd259414a2b5f6d8357eeacc601b3",
+   "size": [
+    263.0,
+    135.9,
+    118.8
+   ],
+   "skinned": false,
+   "triangles": 2340
+  },
+  "model/obj_evntl_secondflight_b.mod@f7327730": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evntl_secondflight_b.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "f7327730b19d4a9d3d7ed8449a9031640a28508c2d202751badf138e3f19bcd8",
+   "size": [
+    135.9,
+    131.3,
+    72.9
+   ],
+   "skinned": false,
+   "triangles": 1158
+  },
+  "model/obj_evntl_shard_room_thorn.mod@e4d8ab20": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evntl_shard_room_thorn.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "e4d8ab20492d3e682618658707da367376b8c7888ba56713b41da6d9261c112a",
+   "size": [
+    168.7,
+    138.9,
+    117.7
+   ],
+   "skinned": false,
+   "triangles": 76
+  },
+  "model/obj_evntl_shard_vine_a.mod@901a2f9c": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evntl_shard_vine_a.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "901a2f9c5ab4f938ce1eb71a132d9cf8241353fd9902df5082da8ef6a599afea",
+   "size": [
+    182.3,
+    111.5,
+    145.7
+   ],
+   "skinned": false,
+   "triangles": 2454
+  },
+  "model/obj_evntl_shard_vine_b.mod@836b9aa8": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evntl_shard_vine_b.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "836b9aa82fa6e45cfdb515c39c7cd7e479e4ff6840b29e48ed7e7883c8fa0c3f",
+   "size": [
+    47.8,
+    80.8,
+    40.7
+   ],
+   "skinned": false,
+   "triangles": 828
+  },
+  "model/obj_evntl_shard_vine_c.mod@5c351f6d": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evntl_shard_vine_c.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "5c351f6df9ac357269dd57bd32da41e9145da4ed6795bd704a61abadbbd5e78b",
+   "size": [
+    71.3,
+    114.5,
+    129.1
+   ],
+   "skinned": false,
+   "triangles": 2114
+  },
+  "model/obj_evntl_shard_vine_d.mod@75217be1": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evntl_shard_vine_d.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "75217be1c7f18987d5825eec4d4894ae59cf35f02ee6437340083fcc1bc5df52",
+   "size": [
+    38.3,
+    49.5,
+    119.1
+   ],
+   "skinned": false,
+   "triangles": 2084
+  },
+  "model/obj_evntl_stair_entry.mod@39065b29": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evntl_stair_entry.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "39065b29b0217481fa9038a5d10713d448f8bf099e0c300f8b14463da3e33e07",
+   "size": [
+    67.8,
+    86.7,
+    29.6
+   ],
+   "skinned": false,
+   "triangles": 2120
+  },
+  "model/obj_evntl_stair_exit.mod@84e98e67": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evntl_stair_exit.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "84e98e67d6628691cb7f2e09dd8fc28c405a42d605c1e8e70dbd9c13b08c3bf7",
+   "size": [
+    46.9,
+    65.4,
+    26.9
+   ],
+   "skinned": false,
+   "triangles": 1538
+  },
+  "model/obj_evntl_stairwell_doorway.mod@4aef9ee4": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_evntl_stairwell_doorway.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "4aef9ee4d60137f97f1bee3c030773383d5084b5dc694e3751a6669f432e428d",
+   "size": [
+    44.0,
+    29.5,
+    29.9
+   ],
+   "skinned": false,
+   "triangles": 863
+  },
+  "model/obj_vinewall_mainarea.mod@96d28879": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_vinewall_mainarea.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "96d288790ae6ced30cf7cc274d6d617b713b5c4370fbc4d3001ad2be919fd9f5",
+   "size": [
+    90.5,
+    91.6,
+    136.6
+   ],
+   "skinned": false,
+   "triangles": 384
+  },
+  "model/obj_vinewall_room_a.mod@4fc36c3b": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obj_vinewall_room_a.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "4fc36c3bad3f3e985334a90607e55817d37141f2f9a06096330a98c8866c42b6",
+   "size": [
+    206.1,
+    107.9,
+    136.6
+   ],
+   "skinned": false,
+   "triangles": 576
+  },
+  "model/obp_evntl_step_a.mod@6c0c0231": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obp_evntl_step_a.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "6c0c0231767e3d1d3e5d0e629182bf2bc7350b9b9be0dc5816b2ed8dacbfb6d4",
+   "size": [
+    127.8,
+    135.1,
+    47.4
+   ],
+   "skinned": false,
+   "triangles": 1274
+  },
+  "model/obp_evntl_step_b.mod@cfb74b40": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obp_evntl_step_b.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "cfb74b407146485fc8d8186e164adfc1d6854c246d77d99e38a7e9329988abc6",
+   "size": [
+    127.8,
+    135.1,
+    47.4
+   ],
+   "skinned": false,
+   "triangles": 1274
+  },
+  "model/obp_evntl_step_c.mod@740df9a7": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obp_evntl_step_c.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "740df9a7256f828e15fee41ee1c69dde53cab90299223cc7a4c30be88dfe4dc7",
+   "size": [
+    127.8,
+    135.1,
+    47.4
+   ],
+   "skinned": false,
+   "triangles": 1274
+  },
+  "model/obp_evntl_step_d.mod@65d484b4": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "obp_evntl_step_d.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "65d484b465c0509279b973d559b7e723638b36806de327a128a227bd90f0615e",
+   "size": [
+    127.8,
+    132.5,
+    47.0
+   ],
+   "skinned": false,
+   "triangles": 1256
+  },
+  "model/ter_phinteriortree3br.ter@3aeaa4fd": {
+   "archive": "phinteriortree3br.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "dry_bark_vine_c.dds",
+      "e_TextureNormal0": "dry_bark_vine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evilbranch_glow_c512.dds",
+      "e_TextureNormal0": "bark_evilvine_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "eviltree_vines_glow_c.dds",
+      "e_TextureNormal0": "eviltree_vines_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "bark_base_c.dds",
+      "e_TextureNormal0": "bark_base_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_thuleground_ov.dds",
+      "e_TextureDiffuse0": "treering1024x_drk_c.dds",
+      "e_TextureNormal0": "treering256x_drk_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "blood_wood_plank.dds",
+      "e_TextureNormal0": "blood_wood_plank_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBasic.fx",
+     "textures": {
+      "e_TextureDiffuse0": "purple_crystal256.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_tosk_ov2.dds",
+      "e_TextureDiffuse0": "evantil_branch_cutaway_c.dds",
+      "e_TextureNormal0": "evantil_branch_cutaway_n.dds"
+     }
+    }
+   ],
+   "name": "ter_phinteriortree3br.ter",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "3aeaa4fdeddabf4585c9e43911339759e68d6f81c331582255abcc291b4088f5",
+   "size": [
+    272.5,
+    272.5,
+    339.1
+   ],
+   "skinned": false,
+   "triangles": 3690
+  },
+  "texture/bark_base_c.dds@b593ef66": {
+   "archives": [
+    "phinteriortree3br.eqg"
+   ],
+   "brightness": 0.394,
+   "colorName": "brown",
+   "contrast": 0.136,
+   "fileName": "bark_base_c.dds",
+   "format": "DXT5",
+   "height": 512,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_evntl_shard_vine_a.mod": 1,
+     "obj_evntl_shard_vine_b.mod": 1,
+     "obj_evntl_shard_vine_c.mod": 1,
+     "obj_evntl_shard_vine_d.mod": 1,
+     "ter_phinteriortree3br.ter": 1
+    },
+    "partners": {
+     "bark_base_n.dds": 38,
+     "coverage_tosk_ov2.dds": 38
+    },
+    "roles": {
+     "e_TextureDiffuse0": 38
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 38
+    }
+   },
+   "meanColor": [
+    108,
+    100,
+    83
+   ],
+   "name": "bark_base_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.89,
+    1.0
+   ],
+   "sha256": "b593ef6635b694846272443d349c6f65875efa98348996157a1a6ba8dc081a1a",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0849,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.63,
+     "overhang": 0.364,
+     "slope": 0.002,
+     "steep": 0.001,
+     "vertical": 0.002
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 13.3
+   },
+   "width": 512
+  },
+  "texture/bark_base_n.dds@38c93f00": {
+   "archives": [
+    "phinteriortree3br.eqg"
+   ],
+   "brightness": 0.546,
+   "colorName": "blue",
+   "contrast": 0.129,
+   "fileName": "bark_base_n.dds",
+   "format": "XRGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_evntl_shard_vine_a.mod": 1,
+     "obj_evntl_shard_vine_b.mod": 1,
+     "obj_evntl_shard_vine_c.mod": 1,
+     "obj_evntl_shard_vine_d.mod": 1,
+     "ter_phinteriortree3br.ter": 1
+    },
+    "partners": {
+     "bark_base_c.dds": 38,
+     "coverage_tosk_ov2.dds": 38
+    },
+    "roles": {
+     "e_TextureNormal0": 38
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 38
+    }
+   },
+   "meanColor": [
+    128,
+    127,
+    231
+   ],
+   "name": "bark_base_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.93,
+    0.97
+   ],
+   "sha256": "38c93f00408d67a00b0173aa64218cc586ff7f687d77a787f2d00ed05798ebba",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/bark_base_vine_c.dds@a0451658": {
+   "archives": [
+    "phinteriortree3br.eqg"
+   ],
+   "brightness": 0.311,
+   "colorName": "brown",
+   "contrast": 0.145,
+   "fileName": "bark_base_vine_c.dds",
+   "format": "DXT5",
+   "height": 512,
+   "kind": "texture",
+   "meanColor": [
+    86,
+    79,
+    64
+   ],
+   "name": "bark_base_vine_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.87,
+    0.91
+   ],
+   "sha256": "a0451658de87c51903d6e87d637d1ab5faf78774594716fdbebf7b83c0d606d7",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 512
+  },
+  "texture/bark_base_vine_n.dds@557d1d79": {
+   "archives": [
+    "phinteriortree3br.eqg"
+   ],
+   "brightness": 0.539,
+   "colorName": "blue",
+   "contrast": 0.099,
+   "fileName": "bark_base_vine_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    127,
+    127,
+    212
+   ],
+   "name": "bark_base_vine_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.864,
+   "seamRatios": [
+    1.05,
+    1.03
+   ],
+   "sha256": "557d1d795a1333b1868eb9d87c824c8baf4c74a3fe26babbcd44c62ce59330a4",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.74,
+   "width": 256
+  },
+  "texture/bark_evilvine_n.dds@932b17f5": {
+   "archives": [
+    "phinteriortree3br.eqg"
+   ],
+   "brightness": 0.545,
+   "colorName": "blue",
+   "contrast": 0.143,
+   "fileName": "bark_evilvine_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_evntl_shard_vine_a.mod": 1,
+     "obj_evntl_shard_vine_b.mod": 1,
+     "obj_evntl_shard_vine_c.mod": 1,
+     "obj_evntl_shard_vine_d.mod": 1,
+     "ter_phinteriortree3br.ter": 1
+    },
+    "partners": {
+     "coverage_tosk_ov2.dds": 38,
+     "evilbranch_glow_c512.dds": 38
+    },
+    "roles": {
+     "e_TextureNormal0": 38
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 38
+    }
+   },
+   "meanColor": [
+    127,
+    128,
+    228
+   ],
+   "name": "bark_evilvine_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.979,
+   "seamRatios": [
+    0.97,
+    0.98
+   ],
+   "sha256": "932b17f5b29ebe6ada5efa95364d148ee35d4b4d77eca76dde520578f5bcf39a",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.436,
+   "width": 256
+  },
+  "texture/blood_wood_plank.dds@4f4306ce": {
+   "archives": [
+    "phinteriortree3br.eqg"
+   ],
+   "brightness": 0.269,
+   "colorName": "brown",
+   "contrast": 0.094,
+   "fileName": "blood_wood_plank.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_evntl_shard_vine_a.mod": 1,
+     "obj_evntl_shard_vine_b.mod": 1,
+     "obj_evntl_shard_vine_c.mod": 1,
+     "obj_evntl_shard_vine_d.mod": 1,
+     "ter_phinteriortree3br.ter": 1
+    },
+    "partners": {
+     "blood_wood_plank_n.dds": 38,
+     "coverage_tosk_ov2.dds": 38
+    },
+    "roles": {
+     "e_TextureDiffuse0": 38
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 38
+    }
+   },
+   "meanColor": [
+    77,
+    68,
+    51
+   ],
+   "name": "blood_wood_plank.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.06,
+    1.17
+   ],
+   "sha256": "4f4306cebf2939480e308ea4592b8666b1c6236b1aa5889ddd7d53f50b90b514",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0004,
+    "objectShare": 0.709,
+    "slopeShares": {
+     "flat": 0.015,
+     "overhang": 0.015,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.969
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 4.5
+   },
+   "width": 256
+  },
+  "texture/blood_wood_plank_drk.dds@ff8b60e4": {
+   "archives": [
+    "phinteriortree3br.eqg"
+   ],
+   "brightness": 0.094,
+   "colorName": "black",
+   "contrast": 0.046,
+   "fileName": "blood_wood_plank_drk.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    28,
+    23,
+    16
+   ],
+   "name": "blood_wood_plank_drk.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.77,
+    1.1
+   ],
+   "sha256": "ff8b60e48210e30254052252404b01fc96793decd495aeac9d2550f0de5788a5",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/blood_wood_plank_n.dds@cf23a837": {
+   "archives": [
+    "phinteriortree3br.eqg"
+   ],
+   "brightness": 0.558,
+   "colorName": "blue",
+   "contrast": 0.024,
+   "fileName": "blood_wood_plank_n.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_evntl_shard_vine_a.mod": 1,
+     "obj_evntl_shard_vine_b.mod": 1,
+     "obj_evntl_shard_vine_c.mod": 1,
+     "obj_evntl_shard_vine_d.mod": 1,
+     "ter_phinteriortree3br.ter": 1
+    },
+    "partners": {
+     "blood_wood_plank.dds": 38,
+     "coverage_tosk_ov2.dds": 38
+    },
+    "roles": {
+     "e_TextureNormal0": 38
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 38
+    }
+   },
+   "meanColor": [
+    128,
+    128,
+    253
+   ],
+   "name": "blood_wood_plank_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 1.0,
+   "seamRatios": [
+    1.45,
+    1.01
+   ],
+   "sha256": "cf23a83759ea96a39512cc314a4c619e49ec14548f509cf34ca161c12abb19ab",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.979,
+   "width": 256
+  },
+  "texture/canopy_leaves_purp.dds@c23fe512": {
+   "archives": [
+    "phinteriortree3br.eqg"
+   ],
+   "brightness": 0.107,
+   "colorName": "blue",
+   "contrast": 0.038,
+   "fileName": "canopy_leaves_purp.dds",
+   "format": "DXT5",
+   "height": 512,
+   "kind": "texture",
+   "meanColor": [
+    25,
+    30,
+    49
+   ],
+   "name": "canopy_leaves_purp.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.105,
+   "seamRatios": [
+    0.0,
+    0.48
+   ],
+   "sha256": "c23fe51287d55ebf31445220b7ab1fe8137dc20c36e7132a06bf9df3dc4c6ad6",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.605,
+   "width": 512
+  },
+  "texture/coverage_thuleground_ov.dds@df5624ec": {
+   "archives": [
+    "phinteriortree3br.eqg"
+   ],
+   "brightness": 0.283,
+   "colorName": "tan",
+   "contrast": 0.058,
+   "fileName": "coverage_thuleground_ov.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_evntl_shard_vine_a.mod": 1,
+     "obj_evntl_shard_vine_b.mod": 1,
+     "obj_evntl_shard_vine_c.mod": 1,
+     "obj_evntl_shard_vine_d.mod": 1,
+     "ter_phinteriortree3br.ter": 1
+    },
+    "partners": {
+     "treering1024x_drk_c.dds": 38,
+     "treering256x_drk_n.dds": 38
+    },
+    "roles": {
+     "e_TextureCoverage0": 38
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 38
+    }
+   },
+   "meanColor": [
+    79,
+    73,
+    51
+   ],
+   "name": "coverage_thuleground_ov.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.1,
+    1.1
+   ],
+   "sha256": "df5624ec1eb73e50df2872e26468df58c18a095dd685b533aa43d859139160bb",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/coverage_tosk_ov2.dds@19b0fbfe": {
+   "archives": [
+    "phinteriortree3br.eqg"
+   ],
+   "brightness": 0.261,
+   "colorName": "grey",
+   "contrast": 0.059,
+   "fileName": "coverage_tosk_ov2.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_evntl_shard_vine_a.mod": 6,
+     "obj_evntl_shard_vine_b.mod": 6,
+     "obj_evntl_shard_vine_c.mod": 6,
+     "obj_evntl_shard_vine_d.mod": 6,
+     "ter_phinteriortree3br.ter": 6
+    },
+    "partners": {
+     "bark_evilvine_n.dds": 38,
+     "dry_bark_vine_c.dds": 38,
+     "dry_bark_vine_n.dds": 38,
+     "evilbranch_glow_c512.dds": 38,
+     "eviltree_vines_glow_c.dds": 38
+    },
+    "roles": {
+     "e_TextureCoverage0": 228
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 228
+    }
+   },
+   "meanColor": [
+    67,
+    67,
+    64
+   ],
+   "name": "coverage_tosk_ov2.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.95,
+    1.03
+   ],
+   "sha256": "19b0fbfe98f05446475550206c229d5775f833fed2b3958fbe166232b6480b53",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/dry_bark_vine_c.dds@bb48dfc6": {
+   "archives": [
+    "phinteriortree3br.eqg"
+   ],
+   "brightness": 0.353,
+   "colorName": "brown",
+   "contrast": 0.143,
+   "fileName": "dry_bark_vine_c.dds",
+   "format": "DXT5",
+   "height": 512,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_evntl_shard_vine_a.mod": 1,
+     "obj_evntl_shard_vine_b.mod": 1,
+     "obj_evntl_shard_vine_c.mod": 1,
+     "obj_evntl_shard_vine_d.mod": 1,
+     "ter_phinteriortree3br.ter": 1
+    },
+    "partners": {
+     "coverage_tosk_ov2.dds": 38,
+     "dry_bark_vine_n.dds": 38
+    },
+    "roles": {
+     "e_TextureDiffuse0": 38
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 38
+    }
+   },
+   "meanColor": [
+    98,
+    89,
+    74
+   ],
+   "name": "dry_bark_vine_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.8,
+    1.02
+   ],
+   "sha256": "bb48dfc64157f6fe16b91692a9f75710a1822d2eaadfd17b34c31f3b1e24fc7b",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.4622,
+    "objectShare": 0.729,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.418,
+     "slope": 0.0,
+     "steep": 0.027,
+     "vertical": 0.555
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 17.4
+   },
+   "width": 512
+  },
+  "texture/dry_bark_vine_n.dds@0229f2f7": {
+   "archives": [
+    "phinteriortree3br.eqg"
+   ],
+   "brightness": 0.543,
+   "colorName": "blue",
+   "contrast": 0.133,
+   "fileName": "dry_bark_vine_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_evntl_shard_vine_a.mod": 1,
+     "obj_evntl_shard_vine_b.mod": 1,
+     "obj_evntl_shard_vine_c.mod": 1,
+     "obj_evntl_shard_vine_d.mod": 1,
+     "ter_phinteriortree3br.ter": 1
+    },
+    "partners": {
+     "coverage_tosk_ov2.dds": 38,
+     "dry_bark_vine_c.dds": 38
+    },
+    "roles": {
+     "e_TextureNormal0": 38
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 38
+    }
+   },
+   "meanColor": [
+    128,
+    127,
+    228
+   ],
+   "name": "dry_bark_vine_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.966,
+   "seamRatios": [
+    0.9,
+    0.95
+   ],
+   "sha256": "0229f2f7e435bbc7036318bdfa40646507149e850a32173d6a78106026aedcef",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.38,
+   "width": 256
+  },
+  "texture/evantil_branch_cutaway_c.dds@87a7d8ca": {
+   "archives": [
+    "phinteriortree3br.eqg"
+   ],
+   "brightness": 0.268,
+   "colorName": "pink",
+   "contrast": 0.101,
+   "fileName": "evantil_branch_cutaway_c.dds",
+   "format": "DXT5",
+   "height": 512,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_evntl_shard_vine_a.mod": 1,
+     "obj_evntl_shard_vine_b.mod": 1,
+     "obj_evntl_shard_vine_c.mod": 1,
+     "obj_evntl_shard_vine_d.mod": 1,
+     "ter_phinteriortree3br.ter": 1
+    },
+    "partners": {
+     "coverage_tosk_ov2.dds": 38,
+     "evantil_branch_cutaway_n.dds": 38
+    },
+    "roles": {
+     "e_TextureDiffuse0": 38
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 38
+    }
+   },
+   "meanColor": [
+    81,
+    59,
+    80
+   ],
+   "name": "evantil_branch_cutaway_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.04,
+    1.08
+   ],
+   "sha256": "87a7d8ca7d10ba8703979365f848862b57c950dd72abfc60b7642c8d347b98d8",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0141,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.262,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.738
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 30.5
+   },
+   "width": 512
+  },
+  "texture/evantil_branch_cutaway_n.dds@5aa597db": {
+   "archives": [
+    "phinteriortree3br.eqg"
+   ],
+   "brightness": 0.554,
+   "colorName": "blue",
+   "contrast": 0.076,
+   "fileName": "evantil_branch_cutaway_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_evntl_shard_vine_a.mod": 1,
+     "obj_evntl_shard_vine_b.mod": 1,
+     "obj_evntl_shard_vine_c.mod": 1,
+     "obj_evntl_shard_vine_d.mod": 1,
+     "ter_phinteriortree3br.ter": 1
+    },
+    "partners": {
+     "coverage_tosk_ov2.dds": 38,
+     "evantil_branch_cutaway_c.dds": 38
+    },
+    "roles": {
+     "e_TextureNormal0": 38
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 38
+    }
+   },
+   "meanColor": [
+    128,
+    127,
+    247
+   ],
+   "name": "evantil_branch_cutaway_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.85,
+    0.91
+   ],
+   "sha256": "5aa597dbf323adb9fec7b8ae0dfa598394a224c7019a302d967932a04ec88aa3",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/evil_treebranch_purp512.dds@88825b28": {
+   "archives": [
+    "phinteriortree3br.eqg"
+   ],
+   "brightness": 0.141,
+   "colorName": "black",
+   "contrast": 0.118,
+   "fileName": "evil_treebranch_purp512.dds",
+   "format": "DXT5",
+   "height": 512,
+   "kind": "texture",
+   "meanColor": [
+    27,
+    21,
+    23
+   ],
+   "name": "evil_treebranch_purp512.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.064,
+   "seamRatios": [
+    3.82,
+    5.09
+   ],
+   "sha256": "88825b28e81e651ff03fd05099b5e5b00388973c33643b37ac711c1dd8144f5f",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.902,
+   "width": 512
+  },
+  "texture/evilbranch_glow_c512.dds@ef08143c": {
+   "archives": [
+    "phinteriortree3br.eqg"
+   ],
+   "brightness": 0.161,
+   "colorName": "pink",
+   "contrast": 0.1,
+   "fileName": "evilbranch_glow_c512.dds",
+   "format": "DXT5",
+   "height": 512,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_evntl_shard_vine_a.mod": 1,
+     "obj_evntl_shard_vine_b.mod": 1,
+     "obj_evntl_shard_vine_c.mod": 1,
+     "obj_evntl_shard_vine_d.mod": 1,
+     "ter_phinteriortree3br.ter": 1
+    },
+    "partners": {
+     "bark_evilvine_n.dds": 38,
+     "coverage_tosk_ov2.dds": 38
+    },
+    "roles": {
+     "e_TextureDiffuse0": 38
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 38
+    }
+   },
+   "meanColor": [
+    47,
+    38,
+    42
+   ],
+   "name": "evilbranch_glow_c512.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.15,
+    1.18
+   ],
+   "sha256": "ef08143c3d25cd3fae0d6351dbbb77bfc926daca374d7727e8e589f800483089",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.2426,
+    "objectShare": 0.796,
+    "slopeShares": {
+     "flat": 0.003,
+     "overhang": 0.237,
+     "slope": 0.039,
+     "steep": 0.199,
+     "vertical": 0.522
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 22.5
+   },
+   "width": 512
+  },
+  "texture/eviltree_vines_glow_c.dds@109cb089": {
+   "archives": [
+    "phinteriortree3br.eqg"
+   ],
+   "brightness": 0.127,
+   "colorName": "red",
+   "contrast": 0.086,
+   "fileName": "eviltree_vines_glow_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_evntl_shard_vine_a.mod": 1,
+     "obj_evntl_shard_vine_b.mod": 1,
+     "obj_evntl_shard_vine_c.mod": 1,
+     "obj_evntl_shard_vine_d.mod": 1,
+     "ter_phinteriortree3br.ter": 1
+    },
+    "partners": {
+     "coverage_tosk_ov2.dds": 38,
+     "eviltree_vines_n.dds": 38
+    },
+    "roles": {
+     "e_TextureDiffuse0": 38
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 38
+    }
+   },
+   "meanColor": [
+    39,
+    30,
+    28
+   ],
+   "name": "eviltree_vines_glow_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.65,
+    1.13
+   ],
+   "sha256": "109cb089aa328f32ebdff69305a364c613092f368a0d4fe31d11fd441ab06d17",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.1122,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.01,
+     "overhang": 0.312,
+     "slope": 0.063,
+     "steep": 0.242,
+     "vertical": 0.373
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 13.3
+   },
+   "width": 256
+  },
+  "texture/eviltree_vines_n.dds@17da1102": {
+   "archives": [
+    "phinteriortree3br.eqg"
+   ],
+   "brightness": 0.548,
+   "colorName": "blue",
+   "contrast": 0.108,
+   "fileName": "eviltree_vines_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_evntl_shard_vine_a.mod": 1,
+     "obj_evntl_shard_vine_b.mod": 1,
+     "obj_evntl_shard_vine_c.mod": 1,
+     "obj_evntl_shard_vine_d.mod": 1,
+     "ter_phinteriortree3br.ter": 1
+    },
+    "partners": {
+     "coverage_tosk_ov2.dds": 38,
+     "eviltree_vines_glow_c.dds": 38
+    },
+    "roles": {
+     "e_TextureNormal0": 38
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 38
+    }
+   },
+   "meanColor": [
+    128,
+    127,
+    226
+   ],
+   "name": "eviltree_vines_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.919,
+   "seamRatios": [
+    0.82,
+    0.76
+   ],
+   "sha256": "17da1102f1ec1375047812813f482f4fbe52da57043a384285610a0df0556b79",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.784,
+   "width": 256
+  },
+  "texture/purple_crystal256.dds@59b06b71": {
+   "archives": [
+    "phinteriortree3br.eqg"
+   ],
+   "brightness": 0.276,
+   "colorName": "blue",
+   "contrast": 0.076,
+   "fileName": "purple_crystal256.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_evntl_shard_vine_a.mod": 1,
+     "obj_evntl_shard_vine_b.mod": 1,
+     "obj_evntl_shard_vine_c.mod": 1,
+     "obj_evntl_shard_vine_d.mod": 1,
+     "ter_phinteriortree3br.ter": 1
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 38
+    },
+    "shaders": {
+     "Opaque_MPLBasic.fx": 38
+    }
+   },
+   "meanColor": [
+    69,
+    56,
+    144
+   ],
+   "name": "purple_crystal256.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.08,
+    1.13
+   ],
+   "sha256": "59b06b712c08dc2214a0cdd4e39cf443997c19ac30ba4c5269f4e502c1a66fb1",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0016,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.432,
+     "slope": 0.04,
+     "steep": 0.204,
+     "vertical": 0.324
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 11.6
+   },
+   "width": 256
+  },
+  "texture/treering1024x_drk_c.dds@ccd81031": {
+   "archives": [
+    "phinteriortree3br.eqg"
+   ],
+   "brightness": 0.301,
+   "colorName": "brown",
+   "contrast": 0.07,
+   "fileName": "treering1024x_drk_c.dds",
+   "format": "DXT5",
+   "height": 1024,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_evntl_shard_vine_a.mod": 1,
+     "obj_evntl_shard_vine_b.mod": 1,
+     "obj_evntl_shard_vine_c.mod": 1,
+     "obj_evntl_shard_vine_d.mod": 1,
+     "ter_phinteriortree3br.ter": 1
+    },
+    "partners": {
+     "coverage_thuleground_ov.dds": 38,
+     "treering256x_drk_n.dds": 38
+    },
+    "roles": {
+     "e_TextureDiffuse0": 38
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 38
+    }
+   },
+   "meanColor": [
+    99,
+    69,
+    58
+   ],
+   "name": "treering1024x_drk_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    2.94,
+    1.05
+   ],
+   "sha256": "ccd81031446acf96ee7f5b2e0243ec4e35b89672d97301a2e40fa312a45d703a",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.082,
+    "objectShare": 0.679,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 155.0
+   },
+   "width": 1024
+  },
+  "texture/treering256x_drk_n.dds@21e42859": {
+   "archives": [
+    "phinteriortree3br.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.041,
+   "fileName": "treering256x_drk_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_evntl_shard_vine_a.mod": 1,
+     "obj_evntl_shard_vine_b.mod": 1,
+     "obj_evntl_shard_vine_c.mod": 1,
+     "obj_evntl_shard_vine_d.mod": 1,
+     "ter_phinteriortree3br.ter": 1
+    },
+    "partners": {
+     "coverage_thuleground_ov.dds": 38,
+     "treering1024x_drk_c.dds": 38
+    },
+    "roles": {
+     "e_TextureNormal0": 38
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 38
+    }
+   },
+   "meanColor": [
+    128,
+    128,
+    253
+   ],
+   "name": "treering256x_drk_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 1.0,
+   "seamRatios": [
+    0.78,
+    0.69
+   ],
+   "sha256": "21e428596b95d31a30249bebcf18d30c76b4374fdb89c49b7685d67e9bb3ae17",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 1.0,
+   "width": 256
+  }
+ },
+ "fileHashes": {
+  "phinteriortree3br.eqg": "6f986391d207ad33ab91db171942b52f023ce8b8df9d93a6594247dce0ee41b9",
+  "phinteriortree3br.zon": "28d1f08af623415dd5d9c194530aae055408cd69394e1da9bfacc44e0feed8b7"
+ },
+ "format": "eqgz",
+ "problems": [],
+ "source": "zone:phinteriortree3br",
+ "surveyVersion": 4,
+ "zone": "phinteriortree3br"
+}

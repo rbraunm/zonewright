@@ -1,0 +1,8208 @@
+{
+ "archives": [
+  "stonebrunt_obj2.s3d",
+  "stonebrunt_obj.s3d",
+  "stonebrunt.s3d",
+  "stonebrunt_2_obj.s3d"
+ ],
+ "assets": {
+  "light/stonebrunt/r200_82821e": {
+   "colors": [
+    {
+     "count": 30,
+     "rgb": [
+      0.51,
+      0.51,
+      0.118
+     ]
+    }
+   ],
+   "count": 30,
+   "examplePositions": [
+    [
+     2256.7,
+     -730.0,
+     796.0
+    ],
+    [
+     2115.3,
+     -588.8,
+     792.8
+    ],
+    [
+     1972.4,
+     -665.0,
+     811.5
+    ]
+   ],
+   "flickerFrames": 1,
+   "kind": "light",
+   "name": "r200_82821e",
+   "names": [
+    "L0_LDEF",
+    "L10_LDEF",
+    "L11_LDEF"
+   ],
+   "radii": [
+    200.0
+   ],
+   "shareOfZoneLights": 1.0,
+   "zone": "stonebrunt"
+  },
+  "model/bed1_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "bed1_actordef",
+   "placements": 3
+  },
+  "model/brazier2_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "brazier2_actordef",
+   "placements": 2
+  },
+  "model/cratea_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "cratea_actordef",
+   "placements": 4
+  },
+  "model/crateb_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "crateb_actordef",
+   "placements": 1
+  },
+  "model/cratec_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "cratec_actordef",
+   "placements": 2
+  },
+  "model/crated_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "crated_actordef",
+   "placements": 2
+  },
+  "model/cscarrock200_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "cscarrock200_actordef",
+   "placements": 3
+  },
+  "model/ewbonfire200_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "ewbonfire200_actordef",
+   "placements": 1
+  },
+  "model/ictreepine200_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldSkeletal",
+   "name": "ictreepine200_actordef",
+   "placements": 158
+  },
+  "model/jngrass101_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldSkeletal",
+   "name": "jngrass101_actordef",
+   "placements": 97
+  },
+  "model/jngrass102_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldSkeletal",
+   "name": "jngrass102_actordef",
+   "placements": 97
+  },
+  "model/kermat_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "kermat_actordef",
+   "placements": 3
+  },
+  "model/sbrock200_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "sbrock200_actordef",
+   "placements": 95
+  },
+  "model/sbrock201_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "sbrock201_actordef",
+   "placements": 91
+  },
+  "model/sbrock202_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "sbrock202_actordef",
+   "placements": 225
+  },
+  "model/sbtable101_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "sbtable101_actordef",
+   "placements": 1
+  },
+  "model/sbtable102_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "sbtable102_actordef",
+   "placements": 3
+  },
+  "model/smalltable_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "smalltable_actordef",
+   "placements": 1
+  },
+  "model/snkerrafort202_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "snkerrafort202_actordef",
+   "placements": 1
+  },
+  "model/snkerrafort203_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "snkerrafort203_actordef",
+   "placements": 3
+  },
+  "model/squaretable_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "squaretable_actordef",
+   "placements": 3
+  },
+  "model/torch2_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "torch2_actordef",
+   "placements": 22
+  },
+  "model/torch_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "torch_actordef",
+   "placements": 2
+  },
+  "model/treepine103_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldSkeletal",
+   "name": "treepine103_actordef",
+   "placements": 128
+  },
+  "model/warrenrck202a_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldStatic",
+   "name": "warrenrck202a_actordef",
+   "placements": 1
+  },
+  "model/wltree203_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldSkeletal",
+   "name": "wltree203_actordef",
+   "placements": 288
+  },
+  "model/wltree205_actordef@stonebrunt_obj": {
+   "archive": "stonebrunt_obj.s3d",
+   "kind": "model",
+   "modelKind": "wldSkeletal",
+   "name": "wltree205_actordef",
+   "placements": 45
+  },
+  "texture/bedfabric.bmp@a2aca100": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.155,
+   "colorName": "red",
+   "contrast": 0.07,
+   "fileName": "bedfabric.bmp",
+   "format": "BMP P",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    73,
+    24,
+    28
+   ],
+   "name": "bedfabric.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.76,
+    0.59
+   ],
+   "sha256": "a2aca100bea460af38425a8ab003c3a0e3fc82ccfe359637a36f551799aabe0b",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/bedtop.bmp@bb05b655": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.258,
+   "colorName": "red",
+   "contrast": 0.184,
+   "fileName": "bedtop.bmp",
+   "format": "BMP P",
+   "height": 32,
+   "kind": "texture",
+   "meanColor": [
+    92,
+    54,
+    56
+   ],
+   "name": "bedtop.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    3.3,
+    1.85
+   ],
+   "sha256": "bb05b65584657c530d7247ba13701386902b0f4aa1decd00f4cdfd224fcb93a7",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/bedwood.bmp@455a45bb": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.148,
+   "colorName": "brown",
+   "contrast": 0.048,
+   "fileName": "bedwood.bmp",
+   "format": "BMP P",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    58,
+    33,
+    9
+   ],
+   "name": "bedwood.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.2,
+    1.03
+   ],
+   "sha256": "455a45bb59637abd6b195e704680df3e27c6f475674293621d6726854edeb6db",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/bradec1.bmp@4a782f3b": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.182,
+   "colorName": "brown",
+   "contrast": 0.089,
+   "fileName": "bradec1.bmp",
+   "format": "BMP P",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    56,
+    43,
+    36
+   ],
+   "name": "bradec1.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.78,
+    1.3
+   ],
+   "sha256": "4a782f3b17450b23076f722cc60b50d1d3fab3cc662f8f1fc22889ff054cb090",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/bradec2.bmp@3ec0af14": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.193,
+   "colorName": "brown",
+   "contrast": 0.103,
+   "fileName": "bradec2.bmp",
+   "format": "BMP P",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    60,
+    46,
+    36
+   ],
+   "name": "bradec2.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.8,
+    1.17
+   ],
+   "sha256": "3ec0af148fcaa231b08caaac535ca6f957f24072d8ca03c8cfa4fc471f9bf99f",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/brazin.bmp@8a489d9d": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.29,
+   "colorName": "brown",
+   "contrast": 0.073,
+   "fileName": "brazin.bmp",
+   "format": "BMP P",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    85,
+    70,
+    62
+   ],
+   "name": "brazin.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.62,
+    1.95
+   ],
+   "sha256": "8a489d9de35027b057c021c5752a5f2d60a98ac8ddd1245bed2705bc90a5f478",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/brazlite.bmp@7d284181": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.381,
+   "colorName": "brown",
+   "contrast": 0.072,
+   "fileName": "brazlite.bmp",
+   "format": "BMP P",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    125,
+    89,
+    64
+   ],
+   "name": "brazlite.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.65,
+    1.96
+   ],
+   "sha256": "7d284181ab795032bb9162a8f80a8630aecc29bed20e077bbb2c52d82bfdfc90",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/brazout.bmp@3140cadc": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.161,
+   "colorName": "brown",
+   "contrast": 0.045,
+   "fileName": "brazout.bmp",
+   "format": "BMP P",
+   "height": 32,
+   "kind": "texture",
+   "meanColor": [
+    50,
+    38,
+    32
+   ],
+   "name": "brazout.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.13,
+    1.97
+   ],
+   "sha256": "3140cadc2191129daae9bcbad84ce29e5e8f40f1450328465070c426b9686afa",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 32,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/coals.bmp@3022fa16": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.529,
+   "colorName": "orange",
+   "contrast": 0.144,
+   "fileName": "coals.bmp",
+   "format": "BMP P",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    233,
+    110,
+    3
+   ],
+   "name": "coals.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.91,
+    4.02
+   ],
+   "sha256": "3022fa167c7d99554aac287426d40180a9276ce1bf9259b1e868648ce997d473",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/coord.bmp@ba928827": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.959,
+   "colorName": "white",
+   "contrast": 0.182,
+   "fileName": "coord.bmp",
+   "format": "BMP P",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    245,
+    245,
+    245
+   ],
+   "name": "coord.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.0,
+    0.0
+   ],
+   "sha256": "ba9288271df373d477e9245db2114affc377c9fb45a69ece3af73ae942ed5c1e",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.125,
+     "overhang": 0.125,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.75
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 12.2
+   },
+   "width": 128,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/crate1.bmp@a874475c": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.304,
+   "colorName": "brown",
+   "contrast": 0.153,
+   "fileName": "crate1.bmp",
+   "format": "BMP P",
+   "height": 32,
+   "kind": "texture",
+   "meanColor": [
+    114,
+    67,
+    37
+   ],
+   "name": "crate1.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.64,
+    0.46
+   ],
+   "sha256": "a874475cbf3044bce833d63fe9cac0082dd3b866ddb1f6e20efb60416e1eedc3",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/crate10.bmp@ae8f706b": {
+   "archives": [
+    "stonebrunt_obj.s3d",
+    "stonebrunt_2_obj.s3d"
+   ],
+   "brightness": 0.393,
+   "colorName": "orange",
+   "contrast": 0.097,
+   "fileName": "crate10.bmp",
+   "format": "BMP P",
+   "height": 32,
+   "kind": "texture",
+   "meanColor": [
+    143,
+    88,
+    49
+   ],
+   "name": "crate10.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    2.98,
+    2.03
+   ],
+   "sha256": "ae8f706b462b826c279b9421971cb8c670774c57b38204a57402256a021161e9",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/crate10a.bmp@7a9fba22": {
+   "archives": [
+    "stonebrunt_obj.s3d",
+    "stonebrunt_2_obj.s3d"
+   ],
+   "brightness": 0.284,
+   "colorName": "brown",
+   "contrast": 0.093,
+   "fileName": "crate10a.bmp",
+   "format": "BMP P",
+   "height": 32,
+   "kind": "texture",
+   "meanColor": [
+    116,
+    60,
+    23
+   ],
+   "name": "crate10a.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    3.07,
+    2.12
+   ],
+   "sha256": "7a9fba224b4233d01f59c6069c1957a0a3f0b9275f88a1723f0e3dea610798a9",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/crate2.bmp@610c07ad": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.222,
+   "colorName": "brown",
+   "contrast": 0.086,
+   "fileName": "crate2.bmp",
+   "format": "BMP P",
+   "height": 32,
+   "kind": "texture",
+   "meanColor": [
+    92,
+    46,
+    18
+   ],
+   "name": "crate2.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.3,
+    0.12
+   ],
+   "sha256": "610c07ad0d7631b8577ea676881c11e9efd0d85c48663d399153c9bac8aaa74c",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/crate3.bmp@48a36c44": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.332,
+   "colorName": "brown",
+   "contrast": 0.094,
+   "fileName": "crate3.bmp",
+   "format": "BMP P",
+   "height": 32,
+   "kind": "texture",
+   "meanColor": [
+    125,
+    73,
+    39
+   ],
+   "name": "crate3.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.76,
+    0.81
+   ],
+   "sha256": "48a36c4441357a03c825cf2418b3813ecd7c32c9fde658ddd588941c88154a78",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/crate4.bmp@0c53eace": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.245,
+   "colorName": "brown",
+   "contrast": 0.08,
+   "fileName": "crate4.bmp",
+   "format": "BMP P",
+   "height": 32,
+   "kind": "texture",
+   "meanColor": [
+    103,
+    50,
+    19
+   ],
+   "name": "crate4.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.99,
+    1.17
+   ],
+   "sha256": "0c53eace1a6e6c0c1cfcec8b0498f46a8ee25556fb7c57bec14d31a6b387efc2",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/crate5.bmp@c8337c16": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.234,
+   "colorName": "brown",
+   "contrast": 0.107,
+   "fileName": "crate5.bmp",
+   "format": "BMP P",
+   "height": 32,
+   "kind": "texture",
+   "meanColor": [
+    90,
+    51,
+    26
+   ],
+   "name": "crate5.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.58,
+    3.43
+   ],
+   "sha256": "c8337c161222b9b189f1c96f5e02728b6090f5224a7a8656a462b1ca491f1b38",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/crate6.bmp@d41e8244": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.17,
+   "colorName": "brown",
+   "contrast": 0.078,
+   "fileName": "crate6.bmp",
+   "format": "BMP P",
+   "height": 32,
+   "kind": "texture",
+   "meanColor": [
+    73,
+    34,
+    12
+   ],
+   "name": "crate6.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.09,
+    3.51
+   ],
+   "sha256": "d41e82444cf632114b40a3e9d847b75325c17eb524157e9bc5cf3670e5df5924",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/crate7.bmp@0ce42699": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.396,
+   "colorName": "orange",
+   "contrast": 0.072,
+   "fileName": "crate7.bmp",
+   "format": "BMP P",
+   "height": 32,
+   "kind": "texture",
+   "meanColor": [
+    147,
+    88,
+    48
+   ],
+   "name": "crate7.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    5.77,
+    2.08
+   ],
+   "sha256": "0ce426996d28c94291d9958d6ce28c86d968d9a4994d8277a62ef87bb2dc29e2",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/crate8.bmp@6f230dca": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.272,
+   "colorName": "brown",
+   "contrast": 0.071,
+   "fileName": "crate8.bmp",
+   "format": "BMP P",
+   "height": 32,
+   "kind": "texture",
+   "meanColor": [
+    115,
+    56,
+    19
+   ],
+   "name": "crate8.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    5.78,
+    2.09
+   ],
+   "sha256": "6f230dca3a00a6e6fc74221a0198d3756488fa0a1236e26fb7d0efb6e18f0f8b",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/ewbonbark.bmp@826fe235": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.25,
+   "colorName": "grey",
+   "contrast": 0.156,
+   "fileName": "ewbonbark.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    62,
+    64,
+    65
+   ],
+   "name": "ewbonbark.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.96,
+    2.07
+   ],
+   "sha256": "826fe2355182e9bb9505f38be8a88892f16df48cb8ef402c6313cd68a5232ee8",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/feet.bmp@39d6c39b": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.545,
+   "colorName": "orange",
+   "contrast": 0.065,
+   "fileName": "feet.bmp",
+   "format": "BMP P",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    198,
+    125,
+    56
+   ],
+   "name": "feet.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    3.51,
+    4.82
+   ],
+   "sha256": "39d6c39b6c0b99d98cb85d8aef31ac76ce400f13d110af1a1ac40025d9c25d55",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 128,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/fire1.bmp@92fa97bd": {
+   "archives": [
+    "stonebrunt_obj.s3d",
+    "stonebrunt_2_obj.s3d"
+   ],
+   "brightness": 0.4,
+   "colorName": "orange",
+   "contrast": 0.332,
+   "fileName": "fire1.bmp",
+   "format": "BMP P",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    132,
+    94,
+    62
+   ],
+   "name": "fire1.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.62,
+    0.07
+   ],
+   "sha256": "92fa97bd790021c8004b4782770ae2e1d1751972fb35662cc46dbef3f89389fe",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": [
+     "fire1.bmp",
+     "fire2.bmp",
+     "fire3.bmp",
+     "fire4.bmp"
+    ],
+    "renderMethods": {
+     "0x8000000b": 4
+    }
+   }
+  },
+  "texture/fire2.bmp@eafcd0ce": {
+   "archives": [
+    "stonebrunt_obj.s3d",
+    "stonebrunt_2_obj.s3d"
+   ],
+   "brightness": 0.374,
+   "colorName": "brown",
+   "contrast": 0.332,
+   "fileName": "fire2.bmp",
+   "format": "BMP P",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    124,
+    88,
+    59
+   ],
+   "name": "fire2.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.32,
+    0.08
+   ],
+   "sha256": "eafcd0cedc85f0ead515797794950ff791744946df70ff23e50b45d234976620",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": [
+     "fire1.bmp",
+     "fire2.bmp",
+     "fire3.bmp",
+     "fire4.bmp"
+    ],
+    "renderMethods": {
+     "0x8000000b": 4
+    }
+   }
+  },
+  "texture/fire3.bmp@942e35e3": {
+   "archives": [
+    "stonebrunt_obj.s3d",
+    "stonebrunt_2_obj.s3d"
+   ],
+   "brightness": 0.395,
+   "colorName": "orange",
+   "contrast": 0.337,
+   "fileName": "fire3.bmp",
+   "format": "BMP P",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    94,
+    64
+   ],
+   "name": "fire3.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.18,
+    0.02
+   ],
+   "sha256": "942e35e3593899097e2a813382421b2f4c7fefdb22ede2e7c44b4d8b6d99402a",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": [
+     "fire1.bmp",
+     "fire2.bmp",
+     "fire3.bmp",
+     "fire4.bmp"
+    ],
+    "renderMethods": {
+     "0x8000000b": 4
+    }
+   }
+  },
+  "texture/fire4.bmp@07b31642": {
+   "archives": [
+    "stonebrunt_obj.s3d",
+    "stonebrunt_2_obj.s3d"
+   ],
+   "brightness": 0.384,
+   "colorName": "brown",
+   "contrast": 0.33,
+   "fileName": "fire4.bmp",
+   "format": "BMP P",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    127,
+    91,
+    60
+   ],
+   "name": "fire4.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.32,
+    0.04
+   ],
+   "sha256": "07b3164266a7766cf165265dfe63dc75ad41d69eab45ce25b347e7dd52178659",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": [
+     "fire1.bmp",
+     "fire2.bmp",
+     "fire3.bmp",
+     "fire4.bmp"
+    ],
+    "renderMethods": {
+     "0x8000000b": 4
+    }
+   }
+  },
+  "texture/firewood.bmp@25e08d84": {
+   "archives": [
+    "stonebrunt_2_obj.s3d"
+   ],
+   "brightness": 0.078,
+   "colorName": "black",
+   "contrast": 0.056,
+   "fileName": "firewood.bmp",
+   "format": "BMP P",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    32,
+    15,
+    11
+   ],
+   "name": "firewood.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.85,
+    0.89
+   ],
+   "sha256": "25e08d84167b32d6c80e6521ef29ca254d0de495e735dadbc009978032457c25",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/gkarriv01.dds@f14333de": {
+   "archives": [
+    "stonebrunt_obj2.s3d"
+   ],
+   "brightness": 0.14,
+   "colorName": "brown",
+   "contrast": 0.094,
+   "fileName": "gkarriv01.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    45,
+    34,
+    23
+   ],
+   "name": "gkarriv01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.55,
+    1.38
+   ],
+   "sha256": "f14333ded729667f6da1aa733b5fb7b1abcfbb4fa35c3577e452e90bfc746303",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/gkarriv02.dds@ed753fa0": {
+   "archives": [
+    "stonebrunt_obj2.s3d"
+   ],
+   "brightness": 0.201,
+   "colorName": "brown",
+   "contrast": 0.038,
+   "fileName": "gkarriv02.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    64,
+    48,
+    33
+   ],
+   "name": "gkarriv02.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.9,
+    0.74
+   ],
+   "sha256": "ed753fa09bb6179820a34f2cc923109a92f4efc3be002e4188e8e6ad918ba9f0",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 2
+    }
+   }
+  },
+  "texture/gkarriv03.dds@296ac506": {
+   "archives": [
+    "stonebrunt_obj2.s3d"
+   ],
+   "brightness": 0.217,
+   "colorName": "brown",
+   "contrast": 0.104,
+   "fileName": "gkarriv03.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    65,
+    54,
+    37
+   ],
+   "name": "gkarriv03.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.71,
+    0.75
+   ],
+   "sha256": "296ac5060cebfa1669c3e2a041913de97fbb18c0bf26a52f9f6221db7497f3bf",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/gkarriv04.dds@61eda99e": {
+   "archives": [
+    "stonebrunt_obj2.s3d"
+   ],
+   "brightness": 0.14,
+   "colorName": "brown",
+   "contrast": 0.08,
+   "fileName": "gkarriv04.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    45,
+    33,
+    23
+   ],
+   "name": "gkarriv04.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.79,
+    0.95
+   ],
+   "sha256": "61eda99ecdea4b4fffd9acb575e155a5fb3c5697ea6e60dd9cf8429a67622298",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 2
+    }
+   }
+  },
+  "texture/gkarriv05.dds@3572d8c3": {
+   "archives": [
+    "stonebrunt_obj2.s3d"
+   ],
+   "brightness": 0.144,
+   "colorName": "brown",
+   "contrast": 0.06,
+   "fileName": "gkarriv05.dds",
+   "format": "DXT1",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    41,
+    36,
+    32
+   ],
+   "name": "gkarriv05.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.9,
+    0.93
+   ],
+   "sha256": "3572d8c3e4e9d6e2d78532bd36f54c1ff810d2c7ec6354254f511b9cdf9d4422",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/gkarriv08.dds@18124184": {
+   "archives": [
+    "stonebrunt_obj2.s3d"
+   ],
+   "brightness": 0.24,
+   "colorName": "brown",
+   "contrast": 0.084,
+   "fileName": "gkarriv08.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    72,
+    60,
+    38
+   ],
+   "name": "gkarriv08.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.45,
+    0.8
+   ],
+   "sha256": "18124184e3a67ba1d44c118c66181a4d9921994dc12259f8402b9ac156946d7d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/gkarriv09.dds@cf771490": {
+   "archives": [
+    "stonebrunt_obj2.s3d"
+   ],
+   "brightness": 0.125,
+   "colorName": "brown",
+   "contrast": 0.083,
+   "fileName": "gkarriv09.dds",
+   "format": "DXT1",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    39,
+    30,
+    23
+   ],
+   "name": "gkarriv09.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.26,
+    2.21
+   ],
+   "sha256": "cf771490e189bce602ba80ebb8bc85333a262148098e3c13ed9a8380a01e42ca",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 128,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/gkarriv10.dds@46e3a6dd": {
+   "archives": [
+    "stonebrunt_obj2.s3d"
+   ],
+   "brightness": 0.224,
+   "colorName": "brown",
+   "contrast": 0.093,
+   "fileName": "gkarriv10.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    68,
+    56,
+    36
+   ],
+   "name": "gkarriv10.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.75,
+    0.79
+   ],
+   "sha256": "46e3a6dd87e3edbf402b445a2c0d77d93fa3e6b1558e649ca10f9d319fe58d5f",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/gkarriv11.dds@1cb28a2b": {
+   "archives": [
+    "stonebrunt_obj2.s3d"
+   ],
+   "brightness": 0.157,
+   "colorName": "brown",
+   "contrast": 0.085,
+   "fileName": "gkarriv11.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    44,
+    39,
+    36
+   ],
+   "name": "gkarriv11.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.65,
+    0.84
+   ],
+   "sha256": "1cb28a2b8ce4a80c724220d4a6b89238bb424166b369c4daeba0c5490c1f765d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/gkarriv12.dds@a173d5aa": {
+   "archives": [
+    "stonebrunt_obj2.s3d"
+   ],
+   "brightness": 0.402,
+   "colorName": "brown",
+   "contrast": 0.128,
+   "fileName": "gkarriv12.dds",
+   "format": "DXT1",
+   "height": 32,
+   "kind": "texture",
+   "meanColor": [
+    127,
+    98,
+    59
+   ],
+   "name": "gkarriv12.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.19,
+    0.91
+   ],
+   "sha256": "a173d5aaa64c49fdd203c5611dd0ecac98ad15052cbc5a0f701ea33f88293808",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 32,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/gkarriv13.dds@70e08466": {
+   "archives": [
+    "stonebrunt_obj2.s3d"
+   ],
+   "brightness": 0.22,
+   "colorName": "brown",
+   "contrast": 0.101,
+   "fileName": "gkarriv13.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    66,
+    55,
+    39
+   ],
+   "name": "gkarriv13.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.51,
+    0.78
+   ],
+   "sha256": "70e08466e448b32120a864d07e8bdde457d17150d18e239ab09d6cf6ff15ec1d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/holderd.bmp@5f555de2": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.151,
+   "colorName": "brown",
+   "contrast": 0.021,
+   "fileName": "holderd.bmp",
+   "format": "BMP P",
+   "height": 32,
+   "kind": "texture",
+   "meanColor": [
+    45,
+    37,
+    31
+   ],
+   "name": "holderd.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.22,
+    1.27
+   ],
+   "sha256": "5f555de248181fa6798fe7a30a491ebf8f5c9a90cadd4b2a4c241b1df13cc826",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 32,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 2
+    }
+   }
+  },
+  "texture/holderl.bmp@a25f3b85": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.285,
+   "colorName": "brown",
+   "contrast": 0.051,
+   "fileName": "holderl.bmp",
+   "format": "BMP P",
+   "height": 32,
+   "kind": "texture",
+   "meanColor": [
+    79,
+    71,
+    64
+   ],
+   "name": "holderl.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    5.24,
+    3.1
+   ],
+   "sha256": "a25f3b85d67c7c4976d6c0f1810cc42e23138e3345b13da2d319b5b7faad1486",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 32,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 2
+    }
+   }
+  },
+  "texture/icpine200.bmp@50cc1b4b": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.354,
+   "colorName": "green",
+   "contrast": 0.143,
+   "fileName": "icpine200.bmp",
+   "format": "BMP P",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    74,
+    99,
+    89
+   ],
+   "name": "icpine200.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.0,
+    0.05
+   ],
+   "sha256": "50cc1b4bf4db16c6e13a84772ab10b2c564146bb3de6f0aa52f529a4998fde98",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 128,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000013": 1
+    }
+   }
+  },
+  "texture/icpinebr200.bmp@2694ed9a": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.348,
+   "colorName": "green",
+   "contrast": 0.139,
+   "fileName": "icpinebr200.bmp",
+   "format": "BMP P",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    72,
+    98,
+    86
+   ],
+   "name": "icpinebr200.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.0,
+    0.0
+   ],
+   "sha256": "2694ed9a420ea1535e3acb26781f79014b3e9aad25f19c064e1162e7969ac75f",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 128,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000013": 1
+    }
+   }
+  },
+  "texture/icrock02.bmp@f37d5688": {
+   "archives": [
+    "stonebrunt_obj.s3d",
+    "stonebrunt_2_obj.s3d"
+   ],
+   "brightness": 0.259,
+   "colorName": "grey",
+   "contrast": 0.066,
+   "fileName": "icrock02.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    65,
+    67,
+    64
+   ],
+   "name": "icrock02.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.92,
+    0.88
+   ],
+   "sha256": "f37d5688d23bf1086f359414659c7e95ec1e954110c9a316bc8a9af860e82be8",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/jng2base.bmp@1f37e67f": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.394,
+   "colorName": "green",
+   "contrast": 0.066,
+   "fileName": "jng2base.bmp",
+   "format": "BMP P",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    79,
+    122,
+    46
+   ],
+   "name": "jng2base.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.1,
+    0.15
+   ],
+   "sha256": "1f37e67f6c9f470974a209b81a1700c2a73600cedf1e63e9de7f2c0134925d72",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 128,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000013": 1
+    }
+   }
+  },
+  "texture/jng2top.bmp@6278624d": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.339,
+   "colorName": "yellow",
+   "contrast": 0.156,
+   "fileName": "jng2top.bmp",
+   "format": "BMP P",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    93,
+    91,
+    47
+   ],
+   "name": "jng2top.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.0,
+    0.08
+   ],
+   "sha256": "6278624dad39062603919f7bb9b422cf71ffa1820d385511a8d7b29ae4cf7d35",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000013": 1
+    }
+   }
+  },
+  "texture/jngr1base.bmp@5fac5963": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.285,
+   "colorName": "green",
+   "contrast": 0.054,
+   "fileName": "jngr1base.bmp",
+   "format": "BMP P",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    44,
+    96,
+    26
+   ],
+   "name": "jngr1base.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.18,
+    0.13
+   ],
+   "sha256": "5fac5963f397875941f9cc062748e3385f18871aeb779bf4e875102d75fc4e5d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 128,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000013": 1
+    }
+   }
+  },
+  "texture/jngr1stm.bmp@19bb3dc7": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.277,
+   "colorName": "green",
+   "contrast": 0.053,
+   "fileName": "jngr1stm.bmp",
+   "format": "BMP P",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    51,
+    94,
+    1
+   ],
+   "name": "jngr1stm.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.22,
+    1.01
+   ],
+   "sha256": "19bb3dc75e4265b0af3f4434cb4c49791eddcbde4507e643f0956b77cf301e0e",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000013": 2
+    }
+   }
+  },
+  "texture/jngr1top.bmp@4824f8ff": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.377,
+   "colorName": "yellow",
+   "contrast": 0.108,
+   "fileName": "jngr1top.bmp",
+   "format": "BMP P",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    96,
+    104,
+    53
+   ],
+   "name": "jngr1top.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.0,
+    0.12
+   ],
+   "sha256": "4824f8ff10f1ef9c3de9de4aba48329c5a75128466eba8e40b4ee07738c53484",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 128,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000013": 1
+    }
+   }
+  },
+  "texture/jnt3trnk1.bmp@6fe36bbd": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.397,
+   "colorName": "tan",
+   "contrast": 0.107,
+   "fileName": "jnt3trnk1.bmp",
+   "format": "BMP P",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    105,
+    104,
+    76
+   ],
+   "name": "jnt3trnk1.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.66,
+    1.14
+   ],
+   "sha256": "6fe36bbd0d1351e26acd6ec9997f91e1c11c82a84a45eeb33d67eddb57b65b9f",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/jnt3trnk2.bmp@130f3044": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.309,
+   "colorName": "tan",
+   "contrast": 0.123,
+   "fileName": "jnt3trnk2.bmp",
+   "format": "BMP P",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    80,
+    83,
+    52
+   ],
+   "name": "jnt3trnk2.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.28,
+    2.24
+   ],
+   "sha256": "130f304423024ea2174d1371604603b86ced68d35080312766678773e4e984cd",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/jnt5trnk.bmp@344e57a5": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.269,
+   "colorName": "tan",
+   "contrast": 0.099,
+   "fileName": "jnt5trnk.bmp",
+   "format": "BMP P",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    73,
+    71,
+    46
+   ],
+   "name": "jnt5trnk.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.89,
+    0.68
+   ],
+   "sha256": "344e57a541c1771018370ea65c4565c50e5e78328326f869f7f866d375fbec61",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/jnt5trnk2.bmp@7bd484b5": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.317,
+   "colorName": "yellow",
+   "contrast": 0.097,
+   "fileName": "jnt5trnk2.bmp",
+   "format": "BMP P",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    83,
+    86,
+    49
+   ],
+   "name": "jnt5trnk2.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.36,
+    2.14
+   ],
+   "sha256": "7bd484b5ec342e98f6fde7a17fee3336f9b323cae7eef1d37cbbe272fb061cec",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/kerbrick01.bmp@1ae6b208": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.236,
+   "colorName": "grey",
+   "contrast": 0.148,
+   "fileName": "kerbrick01.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    56,
+    62,
+    61
+   ],
+   "name": "kerbrick01.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.05,
+    0.07
+   ],
+   "sha256": "1ae6b208f76434d82cf536933367d14c43bfd6ad26b8e8c8a9135cdc8a947286",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 2
+    }
+   }
+  },
+  "texture/kermat.bmp@ae0e400b": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.429,
+   "colorName": "orange",
+   "contrast": 0.172,
+   "fileName": "kermat.bmp",
+   "format": "BMP P",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    108,
+    67
+   ],
+   "name": "kermat.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.61,
+    0.77
+   ],
+   "sha256": "ae0e400ba85b5f7ce2d31d96951349874bc922bb5e6bc819696fd1b5bd901166",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000013": 1
+    }
+   }
+  },
+  "texture/kerwood01.bmp@155f328c": {
+   "archives": [
+    "stonebrunt_obj.s3d",
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.347,
+   "colorName": "grey",
+   "contrast": 0.169,
+   "fileName": "kerwood01.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    89,
+    88,
+    90
+   ],
+   "name": "kerwood01.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.85,
+    1.05
+   ],
+   "sha256": "155f328cfdd795023c892edf90c044040307fdd9a4056a8a88505b1f9c901d39",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0002,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.291,
+     "overhang": 0.299,
+     "slope": 0.008,
+     "steep": 0.154,
+     "vertical": 0.247
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 24.0
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 2
+    }
+   }
+  },
+  "texture/kerwood02.bmp@9d7cf1d9": {
+   "archives": [
+    "stonebrunt_obj.s3d",
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.407,
+   "colorName": "grey",
+   "contrast": 0.238,
+   "fileName": "kerwood02.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    102,
+    104,
+    110
+   ],
+   "name": "kerwood02.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.94,
+    13.81
+   ],
+   "sha256": "9d7cf1d952b60c19f4358effda58a9a2465d3d573bf74b7eec6abbe791efb955",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0003,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 1.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 25.8
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 2
+    }
+   }
+  },
+  "texture/kerwood03.bmp@024ed182": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.492,
+   "colorName": "grey",
+   "contrast": 0.211,
+   "fileName": "kerwood03.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    124,
+    125,
+    134
+   ],
+   "name": "kerwood03.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.2,
+    0.91
+   ],
+   "sha256": "024ed182464341b2af793b8799686e2c34b3765d96fb9435c0cfd9a90d1ef7a5",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/kerwood04.bmp@3655e0a2": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.279,
+   "colorName": "grey",
+   "contrast": 0.126,
+   "fileName": "kerwood04.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    70,
+    71,
+    74
+   ],
+   "name": "kerwood04.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.09,
+    0.72
+   ],
+   "sha256": "3655e0a2c634372c22bc1e5e31c15f36748320ef08bba168617020cc097798a0",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.27,
+     "steep": 0.494,
+     "vertical": 0.235
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 27.1
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/kerwood05.bmp@9726ca83": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.274,
+   "colorName": "grey",
+   "contrast": 0.146,
+   "fileName": "kerwood05.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    73,
+    68,
+    72
+   ],
+   "name": "kerwood05.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.58,
+    0.77
+   ],
+   "sha256": "9726ca830fea3f9f956dea167922af8cfbaf183b720df8c3e82a14b5dcc1c212",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 2
+    }
+   }
+  },
+  "texture/kerwood06.bmp@73647a05": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.354,
+   "colorName": "grey",
+   "contrast": 0.179,
+   "fileName": "kerwood06.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    90,
+    90,
+    92
+   ],
+   "name": "kerwood06.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.59,
+    1.57
+   ],
+   "sha256": "73647a05df91cdad670fc112d54e3dbb681e388f1c78492e6f3e5dbb96c1d576",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 2
+    }
+   }
+  },
+  "texture/met1.bmp@9d5b9d44": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.525,
+   "colorName": "orange",
+   "contrast": 0.119,
+   "fileName": "met1.bmp",
+   "format": "BMP P",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    232,
+    109,
+    4
+   ],
+   "name": "met1.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.54,
+    1.67
+   ],
+   "sha256": "9d5b9d44c18ac31e7b9adaa94e1cbf462d0904ff1b3e2be82710fd5c8364b999",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 128,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/newtop_rj.bmp@32bef9d0": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.232,
+   "colorName": "grey",
+   "contrast": 0.095,
+   "fileName": "newtop_rj.bmp",
+   "format": "BMP P",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    60,
+    59,
+    61
+   ],
+   "name": "newtop_rj.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.0,
+    0.0
+   ],
+   "sha256": "32bef9d01e5957db2ed5f80fce26790ce8cdf783e28c75aaab93b8a762f84d1e",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 128,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000013": 2
+    }
+   }
+  },
+  "texture/otent1.bmp@c25420d7": {
+   "archives": [
+    "stonebrunt_2_obj.s3d"
+   ],
+   "brightness": 0.25,
+   "colorName": "brown",
+   "contrast": 0.2,
+   "fileName": "otent1.bmp",
+   "format": "BMP P",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    90,
+    56,
+    37
+   ],
+   "name": "otent1.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.41,
+    0.62
+   ],
+   "sha256": "c25420d79f06cde7660969e690412e9a10ea7f9501942e2cf5e34ead75bcf193",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 128,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 2
+    }
+   }
+  },
+  "texture/palette.bmp@c1fdf09f": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.851,
+   "colorName": "white",
+   "contrast": 0.089,
+   "fileName": "palette.bmp",
+   "format": "BMP P",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    216,
+    216,
+    224
+   ],
+   "name": "palette.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.49,
+    0.42
+   ],
+   "sha256": "c1fdf09f0ddc2e3f390f3a55fdc8294300400264d8c986680d4718962550a955",
+   "shadowed": true,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 128
+  },
+  "texture/palette.bmp@c53d8e4a": {
+   "archives": [
+    "stonebrunt_obj2.s3d"
+   ],
+   "brightness": 0.894,
+   "colorName": "white",
+   "contrast": 0.115,
+   "fileName": "palette.bmp",
+   "format": "BMP P",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    226,
+    231,
+    219
+   ],
+   "name": "palette.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.85,
+    0.71
+   ],
+   "sha256": "c53d8e4a0638cca8298ad4384f839eb4744a5fdfaa450d1fbc7b23a457978425",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 128
+  },
+  "texture/pbark103.bmp@e06b8407": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.185,
+   "colorName": "tan",
+   "contrast": 0.118,
+   "fileName": "pbark103.bmp",
+   "format": "BMP P",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    48,
+    49,
+    36
+   ],
+   "name": "pbark103.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.69,
+    0.8
+   ],
+   "sha256": "e06b8407b45ad6a51e5ecc72da58000d1e79ffbf84d9d1f241533aecf2b1d4c1",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 128,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 2
+    }
+   }
+  },
+  "texture/pine103.bmp@4cca1a4a": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.28,
+   "colorName": "green",
+   "contrast": 0.118,
+   "fileName": "pine103.bmp",
+   "format": "BMP P",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    56,
+    81,
+    64
+   ],
+   "name": "pine103.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.0,
+    0.05
+   ],
+   "sha256": "4cca1a4a8686d0079c55ad581e4d9f3a56b475de2918a7b4dff39cd548b6e61d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 128,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000013": 1
+    }
+   }
+  },
+  "texture/pinebr103.bmp@c02fbfff": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.281,
+   "colorName": "green",
+   "contrast": 0.108,
+   "fileName": "pinebr103.bmp",
+   "format": "BMP P",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    55,
+    82,
+    62
+   ],
+   "name": "pinebr103.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.0,
+    0.0
+   ],
+   "sha256": "c02fbfffc3051de39032aab61c0398f4d7dd63b70e7cc50ee0d2e09782bceceb",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 128,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000013": 1
+    }
+   }
+  },
+  "texture/sbdirtvolc01.bmp@982d7772": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.152,
+   "colorName": "tan",
+   "contrast": 0.091,
+   "fileName": "sbdirtvolc01.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    42,
+    39,
+    27
+   ],
+   "name": "sbdirtvolc01.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.01,
+    2.42
+   ],
+   "sha256": "982d7772d9e3c49ee88c52341ee9dc61079543b074d19ed41cc0dfb871238e12",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 42.9
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbgrass01.bmp@fba4284a": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.277,
+   "colorName": "green",
+   "contrast": 0.062,
+   "fileName": "sbgrass01.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    68,
+    75,
+    53
+   ],
+   "name": "sbgrass01.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.81,
+    0.85
+   ],
+   "sha256": "fba4284ae6c53579526091d96bbdddde701b3250ecd4078ee4e0291d53e450b7",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0415,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.237,
+     "overhang": 0.0,
+     "slope": 0.64,
+     "steep": 0.123,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 107.1
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbgrassspec01.bmp@adc2e861": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.444,
+   "colorName": "tan",
+   "contrast": 0.148,
+   "fileName": "sbgrassspec01.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    130,
+    112,
+    74
+   ],
+   "name": "sbgrassspec01.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    3.73,
+    2.02
+   ],
+   "sha256": "adc2e861bd57c5737d40c12d329962845909d7002b546d73c5b3c7c47f1bfbe7",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 112.5
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbgrassspec02.bmp@45f9b544": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.41,
+   "colorName": "brown",
+   "contrast": 0.162,
+   "fileName": "sbgrassspec02.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    118,
+    104,
+    73
+   ],
+   "name": "sbgrassspec02.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.42,
+    3.99
+   ],
+   "sha256": "45f9b544e073c05b4019804796863c802d1de729a4eb154a97ed285bfb4cf5d5",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 1.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 175.1
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbgrassspec03.bmp@5d4159a5": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.43,
+   "colorName": "brown",
+   "contrast": 0.145,
+   "fileName": "sbgrassspec03.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    124,
+    109,
+    75
+   ],
+   "name": "sbgrassspec03.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.86,
+    3.58
+   ],
+   "sha256": "5d4159a5c29dc1d33a69837cb543be510f7a07682845c834fcf05fab6bb1b8ae",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 1.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 165.3
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbgrassspec04.bmp@553f07c0": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.425,
+   "colorName": "brown",
+   "contrast": 0.158,
+   "fileName": "sbgrassspec04.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    124,
+    108,
+    70
+   ],
+   "name": "sbgrassspec04.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.21,
+    3.66
+   ],
+   "sha256": "553f07c03f6a65419d163be7af927b0c534a27615db549853b3c324a8286bc13",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 1.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 137.2
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbjungfloor.bmp@11e0596c": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.235,
+   "colorName": "yellow",
+   "contrast": 0.115,
+   "fileName": "sbjungfloor.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    64,
+    65,
+    25
+   ],
+   "name": "sbjungfloor.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.97,
+    0.84
+   ],
+   "sha256": "11e0596cf6172af62bf54604a7e831f842cc5d9b6245a183ea40bc6b7ba9807f",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0256,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.439,
+     "overhang": 0.0,
+     "slope": 0.549,
+     "steep": 0.012,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 102.6
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbjunggrass1a.bmp@439b957d": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.241,
+   "colorName": "yellow",
+   "contrast": 0.108,
+   "fileName": "sbjunggrass1a.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    64,
+    66,
+    30
+   ],
+   "name": "sbjunggrass1a.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.33,
+    1.21
+   ],
+   "sha256": "439b957dccefdc617aff16f694a6650010e2400cb5c23888f551ebfafebf2cb0",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0003,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.643,
+     "overhang": 0.0,
+     "slope": 0.357,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 114.1
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbjunggrass1b.bmp@ad14fefb": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.245,
+   "colorName": "yellow",
+   "contrast": 0.107,
+   "fileName": "sbjunggrass1b.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    66,
+    67,
+    30
+   ],
+   "name": "sbjunggrass1b.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.32,
+    1.07
+   ],
+   "sha256": "ad14fefbcf75b8a0c415cbc7de6f87a97fcae7016efe57d2410866732f8f58b4",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0009,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.203,
+     "overhang": 0.0,
+     "slope": 0.611,
+     "steep": 0.186,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 120.7
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbjunggrass1c.bmp@2c0f46b8": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.237,
+   "colorName": "yellow",
+   "contrast": 0.105,
+   "fileName": "sbjunggrass1c.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    63,
+    65,
+    28
+   ],
+   "name": "sbjunggrass1c.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.29,
+    1.23
+   ],
+   "sha256": "2c0f46b8d278050a7774223818862ed3a38579540c41db9e0968dfc5aa2574ad",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0006,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.141,
+     "overhang": 0.0,
+     "slope": 0.859,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 117.1
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbjunggrass1d.bmp@35055708": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.24,
+   "colorName": "yellow",
+   "contrast": 0.108,
+   "fileName": "sbjunggrass1d.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    64,
+    66,
+    30
+   ],
+   "name": "sbjunggrass1d.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.19,
+    1.28
+   ],
+   "sha256": "35055708553b7a81a45189e737a8257ff3649302a9f6d4b0818f868367c29191",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0005,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.048,
+     "overhang": 0.0,
+     "slope": 0.871,
+     "steep": 0.081,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 121.6
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbjunggrass2a.bmp@4f3b1b5a": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.247,
+   "colorName": "yellow",
+   "contrast": 0.096,
+   "fileName": "sbjunggrass2a.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    64,
+    67,
+    36
+   ],
+   "name": "sbjunggrass2a.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.93,
+    1.71
+   ],
+   "sha256": "4f3b1b5a0242792daede3b8399cc03b85781c8392a7435e59ef467e5b25307b9",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0012,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.322,
+     "overhang": 0.0,
+     "slope": 0.564,
+     "steep": 0.114,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 118.2
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbjunggrass2b.bmp@03e3a98e": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.259,
+   "colorName": "yellow",
+   "contrast": 0.086,
+   "fileName": "sbjunggrass2b.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    66,
+    71,
+    40
+   ],
+   "name": "sbjunggrass2b.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.57,
+    0.87
+   ],
+   "sha256": "03e3a98e537cf5d7f95f3ede51600313533b44f1a27ae057d1bbaa4e771d8440",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0024,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.193,
+     "overhang": 0.0,
+     "slope": 0.641,
+     "steep": 0.166,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 120.9
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbjunggrass2c.bmp@62b5e1ef": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.262,
+   "colorName": "green",
+   "contrast": 0.088,
+   "fileName": "sbjunggrass2c.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    67,
+    72,
+    41
+   ],
+   "name": "sbjunggrass2c.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.86,
+    1.42
+   ],
+   "sha256": "62b5e1ef5787207f8dd56f9fc5898fd3c5df9ca3abdd8584f6e9821a7471bea6",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.171,
+     "overhang": 0.0,
+     "slope": 0.702,
+     "steep": 0.128,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 121.6
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbjunggrass2d.bmp@a238b9e8": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.25,
+   "colorName": "green",
+   "contrast": 0.092,
+   "fileName": "sbjunggrass2d.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    63,
+    68,
+    40
+   ],
+   "name": "sbjunggrass2d.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.42,
+    0.88
+   ],
+   "sha256": "a238b9e8130a1d159a7544b0e1f9a8178484334f545f54331951cf0badd95ee8",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0014,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.517,
+     "overhang": 0.0,
+     "slope": 0.462,
+     "steep": 0.021,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 115.1
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbjunggrass3a.bmp@bb3705c6": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.272,
+   "colorName": "green",
+   "contrast": 0.071,
+   "fileName": "sbjunggrass3a.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    68,
+    74,
+    48
+   ],
+   "name": "sbjunggrass3a.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.31,
+    1.31
+   ],
+   "sha256": "bb3705c63ce49fff21657d7d61471e7da613844a84eafe5502069243153af8f5",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0008,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.121,
+     "overhang": 0.0,
+     "slope": 0.545,
+     "steep": 0.334,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 127.5
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbjunggrass3b.bmp@0ed7d1f4": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.265,
+   "colorName": "green",
+   "contrast": 0.076,
+   "fileName": "sbjunggrass3b.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    66,
+    72,
+    48
+   ],
+   "name": "sbjunggrass3b.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.23,
+    1.24
+   ],
+   "sha256": "0ed7d1f44763623f68c063fa7712ef2ff759cf05e759a89b0b9a84ca994cb105",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0005,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.173,
+     "overhang": 0.0,
+     "slope": 0.678,
+     "steep": 0.149,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 120.4
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbjunggrass3c.bmp@baec87a1": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.274,
+   "colorName": "green",
+   "contrast": 0.075,
+   "fileName": "sbjunggrass3c.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    69,
+    74,
+    49
+   ],
+   "name": "sbjunggrass3c.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.04,
+    1.11
+   ],
+   "sha256": "baec87a1294551cfe5aee29f773738e4707d8f0a1e4112b5037c07f317a02a50",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0003,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.268,
+     "overhang": 0.0,
+     "slope": 0.574,
+     "steep": 0.158,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 125.0
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbjunggrass3d.bmp@278a9cb3": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.273,
+   "colorName": "green",
+   "contrast": 0.068,
+   "fileName": "sbjunggrass3d.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    68,
+    74,
+    49
+   ],
+   "name": "sbjunggrass3d.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.17,
+    1.28
+   ],
+   "sha256": "278a9cb34cbbf047865a4da487271308d50228fbfc5a1b41ca797838a3202a34",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0011,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.196,
+     "overhang": 0.0,
+     "slope": 0.527,
+     "steep": 0.278,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 126.6
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbjungsand1a.bmp@1db2de97": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.299,
+   "colorName": "yellow",
+   "contrast": 0.16,
+   "fileName": "sbjungsand1a.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    85,
+    79,
+    39
+   ],
+   "name": "sbjungsand1a.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    2.7,
+    2.52
+   ],
+   "sha256": "1db2de97bb54826d7d791ce36fea30ff17f77fd79413e3e51c5d2727436deece",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0004,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.379,
+     "overhang": 0.0,
+     "slope": 0.285,
+     "steep": 0.336,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 120.2
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbjungsand1d.bmp@f1cdd1a7": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.298,
+   "colorName": "yellow",
+   "contrast": 0.164,
+   "fileName": "sbjungsand1d.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    85,
+    78,
+    39
+   ],
+   "name": "sbjungsand1d.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    2.71,
+    2.97
+   ],
+   "sha256": "f1cdd1a7e50dda947ab79f7cba35dc6fc810373ce1f767cebe489fd05284a6c4",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0002,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.358,
+     "overhang": 0.0,
+     "slope": 0.642,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 114.8
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbjungsand2a.bmp@7e7a2c34": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.419,
+   "colorName": "brown",
+   "contrast": 0.179,
+   "fileName": "sbjungsand2a.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    125,
+    106,
+    65
+   ],
+   "name": "sbjungsand2a.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.07,
+    4.73
+   ],
+   "sha256": "7e7a2c34f1046be2dfb39b3be8e42c9201c24a80710eb64d24137f89beb43d65",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0002,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.79,
+     "steep": 0.21,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 122.3
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbjungsand2c.bmp@f09e5844": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.43,
+   "colorName": "orange",
+   "contrast": 0.166,
+   "fileName": "sbjungsand2c.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    109,
+    66
+   ],
+   "name": "sbjungsand2c.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.03,
+    4.0
+   ],
+   "sha256": "f09e5844eeae614b368cf60881b1a515fbcbc6d98f0f10ff07bf188bd02051a0",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 1.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 123.4
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbjungsand2d.bmp@337f2f38": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.432,
+   "colorName": "orange",
+   "contrast": 0.175,
+   "fileName": "sbjungsand2d.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    129,
+    108,
+    68
+   ],
+   "name": "sbjungsand2d.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    4.17,
+    1.03
+   ],
+   "sha256": "337f2f38db203045efaf801ca2a5db1bbd0d5198d701c7650d7f6ae5a54001c2",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0014,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.125,
+     "overhang": 0.0,
+     "slope": 0.331,
+     "steep": 0.544,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 135.3
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbjungsand3b.bmp@826c0dd2": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.521,
+   "colorName": "tan",
+   "contrast": 0.11,
+   "fileName": "sbjungsand3b.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    158,
+    129,
+    87
+   ],
+   "name": "sbjungsand3b.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    3.91,
+    4.7
+   ],
+   "sha256": "826c0dd24c3ee976de305799fefa8a18a905b47f222aa27c6bdb5f6c772b7d93",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0003,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.282,
+     "steep": 0.718,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 142.5
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbjungsand3c.bmp@94bde371": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.517,
+   "colorName": "orange",
+   "contrast": 0.111,
+   "fileName": "sbjungsand3c.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    156,
+    128,
+    86
+   ],
+   "name": "sbjungsand3c.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    3.42,
+    3.57
+   ],
+   "sha256": "94bde371a9ec8af62130f51dd07fd211d3c4baaa3d9ea8f89673a6150a0f08e0",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0004,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.658,
+     "steep": 0.342,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 129.7
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrivgras02.bmp@198aa049": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.253,
+   "colorName": "tan",
+   "contrast": 0.082,
+   "fileName": "sbrivgras02.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    66,
+    68,
+    44
+   ],
+   "name": "sbrivgras02.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.88,
+    0.89
+   ],
+   "sha256": "198aa049ca83ef651f569926f46c55110aea0cc0ece5442ceee573e94b0cb2ea",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0003,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.517,
+     "overhang": 0.0,
+     "slope": 0.483,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 113.5
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrivgras03.bmp@77a9893a": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.263,
+   "colorName": "tan",
+   "contrast": 0.075,
+   "fileName": "sbrivgras03.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    68,
+    71,
+    46
+   ],
+   "name": "sbrivgras03.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.87,
+    0.87
+   ],
+   "sha256": "77a9893a555658ca0fe81e029f43da87152d1f8301ffc6724750d3e061871740",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0003,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.732,
+     "overhang": 0.0,
+     "slope": 0.267,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 113.3
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrivgras04.bmp@03ed3147": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.265,
+   "colorName": "tan",
+   "contrast": 0.078,
+   "fileName": "sbrivgras04.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    68,
+    71,
+    47
+   ],
+   "name": "sbrivgras04.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.18,
+    0.99
+   ],
+   "sha256": "03ed31476ef2b0ffa8e13ad0ce1d567a6da8e6ba873a3597ab09f2ea7237baa8",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.824,
+     "overhang": 0.0,
+     "slope": 0.176,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 112.5
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrivgras05.bmp@b6b2ca21": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.264,
+   "colorName": "green",
+   "contrast": 0.074,
+   "fileName": "sbrivgras05.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    67,
+    71,
+    47
+   ],
+   "name": "sbrivgras05.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.1,
+    0.95
+   ],
+   "sha256": "b6b2ca2165efa5fd15bda7270a55bd59ef1b2d4d7d4308458e35f611622b6323",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.866,
+     "overhang": 0.0,
+     "slope": 0.134,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 112.3
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrivjung02.bmp@279592d7": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.239,
+   "colorName": "yellow",
+   "contrast": 0.113,
+   "fileName": "sbrivjung02.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    68,
+    64,
+    27
+   ],
+   "name": "sbrivjung02.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.85,
+    0.96
+   ],
+   "sha256": "279592d7999434ad79bb01a6e37f84d6d108ad6915aecc19fda20e2ba4ee2e45",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0003,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.525,
+     "overhang": 0.0,
+     "slope": 0.475,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 113.5
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrivjung02a.bmp@d12a0f80": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.255,
+   "colorName": "yellow",
+   "contrast": 0.087,
+   "fileName": "sbrivjung02a.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    68,
+    69,
+    39
+   ],
+   "name": "sbrivjung02a.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.95,
+    1.6
+   ],
+   "sha256": "d12a0f805e390ca1b55e4c5d1fd8c97d6ac670ffd334fa5fd98eccd3705626fa",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.734,
+     "overhang": 0.0,
+     "slope": 0.266,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 112.5
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrivjung03.bmp@a28ebdcf": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.24,
+   "colorName": "yellow",
+   "contrast": 0.113,
+   "fileName": "sbrivjung03.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    68,
+    64,
+    27
+   ],
+   "name": "sbrivjung03.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.85,
+    0.95
+   ],
+   "sha256": "a28ebdcfa15e3eea2d0d7a4ffbe22b07dc35133311c6e012363d62f87e68cf1c",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0003,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.733,
+     "overhang": 0.0,
+     "slope": 0.267,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 112.8
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrivrock02.bmp@18679239": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.241,
+   "colorName": "grey",
+   "contrast": 0.104,
+   "fileName": "sbrivrock02.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    62,
+    62,
+    56
+   ],
+   "name": "sbrivrock02.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.98,
+    1.16
+   ],
+   "sha256": "186792398317f0ff2f4fbe861ce5214d4b72b61cdcc01eae0bccf5af552e1521",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0006,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.57,
+     "overhang": 0.0,
+     "slope": 0.43,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 114.1
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrivrock02a.bmp@897b5dd5": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.234,
+   "colorName": "tan",
+   "contrast": 0.094,
+   "fileName": "sbrivrock02a.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    60,
+    62,
+    47
+   ],
+   "name": "sbrivrock02a.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.93,
+    1.43
+   ],
+   "sha256": "897b5dd59b2d380ec95861cc05b8d5b283a19b63c6a68c4b407d76d2b02cdd15",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.334,
+     "overhang": 0.0,
+     "slope": 0.666,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 113.8
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrivrock03.bmp@9a971a4e": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.242,
+   "colorName": "grey",
+   "contrast": 0.1,
+   "fileName": "sbrivrock03.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    62,
+    63,
+    56
+   ],
+   "name": "sbrivrock03.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.98,
+    1.18
+   ],
+   "sha256": "9a971a4e991ab56b94e0a9ae25ec8172a60644f099634f005ed9f1fa672b4d89",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0007,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.562,
+     "overhang": 0.0,
+     "slope": 0.434,
+     "steep": 0.004,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 113.9
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrivrock04.bmp@a444a1b0": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.249,
+   "colorName": "grey",
+   "contrast": 0.101,
+   "fileName": "sbrivrock04.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    63,
+    65,
+    59
+   ],
+   "name": "sbrivrock04.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.35,
+    1.65
+   ],
+   "sha256": "a444a1b07fcb548c1e66e62c2c464a07ae91e85c91d7a161909068e5b25d546c",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0003,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.799,
+     "overhang": 0.0,
+     "slope": 0.201,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 112.7
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrivrock05.bmp@4d22ffdd": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.242,
+   "colorName": "grey",
+   "contrast": 0.101,
+   "fileName": "sbrivrock05.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    60,
+    63,
+    58
+   ],
+   "name": "sbrivrock05.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.67,
+    1.54
+   ],
+   "sha256": "4d22ffdd20f2785f83b203414ba72948c688c02584f42e5434427ecf147ad2ee",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0003,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.838,
+     "overhang": 0.0,
+     "slope": 0.162,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 112.7
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrivsand02.bmp@b1c52f71": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.505,
+   "colorName": "orange",
+   "contrast": 0.097,
+   "fileName": "sbrivsand02.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    155,
+    124,
+    83
+   ],
+   "name": "sbrivsand02.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.53,
+    1.16
+   ],
+   "sha256": "b1c52f71e0c66391c64175bb82378749adaeb929a199a85d08f4ae973eab5bba",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.007,
+     "slope": 0.005,
+     "steep": 0.988,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 162.3
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrivsand03a.bmp@4b148766": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.367,
+   "colorName": "brown",
+   "contrast": 0.17,
+   "fileName": "sbrivsand03a.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    110,
+    93,
+    54
+   ],
+   "name": "sbrivsand03a.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.85,
+    3.86
+   ],
+   "sha256": "4b148766a1575316b21aa109a665f3d715db305758d05fd5466bdf4608d9f41e",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.843,
+     "steep": 0.157,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 130.2
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrivsand07.bmp@c1ac8d9c": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.504,
+   "colorName": "orange",
+   "contrast": 0.098,
+   "fileName": "sbrivsand07.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    155,
+    124,
+    83
+   ],
+   "name": "sbrivsand07.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.6,
+    2.38
+   ],
+   "sha256": "c1ac8d9cd2828aa7c3f121b13f965ac531b83a6be2a260fb1529886d1a13a7d2",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.744,
+     "overhang": 0.0,
+     "slope": 0.256,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 118.9
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrivsnow01.bmp@c4d72419": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.46,
+   "colorName": "grey",
+   "contrast": 0.26,
+   "fileName": "sbrivsnow01.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    117,
+    117,
+    119
+   ],
+   "name": "sbrivsnow01.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.9,
+    7.47
+   ],
+   "sha256": "c4d724190034ff2dbf29388fbe9402eeefcef27bc21c0a5e435cff04457af433",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.791,
+     "overhang": 0.0,
+     "slope": 0.209,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 112.3
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrivsnow02a.bmp@1b2d9ba3": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.385,
+   "colorName": "grey",
+   "contrast": 0.236,
+   "fileName": "sbrivsnow02a.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    98,
+    99,
+    97
+   ],
+   "name": "sbrivsnow02a.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.08,
+    7.06
+   ],
+   "sha256": "1b2d9ba3f0abbc252668f49976b532fa4d03c267b5c2f31121630f2f9fc5db55",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 1.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 119.9
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrivsnow05.bmp@35f6b3f6": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.51,
+   "colorName": "grey",
+   "contrast": 0.255,
+   "fileName": "sbrivsnow05.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    129,
+    130,
+    134
+   ],
+   "name": "sbrivsnow05.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.88,
+    1.5
+   ],
+   "sha256": "35f6b3f6d3744e1358934d9a239b1473eb8d0eab8682e5c2c3567a81a50cb993",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0004,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.452,
+     "overhang": 0.0,
+     "slope": 0.548,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 113.9
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrivsnow06.bmp@fef3ff99": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.513,
+   "colorName": "grey",
+   "contrast": 0.256,
+   "fileName": "sbrivsnow06.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    130,
+    131,
+    135
+   ],
+   "name": "sbrivsnow06.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.85,
+    1.15
+   ],
+   "sha256": "fef3ff9989b71a2ac4d504c452840d8296f5d654eca4c74bd82b0d0451aba5e8",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0003,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.518,
+     "overhang": 0.0,
+     "slope": 0.48,
+     "steep": 0.002,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 114.0
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrock05.bmp@5c866b1d": {
+   "archives": [
+    "stonebrunt_obj.s3d",
+    "stonebrunt.s3d",
+    "stonebrunt_2_obj.s3d"
+   ],
+   "brightness": 0.255,
+   "colorName": "grey",
+   "contrast": 0.092,
+   "fileName": "sbrock05.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    61,
+    67,
+    66
+   ],
+   "name": "sbrock05.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.08,
+    0.89
+   ],
+   "sha256": "5c866b1dae13912e6f214ae624befd12c23e6660076261423a6f2beab52b7a35",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.2111,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.166,
+     "overhang": 0.003,
+     "slope": 0.499,
+     "steep": 0.21,
+     "vertical": 0.122
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 115.7
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 3
+    }
+   }
+  },
+  "texture/sbrockgrass1a.bmp@ef160cde": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.249,
+   "colorName": "grey",
+   "contrast": 0.089,
+   "fileName": "sbrockgrass1a.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    60,
+    66,
+    61
+   ],
+   "name": "sbrockgrass1a.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.44,
+    1.16
+   ],
+   "sha256": "ef160cde3fa31de90d68f2ed14b9ec6cc08fce794b63561d22123c0764eb7ea8",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.003,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.072,
+     "overhang": 0.0,
+     "slope": 0.527,
+     "steep": 0.31,
+     "vertical": 0.092
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 133.6
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrockgrass1b.bmp@402e62bc": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.252,
+   "colorName": "grey",
+   "contrast": 0.092,
+   "fileName": "sbrockgrass1b.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    60,
+    67,
+    62
+   ],
+   "name": "sbrockgrass1b.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.3,
+    1.5
+   ],
+   "sha256": "402e62bc30bbbcd1694a6f7b50ed1c268c4e3c8a8ad07a16cd9f8412bf2e59f7",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0024,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.141,
+     "overhang": 0.0,
+     "slope": 0.523,
+     "steep": 0.284,
+     "vertical": 0.052
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 130.4
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrockgrass1c.bmp@04a18a92": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.248,
+   "colorName": "grey",
+   "contrast": 0.09,
+   "fileName": "sbrockgrass1c.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    60,
+    66,
+    61
+   ],
+   "name": "sbrockgrass1c.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.5,
+    1.49
+   ],
+   "sha256": "04a18a92fa8d05b5f5e29c5ccb8644abeb275d5728c9e0e8cc6d023444b8b129",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0018,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.257,
+     "overhang": 0.0,
+     "slope": 0.565,
+     "steep": 0.178,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 122.3
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrockgrass1d.bmp@c67ea93b": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.253,
+   "colorName": "grey",
+   "contrast": 0.092,
+   "fileName": "sbrockgrass1d.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    61,
+    67,
+    62
+   ],
+   "name": "sbrockgrass1d.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.49,
+    1.14
+   ],
+   "sha256": "c67ea93b8289269d45413b77c13a542daf3fa1abdec2bd8e92831d50d12b015d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.003,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.108,
+     "overhang": 0.0,
+     "slope": 0.592,
+     "steep": 0.3,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 124.9
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrockgrass2a.bmp@5a8c797b": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.259,
+   "colorName": "green",
+   "contrast": 0.083,
+   "fileName": "sbrockgrass2a.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    63,
+    70,
+    57
+   ],
+   "name": "sbrockgrass2a.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.99,
+    1.42
+   ],
+   "sha256": "5a8c797b6426349f3983dbe010c23ffc173bdeceba4662ffe0407bdff8541864",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0035,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.078,
+     "overhang": 0.0,
+     "slope": 0.432,
+     "steep": 0.49,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 133.1
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrockgrass2b.bmp@5a0e6534": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.258,
+   "colorName": "green",
+   "contrast": 0.083,
+   "fileName": "sbrockgrass2b.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    63,
+    69,
+    56
+   ],
+   "name": "sbrockgrass2b.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.41,
+    1.0
+   ],
+   "sha256": "5a0e653411eda0b2fa4c651169f2bc69745cc2aa219a0cc0604da48dc30c0274",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0029,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.385,
+     "overhang": 0.0,
+     "slope": 0.531,
+     "steep": 0.056,
+     "vertical": 0.028
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 118.9
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrockgrass2c.bmp@7651c201": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.258,
+   "colorName": "green",
+   "contrast": 0.081,
+   "fileName": "sbrockgrass2c.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    63,
+    69,
+    56
+   ],
+   "name": "sbrockgrass2c.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.85,
+    1.35
+   ],
+   "sha256": "7651c2019ccd3ca503d24fa1d760125b93bd276601f3a036b112c4d265918f5f",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0038,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.133,
+     "overhang": 0.0,
+     "slope": 0.48,
+     "steep": 0.264,
+     "vertical": 0.123
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 132.0
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrockgrass2d.bmp@1edd399d": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.257,
+   "colorName": "green",
+   "contrast": 0.08,
+   "fileName": "sbrockgrass2d.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    63,
+    69,
+    56
+   ],
+   "name": "sbrockgrass2d.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.44,
+    0.73
+   ],
+   "sha256": "1edd399ddb1125fb3b52f8bac0a6cac4eb29590eefd19d8e87d76cf8045f607f",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0035,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.209,
+     "overhang": 0.0,
+     "slope": 0.609,
+     "steep": 0.183,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 121.1
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrockgrass3a.bmp@e96ee59b": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.271,
+   "colorName": "green",
+   "contrast": 0.071,
+   "fileName": "sbrockgrass3a.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    67,
+    73,
+    54
+   ],
+   "name": "sbrockgrass3a.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.13,
+    1.13
+   ],
+   "sha256": "e96ee59b65e1e0b8c51f8059d46b0b2046381672f3ceddbc5c70dc923bed6239",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.187,
+     "overhang": 0.0,
+     "slope": 0.65,
+     "steep": 0.163,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 120.4
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrockgrass3b.bmp@25ad6324": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.266,
+   "colorName": "green",
+   "contrast": 0.072,
+   "fileName": "sbrockgrass3b.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    66,
+    72,
+    52
+   ],
+   "name": "sbrockgrass3b.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.13,
+    1.16
+   ],
+   "sha256": "25ad632492d9852a8761b341d6ff9bb1be4f053bc0010362efee83f4594ae8b1",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0021,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.227,
+     "overhang": 0.0,
+     "slope": 0.471,
+     "steep": 0.302,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 123.4
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrockgrass3c.bmp@742fe88d": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.267,
+   "colorName": "green",
+   "contrast": 0.071,
+   "fileName": "sbrockgrass3c.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    66,
+    72,
+    53
+   ],
+   "name": "sbrockgrass3c.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.15,
+    1.16
+   ],
+   "sha256": "742fe88de462a40c06e5084388feeec23a3e9f49dd6a16b787939d7d68bcdb1f",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0021,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.11,
+     "overhang": 0.0,
+     "slope": 0.447,
+     "steep": 0.275,
+     "vertical": 0.168
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 138.1
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrockgrass3d.bmp@ababa829": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.267,
+   "colorName": "green",
+   "contrast": 0.071,
+   "fileName": "sbrockgrass3d.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    66,
+    72,
+    53
+   ],
+   "name": "sbrockgrass3d.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.18,
+    1.1
+   ],
+   "sha256": "ababa829aa9cf7c5c5aab17eba29e5356d5082aa869bbb1aff312cf150ce54e3",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0014,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.172,
+     "overhang": 0.0,
+     "slope": 0.532,
+     "steep": 0.296,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 124.1
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrocksand2a.bmp@c0b0e192": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.411,
+   "colorName": "brown",
+   "contrast": 0.172,
+   "fileName": "sbrocksand2a.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    118,
+    103,
+    79
+   ],
+   "name": "sbrocksand2a.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.18,
+    5.51
+   ],
+   "sha256": "c0b0e1921d10c0046d00d4a2730ecb3fd6fda61f5c98ea12b972e9661cffec49",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.119,
+     "overhang": 0.0,
+     "slope": 0.045,
+     "steep": 0.735,
+     "vertical": 0.101
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 162.2
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrocksnow1a.bmp@b07aae87": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.641,
+   "colorName": "grey",
+   "contrast": 0.19,
+   "fileName": "sbrocksnow1a.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    158,
+    164,
+    177
+   ],
+   "name": "sbrocksnow1a.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    6.93,
+    6.51
+   ],
+   "sha256": "b07aae87406031457efe5a8d33944defde46b0824f4fb83afa11d4caa51672a3",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0017,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.038,
+     "overhang": 0.0,
+     "slope": 0.57,
+     "steep": 0.392,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 130.6
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrocksnow1b.bmp@021e0512": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.64,
+   "colorName": "grey",
+   "contrast": 0.193,
+   "fileName": "sbrocksnow1b.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    158,
+    163,
+    177
+   ],
+   "name": "sbrocksnow1b.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    6.68,
+    7.78
+   ],
+   "sha256": "021e05127da6069b68a9c1b9f69fdbe4f14223c1a9d30a037026dee7e93b6ce3",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0007,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.033,
+     "overhang": 0.0,
+     "slope": 0.423,
+     "steep": 0.544,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 132.5
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrocksnow1c.bmp@063f71a9": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.649,
+   "colorName": "grey",
+   "contrast": 0.186,
+   "fileName": "sbrocksnow1c.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    160,
+    166,
+    180
+   ],
+   "name": "sbrocksnow1c.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    7.84,
+    8.84
+   ],
+   "sha256": "063f71a97c59e792e7db90e85f4a36c3c78002e212f28bc0c05ffad137c85dd1",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0005,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.045,
+     "overhang": 0.0,
+     "slope": 0.635,
+     "steep": 0.32,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 125.8
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrocksnow1d.bmp@ed4cb89b": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.625,
+   "colorName": "grey",
+   "contrast": 0.215,
+   "fileName": "sbrocksnow1d.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    154,
+    159,
+    173
+   ],
+   "name": "sbrocksnow1d.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    8.24,
+    8.07
+   ],
+   "sha256": "ed4cb89bc52a3724e0102de6ae83524eb0ec7c9a3c971cd324cb2d72d76d90cd",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0015,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.07,
+     "overhang": 0.0,
+     "slope": 0.456,
+     "steep": 0.475,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 134.2
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrocksnow2a.bmp@ad9022ef": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.447,
+   "colorName": "grey",
+   "contrast": 0.25,
+   "fileName": "sbrocksnow2a.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    109,
+    115,
+    122
+   ],
+   "name": "sbrocksnow2a.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.93,
+    10.06
+   ],
+   "sha256": "ad9022ef403d0132573e9f374b486102960c1c1cbec8c3814b80c93cc9027736",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.005,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.013,
+     "overhang": 0.0,
+     "slope": 0.107,
+     "steep": 0.502,
+     "vertical": 0.378
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 178.0
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrocksnow2b.bmp@b1ab090f": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.46,
+   "colorName": "grey",
+   "contrast": 0.24,
+   "fileName": "sbrocksnow2b.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    112,
+    118,
+    125
+   ],
+   "name": "sbrocksnow2b.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    9.4,
+    0.8
+   ],
+   "sha256": "b1ab090f67be77d10b502107cf098825f9d545dde031a321064b3f454aa3026b",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0005,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.078,
+     "overhang": 0.0,
+     "slope": 0.561,
+     "steep": 0.361,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 126.6
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrocksnow2c.bmp@4f5bc5fc": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.475,
+   "colorName": "grey",
+   "contrast": 0.242,
+   "fileName": "sbrocksnow2c.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    116,
+    122,
+    128
+   ],
+   "name": "sbrocksnow2c.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.18,
+    9.58
+   ],
+   "sha256": "4f5bc5fcc1fb39d06f8ebfc294b4bd73c21602ff3534c353cae9700b0a0b58f1",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0062,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.007,
+     "overhang": 0.0,
+     "slope": 0.154,
+     "steep": 0.529,
+     "vertical": 0.31
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 167.3
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrocksnow2d.bmp@7f6089ad": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.443,
+   "colorName": "grey",
+   "contrast": 0.248,
+   "fileName": "sbrocksnow2d.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    108,
+    114,
+    120
+   ],
+   "name": "sbrocksnow2d.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    9.96,
+    1.1
+   ],
+   "sha256": "7f6089adcce0386935a92a988f34470ee1f3a6bd472e71c3c71475536d4dc2c3",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0032,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.107,
+     "overhang": 0.0,
+     "slope": 0.61,
+     "steep": 0.282,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 126.3
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrocksnow3a.bmp@957f942c": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.325,
+   "colorName": "grey",
+   "contrast": 0.191,
+   "fileName": "sbrocksnow3a.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    78,
+    84,
+    87
+   ],
+   "name": "sbrocksnow3a.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    5.02,
+    4.9
+   ],
+   "sha256": "957f942cff7ffd98fe42daa4e1c10309e1922077f658c323e1ba4b71a052c74b",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0003,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.349,
+     "overhang": 0.0,
+     "slope": 0.393,
+     "steep": 0.258,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 122.3
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrocksnow3b.bmp@a746ae2c": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.309,
+   "colorName": "grey",
+   "contrast": 0.177,
+   "fileName": "sbrocksnow3b.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    74,
+    80,
+    82
+   ],
+   "name": "sbrocksnow3b.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    5.25,
+    5.65
+   ],
+   "sha256": "a746ae2c3d715dddbf90d295e6bb256b8a0623167f7573856100f96df958a7a6",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0013,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.116,
+     "overhang": 0.0,
+     "slope": 0.466,
+     "steep": 0.418,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 131.4
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrocksnow3c.bmp@f1c678ae": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.315,
+   "colorName": "grey",
+   "contrast": 0.177,
+   "fileName": "sbrocksnow3c.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    76,
+    82,
+    83
+   ],
+   "name": "sbrocksnow3c.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    5.66,
+    5.76
+   ],
+   "sha256": "f1c678ae5f907cc735469e0b953b9bcff335427fa3fd514e9b3ba7dc6615ba45",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0015,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.074,
+     "overhang": 0.0,
+     "slope": 0.593,
+     "steep": 0.334,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 128.8
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrocksnow3d.bmp@a87dec48": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.35,
+   "colorName": "grey",
+   "contrast": 0.195,
+   "fileName": "sbrocksnow3d.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    85,
+    91,
+    93
+   ],
+   "name": "sbrocksnow3d.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    5.63,
+    4.52
+   ],
+   "sha256": "a87dec4858308eed5313b734c5bfd81ce2048bdf35362e529fbf95683087f01d",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0006,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.216,
+     "steep": 0.784,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 145.2
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrockspec01.bmp@d8112e99": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.285,
+   "colorName": "green",
+   "contrast": 0.122,
+   "fileName": "sbrockspec01.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    72,
+    75,
+    60
+   ],
+   "name": "sbrockspec01.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    2.64,
+    2.39
+   ],
+   "sha256": "d8112e9924523e88d191c47881217780bc214ae222aa31ce8337838ddb2d5b27",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 1.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 111.9
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbrockvolc01.bmp@d77eae0f": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.231,
+   "colorName": "grey",
+   "contrast": 0.107,
+   "fileName": "sbrockvolc01.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    59,
+    61,
+    52
+   ],
+   "name": "sbrockvolc01.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    2.08,
+    0.83
+   ],
+   "sha256": "d77eae0f7d9547bb434a478036b7cf577eb7c8e0cb7c16de33d40c1fdaddd3a7",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.132,
+     "overhang": 0.358,
+     "slope": 0.0,
+     "steep": 0.26,
+     "vertical": 0.25
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 88.7
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbsand01.bmp@6c6263d7": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.558,
+   "colorName": "tan",
+   "contrast": 0.035,
+   "fileName": "sbsand01.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    169,
+    138,
+    94
+   ],
+   "name": "sbsand01.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.69,
+    0.88
+   ],
+   "sha256": "6c6263d7d68c358f5841310f95d60dc6ab3049acafdd32dd5f48816e8ed03fa3",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0234,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.734,
+     "overhang": 0.0,
+     "slope": 0.095,
+     "steep": 0.171,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 104.6
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbsnow1.bmp@7e5efb09": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.735,
+   "colorName": "grey",
+   "contrast": 0.061,
+   "fileName": "sbsnow1.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    182,
+    187,
+    204
+   ],
+   "name": "sbsnow1.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.08,
+    1.08
+   ],
+   "sha256": "7e5efb0972a4e267c941d7b974d59cfaa3dd7d59800c617a9ddf32a8fbc027c4",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.1175,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.115,
+     "overhang": 0.0,
+     "slope": 0.504,
+     "steep": 0.351,
+     "vertical": 0.031
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 116.8
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbtbl1leg.bmp@38a876f7": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.179,
+   "colorName": "grey",
+   "contrast": 0.051,
+   "fileName": "sbtbl1leg.bmp",
+   "format": "BMP P",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    46,
+    46,
+    44
+   ],
+   "name": "sbtbl1leg.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.35,
+    1.18
+   ],
+   "sha256": "38a876f77b275991541f1ce77d38983ae3728ad991758a2fe4e7d5f55b689f96",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 2
+    }
+   }
+  },
+  "texture/sbtbl1top.bmp@6e9f8aa8": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.173,
+   "colorName": "grey",
+   "contrast": 0.048,
+   "fileName": "sbtbl1top.bmp",
+   "format": "BMP P",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    45,
+    44,
+    42
+   ],
+   "name": "sbtbl1top.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    2.45,
+    1.14
+   ],
+   "sha256": "6e9f8aa84a7a9569de39fdb7a5ec9ce639d5e5f5e601713deef23fde1bfd5b3c",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 128,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 2
+    }
+   }
+  },
+  "texture/sbtrailrock01.bmp@e98e2bf9": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.237,
+   "colorName": "grey",
+   "contrast": 0.089,
+   "fileName": "sbtrailrock01.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    57,
+    62,
+    60
+   ],
+   "name": "sbtrailrock01.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.11,
+    1.06
+   ],
+   "sha256": "e98e2bf9a5d5266406e284ce840c61f9af3ba603cc7cb1757f6f8b667ae37350",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.899,
+     "steep": 0.101,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 122.0
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbtrailrock02.bmp@005cf7cd": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.241,
+   "colorName": "grey",
+   "contrast": 0.09,
+   "fileName": "sbtrailrock02.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    58,
+    63,
+    61
+   ],
+   "name": "sbtrailrock02.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.1,
+    1.1
+   ],
+   "sha256": "005cf7cd48f5550eef9356f7fc4cec3f9994fa00b41e7a013097e3789a9a9174",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0004,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.673,
+     "overhang": 0.0,
+     "slope": 0.322,
+     "steep": 0.005,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 113.2
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbtrailrock03.bmp@bf3e608a": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.239,
+   "colorName": "grey",
+   "contrast": 0.089,
+   "fileName": "sbtrailrock03.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    58,
+    63,
+    61
+   ],
+   "name": "sbtrailrock03.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.27,
+    1.1
+   ],
+   "sha256": "bf3e608ac0ea80da445202d20fe33cea8055161d07c39c32554eb71bc1b2bb79",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0004,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.729,
+     "overhang": 0.0,
+     "slope": 0.268,
+     "steep": 0.003,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 113.1
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbtrailrock04.bmp@fa1aa310": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.239,
+   "colorName": "grey",
+   "contrast": 0.09,
+   "fileName": "sbtrailrock04.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    58,
+    63,
+    61
+   ],
+   "name": "sbtrailrock04.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.51,
+    1.24
+   ],
+   "sha256": "fa1aa3108edf659b0b9d9a6c7f7ae6e3932bcd5b013eaa80c701c2ebbf7e7725",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.294,
+     "overhang": 0.0,
+     "slope": 0.699,
+     "steep": 0.008,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 117.6
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbtrailrock05.bmp@ea9811a6": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.244,
+   "colorName": "grey",
+   "contrast": 0.09,
+   "fileName": "sbtrailrock05.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    59,
+    64,
+    62
+   ],
+   "name": "sbtrailrock05.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.54,
+    1.43
+   ],
+   "sha256": "ea9811a6cc36f5fe4a6804630f3e25fc622b7188d6b18eb5b94bac51b3765f21",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0002,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.225,
+     "overhang": 0.0,
+     "slope": 0.773,
+     "steep": 0.002,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 117.2
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbtrailrock06.bmp@0a69184f": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.231,
+   "colorName": "grey",
+   "contrast": 0.086,
+   "fileName": "sbtrailrock06.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    56,
+    61,
+    58
+   ],
+   "name": "sbtrailrock06.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.36,
+    1.18
+   ],
+   "sha256": "0a69184f1d7e1e8999f5fe1be3081250a50614bd0e54041ade48eabbe1aec907",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.007,
+     "overhang": 0.0,
+     "slope": 0.978,
+     "steep": 0.015,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 117.0
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbtrailrock07.bmp@36e12b01": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.242,
+   "colorName": "grey",
+   "contrast": 0.09,
+   "fileName": "sbtrailrock07.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    58,
+    64,
+    62
+   ],
+   "name": "sbtrailrock07.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.1,
+    1.06
+   ],
+   "sha256": "36e12b010d7193984006e9c4e134f0219f979d141402195349555f62d214b514",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.953,
+     "overhang": 0.0,
+     "slope": 0.047,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 111.7
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbtrailsnow01.bmp@be6f79fb": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.639,
+   "colorName": "grey",
+   "contrast": 0.211,
+   "fileName": "sbtrailsnow01.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    158,
+    163,
+    175
+   ],
+   "name": "sbtrailsnow01.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.87,
+    4.47
+   ],
+   "sha256": "be6f79fbeefbdaf68211dcad8d199a84fcdd46da95860e9b673c817479717b55",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.962,
+     "overhang": 0.0,
+     "slope": 0.038,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 111.8
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbtrailsnow02.bmp@c8761173": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.575,
+   "colorName": "grey",
+   "contrast": 0.248,
+   "fileName": "sbtrailsnow02.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    143,
+    147,
+    156
+   ],
+   "name": "sbtrailsnow02.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    3.82,
+    1.04
+   ],
+   "sha256": "c8761173313aeabe4f67042958780335c92423a16b3691494a0ef847c4ff833f",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/sbtrailsnow03.bmp@77d80d38": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.644,
+   "colorName": "grey",
+   "contrast": 0.206,
+   "fileName": "sbtrailsnow03.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    160,
+    164,
+    177
+   ],
+   "name": "sbtrailsnow03.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    4.58,
+    4.86
+   ],
+   "sha256": "77d80d386dfb3ab8e571b2b52a58bf975021c46ae5393bea5b3b586e569a2409",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/sbtrailsnrck01.bmp@eb35a9cc": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.405,
+   "colorName": "grey",
+   "contrast": 0.246,
+   "fileName": "sbtrailsnrck01.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    100,
+    104,
+    107
+   ],
+   "name": "sbtrailsnrck01.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.89,
+    9.7
+   ],
+   "sha256": "eb35a9cc68d9922ba031892b84faf9814d42ba20a04f1df3ed8086b0b9233443",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.958,
+     "steep": 0.042,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 126.0
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbvolc01.bmp@cb222b27": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.244,
+   "colorName": "tan",
+   "contrast": 0.116,
+   "fileName": "sbvolc01.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    64,
+    63,
+    50
+   ],
+   "name": "sbvolc01.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.05,
+    0.9
+   ],
+   "sha256": "cb222b27b4e72abfdc8c81e7d4e4989c77d333df9e14f77613799bb413cdad18",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.15,
+     "overhang": 0.324,
+     "slope": 0.0,
+     "steep": 0.034,
+     "vertical": 0.492
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 40.4
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/sbw1.bmp@436a7dc2": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.34,
+   "colorName": "teal",
+   "contrast": 0.104,
+   "fileName": "sbw1.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    54,
+    98,
+    114
+   ],
+   "name": "sbw1.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.95,
+    0.9
+   ],
+   "sha256": "436a7dc21c2b22a4fc616458f0946affdcaf020780f0594db46d720a920e1eb1",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0016,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.778,
+     "overhang": 0.0,
+     "slope": 0.202,
+     "steep": 0.02,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "passable": 1.0
+    },
+    "unitsPerRepeat": 97.4
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": [
+     "sbw1.bmp",
+     "sbw2.bmp",
+     "sbw3.bmp",
+     "sbw4.bmp"
+    ],
+    "renderMethods": {
+     "0x80000005": 1
+    }
+   }
+  },
+  "texture/sbw2.bmp@600555f1": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.345,
+   "colorName": "teal",
+   "contrast": 0.103,
+   "fileName": "sbw2.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    55,
+    100,
+    115
+   ],
+   "name": "sbw2.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.97,
+    0.81
+   ],
+   "sha256": "600555f1e9bf45cbb7c04acc7202ed82224129a1e6b195b59bf9e0d577b91fea",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": [
+     "sbw1.bmp",
+     "sbw2.bmp",
+     "sbw3.bmp",
+     "sbw4.bmp"
+    ],
+    "renderMethods": {
+     "0x80000005": 1
+    }
+   }
+  },
+  "texture/sbw3.bmp@acc47a07": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.345,
+   "colorName": "teal",
+   "contrast": 0.104,
+   "fileName": "sbw3.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    55,
+    100,
+    115
+   ],
+   "name": "sbw3.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.92,
+    1.13
+   ],
+   "sha256": "acc47a0774df60e5434bdc6cfc3d11c291742dc9080dcac39895cb0b4808d49d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": [
+     "sbw1.bmp",
+     "sbw2.bmp",
+     "sbw3.bmp",
+     "sbw4.bmp"
+    ],
+    "renderMethods": {
+     "0x80000005": 1
+    }
+   }
+  },
+  "texture/sbw4.bmp@13ef4a83": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.343,
+   "colorName": "teal",
+   "contrast": 0.103,
+   "fileName": "sbw4.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    54,
+    99,
+    115
+   ],
+   "name": "sbw4.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.06,
+    0.75
+   ],
+   "sha256": "13ef4a8355a62729771ce9a6e8ae7247943482127ab4098a53f620d9676ef890",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": [
+     "sbw1.bmp",
+     "sbw2.bmp",
+     "sbw3.bmp",
+     "sbw4.bmp"
+    ],
+    "renderMethods": {
+     "0x80000005": 1
+    }
+   }
+  },
+  "texture/sbwarent01.bmp@fd005315": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.249,
+   "colorName": "grey",
+   "contrast": 0.09,
+   "fileName": "sbwarent01.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    59,
+    65,
+    64
+   ],
+   "name": "sbwarent01.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.17,
+    1.32
+   ],
+   "sha256": "fd0053159238744e69deac295717829e8c9fffd7fbe11912e19251d47795b626",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 1.0
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 62.6
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/slt3br1.bmp@4b970a87": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.269,
+   "colorName": "green",
+   "contrast": 0.094,
+   "fileName": "slt3br1.bmp",
+   "format": "BMP P",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    56,
+    82,
+    33
+   ],
+   "name": "slt3br1.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.25,
+    0.11
+   ],
+   "sha256": "4b970a871b0dfde2c233739e295e4da9b4c753d5ffeff9005eaa31d6a44144b1",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 128,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000013": 1
+    }
+   }
+  },
+  "texture/slt3br2.bmp@180f3012": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.255,
+   "colorName": "green",
+   "contrast": 0.096,
+   "fileName": "slt3br2.bmp",
+   "format": "BMP P",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    55,
+    77,
+    32
+   ],
+   "name": "slt3br2.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.06,
+    0.13
+   ],
+   "sha256": "180f301218fd5cbcd61fba368d5ae57a6445c98856a69f3e84fbb0a43b54cc4f",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 128,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000013": 1
+    }
+   }
+  },
+  "texture/slt3brcent.bmp@8c1baced": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.252,
+   "colorName": "green",
+   "contrast": 0.104,
+   "fileName": "slt3brcent.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    48,
+    79,
+    30
+   ],
+   "name": "slt3brcent.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.0,
+    0.0
+   ],
+   "sha256": "8c1baced00b056eb33f44ff557fd0ca6c24e643d4e75890a193362c6ae4ec6e7",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000013": 1
+    }
+   }
+  },
+  "texture/slt5brn1.bmp@f000fa07": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.265,
+   "colorName": "green",
+   "contrast": 0.114,
+   "fileName": "slt5brn1.bmp",
+   "format": "BMP P",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    54,
+    77,
+    53
+   ],
+   "name": "slt5brn1.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.03,
+    0.09
+   ],
+   "sha256": "f000fa07617d9e703b7cf3d9fc1b3a0162fcf3ae19b74402861a7f5cdd71f36d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 128,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000013": 1
+    }
+   }
+  },
+  "texture/slt5brn2.bmp@cca1d46a": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.28,
+   "colorName": "green",
+   "contrast": 0.1,
+   "fileName": "slt5brn2.bmp",
+   "format": "BMP P",
+   "height": 128,
+   "kind": "texture",
+   "meanColor": [
+    54,
+    83,
+    56
+   ],
+   "name": "slt5brn2.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.04,
+    0.08
+   ],
+   "sha256": "cca1d46aa0c47d40c19938012775b122df70b750daedd5e1f7cdd60e2e5c8ac4",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 128,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000013": 1
+    }
+   }
+  },
+  "texture/slt5cent.bmp@6d26567a": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.277,
+   "colorName": "green",
+   "contrast": 0.102,
+   "fileName": "slt5cent.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    53,
+    83,
+    54
+   ],
+   "name": "slt5cent.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.0,
+    0.01
+   ],
+   "sha256": "6d26567ad2279a1f21818075874e4cfa96078ce03b0d74454a82f8736172eb98",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000013": 1
+    }
+   }
+  },
+  "texture/stumptop.bmp@582dd502": {
+   "archives": [
+    "stonebrunt_obj.s3d",
+    "stonebrunt_2_obj.s3d"
+   ],
+   "brightness": 0.309,
+   "colorName": "brown",
+   "contrast": 0.141,
+   "fileName": "stumptop.bmp",
+   "format": "BMP P",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    112,
+    71,
+    29
+   ],
+   "name": "stumptop.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.26,
+    4.31
+   ],
+   "sha256": "582dd50289e5c5efac41f16a34603a706cce6c956c50a9f7e00f80708013af7c",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/tableside.bmp@3861ba01": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.147,
+   "colorName": "red",
+   "contrast": 0.061,
+   "fileName": "tableside.bmp",
+   "format": "BMP P",
+   "height": 32,
+   "kind": "texture",
+   "meanColor": [
+    73,
+    24,
+    13
+   ],
+   "name": "tableside.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    3.38,
+    0.27
+   ],
+   "sha256": "3861ba010df135b28c6224ba8646cbc6f72f76178a5bdd1d16a436d1e9a5f570",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 32,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 2
+    }
+   }
+  },
+  "texture/tabletop.bmp@7c94e67d": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.356,
+   "colorName": "orange",
+   "contrast": 0.073,
+   "fileName": "tabletop.bmp",
+   "format": "BMP P",
+   "height": 32,
+   "kind": "texture",
+   "meanColor": [
+    132,
+    79,
+    45
+   ],
+   "name": "tabletop.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    3.01,
+    0.59
+   ],
+   "sha256": "7c94e67dc4f81892efe61f5322bf9670b1f6fbaf5ee30cdb3adbf7131ec357aa",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 2
+    }
+   }
+  },
+  "texture/torchbot.bmp@2d2886f6": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.165,
+   "colorName": "brown",
+   "contrast": 0.077,
+   "fileName": "torchbot.bmp",
+   "format": "BMP P",
+   "height": 32,
+   "kind": "texture",
+   "meanColor": [
+    48,
+    40,
+    34
+   ],
+   "name": "torchbot.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.96,
+    0.6
+   ],
+   "sha256": "2d2886f601003f41808806d23234a9e6513e020ba337a4dffda6f0e79d4b5223",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 32,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 2
+    }
+   }
+  },
+  "texture/torchtop.bmp@7f9c0062": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.191,
+   "colorName": "brown",
+   "contrast": 0.125,
+   "fileName": "torchtop.bmp",
+   "format": "BMP P",
+   "height": 32,
+   "kind": "texture",
+   "meanColor": [
+    56,
+    47,
+    38
+   ],
+   "name": "torchtop.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.68,
+    0.82
+   ],
+   "sha256": "7f9c0062ad3c0a8853f4630fe26292255c81e3c2afd3805548e4154bc6a56540",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 32,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/tunrock03.bmp@75339998": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.279,
+   "colorName": "grey",
+   "contrast": 0.1,
+   "fileName": "tunrock03.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    74,
+    71,
+    67
+   ],
+   "name": "tunrock03.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.68,
+    0.82
+   ],
+   "sha256": "753399988f00ed20f8b3e2dee1d78764355cea301fed13cb01b4a9b7be262087",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0006,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.345,
+     "overhang": 0.0,
+     "slope": 0.321,
+     "steep": 0.302,
+     "vertical": 0.032
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 51.9
+   },
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/w1.bmp@70326419": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.089,
+   "colorName": "blue",
+   "contrast": 0.053,
+   "fileName": "w1.bmp",
+   "format": "BMP P",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    5,
+    28,
+    42
+   ],
+   "name": "w1.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.1,
+    1.42
+   ],
+   "sha256": "70326419528f0da56bbc05c505df128a97792a941311d1a28598cea36a82e45c",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.5037,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.5,
+     "overhang": 0.5,
+     "slope": 0.0,
+     "steep": 0.0,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "passable": 1.0
+    },
+    "unitsPerRepeat": 288.7
+   },
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": [
+     "w1.bmp",
+     "w2.bmp",
+     "w3.bmp",
+     "w4.bmp"
+    ],
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/w2.bmp@54316ac9": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.09,
+   "colorName": "blue",
+   "contrast": 0.054,
+   "fileName": "w2.bmp",
+   "format": "BMP P",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    5,
+    28,
+    42
+   ],
+   "name": "w2.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.09,
+    1.24
+   ],
+   "sha256": "54316ac9590f7f2f049a4fae9937169369f7ffd9f562ff2dc329e2383b38f38f",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": [
+     "w1.bmp",
+     "w2.bmp",
+     "w3.bmp",
+     "w4.bmp"
+    ],
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/w3.bmp@1a2fa4de": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.09,
+   "colorName": "blue",
+   "contrast": 0.053,
+   "fileName": "w3.bmp",
+   "format": "BMP P",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    5,
+    28,
+    42
+   ],
+   "name": "w3.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.48,
+    1.54
+   ],
+   "sha256": "1a2fa4defe92bfc4690867b6571be2a31145520801820ae8ddde5bba7b432b4c",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": [
+     "w1.bmp",
+     "w2.bmp",
+     "w3.bmp",
+     "w4.bmp"
+    ],
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/w4.bmp@bb231a8d": {
+   "archives": [
+    "stonebrunt.s3d"
+   ],
+   "brightness": 0.089,
+   "colorName": "blue",
+   "contrast": 0.053,
+   "fileName": "w4.bmp",
+   "format": "BMP P",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    5,
+    28,
+    42
+   ],
+   "name": "w4.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.23,
+    1.45
+   ],
+   "sha256": "bb231a8d12f6c9fd766ab22b3168d300a93068b14146248ace51495868fa2f4a",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 64,
+   "wldMaterials": {
+    "animationFrames": [
+     "w1.bmp",
+     "w2.bmp",
+     "w3.bmp",
+     "w4.bmp"
+    ],
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/warrendfrme01.bmp@c6193258": {
+   "archives": [
+    "stonebrunt_obj.s3d",
+    "stonebrunt_2_obj.s3d"
+   ],
+   "brightness": 0.414,
+   "colorName": "grey",
+   "contrast": 0.14,
+   "fileName": "warrendfrme01.bmp",
+   "format": "BMP P",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    107,
+    105,
+    104
+   ],
+   "name": "warrendfrme01.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.46,
+    1.62
+   ],
+   "sha256": "c6193258ea09b5a04405ed3c9af94314632d942414e2b7e5fd5d993c191d0670",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 32,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/warrenrck01.bmp@e0bf344e": {
+   "archives": [
+    "stonebrunt_obj.s3d"
+   ],
+   "brightness": 0.247,
+   "colorName": "grey",
+   "contrast": 0.075,
+   "fileName": "warrenrck01.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    59,
+    65,
+    64
+   ],
+   "name": "warrenrck01.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.03,
+    1.34
+   ],
+   "sha256": "e0bf344e2354f55480554b2611c3874f7c566ead74793dbfc0115b9179842c41",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  },
+  "texture/warrenswdoor01.bmp@504a3f26": {
+   "archives": [
+    "stonebrunt_obj.s3d",
+    "stonebrunt_2_obj.s3d"
+   ],
+   "brightness": 0.347,
+   "colorName": "grey",
+   "contrast": 0.16,
+   "fileName": "warrenswdoor01.bmp",
+   "format": "BMP P",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    90,
+    88,
+    86
+   ],
+   "name": "warrenswdoor01.bmp",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.95,
+    4.31
+   ],
+   "sha256": "504a3f26ae426c1368d562aa11b9f0ad410c8ec3ae031a4fee58d455c5ab110f",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256,
+   "wldMaterials": {
+    "animationFrames": null,
+    "renderMethods": {
+     "0x80000001": 1
+    }
+   }
+  }
+ },
+ "fileHashes": {
+  "stonebrunt.s3d": "41f48b7df9804ed3d407a09751a94cccc0e341039a458d49e1a7b640903204da",
+  "stonebrunt_2_obj.s3d": "3e4e62c0fc6036a4cea8708638cecbe111b9e150616180aaeef913257df921ed",
+  "stonebrunt_obj.s3d": "5eef3c97c710de88d873c61e46a6e770fdeae7642359c20f59458787fd20d2a6",
+  "stonebrunt_obj2.s3d": "233f480487e7d7e881be33f7d423893b3ec9b3c90b9f8ad990515003df4d4f70"
+ },
+ "format": "wld",
+ "problems": [],
+ "source": "zone:stonebrunt",
+ "surveyVersion": 4,
+ "zone": "stonebrunt"
+}

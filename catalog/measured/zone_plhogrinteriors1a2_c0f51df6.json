@@ -1,0 +1,476 @@
+{
+ "archives": [
+  "plhogrinteriors1a2.eqg"
+ ],
+ "assets": {
+  "model/obj_doora.mod@5f26f930": {
+   "archive": "plhogrinteriors1a2.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump2UV.fx",
+     "textures": {
+      "e_TextureCoverage0": "di_fp_ext_coverage_lite.dds",
+      "e_TextureDiffuse0": "di_frnt_wall_plain2.dds",
+      "e_TextureNormal0": "marr_marble_plain_n2.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "di_fp_ext_coverage_lite.dds",
+      "e_TextureDiffuse0": "plh_ogre_drwin_c.dds",
+      "e_TextureNormal0": "plh_ogre_drwin_n4.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "plh_ogr_wallb.dds",
+      "e_TextureDiffuse0": "sarith_grass_a_c.dds",
+      "e_TextureNormal0": "di_morel_ext_stone_6n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump2UV.fx",
+     "textures": {
+      "e_TextureCoverage0": "di_fp_ext_coverage_lite.dds",
+      "e_TextureDiffuse0": "sp_walladark.dds",
+      "e_TextureNormal0": "sp_walladark_n20.dds"
+     }
+    }
+   ],
+   "name": "obj_doora.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "5f26f93065e6e501191c61c2eaa311f9336cb8ac88267821ec446d4adaa0bd54",
+   "size": [
+    9.0,
+    0.9,
+    12.0
+   ],
+   "skinned": false,
+   "triangles": 40
+  },
+  "model/ter_ogrehouse.ter@e5ce8349": {
+   "archive": "plhogrinteriors1a2.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump2UV.fx",
+     "textures": {
+      "e_TextureCoverage0": "di_fp_ext_coverage_lite.dds",
+      "e_TextureDiffuse0": "di_frnt_wall_plain2.dds",
+      "e_TextureNormal0": "marr_marble_plain_n2.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "di_fp_ext_coverage_lite.dds",
+      "e_TextureDiffuse0": "plh_ogre_drwin_c.dds",
+      "e_TextureNormal0": "plh_ogre_drwin_n4.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "plh_ogr_wallb.dds",
+      "e_TextureDiffuse0": "sarith_grass_a_c.dds",
+      "e_TextureNormal0": "di_morel_ext_stone_6n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump2UV.fx",
+     "textures": {
+      "e_TextureCoverage0": "di_fp_ext_coverage_lite.dds",
+      "e_TextureDiffuse0": "sp_walladark.dds",
+      "e_TextureNormal0": "sp_walladark_n20.dds"
+     }
+    }
+   ],
+   "name": "ter_ogrehouse.ter",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "e5ce8349736d04cca116c2a91548f5fd5e438bdaf913be78877c7202f5b3b3a4",
+   "size": [
+    59.8,
+    84.3,
+    27.8
+   ],
+   "skinned": false,
+   "triangles": 1218
+  },
+  "texture/di_fp_ext_coverage_lite.dds@40b101e4": {
+   "archives": [
+    "plhogrinteriors1a2.eqg"
+   ],
+   "brightness": 0.385,
+   "colorName": "grey",
+   "contrast": 0.08,
+   "fileName": "di_fp_ext_coverage_lite.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_doora.mod": 3,
+     "ter_ogrehouse.ter": 3
+    },
+    "partners": {
+     "di_frnt_wall_plain2.dds": 2,
+     "marr_marble_plain_n2.dds": 2,
+     "plh_ogre_drwin_c.dds": 2,
+     "plh_ogre_drwin_n4.dds": 2,
+     "sp_walladark.dds": 2
+    },
+    "roles": {
+     "e_TextureCoverage0": 6
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2,
+     "Opaque_MPLBump2UV.fx": 4
+    }
+   },
+   "meanColor": [
+    99,
+    98,
+    94
+   ],
+   "name": "di_fp_ext_coverage_lite.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.83,
+    6.57
+   ],
+   "sha256": "40b101e41a3bdb68833b88b4924bcc6cbe8b8f8dacdec4d66deb0cb30099dd88",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_frnt_wall_plain2.dds@9871a9a7": {
+   "archives": [
+    "plhogrinteriors1a2.eqg"
+   ],
+   "brightness": 0.484,
+   "colorName": "grey",
+   "contrast": 0.035,
+   "fileName": "di_frnt_wall_plain2.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_doora.mod": 1,
+     "ter_ogrehouse.ter": 1
+    },
+    "partners": {
+     "di_fp_ext_coverage_lite.dds": 2,
+     "marr_marble_plain_n2.dds": 2
+    },
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump2UV.fx": 2
+    }
+   },
+   "meanColor": [
+    126,
+    123,
+    118
+   ],
+   "name": "di_frnt_wall_plain2.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.19,
+    1.18
+   ],
+   "sha256": "9871a9a74ab65ace2c4c016f872236aa39e3d5577e4f515794eefdb1b14d154f",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/marr_marble_plain_n2.dds@72539439": {
+   "archives": [
+    "plhogrinteriors1a2.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.041,
+   "fileName": "marr_marble_plain_n2.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_doora.mod": 1,
+     "ter_ogrehouse.ter": 1
+    },
+    "partners": {
+     "di_fp_ext_coverage_lite.dds": 2,
+     "di_frnt_wall_plain2.dds": 2
+    },
+    "roles": {
+     "e_TextureNormal0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump2UV.fx": 2
+    }
+   },
+   "meanColor": [
+    128,
+    128,
+    253
+   ],
+   "name": "marr_marble_plain_n2.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.55,
+    1.65
+   ],
+   "sha256": "725394391b55e1ef57ac7de3dbf75c1e33847d874563a32554e15b0a864fb56f",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/plh_ogre_drwin_c.dds@be563662": {
+   "archives": [
+    "plhogrinteriors1a2.eqg"
+   ],
+   "brightness": 0.305,
+   "colorName": "brown",
+   "contrast": 0.077,
+   "fileName": "plh_ogre_drwin_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_doora.mod": 1,
+     "ter_ogrehouse.ter": 1
+    },
+    "partners": {
+     "di_fp_ext_coverage_lite.dds": 2,
+     "plh_ogre_drwin_n4.dds": 2
+    },
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    90,
+    76,
+    56
+   ],
+   "name": "plh_ogre_drwin_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.45,
+    1.4
+   ],
+   "sha256": "be563662e1317537d19bc0b8648e745cd6f7dc087e43c9cbfe035583d19d16b1",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0162,
+    "objectShare": 0.429,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.005,
+     "slope": 0.002,
+     "steep": 0.002,
+     "vertical": 0.99
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 12.1
+   },
+   "width": 256
+  },
+  "texture/plh_ogre_drwin_n4.dds@da0a142a": {
+   "archives": [
+    "plhogrinteriors1a2.eqg"
+   ],
+   "brightness": 0.557,
+   "colorName": "blue",
+   "contrast": 0.032,
+   "fileName": "plh_ogre_drwin_n4.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_doora.mod": 1,
+     "ter_ogrehouse.ter": 1
+    },
+    "partners": {
+     "di_fp_ext_coverage_lite.dds": 2,
+     "plh_ogre_drwin_c.dds": 2
+    },
+    "roles": {
+     "e_TextureNormal0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    128,
+    128,
+    253
+   ],
+   "name": "plh_ogre_drwin_n4.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.79,
+    1.05
+   ],
+   "sha256": "da0a142a9989e6a51097d8fdd07ea37b2bc62733d0b316696d430d46bcf21888",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/sp_walladark.dds@d75b6174": {
+   "archives": [
+    "plhogrinteriors1a2.eqg"
+   ],
+   "brightness": 0.246,
+   "colorName": "grey",
+   "contrast": 0.03,
+   "fileName": "sp_walladark.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_doora.mod": 1,
+     "ter_ogrehouse.ter": 1
+    },
+    "partners": {
+     "di_fp_ext_coverage_lite.dds": 2,
+     "sp_walladark_n20.dds": 2
+    },
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump2UV.fx": 2
+    }
+   },
+   "meanColor": [
+    64,
+    63,
+    59
+   ],
+   "name": "sp_walladark.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.14,
+    1.11
+   ],
+   "sha256": "d75b6174a59b568ddc5bbb9017c19ec2f9463a29a194cbc7683cb08e90779f1a",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.9838,
+    "objectShare": 0.0,
+    "slopeShares": {
+     "flat": 0.257,
+     "overhang": 0.332,
+     "slope": 0.036,
+     "steep": 0.016,
+     "vertical": 0.358
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 14.1
+   },
+   "width": 256
+  },
+  "texture/sp_walladark_n20.dds@1eb28045": {
+   "archives": [
+    "plhogrinteriors1a2.eqg"
+   ],
+   "brightness": 0.557,
+   "colorName": "blue",
+   "contrast": 0.026,
+   "fileName": "sp_walladark_n20.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_doora.mod": 1,
+     "ter_ogrehouse.ter": 1
+    },
+    "partners": {
+     "di_fp_ext_coverage_lite.dds": 2,
+     "sp_walladark.dds": 2
+    },
+    "roles": {
+     "e_TextureNormal0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump2UV.fx": 2
+    }
+   },
+   "meanColor": [
+    128,
+    128,
+    254
+   ],
+   "name": "sp_walladark_n20.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.92,
+    0.88
+   ],
+   "sha256": "1eb28045ba0dc2b6c578b4065bfbdad901e99ef6b80a83a530d67f1670fa99ed",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  }
+ },
+ "fileHashes": {
+  "plhogrinteriors1a2.eqg": "916c577c81d0511a2c8a48ca629a63776c5151877e45369ce9d8aba84142c901",
+  "plhogrinteriors1a2.zon": "120daf45f937664f7fffe8cadcbc5b0513c5b150979146277f1436e1a7ad059a"
+ },
+ "format": "eqgz",
+ "problems": [],
+ "source": "zone:plhogrinteriors1a2",
+ "surveyVersion": 4,
+ "zone": "plhogrinteriors1a2"
+}

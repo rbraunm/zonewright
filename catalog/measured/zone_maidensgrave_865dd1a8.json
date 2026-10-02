@@ -1,0 +1,6058 @@
+{
+ "archives": [
+  "buriedswitches.eqg",
+  "maidensgrave.eqg"
+ ],
+ "assets": {
+  "ecosystem/maidensgrave/base": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "di_cover_ground02b.dds",
+     "detailMap": "whitesand01.dds",
+     "detailRepeat": 20,
+     "detailUnitsPerRepeat": 19.2,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "underwater",
+     "normalMap": "whitesand01_n.dds",
+     "normalRepeat": 20,
+     "normalUnitsPerRepeat": 19.2,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "base",
+   "zone": "maidensgrave"
+  },
+  "ecosystem/maidensgrave/blacksand": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_desert.dds",
+     "detailMap": "sb_rock01_c.dds",
+     "detailRepeat": 6,
+     "detailUnitsPerRepeat": 64.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "sand",
+     "normalMap": "sb_rock01_n.dds",
+     "normalRepeat": 6,
+     "normalUnitsPerRepeat": 64.0,
+     "slopeTolerance": 1
+    },
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_desert.dds",
+     "detailMap": "blacksand05_c.dds",
+     "detailRepeat": 30,
+     "detailUnitsPerRepeat": 12.8,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 320.0,
+     "maxSlope": 45,
+     "minHeight": 200.0,
+     "minSlope": 0,
+     "name": "blksand",
+     "normalMap": "whitesand01_n.dds",
+     "normalRepeat": 30,
+     "normalUnitsPerRepeat": 12.8,
+     "slopeTolerance": 1
+    },
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_desert.dds",
+     "detailMap": "ab_junglefloor03_c.dds",
+     "detailRepeat": 20,
+     "detailUnitsPerRepeat": 19.2,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 500.0,
+     "maxSlope": 30,
+     "minHeight": 420.0,
+     "minSlope": 0,
+     "name": "grass",
+     "normalMap": "ab_junglefloor_n.dds",
+     "normalRepeat": 20,
+     "normalUnitsPerRepeat": 19.2,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "blacksand",
+   "zone": "maidensgrave"
+  },
+  "ecosystem/maidensgrave/blksand2": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_desert.dds",
+     "detailMap": "sb_rock01_c.dds",
+     "detailRepeat": 6,
+     "detailUnitsPerRepeat": 64.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "blksand",
+     "normalMap": "sb_rock01_n.dds",
+     "normalRepeat": 6,
+     "normalUnitsPerRepeat": 64.0,
+     "slopeTolerance": 1
+    },
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_desert.dds",
+     "detailMap": "blacksand05_c.dds",
+     "detailRepeat": 30,
+     "detailUnitsPerRepeat": 12.8,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 320.0,
+     "maxSlope": 45,
+     "minHeight": 200.0,
+     "minSlope": 0,
+     "name": "sand",
+     "normalMap": "whitesand01_n.dds",
+     "normalRepeat": 30,
+     "normalUnitsPerRepeat": 12.8,
+     "slopeTolerance": 1
+    },
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_desert.dds",
+     "detailMap": "ab_junglefloor03_c.dds",
+     "detailRepeat": 20,
+     "detailUnitsPerRepeat": 19.2,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 500.0,
+     "maxSlope": 30,
+     "minHeight": 312.0,
+     "minSlope": 3,
+     "name": "grass",
+     "normalMap": "ab_junglefloor_n.dds",
+     "normalRepeat": 20,
+     "normalUnitsPerRepeat": 19.2,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "blksand2",
+   "zone": "maidensgrave"
+  },
+  "ecosystem/maidensgrave/island": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_desert.dds",
+     "detailMap": "sb_rock01_c.dds",
+     "detailRepeat": 6,
+     "detailUnitsPerRepeat": 64.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "wetsand",
+     "normalMap": "sb_rock01_n.dds",
+     "normalRepeat": 6,
+     "normalUnitsPerRepeat": 64.0,
+     "slopeTolerance": 1
+    },
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 1,
+     "coverMap": "reallywhitesand.dds",
+     "detailMap": "reallywhitesand.dds",
+     "detailRepeat": 30,
+     "detailUnitsPerRepeat": 12.8,
+     "heightTolerance": 53.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 325.0,
+     "maxSlope": 20,
+     "minHeight": 250.0,
+     "minSlope": 0,
+     "name": "beach",
+     "normalMap": "whitesand01_n.dds",
+     "normalRepeat": 30,
+     "normalUnitsPerRepeat": 12.8,
+     "slopeTolerance": 30
+    },
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_desert.dds",
+     "detailMap": "ab_junglefloor03_c.dds",
+     "detailRepeat": 30,
+     "detailUnitsPerRepeat": 12.8,
+     "heightTolerance": 15.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 600.0,
+     "maxSlope": 30,
+     "minHeight": 315.0,
+     "minSlope": 5,
+     "name": "green",
+     "normalMap": "ab_junglefloor_n.dds",
+     "normalRepeat": 30,
+     "normalUnitsPerRepeat": 12.8,
+     "slopeTolerance": 6
+    }
+   ],
+   "name": "island",
+   "zone": "maidensgrave"
+  },
+  "ecosystem/maidensgrave/monkeyisland": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_desert.dds",
+     "detailMap": "sb_rock01_c.dds",
+     "detailRepeat": 6,
+     "detailUnitsPerRepeat": 64.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "seafloor",
+     "normalMap": "sb_rock01_n.dds",
+     "normalRepeat": 6,
+     "normalUnitsPerRepeat": 64.0,
+     "slopeTolerance": 1
+    },
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_desert.dds",
+     "detailMap": "reallywhitesand.dds",
+     "detailRepeat": 30,
+     "detailUnitsPerRepeat": 12.8,
+     "heightTolerance": 53.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 325.0,
+     "maxSlope": 20,
+     "minHeight": 250.0,
+     "minSlope": 0,
+     "name": "beach",
+     "normalMap": "whitesand01_n.dds",
+     "normalRepeat": 30,
+     "normalUnitsPerRepeat": 12.8,
+     "slopeTolerance": 30
+    },
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_desert.dds",
+     "detailMap": "ab_junglefloor03_c.dds",
+     "detailRepeat": 20,
+     "detailUnitsPerRepeat": 19.2,
+     "heightTolerance": 15.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 600.0,
+     "maxSlope": 30,
+     "minHeight": 315.0,
+     "minSlope": 5,
+     "name": "grass",
+     "normalMap": "ab_junglefloor_n.dds",
+     "normalRepeat": 20,
+     "normalUnitsPerRepeat": 19.2,
+     "slopeTolerance": 6
+    }
+   ],
+   "name": "monkeyisland",
+   "zone": "maidensgrave"
+  },
+  "ecosystem/maidensgrave/rock": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_desert.dds",
+     "detailMap": "sb_rock01_c.dds",
+     "detailRepeat": 6,
+     "detailUnitsPerRepeat": 64.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "rock",
+     "normalMap": "sb_rock01_n.dds",
+     "normalRepeat": 6,
+     "normalUnitsPerRepeat": 64.0,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "rock",
+   "zone": "maidensgrave"
+  },
+  "ecosystem/maidensgrave/sand": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_desert.dds",
+     "detailMap": "reallywhitesand.dds",
+     "detailRepeat": 30,
+     "detailUnitsPerRepeat": 12.8,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "name": "sand",
+     "normalMap": "whitesand01_n.dds",
+     "normalRepeat": 30,
+     "normalUnitsPerRepeat": 12.8,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "sand",
+   "zone": "maidensgrave"
+  },
+  "ecosystem/maidensgrave/siren": {
+   "kind": "ecosystem",
+   "layers": [
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_desert.dds",
+     "detailMap": "sb_rock01_c.dds",
+     "detailRepeat": 6,
+     "detailUnitsPerRepeat": 64.0,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": 360.0,
+     "minSlope": 0,
+     "name": "ocnflr",
+     "normalMap": "sb_rock01_n.dds",
+     "normalRepeat": 6,
+     "normalUnitsPerRepeat": 64.0,
+     "slopeTolerance": 1
+    },
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_desert.dds",
+     "detailMap": "di_ocean_shell_pile.dds",
+     "detailRepeat": 25,
+     "detailUnitsPerRepeat": 15.4,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 305.0,
+     "maxSlope": 45,
+     "minHeight": 305.0,
+     "minSlope": 10,
+     "name": "blksnd",
+     "normalMap": "di_ocean_shell_pile_n.dds",
+     "normalRepeat": 25,
+     "normalUnitsPerRepeat": 15.4,
+     "slopeTolerance": 1
+    },
+    {
+     "blendMap": "default.bmp",
+     "blendSoftness": 0,
+     "coverMap": "coverage_desert.dds",
+     "detailMap": "di_ocean_coral_reef2.dds",
+     "detailRepeat": 9,
+     "detailUnitsPerRepeat": 42.7,
+     "heightTolerance": 10.0,
+     "layeringArea": 16,
+     "layeringMap": "default.bmp",
+     "maxHeight": 390.0,
+     "maxSlope": 45,
+     "minHeight": 315.0,
+     "minSlope": 20,
+     "name": "clrrck",
+     "normalMap": "di_ocean_coral_reef_n.dds",
+     "normalRepeat": 9,
+     "normalUnitsPerRepeat": 42.7,
+     "slopeTolerance": 1
+    }
+   ],
+   "name": "siren",
+   "zone": "maidensgrave"
+  },
+  "model/obj_bgrocka_dk.mod@023ebd49": {
+   "archive": "maidensgrave.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump2UV.fx",
+     "textures": {
+      "e_TextureCoverage0": "di_ocean_beach_cave.dds",
+      "e_TextureDiffuse0": "sb_rock01_c.dds",
+      "e_TextureNormal0": "sb_rock01_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump2UV.fx",
+     "textures": {
+      "e_TextureCoverage0": "di_ocean_beach_rock.dds",
+      "e_TextureDiffuse0": "di_ocean_beach_rock.dds",
+      "e_TextureNormal0": "di_ocean_beach_rock_8n.dds"
+     }
+    }
+   ],
+   "name": "obj_bgrocka_dk.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "023ebd49a5384446549df04ec98e06a28f983ffa41f1efa4814b4ad4e99f1d9b",
+   "size": [
+    116.8,
+    176.4,
+    104.7
+   ],
+   "skinned": false,
+   "triangles": 346
+  },
+  "model/obj_bgrockb_dk.mod@b838cdb0": {
+   "archive": "maidensgrave.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump2UV.fx",
+     "textures": {
+      "e_TextureCoverage0": "di_ocean_beach_cave.dds",
+      "e_TextureDiffuse0": "sb_rock01_c.dds",
+      "e_TextureNormal0": "sb_rock01_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump2UV.fx",
+     "textures": {
+      "e_TextureCoverage0": "di_ocean_beach_rock.dds",
+      "e_TextureDiffuse0": "di_ocean_beach_rock.dds",
+      "e_TextureNormal0": "di_ocean_beach_rock_8n.dds"
+     }
+    }
+   ],
+   "name": "obj_bgrockb_dk.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "b838cdb0a6d95cffa8ffaccba4ae00121404fb219ee7bd6dbe8c16199c32c206",
+   "size": [
+    130.0,
+    183.7,
+    62.2
+   ],
+   "skinned": false,
+   "triangles": 424
+  },
+  "model/obj_camp_bones_a.mod@cc4f56a0": {
+   "archive": "maidensgrave.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "nek_erosion_ov_4tile.dds",
+      "e_TextureDiffuse0": "hp_skull05_c.dds",
+      "e_TextureNormal0": "hp_skull05_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "nek_erosion_ov_4tile.dds",
+      "e_TextureNormal0": "hp_skull06_n.dds"
+     }
+    }
+   ],
+   "name": "obj_camp_bones_a.mod",
+   "placements": 176,
+   "scaleRange": [
+    1.0,
+    1.492
+   ],
+   "sha256": "cc4f56a015942acb6745b987091a43e363701b5711e9826de1ea604e543f8291",
+   "size": [
+    3.9,
+    4.3,
+    0.4
+   ],
+   "skinned": false,
+   "triangles": 476
+  },
+  "model/obj_camp_bones_b.mod@a7638fea": {
+   "archive": "maidensgrave.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "nek_erosion_ov_4tile.dds",
+      "e_TextureDiffuse0": "hp_skull05_c.dds",
+      "e_TextureNormal0": "hp_skull05_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "nek_erosion_ov_4tile.dds",
+      "e_TextureNormal0": "hp_skull06_n.dds"
+     }
+    }
+   ],
+   "name": "obj_camp_bones_b.mod",
+   "placements": 182,
+   "scaleRange": [
+    1.0,
+    1.5
+   ],
+   "sha256": "a7638fea6bb4b3331dd5f6c5df6fbc07798dd8c9808a8ca256bc52c252bb1605",
+   "size": [
+    2.3,
+    3.0,
+    0.7
+   ],
+   "skinned": false,
+   "triangles": 612
+  },
+  "model/obj_mdrocka_dk.mod@93004823": {
+   "archive": "maidensgrave.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump2UV.fx",
+     "textures": {
+      "e_TextureCoverage0": "di_ocean_beach_cave.dds",
+      "e_TextureDiffuse0": "sb_rock01_c.dds",
+      "e_TextureNormal0": "sb_rock01_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump2UV.fx",
+     "textures": {
+      "e_TextureCoverage0": "di_ocean_beach_rock.dds",
+      "e_TextureDiffuse0": "di_ocean_beach_rock.dds",
+      "e_TextureNormal0": "di_ocean_beach_rock_8n.dds"
+     }
+    }
+   ],
+   "name": "obj_mdrocka_dk.mod",
+   "placements": 21,
+   "scaleRange": [
+    0.118,
+    2.001
+   ],
+   "sha256": "930048239b61424d8eda1078eca753ab1bb0af82cf5d08e92dcc1e67351b3734",
+   "size": [
+    47.2,
+    43.3,
+    43.3
+   ],
+   "skinned": false,
+   "triangles": 204
+  },
+  "model/obj_mdrockb_dk.mod@c98f8f51": {
+   "archive": "maidensgrave.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump2UV.fx",
+     "textures": {
+      "e_TextureCoverage0": "di_ocean_beach_cave.dds",
+      "e_TextureDiffuse0": "sb_rock01_c.dds",
+      "e_TextureNormal0": "sb_rock01_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump2UV.fx",
+     "textures": {
+      "e_TextureCoverage0": "di_ocean_beach_rock.dds",
+      "e_TextureDiffuse0": "di_ocean_beach_rock.dds",
+      "e_TextureNormal0": "di_ocean_beach_rock_8n.dds"
+     }
+    }
+   ],
+   "name": "obj_mdrockb_dk.mod",
+   "placements": 1,
+   "scaleRange": [
+    0.501,
+    0.501
+   ],
+   "sha256": "c98f8f51a0e77ef9807ee06ff05bb483c50d2281dae0da501d5c2127dedfa633",
+   "size": [
+    51.0,
+    48.6,
+    35.5
+   ],
+   "skinned": false,
+   "triangles": 276
+  },
+  "model/obj_mdrockc_dk.mod@e770365d": {
+   "archive": "maidensgrave.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump2UV.fx",
+     "textures": {
+      "e_TextureCoverage0": "di_ocean_beach_cave.dds",
+      "e_TextureDiffuse0": "sb_rock01_c.dds",
+      "e_TextureNormal0": "sb_rock01_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump2UV.fx",
+     "textures": {
+      "e_TextureCoverage0": "di_ocean_beach_rock.dds",
+      "e_TextureDiffuse0": "di_ocean_beach_rock.dds",
+      "e_TextureNormal0": "di_ocean_beach_rock_8n.dds"
+     }
+    }
+   ],
+   "name": "obj_mdrockc_dk.mod",
+   "placements": 2,
+   "scaleRange": [
+    0.501,
+    0.501
+   ],
+   "sha256": "e770365dd042a6fddd18026b339f502675cec76624e821963556e61d160e1bf1",
+   "size": [
+    52.7,
+    52.7,
+    53.5
+   ],
+   "skinned": false,
+   "triangles": 276
+  },
+  "model/obj_rock_arch.mod@5f679679": {
+   "archive": "maidensgrave.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_desert.dds",
+      "e_TextureDiffuse0": "sb_rock01_c.dds",
+      "e_TextureNormal0": "sb_rock01_n.dds"
+     }
+    }
+   ],
+   "name": "obj_rock_arch.mod",
+   "placements": 4,
+   "scaleRange": [
+    1.0,
+    2.001
+   ],
+   "sha256": "5f6796790610bf9f8f37c660cf47e0d6ebb9d959a036fa62ac2f9ebc42f89367",
+   "size": [
+    56.5,
+    118.3,
+    90.0
+   ],
+   "skinned": false,
+   "triangles": 1812
+  },
+  "model/obj_rockarcha_dk.mod@d57fd2e1": {
+   "archive": "maidensgrave.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump2UV.fx",
+     "textures": {
+      "e_TextureCoverage0": "di_ocean_beach_cave.dds",
+      "e_TextureDiffuse0": "sb_rock01_c.dds",
+      "e_TextureNormal0": "sb_rock01_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump2UV.fx",
+     "textures": {
+      "e_TextureCoverage0": "di_ocean_beach_rock.dds",
+      "e_TextureDiffuse0": "di_ocean_beach_rock.dds",
+      "e_TextureNormal0": "di_ocean_beach_rock_8n.dds"
+     }
+    }
+   ],
+   "name": "obj_rockarcha_dk.mod",
+   "placements": 5,
+   "scaleRange": [
+    1.0,
+    2.001
+   ],
+   "sha256": "d57fd2e16f0dfceb97a39ecf6446bd28635391450591f81573d5c0d02f33a8a9",
+   "size": [
+    312.6,
+    180.6,
+    113.4
+   ],
+   "skinned": false,
+   "triangles": 848
+  },
+  "model/obj_smrocka_dk.mod@94684055": {
+   "archive": "maidensgrave.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump2UV.fx",
+     "textures": {
+      "e_TextureCoverage0": "di_ocean_beach_cave.dds",
+      "e_TextureDiffuse0": "sb_rock01_c.dds",
+      "e_TextureNormal0": "sb_rock01_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump2UV.fx",
+     "textures": {
+      "e_TextureCoverage0": "di_ocean_beach_rock.dds",
+      "e_TextureDiffuse0": "di_ocean_beach_rock.dds",
+      "e_TextureNormal0": "di_ocean_beach_rock_8n.dds"
+     }
+    }
+   ],
+   "name": "obj_smrocka_dk.mod",
+   "placements": 134,
+   "scaleRange": [
+    0.113,
+    0.985
+   ],
+   "sha256": "94684055031a8ea6a3a2b4a9446b6e9393915488932e6216e135c7db5382052e",
+   "size": [
+    17.8,
+    14.6,
+    7.9
+   ],
+   "skinned": false,
+   "triangles": 90
+  },
+  "model/obj_smrockb_dk.mod@f76e414e": {
+   "archive": "maidensgrave.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump2UV.fx",
+     "textures": {
+      "e_TextureCoverage0": "di_ocean_beach_cave.dds",
+      "e_TextureDiffuse0": "sb_rock01_c.dds",
+      "e_TextureNormal0": "sb_rock01_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump2UV.fx",
+     "textures": {
+      "e_TextureCoverage0": "di_ocean_beach_rock.dds",
+      "e_TextureDiffuse0": "di_ocean_beach_rock.dds",
+      "e_TextureNormal0": "di_ocean_beach_rock_8n.dds"
+     }
+    }
+   ],
+   "name": "obj_smrockb_dk.mod",
+   "placements": 140,
+   "scaleRange": [
+    0.101,
+    0.996
+   ],
+   "sha256": "f76e414e9af52d9c8ed1c75dc1ab3b1ab40b57078405dbd5defd6f4aa52556f5",
+   "size": [
+    16.7,
+    14.6,
+    11.0
+   ],
+   "skinned": false,
+   "triangles": 90
+  },
+  "model/obj_smrockc_dk.mod@670586ec": {
+   "archive": "maidensgrave.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump2UV.fx",
+     "textures": {
+      "e_TextureCoverage0": "di_ocean_beach_cave.dds",
+      "e_TextureDiffuse0": "sb_rock01_c.dds",
+      "e_TextureNormal0": "sb_rock01_n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump2UV.fx",
+     "textures": {
+      "e_TextureCoverage0": "di_ocean_beach_rock.dds",
+      "e_TextureDiffuse0": "di_ocean_beach_rock.dds",
+      "e_TextureNormal0": "di_ocean_beach_rock_8n.dds"
+     }
+    }
+   ],
+   "name": "obj_smrockc_dk.mod",
+   "placements": 129,
+   "scaleRange": [
+    0.104,
+    0.991
+   ],
+   "sha256": "670586ec5d9ddf1870dc51eb97551cd55b411802ae53036419176c705bb36de5",
+   "size": [
+    14.6,
+    18.8,
+    8.0
+   ],
+   "skinned": false,
+   "triangles": 246
+  },
+  "model/obj_wreckbk.mod@0f0d7d63": {
+   "archive": "maidensgrave.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_desert.dds",
+      "e_TextureDiffuse0": "di_ocean_wood_plank.dds",
+      "e_TextureNormal0": "di_ocean_wood_plank_8n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_desert.dds",
+      "e_TextureDiffuse0": "di_ocean_wood_plank_barnacles2.dds",
+      "e_TextureNormal0": "di_ocean_wood_plank_barnacles2_8n.dds"
+     }
+    },
+    {
+     "shader": "Alpha_MPLBasicAT.fx",
+     "textures": {
+      "e_TextureDiffuse0": "cb_rail_alpha_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_desert.dds",
+      "e_TextureDiffuse0": "di_fp_ext_woodbeam_dark.dds",
+      "e_TextureNormal0": "di_fp_ext_woodbeam_16n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_desert.dds",
+      "e_TextureDiffuse0": "adl_plankwall_c.dds",
+      "e_TextureNormal0": "adl_plankwall.dds"
+     }
+    }
+   ],
+   "name": "obj_wreckbk.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "0f0d7d6347c2b6ae1a0a45627fe4b8fbd91a0ff22ab216a244116593f0a11c35",
+   "size": [
+    165.5,
+    97.1,
+    101.2
+   ],
+   "skinned": false,
+   "triangles": 4906
+  },
+  "model/obj_wreckfrnt.mod@db7f3de5": {
+   "archive": "maidensgrave.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_desert.dds",
+      "e_TextureDiffuse0": "di_ocean_wood_plank.dds",
+      "e_TextureNormal0": "di_ocean_wood_plank_8n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_desert.dds",
+      "e_TextureDiffuse0": "di_ocean_wood_plank_barnacles2.dds",
+      "e_TextureNormal0": "di_ocean_wood_plank_barnacles2_8n.dds"
+     }
+    },
+    {
+     "shader": "Alpha_MPLBasicAT.fx",
+     "textures": {
+      "e_TextureDiffuse0": "cb_rail_alpha_c.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_desert.dds",
+      "e_TextureDiffuse0": "di_fp_ext_woodbeam_dark.dds",
+      "e_TextureNormal0": "di_fp_ext_woodbeam_16n.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_desert.dds",
+      "e_TextureDiffuse0": "adl_plankwall_c.dds",
+      "e_TextureNormal0": "adl_plankwall.dds"
+     }
+    }
+   ],
+   "name": "obj_wreckfrnt.mod",
+   "placements": 1,
+   "scaleRange": [
+    1.0,
+    1.0
+   ],
+   "sha256": "db7f3de558f60fb094d9d8936d552f41ee56c6441c9823aebd92221fdc603b6b",
+   "size": [
+    287.9,
+    90.4,
+    104.7
+   ],
+   "skinned": false,
+   "triangles": 2914
+  },
+  "model/obp_dsrt_palm_b_.mod@a66d3b04": {
+   "archive": "maidensgrave.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_desert.dds",
+      "e_TextureDiffuse0": "palmtrunk2.dds",
+      "e_TextureNormal0": "palmtrunk2_bump.dds"
+     }
+    },
+    {
+     "shader": "Chroma_MPLBasicA.fx",
+     "textures": {
+      "e_TextureDiffuse0": "di_ro_palm_frond01.ddsd01_c.dds"
+     }
+    }
+   ],
+   "name": "obp_dsrt_palm_b_.mod",
+   "placements": 84,
+   "scaleRange": [
+    0.103,
+    0.495
+   ],
+   "sha256": "a66d3b0459b134199d2212cce4b6a53af5189364eb9511467a8bd09cd780c244",
+   "size": [
+    58.3,
+    62.7,
+    126.6
+   ],
+   "skinned": false,
+   "triangles": 456
+  },
+  "model/obp_fernsa.mod@b8a916e8": {
+   "archive": "maidensgrave.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Chroma_MPLBasicAT.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ferns03.dds"
+     }
+    },
+    {
+     "shader": "Chroma_MPLBasicAT.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ferns02.dds"
+     }
+    },
+    {
+     "shader": "Chroma_MPLBasicA.fx",
+     "textures": {
+      "e_TextureDiffuse0": "grass01.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_desert.dds",
+      "e_TextureDiffuse0": "palmtrunk2.dds",
+      "e_TextureNormal0": "palmtrunk2_bump.dds"
+     }
+    },
+    {
+     "shader": "Chroma_MPLBasicAT.fx",
+     "textures": {
+      "e_TextureDiffuse0": "flowerbuds.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_desert.dds",
+      "e_TextureDiffuse0": "ab_junglefloor03_c.dds",
+      "e_TextureNormal0": "ab_junglefloor_n.dds"
+     }
+    }
+   ],
+   "name": "obp_fernsa.mod",
+   "placements": 48,
+   "scaleRange": [
+    0.251,
+    0.966
+   ],
+   "sha256": "b8a916e816df3214f03c11e1902ddfe1afd1629f6223b82088ec8bd2f905ee36",
+   "size": [
+    25.7,
+    27.3,
+    14.8
+   ],
+   "skinned": false,
+   "triangles": 186
+  },
+  "model/obp_fernsb.mod@57c0b1d1": {
+   "archive": "maidensgrave.eqg",
+   "kind": "model",
+   "materials": [
+    {
+     "shader": "Chroma_MPLBasicAT.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ferns03.dds"
+     }
+    },
+    {
+     "shader": "Chroma_MPLBasicAT.fx",
+     "textures": {
+      "e_TextureDiffuse0": "ferns02.dds"
+     }
+    },
+    {
+     "shader": "Chroma_MPLBasicA.fx",
+     "textures": {
+      "e_TextureDiffuse0": "grass01.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_desert.dds",
+      "e_TextureDiffuse0": "palmtrunk2.dds",
+      "e_TextureNormal0": "palmtrunk2_bump.dds"
+     }
+    },
+    {
+     "shader": "Chroma_MPLBasicAT.fx",
+     "textures": {
+      "e_TextureDiffuse0": "flowerbuds.dds"
+     }
+    },
+    {
+     "shader": "Opaque_MPLBump.fx",
+     "textures": {
+      "e_TextureCoverage0": "coverage_desert.dds",
+      "e_TextureDiffuse0": "ab_junglefloor03_c.dds",
+      "e_TextureNormal0": "ab_junglefloor_n.dds"
+     }
+    }
+   ],
+   "name": "obp_fernsb.mod",
+   "placements": 43,
+   "scaleRange": [
+    0.264,
+    0.995
+   ],
+   "sha256": "57c0b1d1789214bbf16d8568228db7ad5e098c39e56b7a9b7b9600c10a65b6d3",
+   "size": [
+    28.8,
+    28.6,
+    18.3
+   ],
+   "skinned": false,
+   "triangles": 246
+  },
+  "texture/ab_hematite_c.dds@dfc563d3": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.03,
+   "colorName": "black",
+   "contrast": 0.06,
+   "fileName": "ab_hematite_c.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    7,
+    8,
+    9
+   ],
+   "name": "ab_hematite_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.73,
+    0.85
+   ],
+   "sha256": "dfc563d3a675ee839759a2f34bc3bfa61bb381272aace2fe26d116f4c7c727f1",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/ab_junglefloor03_c.dds@9c8b23c3": {
+   "archives": [
+    "buriedswitches.eqg",
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.25,
+   "colorName": "green",
+   "contrast": 0.061,
+   "ecosystemLayers": [
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 19.2,
+     "ecosystem": "blacksand",
+     "layer": "grass",
+     "maxHeight": 500.0,
+     "maxSlope": 30,
+     "minHeight": 420.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 19.2
+    },
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 19.2,
+     "ecosystem": "blksand2",
+     "layer": "grass",
+     "maxHeight": 500.0,
+     "maxSlope": 30,
+     "minHeight": 312.0,
+     "minSlope": 3,
+     "normalUnitsPerRepeat": 19.2
+    },
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 12.8,
+     "ecosystem": "island",
+     "layer": "green",
+     "maxHeight": 600.0,
+     "maxSlope": 30,
+     "minHeight": 315.0,
+     "minSlope": 5,
+     "normalUnitsPerRepeat": 12.8
+    },
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 19.2,
+     "ecosystem": "monkeyisland",
+     "layer": "grass",
+     "maxHeight": 600.0,
+     "maxSlope": 30,
+     "minHeight": 315.0,
+     "minSlope": 5,
+     "normalUnitsPerRepeat": 19.2
+    }
+   ],
+   "fileName": "ab_junglefloor03_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obp_fernsa.mod": 48,
+     "obp_fernsb.mod": 43
+    },
+    "partners": {
+     "ab_junglefloor_n.dds": 2,
+     "coverage_desert.dds": 2
+    },
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    49,
+    76,
+    40
+   ],
+   "name": "ab_junglefloor03_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.85,
+    0.94
+   ],
+   "sha256": "9c8b23c35f3067e9eabf9b4bfd74f2d05086a8342340cd7c96b85cba140e00f8",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.0,
+     "slope": 0.091,
+     "steep": 0.422,
+     "vertical": 0.487
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 9.1
+   },
+   "width": 256
+  },
+  "texture/ab_junglefloor_n.dds@d8e92ec3": {
+   "archives": [
+    "buriedswitches.eqg",
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.079,
+   "ecosystemLayers": [
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 19.2,
+     "ecosystem": "blacksand",
+     "layer": "grass",
+     "maxHeight": 500.0,
+     "maxSlope": 30,
+     "minHeight": 420.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 19.2
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 19.2,
+     "ecosystem": "blksand2",
+     "layer": "grass",
+     "maxHeight": 500.0,
+     "maxSlope": 30,
+     "minHeight": 312.0,
+     "minSlope": 3,
+     "normalUnitsPerRepeat": 19.2
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 12.8,
+     "ecosystem": "island",
+     "layer": "green",
+     "maxHeight": 600.0,
+     "maxSlope": 30,
+     "minHeight": 315.0,
+     "minSlope": 5,
+     "normalUnitsPerRepeat": 12.8
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 19.2,
+     "ecosystem": "monkeyisland",
+     "layer": "grass",
+     "maxHeight": 600.0,
+     "maxSlope": 30,
+     "minHeight": 315.0,
+     "minSlope": 5,
+     "normalUnitsPerRepeat": 19.2
+    }
+   ],
+   "fileName": "ab_junglefloor_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obp_fernsa.mod": 48,
+     "obp_fernsb.mod": 43
+    },
+    "partners": {
+     "ab_junglefloor03_c.dds": 2,
+     "coverage_desert.dds": 2
+    },
+    "roles": {
+     "e_TextureNormal0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    128,
+    128,
+    248
+   ],
+   "name": "ab_junglefloor_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.79,
+    0.82
+   ],
+   "sha256": "d8e92ec3e35fb2046c9e980450e076cebc2d54068aaabcc727a5e036b4cbc868",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/ab_korlach_top01_c_ov.dds@95c72aff": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.439,
+   "colorName": "teal",
+   "contrast": 0.049,
+   "fileName": "ab_korlach_top01_c_ov.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    96,
+    119,
+    117
+   ],
+   "name": "ab_korlach_top01_c_ov.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.85,
+    1.43
+   ],
+   "sha256": "95c72aff5a55894d95c7c863cf232c8996347b396f1db8deade32d76d32e01d0",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/adl_plankwall.dds@6b220e63": {
+   "archives": [
+    "buriedswitches.eqg",
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.553,
+   "colorName": "blue",
+   "contrast": 0.099,
+   "fileName": "adl_plankwall.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_wreckbk.mod": 1,
+     "obj_wreckfrnt.mod": 1
+    },
+    "partners": {
+     "adl_plankwall_c.dds": 2,
+     "coverage_desert.dds": 2
+    },
+    "roles": {
+     "e_TextureNormal0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    127,
+    128,
+    242
+   ],
+   "name": "adl_plankwall.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.9,
+    0.75
+   ],
+   "sha256": "6b220e630cd8011cf8c62afdcbdc4c6f7c08079c0fab9f1eda4f14252889f4eb",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/adl_plankwall_c.dds@a46dcc31": {
+   "archives": [
+    "buriedswitches.eqg",
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.252,
+   "colorName": "brown",
+   "contrast": 0.09,
+   "fileName": "adl_plankwall_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_wreckbk.mod": 1,
+     "obj_wreckfrnt.mod": 1
+    },
+    "partners": {
+     "adl_plankwall.dds": 2,
+     "coverage_desert.dds": 2
+    },
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    76,
+    62,
+    44
+   ],
+   "name": "adl_plankwall_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.88,
+    0.31
+   ],
+   "sha256": "a46dcc31cc059135b278fe5322afe85daf8f1e699da7f0e97873e38f2d6ededb",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0039,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.016,
+     "overhang": 0.579,
+     "slope": 0.127,
+     "steep": 0.214,
+     "vertical": 0.065
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 15.2
+   },
+   "width": 256
+  },
+  "texture/blacksand05_c.dds@a30966a4": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.19,
+   "colorName": "grey",
+   "contrast": 0.065,
+   "ecosystemLayers": [
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 12.8,
+     "ecosystem": "blacksand",
+     "layer": "blksand",
+     "maxHeight": 320.0,
+     "maxSlope": 45,
+     "minHeight": 200.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 12.8
+    },
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 12.8,
+     "ecosystem": "blksand2",
+     "layer": "sand",
+     "maxHeight": 320.0,
+     "maxSlope": 45,
+     "minHeight": 200.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 12.8
+    }
+   ],
+   "fileName": "blacksand05_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    46,
+    49,
+    53
+   ],
+   "name": "blacksand05_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.93,
+    1.0
+   ],
+   "sha256": "a30966a45505164d39ddc12e8b724159101f31af9e6e06457418f469d62d5fb6",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/bronze.dds@9f2eaf10": {
+   "archives": [
+    "buriedswitches.eqg"
+   ],
+   "brightness": 0.335,
+   "colorName": "brown",
+   "contrast": 0.047,
+   "fileName": "bronze.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    108,
+    82,
+    46
+   ],
+   "name": "bronze.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.016,
+   "seamRatios": [
+    1.45,
+    1.53
+   ],
+   "sha256": "9f2eaf106f0bc94961e8dea8ed6ec7617c2610d03094d6d3196809ebe01f6dbe",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/bronze_8n.dds@49181b14": {
+   "archives": [
+    "buriedswitches.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.041,
+   "fileName": "bronze_8n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    127,
+    253
+   ],
+   "name": "bronze_8n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    3.28,
+    2.82
+   ],
+   "sha256": "49181b14864518501d786f5d16f2c024a08e2cd7d42ccfa41e64a51aacde2c65",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/cover_b.dds@984eabb6": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.301,
+   "colorName": "brown",
+   "contrast": 0.048,
+   "fileName": "cover_b.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    83,
+    75,
+    68
+   ],
+   "name": "cover_b.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.5,
+    0.88
+   ],
+   "sha256": "984eabb675b147b5517f588641b870577c4b800e0b645b5e9293d7e987e00761",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/coverage.dds@575ae795": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.454,
+   "colorName": "grey",
+   "contrast": 0.046,
+   "fileName": "coverage.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    117,
+    116,
+    112
+   ],
+   "name": "coverage.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.95,
+    0.92
+   ],
+   "sha256": "575ae795fdaa4609f5d00096741595cfef6c0098a2c9c27e9b90980f75958c80",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/coverage2_rock.dds@6eabbe40": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.613,
+   "colorName": "grey",
+   "contrast": 0.071,
+   "fileName": "coverage2_rock.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    154,
+    157,
+    157
+   ],
+   "name": "coverage2_rock.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.86,
+    0.95
+   ],
+   "sha256": "6eabbe40e0719166dfa307eb07ac5b1bdce3be231c970ceb481c2a1b97e6b7a8",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/coverage4.dds@f2ee9629": {
+   "archives": [
+    "buriedswitches.eqg",
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.504,
+   "colorName": "grey",
+   "contrast": 0.109,
+   "fileName": "coverage4.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    130,
+    128,
+    130
+   ],
+   "name": "coverage4.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.79,
+    1.21
+   ],
+   "sha256": "f2ee96298d636f25297a0e8fab4fc4de73493f5bff990e14b19c2b7b0ef77184",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/coverage5.dds@703f5dc7": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.48,
+   "colorName": "grey",
+   "contrast": 0.079,
+   "fileName": "coverage5.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    124,
+    121,
+    124
+   ],
+   "name": "coverage5.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.04,
+    1.35
+   ],
+   "sha256": "703f5dc754f4c1c08c3bb9852b502f03dcd0f839516b771176efc73a9588b5c9",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/coverage_a.dds@e51c5019": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.461,
+   "colorName": "grey",
+   "contrast": 0.075,
+   "fileName": "coverage_a.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    119,
+    117,
+    119
+   ],
+   "name": "coverage_a.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.97,
+    0.95
+   ],
+   "sha256": "e51c50198e5e488e59728a2bd57d38a00776020b42fc3f15f86e3251c24eb22e",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/coverage_bamboo.dds@5d874cf9": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.513,
+   "colorName": "grey",
+   "contrast": 0.072,
+   "fileName": "coverage_bamboo.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    132,
+    130,
+    132
+   ],
+   "name": "coverage_bamboo.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.89,
+    0.92
+   ],
+   "sha256": "5d874cf9df147e238b88316cdea0f8096025975993b62d578b2197ea881a2f66",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/coverage_desert.dds@ce0646f8": {
+   "archives": [
+    "buriedswitches.eqg",
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.691,
+   "colorName": "grey",
+   "contrast": 0.07,
+   "ecosystemLayers": [
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "blacksand",
+     "layer": "sand",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 64.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 12.8,
+     "ecosystem": "blacksand",
+     "layer": "blksand",
+     "maxHeight": 320.0,
+     "maxSlope": 45,
+     "minHeight": 200.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 12.8
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 19.2,
+     "ecosystem": "blacksand",
+     "layer": "grass",
+     "maxHeight": 500.0,
+     "maxSlope": 30,
+     "minHeight": 420.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 19.2
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "blksand2",
+     "layer": "blksand",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 64.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 12.8,
+     "ecosystem": "blksand2",
+     "layer": "sand",
+     "maxHeight": 320.0,
+     "maxSlope": 45,
+     "minHeight": 200.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 12.8
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 19.2,
+     "ecosystem": "blksand2",
+     "layer": "grass",
+     "maxHeight": 500.0,
+     "maxSlope": 30,
+     "minHeight": 312.0,
+     "minSlope": 3,
+     "normalUnitsPerRepeat": 19.2
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "island",
+     "layer": "wetsand",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 64.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 12.8,
+     "ecosystem": "island",
+     "layer": "green",
+     "maxHeight": 600.0,
+     "maxSlope": 30,
+     "minHeight": 315.0,
+     "minSlope": 5,
+     "normalUnitsPerRepeat": 12.8
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "monkeyisland",
+     "layer": "seafloor",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 64.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 12.8,
+     "ecosystem": "monkeyisland",
+     "layer": "beach",
+     "maxHeight": 325.0,
+     "maxSlope": 20,
+     "minHeight": 250.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 12.8
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 19.2,
+     "ecosystem": "monkeyisland",
+     "layer": "grass",
+     "maxHeight": 600.0,
+     "maxSlope": 30,
+     "minHeight": 315.0,
+     "minSlope": 5,
+     "normalUnitsPerRepeat": 19.2
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "rock",
+     "layer": "rock",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 64.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 12.8,
+     "ecosystem": "sand",
+     "layer": "sand",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 12.8
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "siren",
+     "layer": "ocnflr",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": 360.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 64.0
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 15.4,
+     "ecosystem": "siren",
+     "layer": "blksnd",
+     "maxHeight": 305.0,
+     "maxSlope": 45,
+     "minHeight": 305.0,
+     "minSlope": 10,
+     "normalUnitsPerRepeat": 15.4
+    },
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 42.7,
+     "ecosystem": "siren",
+     "layer": "clrrck",
+     "maxHeight": 390.0,
+     "maxSlope": 45,
+     "minHeight": 315.0,
+     "minSlope": 20,
+     "normalUnitsPerRepeat": 42.7
+    }
+   ],
+   "fileName": "coverage_desert.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_wreckbk.mod": 4,
+     "obj_wreckfrnt.mod": 4,
+     "obp_dsrt_palm_b_.mod": 84,
+     "obp_fernsa.mod": 96,
+     "obp_fernsb.mod": 86
+    },
+    "partners": {
+     "ab_junglefloor03_c.dds": 2,
+     "ab_junglefloor_n.dds": 2,
+     "di_ocean_wood_plank.dds": 2,
+     "palmtrunk2.dds": 3,
+     "palmtrunk2_bump.dds": 3
+    },
+    "roles": {
+     "e_TextureCoverage0": 14
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 14
+    }
+   },
+   "meanColor": [
+    183,
+    174,
+    166
+   ],
+   "name": "coverage_desert.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.0,
+    1.04
+   ],
+   "sha256": "ce0646f875b5796572dfe9e621135e22782024737158ed50b00c2be8f113bc4d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/coverage_light_b.dds@6d154f85": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.392,
+   "colorName": "grey",
+   "contrast": 0.023,
+   "fileName": "coverage_light_b.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    101,
+    100,
+    101
+   ],
+   "name": "coverage_light_b.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.89,
+    1.0
+   ],
+   "sha256": "6d154f85e4c786a7eaa3f804278103697b7a891de764d46be79afc75c351759c",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/coveragem.dds@cd2ca3dc": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.456,
+   "colorName": "grey",
+   "contrast": 0.038,
+   "fileName": "coveragem.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    118,
+    116,
+    118
+   ],
+   "name": "coveragem.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.93,
+    0.81
+   ],
+   "sha256": "cd2ca3dcebdbd32f5bc6bac014cc1d6a06b5846cee24abe9d7bed3ff43e8e040",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_feasting_ext_wood.dds@9336724d": {
+   "archives": [
+    "buriedswitches.eqg"
+   ],
+   "brightness": 0.308,
+   "colorName": "brown",
+   "contrast": 0.075,
+   "fileName": "di_feasting_ext_wood.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    92,
+    76,
+    57
+   ],
+   "name": "di_feasting_ext_wood.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.02,
+    1.02
+   ],
+   "sha256": "9336724d44f2a9f6ac4146362ed6c2859c2d3ce7bbbda3d7be5706f643f92268",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_feasting_ext_wood2.dds@2afd4370": {
+   "archives": [
+    "buriedswitches.eqg"
+   ],
+   "brightness": 0.308,
+   "colorName": "brown",
+   "contrast": 0.075,
+   "fileName": "di_feasting_ext_wood2.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    92,
+    76,
+    57
+   ],
+   "name": "di_feasting_ext_wood2.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.02,
+    1.02
+   ],
+   "sha256": "2afd4370d440c7db5f4c64daf506012719ae6743f2bcc1039612c16dcf5413f9",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_feasting_ext_wood_8n.dds@9f5a3062": {
+   "archives": [
+    "buriedswitches.eqg"
+   ],
+   "brightness": 0.558,
+   "colorName": "blue",
+   "contrast": 0.051,
+   "fileName": "di_feasting_ext_wood_8n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    253
+   ],
+   "name": "di_feasting_ext_wood_8n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.9,
+    1.0
+   ],
+   "sha256": "9f5a30625110f90eb401df3414c4550b6d0dc1ef9b14941d45c196cad9f5d936",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_feasting_ext_wood_8n2.dds@e928f263": {
+   "archives": [
+    "buriedswitches.eqg"
+   ],
+   "brightness": 0.558,
+   "colorName": "blue",
+   "contrast": 0.049,
+   "fileName": "di_feasting_ext_wood_8n2.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    253
+   ],
+   "name": "di_feasting_ext_wood_8n2.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.94,
+    1.07
+   ],
+   "sha256": "e928f263c6a550d0bc2255246ca6d4c13a4a618c90d5eeea64bdf316d2904f02",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_fp_ext_woodbeam_16n.dds@02ccd4f8": {
+   "archives": [
+    "buriedswitches.eqg",
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.066,
+   "fileName": "di_fp_ext_woodbeam_16n.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_wreckbk.mod": 1,
+     "obj_wreckfrnt.mod": 1
+    },
+    "partners": {
+     "coverage_desert.dds": 2,
+     "di_fp_ext_woodbeam_dark.dds": 2
+    },
+    "roles": {
+     "e_TextureNormal0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    128,
+    128,
+    249
+   ],
+   "name": "di_fp_ext_woodbeam_16n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.79,
+    1.02
+   ],
+   "sha256": "02ccd4f89a7e40b18182896da2bdac0fe098be2c02ab0615d9471c6b1c1538dd",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_fp_ext_woodbeam_dark.dds@9c4e1f83": {
+   "archives": [
+    "buriedswitches.eqg",
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.371,
+   "colorName": "brown",
+   "contrast": 0.065,
+   "fileName": "di_fp_ext_woodbeam_dark.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_wreckbk.mod": 1,
+     "obj_wreckfrnt.mod": 1
+    },
+    "partners": {
+     "coverage_desert.dds": 2,
+     "di_fp_ext_woodbeam_16n.dds": 2
+    },
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    106,
+    94,
+    67
+   ],
+   "name": "di_fp_ext_woodbeam_dark.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.41,
+    1.19
+   ],
+   "sha256": "9c4e1f83f7a9e8f5b6abdaceb71edad849cacf9abca56792e61f363ea9a1caa4",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0005,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.023,
+     "overhang": 0.417,
+     "slope": 0.067,
+     "steep": 0.323,
+     "vertical": 0.17
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 10.5
+   },
+   "width": 256
+  },
+  "texture/di_fp_ext_woodbeam_lite.dds@2108c2fa": {
+   "archives": [
+    "buriedswitches.eqg"
+   ],
+   "brightness": 0.542,
+   "colorName": "tan",
+   "contrast": 0.088,
+   "fileName": "di_fp_ext_woodbeam_lite.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    153,
+    137,
+    103
+   ],
+   "name": "di_fp_ext_woodbeam_lite.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.42,
+    1.23
+   ],
+   "sha256": "2108c2faf32ae13b8578f41752b43baf5ae0bbb07fd50c26299bff7cdc84951b",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_korlach_abalone_sg.dds@343f6802": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.467,
+   "colorName": "teal",
+   "contrast": 0.129,
+   "fileName": "di_korlach_abalone_sg.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    83,
+    188,
+    201
+   ],
+   "name": "di_korlach_abalone_sg.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.921,
+   "seamRatios": [
+    1.07,
+    1.18
+   ],
+   "sha256": "343f68020d7da3313daf17945c3f43b30f9f7a8fd4d76f8f2f13459b30a9494d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.716,
+   "width": 256
+  },
+  "texture/di_ocean_barnacle_rock_plain.dds@eed22e23": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.489,
+   "colorName": "grey",
+   "contrast": 0.13,
+   "fileName": "di_ocean_barnacle_rock_plain.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    130,
+    125,
+    113
+   ],
+   "name": "di_ocean_barnacle_rock_plain.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.16,
+    1.08
+   ],
+   "sha256": "eed22e233578ef378112188cd4517fb56459d7c38a1fa23454eb9573123b099b",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_barnacle_rock_plain_15n.dds@e0ac4681": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.547,
+   "colorName": "blue",
+   "contrast": 0.114,
+   "fileName": "di_ocean_barnacle_rock_plain_15n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    127,
+    234
+   ],
+   "name": "di_ocean_barnacle_rock_plain_15n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.02,
+    1.16
+   ],
+   "sha256": "e0ac4681208a22db9e92eff95319910f6a376249cb8c514bca0d25bb5bf7f975",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_beach_cave.dds@6ed8394e": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.553,
+   "colorName": "grey",
+   "contrast": 0.075,
+   "fileName": "di_ocean_beach_cave.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_mdrocka_dk.mod": 21,
+     "obj_rockarcha_dk.mod": 5,
+     "obj_smrocka_dk.mod": 134,
+     "obj_smrockb_dk.mod": 140,
+     "obj_smrockc_dk.mod": 129
+    },
+    "partners": {
+     "sb_rock01_c.dds": 9,
+     "sb_rock01_n.dds": 9
+    },
+    "roles": {
+     "e_TextureCoverage0": 9
+    },
+    "shaders": {
+     "Opaque_MPLBump2UV.fx": 9
+    }
+   },
+   "meanColor": [
+    145,
+    141,
+    129
+   ],
+   "name": "di_ocean_beach_cave.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.83,
+    0.78
+   ],
+   "sha256": "6ed8394e1da76c1b50c23067be2578024cad0a08ed6ef9b9a92c485260aa57c8",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_beach_cave_15n.dds@2fbde767": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.552,
+   "colorName": "blue",
+   "contrast": 0.088,
+   "fileName": "di_ocean_beach_cave_15n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    127,
+    127,
+    246
+   ],
+   "name": "di_ocean_beach_cave_15n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.02,
+    0.96
+   ],
+   "sha256": "2fbde767ad002300e739c0ad9ff73f65543c8a7cdd1bcaf7fb56ca6f617f9bf6",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_beach_cliff.dds@7b3ed4ea": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.531,
+   "colorName": "grey",
+   "contrast": 0.074,
+   "fileName": "di_ocean_beach_cliff.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    139,
+    136,
+    122
+   ],
+   "name": "di_ocean_beach_cliff.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.04,
+    1.09
+   ],
+   "sha256": "7b3ed4eadd927d4e14f68c83f364ea750c3de78357b36fd83d481302fef26a07",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_beach_cliff2.dds@1394d371": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.516,
+   "colorName": "grey",
+   "contrast": 0.065,
+   "fileName": "di_ocean_beach_cliff2.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    135,
+    132,
+    120
+   ],
+   "name": "di_ocean_beach_cliff2.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.68,
+    1.06
+   ],
+   "sha256": "1394d371a04c6fc427236492dbc3e060117b7a995cb54978c38edad886e44c52",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_beach_cliff2_10n.dds@1098f2f4": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.555,
+   "colorName": "blue",
+   "contrast": 0.071,
+   "fileName": "di_ocean_beach_cliff2_10n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    250
+   ],
+   "name": "di_ocean_beach_cliff2_10n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.69,
+    0.97
+   ],
+   "sha256": "1098f2f4ced3d65dc64c7f532f8363e637422357ad064e869919f2be9aec0deb",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_beach_cliff2_crevices.dds@f188a220": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.516,
+   "colorName": "grey",
+   "contrast": 0.079,
+   "fileName": "di_ocean_beach_cliff2_crevices.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    134,
+    132,
+    122
+   ],
+   "name": "di_ocean_beach_cliff2_crevices.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.77,
+    1.18
+   ],
+   "sha256": "f188a220a961e996369088fc04f8aa5f58335af09224b49b2ecab25f15032024",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_beach_cliff2_crevices_10n.dds@f0a8873a": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.554,
+   "colorName": "blue",
+   "contrast": 0.07,
+   "fileName": "di_ocean_beach_cliff2_crevices_10n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    248
+   ],
+   "name": "di_ocean_beach_cliff2_crevices_10n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.77,
+    0.97
+   ],
+   "sha256": "f0a8873aee490d5809bb01f7eabee83659970b4421c3d3c0cfbb4c044ecabca1",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_beach_cliff_10n.dds@f28fe38f": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.048,
+   "fileName": "di_ocean_beach_cliff_10n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    252
+   ],
+   "name": "di_ocean_beach_cliff_10n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.01,
+    1.11
+   ],
+   "sha256": "f28fe38f1dc399e0e88c8aaec964634a0ac6b654cbf2ece0cf80d9cac8c70db5",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_beach_cliff_n.dds@731b56b3": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.068,
+   "fileName": "di_ocean_beach_cliff_n.dds",
+   "format": "XRGB24",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    248
+   ],
+   "name": "di_ocean_beach_cliff_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.86,
+    0.75
+   ],
+   "sha256": "731b56b34886046736a5f27c2c64b0f9bf5fa693bb636c0333b6aafd483ac343",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_beach_rock.dds@e113b445": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.554,
+   "colorName": "grey",
+   "contrast": 0.077,
+   "fileName": "di_ocean_beach_rock.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_mdrocka_dk.mod": 42,
+     "obj_rockarcha_dk.mod": 10,
+     "obj_smrocka_dk.mod": 268,
+     "obj_smrockb_dk.mod": 280,
+     "obj_smrockc_dk.mod": 258
+    },
+    "partners": {
+     "di_ocean_beach_rock_8n.dds": 18
+    },
+    "roles": {
+     "e_TextureCoverage0": 9,
+     "e_TextureDiffuse0": 9
+    },
+    "shaders": {
+     "Opaque_MPLBump2UV.fx": 18
+    }
+   },
+   "meanColor": [
+    145,
+    142,
+    129
+   ],
+   "name": "di_ocean_beach_rock.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.21,
+    1.08
+   ],
+   "sha256": "e113b4450cc4307d65c6744cadd936f1df907b1dbfceefa5e3bb464d65369d9b",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_beach_rock_8n.dds@1267f155": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.038,
+   "fileName": "di_ocean_beach_rock_8n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_mdrocka_dk.mod": 21,
+     "obj_rockarcha_dk.mod": 5,
+     "obj_smrocka_dk.mod": 134,
+     "obj_smrockb_dk.mod": 140,
+     "obj_smrockc_dk.mod": 129
+    },
+    "partners": {
+     "di_ocean_beach_rock.dds": 18
+    },
+    "roles": {
+     "e_TextureNormal0": 9
+    },
+    "shaders": {
+     "Opaque_MPLBump2UV.fx": 9
+    }
+   },
+   "meanColor": [
+    128,
+    128,
+    253
+   ],
+   "name": "di_ocean_beach_rock_8n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.99,
+    0.9
+   ],
+   "sha256": "1267f1553b0f476dae562e86cbf518a5067a480536496a088915f19eeecd80c5",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_beach_rock_erroded.dds@14965be7": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.532,
+   "colorName": "grey",
+   "contrast": 0.075,
+   "fileName": "di_ocean_beach_rock_erroded.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    140,
+    136,
+    122
+   ],
+   "name": "di_ocean_beach_rock_erroded.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.09,
+    0.85
+   ],
+   "sha256": "14965be7cd06514c50775755fd8f4a9a8cfff59c88bcc8236ef1f850262c627f",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_beach_rock_erroded_10n.dds@62cdccbb": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.552,
+   "colorName": "blue",
+   "contrast": 0.085,
+   "fileName": "di_ocean_beach_rock_erroded_10n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    244
+   ],
+   "name": "di_ocean_beach_rock_erroded_10n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.24,
+    1.0
+   ],
+   "sha256": "62cdccbbc74268563464f60a52f7ca3a7624c50028627ef0022f05cd6e428b88",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_beach_rock_n.dds@f84f7c3d": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.549,
+   "colorName": "blue",
+   "contrast": 0.095,
+   "fileName": "di_ocean_beach_rock_n.dds",
+   "format": "XRGB24",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    129,
+    229
+   ],
+   "name": "di_ocean_beach_rock_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.84,
+    0.99
+   ],
+   "sha256": "f84f7c3d32126533fb09ca3086257c0c1fad1c0db93bfa15e3b279ba055d367d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_coral_5n.dds@1ab47c9c": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.051,
+   "fileName": "di_ocean_coral_5n.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    127,
+    128,
+    252
+   ],
+   "name": "di_ocean_coral_5n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.27,
+    1.28
+   ],
+   "sha256": "1ab47c9cac16a1e020b7b5b58426b22bb7252559c2e7a165b4ff5b70e76f9247",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_coral_brain.dds@85d1fc72": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.367,
+   "colorName": "purple",
+   "contrast": 0.064,
+   "fileName": "di_ocean_coral_brain.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    98,
+    89,
+    106
+   ],
+   "name": "di_ocean_coral_brain.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.08,
+    1.23
+   ],
+   "sha256": "85d1fc724aa5010025cdaedbb3c6b4beb7f481130e4e76b845ed6ab67fe4c403",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_coral_brain2.dds@ca8fd3b6": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.492,
+   "colorName": "teal",
+   "contrast": 0.07,
+   "fileName": "di_ocean_coral_brain2.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    97,
+    136,
+    146
+   ],
+   "name": "di_ocean_coral_brain2.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.97,
+    1.25
+   ],
+   "sha256": "ca8fd3b618a06096972062611007d74deed4a35077865e750e9e77391fa1e667",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_coral_brain_8n.dds@410c04d8": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.554,
+   "colorName": "blue",
+   "contrast": 0.099,
+   "fileName": "di_ocean_coral_brain_8n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    129,
+    130,
+    234
+   ],
+   "name": "di_ocean_coral_brain_8n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.9,
+    1.14
+   ],
+   "sha256": "410c04d89f54ca9de0cce234cf3037cbb0cf01eaa6117117968a6de0f76789d7",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_coral_reef.dds@1800a5c3": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.228,
+   "colorName": "grey",
+   "contrast": 0.074,
+   "fileName": "di_ocean_coral_reef.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    55,
+    60,
+    58
+   ],
+   "name": "di_ocean_coral_reef.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.015,
+   "seamRatios": [
+    0.87,
+    1.0
+   ],
+   "sha256": "1800a5c3a3a1c7bf1766da9b8c5eb94dacfbe5e73015443431210e59e32a8808",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_coral_reef2.dds@eb15a63b": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.364,
+   "colorName": "grey",
+   "contrast": 0.112,
+   "ecosystemLayers": [
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 42.7,
+     "ecosystem": "siren",
+     "layer": "clrrck",
+     "maxHeight": 390.0,
+     "maxSlope": 45,
+     "minHeight": 315.0,
+     "minSlope": 20,
+     "normalUnitsPerRepeat": 42.7
+    }
+   ],
+   "fileName": "di_ocean_coral_reef2.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    85,
+    96,
+    97
+   ],
+   "name": "di_ocean_coral_reef2.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.88,
+    0.97
+   ],
+   "sha256": "eb15a63b224234df68a2f4ea575daedb11ee50c98845cba4fb225ee3ea4067ef",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_coral_reef2_5n.dds@7cbc8612": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.555,
+   "colorName": "blue",
+   "contrast": 0.055,
+   "fileName": "di_ocean_coral_reef2_5n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    251
+   ],
+   "name": "di_ocean_coral_reef2_5n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.3,
+    1.43
+   ],
+   "sha256": "7cbc8612275fe9761da59ee8a7762e3f65c77a30c99b1d113c593e21b7f6fdc5",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_coral_reef_8n.dds@d75c6493": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.553,
+   "colorName": "blue",
+   "contrast": 0.078,
+   "fileName": "di_ocean_coral_reef_8n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    242
+   ],
+   "name": "di_ocean_coral_reef_8n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.87,
+    0.96
+   ],
+   "sha256": "d75c6493eccd8befbc9a3b824652d82a98ffb616215a0693ccb8a19688533854",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_coral_reef_n.dds@98cefddc": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.553,
+   "colorName": "blue",
+   "contrast": 0.111,
+   "ecosystemLayers": [
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 42.7,
+     "ecosystem": "siren",
+     "layer": "clrrck",
+     "maxHeight": 390.0,
+     "maxSlope": 45,
+     "minHeight": 315.0,
+     "minSlope": 20,
+     "normalUnitsPerRepeat": 42.7
+    }
+   ],
+   "fileName": "di_ocean_coral_reef_n.dds",
+   "format": "XRGB24",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    129,
+    239
+   ],
+   "name": "di_ocean_coral_reef_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.88,
+    0.97
+   ],
+   "sha256": "98cefddcc300ec217a4893bd6edea87a9a87dc86195735e3a7336aba6e169c9e",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_ferns_grass.dds@61c424fa": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.271,
+   "colorName": "green",
+   "contrast": 0.069,
+   "fileName": "di_ocean_ferns_grass.dds",
+   "format": "DXT5",
+   "height": 512,
+   "kind": "texture",
+   "meanColor": [
+    62,
+    93,
+    45
+   ],
+   "name": "di_ocean_ferns_grass.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.135,
+   "seamRatios": [
+    2.51,
+    2.68
+   ],
+   "sha256": "61c424fae23e51f667472931c02939d1b94a03aabe5c93aff95df85988fddffe",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.762,
+   "width": 512
+  },
+  "texture/di_ocean_rock_fossil_8n.dds@d84f3ccd": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.551,
+   "colorName": "blue",
+   "contrast": 0.097,
+   "fileName": "di_ocean_rock_fossil_8n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    127,
+    242
+   ],
+   "name": "di_ocean_rock_fossil_8n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.98,
+    0.94
+   ],
+   "sha256": "d84f3ccdea082e3b3d37f97eca532254ffb1a9c3ee218bdcb1fafc29c2ca3912",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_rock_fossil_blk.dds@0eb8cd7d": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.278,
+   "colorName": "grey",
+   "contrast": 0.071,
+   "fileName": "di_ocean_rock_fossil_blk.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    71,
+    72,
+    67
+   ],
+   "name": "di_ocean_rock_fossil_blk.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.0,
+    1.06
+   ],
+   "sha256": "0eb8cd7d978fa7c56e550b204cf8f91647d708cab50242cb70347ba019dece95",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_shell_pile.dds@e68252d9": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.369,
+   "colorName": "grey",
+   "contrast": 0.111,
+   "ecosystemLayers": [
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 15.4,
+     "ecosystem": "siren",
+     "layer": "blksnd",
+     "maxHeight": 305.0,
+     "maxSlope": 45,
+     "minHeight": 305.0,
+     "minSlope": 10,
+     "normalUnitsPerRepeat": 15.4
+    }
+   ],
+   "fileName": "di_ocean_shell_pile.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    92,
+    95,
+    93
+   ],
+   "name": "di_ocean_shell_pile.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.95,
+    1.05
+   ],
+   "sha256": "e68252d92c3580ba7efe0015376209923135b911f9089c4792bec3a3f12be8b3",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_shell_pile_n.dds@bd657cb1": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.549,
+   "colorName": "blue",
+   "contrast": 0.131,
+   "ecosystemLayers": [
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 15.4,
+     "ecosystem": "siren",
+     "layer": "blksnd",
+     "maxHeight": 305.0,
+     "maxSlope": 45,
+     "minHeight": 305.0,
+     "minSlope": 10,
+     "normalUnitsPerRepeat": 15.4
+    }
+   ],
+   "fileName": "di_ocean_shell_pile_n.dds",
+   "format": "XRGB24",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    232
+   ],
+   "name": "di_ocean_shell_pile_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.89,
+    0.9
+   ],
+   "sha256": "bd657cb1a41a2e588a09daa18d5b5d1bd3fa4457a874dcc001fca4643e16b1a9",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_shell_pile_sand.dds@ae158a73": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.59,
+   "colorName": "grey",
+   "contrast": 0.129,
+   "fileName": "di_ocean_shell_pile_sand.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    155,
+    149,
+    147
+   ],
+   "name": "di_ocean_shell_pile_sand.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.94,
+    0.99
+   ],
+   "sha256": "ae158a7375e0d5693df43f1f1a4fc97a194d4e1050324d88c1f17415c471d224",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_wood_plank.dds@5540c40d": {
+   "archives": [
+    "buriedswitches.eqg",
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.321,
+   "colorName": "brown",
+   "contrast": 0.099,
+   "fileName": "di_ocean_wood_plank.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_wreckbk.mod": 1,
+     "obj_wreckfrnt.mod": 1
+    },
+    "partners": {
+     "coverage_desert.dds": 2,
+     "di_ocean_wood_plank_8n.dds": 2
+    },
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    92,
+    81,
+    62
+   ],
+   "name": "di_ocean_wood_plank.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.55,
+    1.11
+   ],
+   "sha256": "5540c40d29a8dfec22d978b60152d5f31227fd9fb08e23481d39bec27faa317e",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0032,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.293,
+     "slope": 0.354,
+     "steep": 0.247,
+     "vertical": 0.106
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 13.4
+   },
+   "width": 256
+  },
+  "texture/di_ocean_wood_plank_8n.dds@ac19534a": {
+   "archives": [
+    "buriedswitches.eqg",
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.553,
+   "colorName": "blue",
+   "contrast": 0.051,
+   "fileName": "di_ocean_wood_plank_8n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_wreckbk.mod": 1,
+     "obj_wreckfrnt.mod": 1
+    },
+    "partners": {
+     "coverage_desert.dds": 2,
+     "di_ocean_wood_plank.dds": 2
+    },
+    "roles": {
+     "e_TextureNormal0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    128,
+    127,
+    247
+   ],
+   "name": "di_ocean_wood_plank_8n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    2.1,
+    0.77
+   ],
+   "sha256": "ac19534a016b821dd5f9384ecce2b81a991655873261830d21dd2a79c0637e88",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_wood_plank_barnacles.dds@bf659d4b": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.312,
+   "colorName": "brown",
+   "contrast": 0.129,
+   "fileName": "di_ocean_wood_plank_barnacles.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    87,
+    79,
+    62
+   ],
+   "name": "di_ocean_wood_plank_barnacles.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.62,
+    1.07
+   ],
+   "sha256": "bf659d4ba5d141a1d18b50ababe717fd1053610ffc2babbb249bb626037d152d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_wood_plank_barnacles2.dds@f6942e7c": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.333,
+   "colorName": "brown",
+   "contrast": 0.117,
+   "fileName": "di_ocean_wood_plank_barnacles2.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_wreckbk.mod": 1,
+     "obj_wreckfrnt.mod": 1
+    },
+    "partners": {
+     "coverage_desert.dds": 2,
+     "di_ocean_wood_plank_barnacles2_8n.dds": 2
+    },
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    92,
+    84,
+    69
+   ],
+   "name": "di_ocean_wood_plank_barnacles2.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.55,
+    1.2
+   ],
+   "sha256": "f6942e7ce1fa3a16c6000dcf63557320dbd59aae4c21290bd67fa54dd7b224a9",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_wood_plank_barnacles2_8n.dds@a2629266": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.549,
+   "colorName": "blue",
+   "contrast": 0.102,
+   "fileName": "di_ocean_wood_plank_barnacles2_8n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_wreckbk.mod": 1,
+     "obj_wreckfrnt.mod": 1
+    },
+    "partners": {
+     "coverage_desert.dds": 2,
+     "di_ocean_wood_plank_barnacles2.dds": 2
+    },
+    "roles": {
+     "e_TextureNormal0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    127,
+    128,
+    237
+   ],
+   "name": "di_ocean_wood_plank_barnacles2_8n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    2.1,
+    1.01
+   ],
+   "sha256": "a262926692ddd462d8e688c9cd9b97eb5a946f8b96a034ee15dc80dbb070b9d7",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_wood_plank_barnacles_8n.dds@8f8e48ca": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.549,
+   "colorName": "blue",
+   "contrast": 0.106,
+   "fileName": "di_ocean_wood_plank_barnacles_8n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    127,
+    128,
+    237
+   ],
+   "name": "di_ocean_wood_plank_barnacles_8n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.9,
+    0.87
+   ],
+   "sha256": "8f8e48caf25cacd22f09260d8dc72e862c1450452a91def1d7b3064edbbf52b1",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_wood_plank_paint.dds@b3bd49a6": {
+   "archives": [
+    "buriedswitches.eqg",
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.323,
+   "colorName": "red",
+   "contrast": 0.089,
+   "fileName": "di_ocean_wood_plank_paint.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    116,
+    68,
+    68
+   ],
+   "name": "di_ocean_wood_plank_paint.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.14,
+    0.78
+   ],
+   "sha256": "b3bd49a6f917c8ff6d60dc610e604ccae371b569dbc02b1c707292ce038af2bb",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_wood_plank_paint_8n.dds@2c14def0": {
+   "archives": [
+    "buriedswitches.eqg",
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.552,
+   "colorName": "blue",
+   "contrast": 0.059,
+   "fileName": "di_ocean_wood_plank_paint_8n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    127,
+    128,
+    244
+   ],
+   "name": "di_ocean_wood_plank_paint_8n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.23,
+    0.76
+   ],
+   "sha256": "2c14def02aee98d7f0262f4161de1c8fef36fa33736c297d7b1801184e6d29d6",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_wood_plank_paint_barnacles.dds@50c0eabb": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.336,
+   "colorName": "red",
+   "contrast": 0.114,
+   "fileName": "di_ocean_wood_plank_paint_barnacles.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    110,
+    76,
+    74
+   ],
+   "name": "di_ocean_wood_plank_paint_barnacles.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.29,
+    0.86
+   ],
+   "sha256": "50c0eabb31b527b5b76b30914ffb97c14047778dbc22eb7ca70f4db0e46a5e27",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_wood_plank_paint_barnacles_8n.dds@60070838": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.551,
+   "colorName": "blue",
+   "contrast": 0.1,
+   "fileName": "di_ocean_wood_plank_paint_barnacles_8n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    127,
+    128,
+    240
+   ],
+   "name": "di_ocean_wood_plank_paint_barnacles_8n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.12,
+    0.74
+   ],
+   "sha256": "60070838b955db7296f9cf549e66111ad6e44cc50f28f4a2f12fa23b6966b557",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_woodbeam.dds@6910b39b": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.328,
+   "colorName": "brown",
+   "contrast": 0.067,
+   "fileName": "di_ocean_woodbeam.dds",
+   "format": "DXT5",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    97,
+    82,
+    61
+   ],
+   "name": "di_ocean_woodbeam.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.94,
+    1.02
+   ],
+   "sha256": "6910b39ba8d1896ebbe1eab50c7b3b3be5b932011ebfc0d38c8f7fa76d63bb6e",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ocean_woodbeam_10n.dds@ce7226f0": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.069,
+   "fileName": "di_ocean_woodbeam_10n.dds",
+   "format": "ARGB32",
+   "height": 64,
+   "kind": "texture",
+   "meanColor": [
+    127,
+    129,
+    248
+   ],
+   "name": "di_ocean_woodbeam_10n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.85,
+    1.35
+   ],
+   "sha256": "ce7226f09fba35039b5c62cd0cbc63b3b84d82a2ba107690ab7cb46d523ceade",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/di_ro_palm_frond01.ddsd01_c.dds@dc8ba8a8": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.363,
+   "colorName": "green",
+   "contrast": 0.091,
+   "fileName": "di_ro_palm_frond01.ddsd01_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obp_dsrt_palm_b_.mod": 84
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 1
+    },
+    "shaders": {
+     "Chroma_MPLBasicA.fx": 1
+    }
+   },
+   "meanColor": [
+    85,
+    124,
+    38
+   ],
+   "name": "di_ro_palm_frond01.ddsd01_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.11,
+   "seamRatios": [
+    0.05,
+    0.39
+   ],
+   "sha256": "dc8ba8a8685fdb864c35d9e40c39b6721646b65b1eb81a9f766d214ee1061d70",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.484,
+   "uses": {
+    "areaShare": 0.0025,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.007,
+     "overhang": 0.402,
+     "slope": 0.184,
+     "steep": 0.211,
+     "vertical": 0.197
+    },
+    "surfaces": {
+     "cutout": 1.0
+    },
+    "unitsPerRepeat": 6.3
+   },
+   "width": 128
+  },
+  "texture/di_ro_palm_frond01_n.dds@05130887": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.552,
+   "colorName": "blue",
+   "contrast": 0.09,
+   "fileName": "di_ro_palm_frond01_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    127,
+    232
+   ],
+   "name": "di_ro_palm_frond01_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.114,
+   "seamRatios": [
+    0.0,
+    0.11
+   ],
+   "sha256": "0513088773cf95711bd49f67bffa2399142fba84fdf1a92db16c828d3876d42d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.484,
+   "width": 128
+  },
+  "texture/di_sotg_ground_smooth.dds@8ddf86cd": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.383,
+   "colorName": "grey",
+   "contrast": 0.044,
+   "fileName": "di_sotg_ground_smooth.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    100,
+    98,
+    93
+   ],
+   "name": "di_sotg_ground_smooth.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.17,
+    1.18
+   ],
+   "sha256": "8ddf86cd34a528cd6377fc96c056cc297f6dfd801d11841a144eef89d0cda831",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/dirt_tunnel_floor_ov.dds@10def9eb": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.376,
+   "colorName": "grey",
+   "contrast": 0.046,
+   "fileName": "dirt_tunnel_floor_ov.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    100,
+    95,
+    91
+   ],
+   "name": "dirt_tunnel_floor_ov.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.52,
+    1.61
+   ],
+   "sha256": "10def9eb52deea4624a12e36d591c03121a007691223576e63e0ab87259cdea9",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/drk_column_block_6n.dds@05f9e5fa": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.558,
+   "colorName": "blue",
+   "contrast": 0.052,
+   "fileName": "drk_column_block_6n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    253
+   ],
+   "name": "drk_column_block_6n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.99,
+    4.27
+   ],
+   "sha256": "05f9e5faccfb0cf5fbc3babad0123ae2bd8f9ccba119fe1742b6011681e66ec9",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/drk_column_block_c.dds@21687275": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.49,
+   "colorName": "grey",
+   "contrast": 0.083,
+   "fileName": "drk_column_block_c.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    127,
+    124,
+    124
+   ],
+   "name": "drk_column_block_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.07,
+    1.16
+   ],
+   "sha256": "21687275c1d589eff06db8d78abf8844a359d0d67bfd23c9916fedb23e13f3bc",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/drk_wall_grunge.dds@c5b0dd85": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.437,
+   "colorName": "grey",
+   "contrast": 0.06,
+   "fileName": "drk_wall_grunge.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    115,
+    111,
+    106
+   ],
+   "name": "drk_wall_grunge.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.28,
+    1.1
+   ],
+   "sha256": "c5b0dd85e671b7dff0babc336950685a0fc9d46b9b7e0abc6261b16895c1fb65",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/drk_wall_grunge_6n.dds@e6990947": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.558,
+   "colorName": "blue",
+   "contrast": 0.031,
+   "fileName": "drk_wall_grunge_6n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    254
+   ],
+   "name": "drk_wall_grunge_6n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.84,
+    0.87
+   ],
+   "sha256": "e69909470572e80ef65e7598715dce6d0b429f5df75b9e93f3caf37c486677b8",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/ferns02.dds@f9caaffe": {
+   "archives": [
+    "buriedswitches.eqg",
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.258,
+   "colorName": "green",
+   "contrast": 0.057,
+   "fileName": "ferns02.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obp_fernsa.mod": 48,
+     "obp_fernsb.mod": 43
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Chroma_MPLBasicAT.fx": 2
+    }
+   },
+   "meanColor": [
+    58,
+    91,
+    43
+   ],
+   "name": "ferns02.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.046,
+   "seamRatios": [
+    0.0,
+    0.17
+   ],
+   "sha256": "f9caaffe4ba6b6d4d650b2f852b0fac9ac35cf96264470daf4067bb7022ce59c",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.578,
+   "uses": {
+    "areaShare": 0.0008,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.136,
+     "overhang": 0.5,
+     "slope": 0.261,
+     "steep": 0.103,
+     "vertical": 0.0
+    },
+    "surfaces": {
+     "cutout": 1.0
+    },
+    "unitsPerRepeat": 6.7
+   },
+   "width": 256
+  },
+  "texture/ferns03.dds@01e347aa": {
+   "archives": [
+    "buriedswitches.eqg",
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.251,
+   "colorName": "green",
+   "contrast": 0.048,
+   "fileName": "ferns03.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obp_fernsa.mod": 48,
+     "obp_fernsb.mod": 43
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Chroma_MPLBasicAT.fx": 2
+    }
+   },
+   "meanColor": [
+    40,
+    58,
+    32
+   ],
+   "name": "ferns03.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.08,
+   "seamRatios": [
+    0.0,
+    0.21
+   ],
+   "sha256": "01e347aaa42cfd9e4814314147326190983ec8254d3022370df5f7a874279169",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.683,
+   "uses": {
+    "areaShare": 0.0008,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.01,
+     "overhang": 0.46,
+     "slope": 0.244,
+     "steep": 0.205,
+     "vertical": 0.081
+    },
+    "surfaces": {
+     "cutout": 1.0
+    },
+    "unitsPerRepeat": 6.1
+   },
+   "width": 256
+  },
+  "texture/flowerbuds.dds@d582abdb": {
+   "archives": [
+    "buriedswitches.eqg",
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.286,
+   "colorName": "pink",
+   "contrast": 0.119,
+   "fileName": "flowerbuds.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obp_fernsa.mod": 48,
+     "obp_fernsb.mod": 43
+    },
+    "partners": {},
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Chroma_MPLBasicAT.fx": 2
+    }
+   },
+   "meanColor": [
+    64,
+    18,
+    62
+   ],
+   "name": "flowerbuds.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.203,
+   "seamRatios": [
+    0.0,
+    0.07
+   ],
+   "sha256": "d582abdbf6f60b2afa6c93755e87d72590eea0a8a88d6f9e5c8ffa4e3eb7f139",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.629,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.313,
+     "slope": 0.056,
+     "steep": 0.257,
+     "vertical": 0.374
+    },
+    "surfaces": {
+     "cutout": 1.0
+    },
+    "unitsPerRepeat": 7.6
+   },
+   "width": 256
+  },
+  "texture/hair.dds@b0b9a5f0": {
+   "archives": [
+    "buriedswitches.eqg"
+   ],
+   "brightness": 0.073,
+   "colorName": "black",
+   "contrast": 0.049,
+   "fileName": "hair.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    25,
+    17,
+    10
+   ],
+   "name": "hair.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.66,
+    7.26
+   ],
+   "sha256": "b0b9a5f0ac9a9aa270bf50009b6adf2d06a0abf0059e3bd8c836a39578561dd1",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hair_01_c.dds@c8fb4257": {
+   "archives": [
+    "buriedswitches.eqg"
+   ],
+   "brightness": 0.073,
+   "colorName": "black",
+   "contrast": 0.049,
+   "fileName": "hair_01_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    25,
+    16,
+    10
+   ],
+   "name": "hair_01_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.33,
+   "seamRatios": [
+    1.66,
+    7.26
+   ],
+   "sha256": "c8fb4257140ebbb153f159c1460e6f07e2bf383a9913a7afcbbcfbcf4706a28f",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.314,
+   "width": 256
+  },
+  "texture/hp_anenome_orange01.dds@4567c89c": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.235,
+   "colorName": "brown",
+   "contrast": 0.106,
+   "fileName": "hp_anenome_orange01.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    107,
+    45,
+    15
+   ],
+   "name": "hp_anenome_orange01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.64,
+    6.61
+   ],
+   "sha256": "4567c89cbdad9af60082d9a6a7597181b063959680546c623eff7339a8b200a2",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hp_anenome_orange_glow01_n.dds@eeed068b": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.545,
+   "colorName": "blue",
+   "contrast": 0.14,
+   "fileName": "hp_anenome_orange_glow01_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    127,
+    232
+   ],
+   "name": "hp_anenome_orange_glow01_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.09,
+    1.05
+   ],
+   "sha256": "eeed068bb46dfe9842330929a93760a52668909ee6c03d7d9938f1a31d5763cd",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hp_korlachseaplanta01.dds@7bf0e78f": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.447,
+   "colorName": "teal",
+   "contrast": 0.106,
+   "fileName": "hp_korlachseaplanta01.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    69,
+    145,
+    148
+   ],
+   "name": "hp_korlachseaplanta01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.079,
+   "seamRatios": [
+    0.88,
+    0.83
+   ],
+   "sha256": "7bf0e78f8e97098226299e7c46d244fd8758f3f237341f7f6ab8f98d0467f6df",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.868,
+   "width": 256
+  },
+  "texture/hp_korlachseaplanta02.dds@28cbdc2d": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.448,
+   "colorName": "teal",
+   "contrast": 0.107,
+   "fileName": "hp_korlachseaplanta02.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    70,
+    146,
+    149
+   ],
+   "name": "hp_korlachseaplanta02.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.137,
+   "seamRatios": [
+    0.86,
+    0.82
+   ],
+   "sha256": "28cbdc2df07c38efd7cc1be0b7dbaa765e7bfe2e4625f9bc9f312a18a57fd0c8",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.839,
+   "width": 256
+  },
+  "texture/hp_korlachseaplantb01.dds@baa52274": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.255,
+   "colorName": "pink",
+   "contrast": 0.077,
+   "fileName": "hp_korlachseaplantb01.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    130,
+    50,
+    125
+   ],
+   "name": "hp_korlachseaplantb01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.05,
+   "seamRatios": [
+    0.83,
+    0.88
+   ],
+   "sha256": "baa52274a0bb59b96f04c9ea82afb51c3e305d1b8844b342effdc138d455ba96",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.844,
+   "width": 256
+  },
+  "texture/hp_korlachseaplantb02.dds@4d5cb12b": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.253,
+   "colorName": "pink",
+   "contrast": 0.074,
+   "fileName": "hp_korlachseaplantb02.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    123,
+    42,
+    131
+   ],
+   "name": "hp_korlachseaplantb02.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.244,
+   "seamRatios": [
+    0.88,
+    0.85
+   ],
+   "sha256": "4d5cb12be1e2844b98a5b4436ddb0f526f4ca627419b55a0473a7fd72e627c71",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.808,
+   "width": 256
+  },
+  "texture/hp_roostwooda01_c.dds@d4ac2339": {
+   "archives": [
+    "buriedswitches.eqg",
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.308,
+   "colorName": "brown",
+   "contrast": 0.077,
+   "fileName": "hp_roostwooda01_c.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    90,
+    79,
+    49
+   ],
+   "name": "hp_roostwooda01_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.35,
+    1.05
+   ],
+   "sha256": "d4ac23392e5ba7eda1897c5afab1338b43beaf6d24cb056f570950d5ab3030d3",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hp_roostwooda01_n.dds@72b4586e": {
+   "archives": [
+    "buriedswitches.eqg",
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.035,
+   "fileName": "hp_roostwooda01_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    253
+   ],
+   "name": "hp_roostwooda01_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.57,
+    1.08
+   ],
+   "sha256": "72b4586e9c971c25ad4c7582d470e9fe6fbbc6f9a6f95e41a1bd2cbabd434e7d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hp_skull05_c.dds@62c2ada9": {
+   "archives": [
+    "buriedswitches.eqg",
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.352,
+   "colorName": "brown",
+   "contrast": 0.238,
+   "fileName": "hp_skull05_c.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_camp_bones_a.mod": 176,
+     "obj_camp_bones_b.mod": 182
+    },
+    "partners": {
+     "hp_skull05_n.dds": 2,
+     "nek_erosion_ov_4tile.dds": 2
+    },
+    "roles": {
+     "e_TextureDiffuse0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    99,
+    88,
+    75
+   ],
+   "name": "hp_skull05_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.61,
+    1.9
+   ],
+   "sha256": "62c2ada94044a0124905b9e7f9245b09f654b3361aee75b10b17b0a645b797fe",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0001,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.046,
+     "overhang": 0.406,
+     "slope": 0.252,
+     "steep": 0.109,
+     "vertical": 0.187
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 4.8
+   },
+   "width": 256
+  },
+  "texture/hp_skull05_n.dds@74c0574b": {
+   "archives": [
+    "buriedswitches.eqg",
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.546,
+   "colorName": "blue",
+   "contrast": 0.138,
+   "fileName": "hp_skull05_n.dds",
+   "format": "XRGB24",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_camp_bones_a.mod": 176,
+     "obj_camp_bones_b.mod": 182
+    },
+    "partners": {
+     "hp_skull05_c.dds": 2,
+     "nek_erosion_ov_4tile.dds": 2
+    },
+    "roles": {
+     "e_TextureNormal0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    128,
+    128,
+    227
+   ],
+   "name": "hp_skull05_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.58,
+    1.14
+   ],
+   "sha256": "74c0574bfcd1d9181196eedb458f79a857ad3f12d22bf2ffc2da059b4b15dc97",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hp_skull06_n.dds@057706ce": {
+   "archives": [
+    "buriedswitches.eqg",
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.547,
+   "colorName": "blue",
+   "contrast": 0.142,
+   "fileName": "hp_skull06_n.dds",
+   "format": "XRGB24",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_camp_bones_a.mod": 176,
+     "obj_camp_bones_b.mod": 182
+    },
+    "partners": {
+     "nek_erosion_ov_4tile.dds": 2
+    },
+    "roles": {
+     "e_TextureNormal0": 2
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 2
+    }
+   },
+   "meanColor": [
+    129,
+    128,
+    227
+   ],
+   "name": "hp_skull06_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.0,
+    0.77
+   ],
+   "sha256": "057706cec25c09f5adc60b037fc135c89e161be34382530aee1aa341324ddd9a",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hp_sponge_purple01.dds@4484a149": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.157,
+   "colorName": "pink",
+   "contrast": 0.084,
+   "fileName": "hp_sponge_purple01.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    57,
+    30,
+    44
+   ],
+   "name": "hp_sponge_purple01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.33,
+    5.12
+   ],
+   "sha256": "4484a149d26db92d450450e487d752617bb147d7a76604ae446af72c6639ee1c",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hp_sponge_purple01_n.dds@eeed068b": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.545,
+   "colorName": "blue",
+   "contrast": 0.14,
+   "fileName": "hp_sponge_purple01_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    127,
+    232
+   ],
+   "name": "hp_sponge_purple01_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.09,
+    1.05
+   ],
+   "sha256": "eeed068bb46dfe9842330929a93760a52668909ee6c03d7d9938f1a31d5763cd",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hp_sponge_purple_glow01.dds@02f7794e": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.344,
+   "colorName": "brown",
+   "contrast": 0.124,
+   "fileName": "hp_sponge_purple_glow01.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    115,
+    82,
+    43
+   ],
+   "name": "hp_sponge_purple_glow01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.59,
+    7.08
+   ],
+   "sha256": "02f7794ed8473f4c0f25fb3cb73dd205f3204977744157cf2ebc7805f52e4133",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hp_sponge_purple_glow01_n.dds@eeed068b": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.545,
+   "colorName": "blue",
+   "contrast": 0.14,
+   "fileName": "hp_sponge_purple_glow01_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    127,
+    232
+   ],
+   "name": "hp_sponge_purple_glow01_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.09,
+    1.05
+   ],
+   "sha256": "eeed068bb46dfe9842330929a93760a52668909ee6c03d7d9938f1a31d5763cd",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hp_stone_warma01_c.dds@be0f1938": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.435,
+   "colorName": "grey",
+   "contrast": 0.071,
+   "fileName": "hp_stone_warma01_c.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    117,
+    110,
+    101
+   ],
+   "name": "hp_stone_warma01_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.01,
+    1.06
+   ],
+   "sha256": "be0f193805d06c8fbef1604db814f63fab3b4d7f6e07daeb09fcb1e10d316774",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hp_stone_warma01_n.dds@cc395031": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.555,
+   "colorName": "blue",
+   "contrast": 0.059,
+   "fileName": "hp_stone_warma01_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    127,
+    128,
+    251
+   ],
+   "name": "hp_stone_warma01_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.98,
+    0.92
+   ],
+   "sha256": "cc395031178070c00067365f9888a7438abf2f34f6419a3f92d1fef4c9f87098",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hp_wdplanks_exta01_c.dds@2ce7ac0b": {
+   "archives": [
+    "buriedswitches.eqg"
+   ],
+   "brightness": 0.476,
+   "colorName": "tan",
+   "contrast": 0.112,
+   "fileName": "hp_wdplanks_exta01_c.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    139,
+    120,
+    82
+   ],
+   "name": "hp_wdplanks_exta01_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.56,
+    1.26
+   ],
+   "sha256": "2ce7ac0bbbfebc05c8f80d72808eb6b2df3b8cd92eb2e863ae8687b8d291b75f",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hp_wdplanks_inta01_n.dds@47610228": {
+   "archives": [
+    "buriedswitches.eqg"
+   ],
+   "brightness": 0.557,
+   "colorName": "blue",
+   "contrast": 0.019,
+   "fileName": "hp_wdplanks_inta01_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    254
+   ],
+   "name": "hp_wdplanks_inta01_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.12,
+    0.88
+   ],
+   "sha256": "47610228e38968c71fd8beb3a1df8b2add3e18bf8dc5e5b631c8dc1e77e2d484",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hp_wood_rougha01_c.dds@c40f1f50": {
+   "archives": [
+    "buriedswitches.eqg"
+   ],
+   "brightness": 0.317,
+   "colorName": "brown",
+   "contrast": 0.101,
+   "fileName": "hp_wood_rougha01_c.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    94,
+    80,
+    53
+   ],
+   "name": "hp_wood_rougha01_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.47,
+    1.02
+   ],
+   "sha256": "c40f1f50bb923b6ec2a471c0fba831740b20f46c0148071435d69f302d429a5f",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/hp_wood_rougha01_n.dds@8d14b71f": {
+   "archives": [
+    "buriedswitches.eqg"
+   ],
+   "brightness": 0.557,
+   "colorName": "blue",
+   "contrast": 0.041,
+   "fileName": "hp_wood_rougha01_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    252
+   ],
+   "name": "hp_wood_rougha01_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.58,
+    0.84
+   ],
+   "sha256": "8d14b71f8066acc80f7d434b17396423a70c15b249658b1d6861d8bc56e1cfa0",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/nek_erosion_ov_4tile.dds@7d2136e7": {
+   "archives": [
+    "buriedswitches.eqg",
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.356,
+   "colorName": "grey",
+   "contrast": 0.086,
+   "fileName": "nek_erosion_ov_4tile.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_camp_bones_a.mod": 352,
+     "obj_camp_bones_b.mod": 364
+    },
+    "partners": {
+     "hp_skull05_c.dds": 2,
+     "hp_skull05_n.dds": 2,
+     "hp_skull06_n.dds": 2
+    },
+    "roles": {
+     "e_TextureCoverage0": 4
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 4
+    }
+   },
+   "meanColor": [
+    93,
+    90,
+    88
+   ],
+   "name": "nek_erosion_ov_4tile.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.87,
+    1.08
+   ],
+   "sha256": "7d2136e7b70090132e74c0301e833379c9f3912a310b412a987a4769b7fefb19",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/nek_erosion_ov_4tile_b.dds@3932f1f9": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.453,
+   "colorName": "tan",
+   "contrast": 0.085,
+   "fileName": "nek_erosion_ov_4tile_b.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    121,
+    118,
+    87
+   ],
+   "name": "nek_erosion_ov_4tile_b.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.91,
+    1.08
+   ],
+   "sha256": "3932f1f9807664f073a893a074fdd7c25ada4950e13f708e9edfed3352760b0a",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/palmbase.dds@4dbf0708": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.405,
+   "colorName": "tan",
+   "contrast": 0.087,
+   "fileName": "palmbase.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    107,
+    105,
+    88
+   ],
+   "name": "palmbase.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.8,
+    0.78
+   ],
+   "sha256": "4dbf0708f9fba98040eb59a7fd6835f86a74b02758f87c6f115c1d240b1d54af",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/palmbase_bump.dds@73b7fc9c": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.034,
+   "fileName": "palmbase_bump.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    127,
+    127,
+    253
+   ],
+   "name": "palmbase_bump.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.3,
+    1.22
+   ],
+   "sha256": "73b7fc9c4f2e3a8f17f3b4ebc9421c5c116206715e84d93cb56fac455324bd15",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/palmfrond2.dds@cfab089b": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.288,
+   "colorName": "green",
+   "contrast": 0.065,
+   "fileName": "palmfrond2.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    55,
+    76,
+    40
+   ],
+   "name": "palmfrond2.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.11,
+   "seamRatios": [
+    0.11,
+    0.17
+   ],
+   "sha256": "cfab089b92dfa90753e7e7b8edb75e7851d13fc07191371384111a27f0e85422",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.484,
+   "width": 128
+  },
+  "texture/palmfrond3.dds@1fd9c127": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.269,
+   "colorName": "green",
+   "contrast": 0.059,
+   "fileName": "palmfrond3.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    53,
+    69,
+    45
+   ],
+   "name": "palmfrond3.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.11,
+   "seamRatios": [
+    0.14,
+    0.2
+   ],
+   "sha256": "1fd9c12798984b0c5cc9b60953f838bf7187d69f64cbd0057b98f716e752b366",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.484,
+   "width": 128
+  },
+  "texture/palmtrunk2.dds@67270976": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.384,
+   "colorName": "tan",
+   "contrast": 0.067,
+   "fileName": "palmtrunk2.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obp_dsrt_palm_b_.mod": 84,
+     "obp_fernsa.mod": 48,
+     "obp_fernsb.mod": 43
+    },
+    "partners": {
+     "coverage_desert.dds": 3,
+     "palmtrunk2_bump.dds": 3
+    },
+    "roles": {
+     "e_TextureDiffuse0": 3
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 3
+    }
+   },
+   "meanColor": [
+    102,
+    99,
+    81
+   ],
+   "name": "palmtrunk2.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.016,
+   "seamRatios": [
+    0.83,
+    0.65
+   ],
+   "sha256": "672709767d7b69c755df50bbedb4399afc39197bbb8d96ef474c5b148a6a73c8",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0006,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.0,
+     "overhang": 0.165,
+     "slope": 0.016,
+     "steep": 0.139,
+     "vertical": 0.68
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 4.7
+   },
+   "width": 256
+  },
+  "texture/palmtrunk2_bump.dds@ba25c40f": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.018,
+   "fileName": "palmtrunk2_bump.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obp_dsrt_palm_b_.mod": 84,
+     "obp_fernsa.mod": 48,
+     "obp_fernsb.mod": 43
+    },
+    "partners": {
+     "coverage_desert.dds": 3,
+     "palmtrunk2.dds": 3
+    },
+    "roles": {
+     "e_TextureNormal0": 3
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 3
+    }
+   },
+   "meanColor": [
+    128,
+    127,
+    255
+   ],
+   "name": "palmtrunk2_bump.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 1.0,
+   "seamRatios": [
+    1.04,
+    1.02
+   ],
+   "sha256": "ba25c40f2862fc936280dc851480b94f619cef62b527f4f8d98bed2031d46349",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.548,
+   "width": 256
+  },
+  "texture/reallywhitesand.dds@364bdd96": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.71,
+   "colorName": "grey",
+   "contrast": 0.085,
+   "ecosystemLayers": [
+    {
+     "as": "coverMap",
+     "detailUnitsPerRepeat": 12.8,
+     "ecosystem": "island",
+     "layer": "beach",
+     "maxHeight": 325.0,
+     "maxSlope": 20,
+     "minHeight": 250.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 12.8
+    },
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 12.8,
+     "ecosystem": "island",
+     "layer": "beach",
+     "maxHeight": 325.0,
+     "maxSlope": 20,
+     "minHeight": 250.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 12.8
+    },
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 12.8,
+     "ecosystem": "monkeyisland",
+     "layer": "beach",
+     "maxHeight": 325.0,
+     "maxSlope": 20,
+     "minHeight": 250.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 12.8
+    },
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 12.8,
+     "ecosystem": "sand",
+     "layer": "sand",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 12.8
+    }
+   ],
+   "fileName": "reallywhitesand.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    183,
+    181,
+    175
+   ],
+   "name": "reallywhitesand.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.95,
+    0.96
+   ],
+   "sha256": "364bdd9695ff5c4e7693992cc7f5162e1efe1b9fcb53bee7fc23325fab2cd0f2",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/rope3.dds@d14aca2d": {
+   "archives": [
+    "buriedswitches.eqg"
+   ],
+   "brightness": 0.382,
+   "colorName": "brown",
+   "contrast": 0.111,
+   "fileName": "rope3.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    109,
+    95,
+    81
+   ],
+   "name": "rope3.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.12,
+    0.91
+   ],
+   "sha256": "d14aca2d1c66ee35912f853fb1e41877e7fc6123e32947086f477299433afa9e",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/rope3_n.dds@0bcef119": {
+   "archives": [
+    "buriedswitches.eqg"
+   ],
+   "brightness": 0.545,
+   "colorName": "blue",
+   "contrast": 0.166,
+   "fileName": "rope3_n.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    129,
+    129,
+    218
+   ],
+   "name": "rope3_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.1,
+    0.99
+   ],
+   "sha256": "0bcef119f9a29f1d103c00b6d56c56e1a2f160a18f1e9d889c7b97f4f1063bac",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/sb_rock01_10n.dds@8c4762d0": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.556,
+   "colorName": "blue",
+   "contrast": 0.037,
+   "fileName": "sb_rock01_10n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    127,
+    127,
+    253
+   ],
+   "name": "sb_rock01_10n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    1.41,
+    1.66
+   ],
+   "sha256": "8c4762d01c5c2f88d97eab626155b2e3aec5f3d4f684801f1d2965437df71fac",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/sb_rock01_c.dds@d2780e21": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.311,
+   "colorName": "grey",
+   "contrast": 0.05,
+   "ecosystemLayers": [
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "blacksand",
+     "layer": "sand",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 64.0
+    },
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "blksand2",
+     "layer": "blksand",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 64.0
+    },
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "island",
+     "layer": "wetsand",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 64.0
+    },
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "monkeyisland",
+     "layer": "seafloor",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 64.0
+    },
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "rock",
+     "layer": "rock",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 64.0
+    },
+    {
+     "as": "detailMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "siren",
+     "layer": "ocnflr",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": 360.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 64.0
+    }
+   ],
+   "fileName": "sb_rock01_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_mdrocka_dk.mod": 21,
+     "obj_rockarcha_dk.mod": 5,
+     "obj_smrocka_dk.mod": 134,
+     "obj_smrockb_dk.mod": 140,
+     "obj_smrockc_dk.mod": 129
+    },
+    "partners": {
+     "coverage_desert.dds": 1,
+     "di_ocean_beach_cave.dds": 9,
+     "sb_rock01_n.dds": 10
+    },
+    "roles": {
+     "e_TextureDiffuse0": 10
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1,
+     "Opaque_MPLBump2UV.fx": 9
+    }
+   },
+   "meanColor": [
+    78,
+    80,
+    77
+   ],
+   "name": "sb_rock01_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.83,
+    0.97
+   ],
+   "sha256": "d2780e21be168bf1726ee10727bca7a2b1885ba847f801199eab688d17dfe202",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "uses": {
+    "areaShare": 0.0679,
+    "objectShare": 1.0,
+    "slopeShares": {
+     "flat": 0.023,
+     "overhang": 0.096,
+     "slope": 0.106,
+     "steep": 0.312,
+     "vertical": 0.463
+    },
+    "surfaces": {
+     "solid": 1.0
+    },
+    "unitsPerRepeat": 37.6
+   },
+   "width": 256
+  },
+  "texture/sb_rock01_n.dds@e9551ed1": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.554,
+   "colorName": "blue",
+   "contrast": 0.081,
+   "ecosystemLayers": [
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "blacksand",
+     "layer": "sand",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 64.0
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "blksand2",
+     "layer": "blksand",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 64.0
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "island",
+     "layer": "wetsand",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 64.0
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "monkeyisland",
+     "layer": "seafloor",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 64.0
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "rock",
+     "layer": "rock",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 64.0
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 64.0,
+     "ecosystem": "siren",
+     "layer": "ocnflr",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": 360.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 64.0
+    }
+   ],
+   "fileName": "sb_rock01_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "materials": {
+    "models": {
+     "obj_mdrocka_dk.mod": 21,
+     "obj_rockarcha_dk.mod": 5,
+     "obj_smrocka_dk.mod": 134,
+     "obj_smrockb_dk.mod": 140,
+     "obj_smrockc_dk.mod": 129
+    },
+    "partners": {
+     "coverage_desert.dds": 1,
+     "di_ocean_beach_cave.dds": 9,
+     "sb_rock01_c.dds": 10
+    },
+    "roles": {
+     "e_TextureNormal0": 10
+    },
+    "shaders": {
+     "Opaque_MPLBump.fx": 1,
+     "Opaque_MPLBump2UV.fx": 9
+    }
+   },
+   "meanColor": [
+    128,
+    128,
+    247
+   ],
+   "name": "sb_rock01_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.75,
+    0.75
+   ],
+   "sha256": "e9551ed1349573e3fd175eec83286a716cf7f05b1278c4759b85565b6f797b15",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/sb_rock01a_8n.dds@8aaf626d": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.554,
+   "colorName": "blue",
+   "contrast": 0.087,
+   "fileName": "sb_rock01a_8n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    127,
+    247
+   ],
+   "name": "sb_rock01a_8n.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.99,
+    0.79
+   ],
+   "sha256": "8aaf626df53a027d807ee191554c6e7b250391bb850f065279fcb039851d62ca",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/sb_rock01a_c.dds@7d316698": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.269,
+   "colorName": "grey",
+   "contrast": 0.064,
+   "fileName": "sb_rock01a_c.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    67,
+    70,
+    67
+   ],
+   "name": "sb_rock01a_c.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.88,
+    0.91
+   ],
+   "sha256": "7d3166980ab05cb7d45cca7e5b8e6dc4117a9fce19298952e10c219197a7a87d",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/shrub01.dds@fdffd20b": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.255,
+   "colorName": "green",
+   "contrast": 0.067,
+   "fileName": "shrub01.dds",
+   "format": "DXT5",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    65,
+    87,
+    39
+   ],
+   "name": "shrub01.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.05,
+   "seamRatios": [
+    0.02,
+    0.0
+   ],
+   "sha256": "fdffd20b2bc52ec70666e7c8b7a58d2ca5cdb9c0d4d40aede8a22ff20e13d588",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.575,
+   "width": 256
+  },
+  "texture/water_e.dds@2afeca19": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.469,
+   "colorName": "grey",
+   "contrast": 0.34,
+   "fileName": "water_e.dds",
+   "format": "DXT1",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    117,
+    119,
+    127
+   ],
+   "name": "water_e.dds",
+   "nameSaysNormalMap": false,
+   "normalMapLike": false,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    24.53,
+    23.52
+   ],
+   "sha256": "2afeca19e74af110d62b443eedbcfd27a1d17ce9561631f09a680b6d58b797f7",
+   "shadowed": false,
+   "tiles": false,
+   "transparentShare": 0.0,
+   "width": 256
+  },
+  "texture/water_n.dds@14c72795": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.552,
+   "colorName": "blue",
+   "contrast": 0.071,
+   "fileName": "water_n.dds",
+   "format": "ARGB16",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    113,
+    112,
+    250
+   ],
+   "name": "water_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.982,
+   "seamRatios": [
+    0.84,
+    0.97
+   ],
+   "sha256": "14c72795da7d57cb4ace06c33dc4e3f0245ebb50231d681b77c44f5918061df3",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.481,
+   "width": 256
+  },
+  "texture/whitesand01_n.dds@a91e6b30": {
+   "archives": [
+    "maidensgrave.eqg"
+   ],
+   "brightness": 0.558,
+   "colorName": "blue",
+   "contrast": 0.045,
+   "ecosystemLayers": [
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 19.2,
+     "ecosystem": "base",
+     "layer": "underwater",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 19.2
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 12.8,
+     "ecosystem": "blacksand",
+     "layer": "blksand",
+     "maxHeight": 320.0,
+     "maxSlope": 45,
+     "minHeight": 200.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 12.8
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 12.8,
+     "ecosystem": "blksand2",
+     "layer": "sand",
+     "maxHeight": 320.0,
+     "maxSlope": 45,
+     "minHeight": 200.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 12.8
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 12.8,
+     "ecosystem": "island",
+     "layer": "beach",
+     "maxHeight": 325.0,
+     "maxSlope": 20,
+     "minHeight": 250.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 12.8
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 12.8,
+     "ecosystem": "monkeyisland",
+     "layer": "beach",
+     "maxHeight": 325.0,
+     "maxSlope": 20,
+     "minHeight": 250.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 12.8
+    },
+    {
+     "as": "normalMap",
+     "detailUnitsPerRepeat": 12.8,
+     "ecosystem": "sand",
+     "layer": "sand",
+     "maxHeight": 10000.0,
+     "maxSlope": 90,
+     "minHeight": -10000.0,
+     "minSlope": 0,
+     "normalUnitsPerRepeat": 12.8
+    }
+   ],
+   "fileName": "whitesand01_n.dds",
+   "format": "ARGB32",
+   "height": 256,
+   "kind": "texture",
+   "meanColor": [
+    128,
+    128,
+    253
+   ],
+   "name": "whitesand01_n.dds",
+   "nameSaysNormalMap": true,
+   "normalMapLike": true,
+   "partialAlphaShare": 0.0,
+   "seamRatios": [
+    0.88,
+    0.93
+   ],
+   "sha256": "a91e6b3000609c86d161c1941c7ee76383079a592748ba0a4e23bc45b722aac8",
+   "shadowed": false,
+   "tiles": true,
+   "transparentShare": 0.0,
+   "width": 256
+  }
+ },
+ "fileHashes": {
+  "buriedswitches.eqg": "090509b9c28f31e4744a8bcaddb68714f6e5f25eab8ec6b809aadc1bceda4716",
+  "maidensgrave.eqg": "039b7e532963c07cb4bb1579d93906533d83fdf4f0c2172f5e9e340a3218dbdc"
+ },
+ "format": "eqtzp",
+ "problems": [
+  "This EQ terrain zone's lights are not read"
+ ],
+ "source": "zone:maidensgrave",
+ "surveyVersion": 4,
+ "zone": "maidensgrave"
+}
