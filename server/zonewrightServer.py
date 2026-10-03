@@ -1047,6 +1047,27 @@ async def createTerrainGrid(context: Context, name: str, size: list[float], spac
 
 
 @guardedTool()
+async def createRockFromOutline(
+  context: Context, name: str, outline: list[list[float]], top: float, underside: dict, flare: list[list[float]] | None = None,
+  spacing: float = 16.0, ground: str | None = None, collection: str | None = None,
+):
+  """Build rock that has an underside, which ground shaped from above cannot have (a natural arch or bridge, an overhanging lip, a
+  ledge off a wall), drawn as the rock around it is: a closed outline [[x, y], ...] in plan with straight runs and jogs, its faces
+  dropping sheer from a flat top at height `top` to its underside. `underside` {"axis": [[x, y], [x, y]], "profile": [[distance,
+  height], ...]} gives the underside's height by distance along the axis from its first point, smooth between the points without
+  overshooting them and held beyond its ends: for an arch, the opening as seen from the side, its crown high and its ends low in the
+  walls. `flare` [[distanceInsideFace, rise], ...] curves the underside up toward the faces, as an arch's vault opens out at each
+  side. Run the outline well into the rock it grows from; with `ground` (the terrain it meets), the top tucks just under that ground
+  wherever the ground stands as high, so the ground runs on across it with no lip or gap and the hidden parts stay inside the rock.
+  Meshed every `spacing` units on a world grid, its faces in rows at the same heights; into the terrain collection (or `collection`)
+  so it exports as terrain. Returns its thinnest point and how many vertices tucked under the ground."""
+  return await callBridge(context, "createRockFromOutline", {
+    "name": name, "outline": outline, "top": top, "underside": underside, "flare": flare, "spacing": spacing, "ground": ground,
+    "collection": collection,
+  })
+
+
+@guardedTool()
 async def transformObjects(
   context: Context, names: list[str], translate: list[float] | None = None, rotateDegrees: list[float] | None = None, scale: list[float] | None = None,
   location: list[float] | None = None, rotationDegrees: list[float] | None = None,

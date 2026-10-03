@@ -5,14 +5,20 @@ import math
 import bmesh
 import bpy
 import mathutils
+import mathutils.bvhtree
+import mathutils.geometry
 import numpy
 
+import bridgeExport
 import bridgeMeshAccess
 import bridgePasses
+import bridgeShaping
 
 roundShapes = ("cylinder", "cone", "sphere")
 eulerModes = ("XYZ", "XZY", "YXZ", "YZX", "ZXY", "ZYX")
 measureCastDistance = 100000.0
+groundTuck = 2.0
+minimumRockThickness = 1.0
 primitiveKinds = ("plane", "grid", "cube") + roundShapes
 
 
@@ -108,6 +114,164 @@ def createTerrainGrid(name, size, spacing, location, collection):
   fitToSize(meshEditor, [size[0], size[1], 0], flat=True)
   newObject = linkNewMesh(name, meshEditor, location, [0, 0, 0], collection)
   return describeTransform(newObject) | bridgeMeshAccess.meshCounts(newObject) | {"spacing": spacing}
+
+
+def requireProfile(label, profile, meaning):
+  profileArray = bridgeMeshAccess.toArray(profile)
+  if profileArray.ndim != 2 or profileArray.shape[1] != 2 or len(profileArray) < 2 or (numpy.diff(profileArray[:, 0]) <= 0).any():
+    raise ValueError(f"{label} is [[{meaning}], ...]: at least two points with distances rising, got {profile!r}")
+  return profileArray
+
+
+def smoothProfile(distances, profileArray):
+  """Heights along a profile at the given distances: a smooth curve through its points that never overshoots them (piecewise cubic
+  Hermite with weighted harmonic-mean slopes), holding its end heights beyond its ends."""
+  knots, heights = profileArray[:, 0], profileArray[:, 1]
+  widths = numpy.diff(knots)
+  secants = numpy.diff(heights) / widths
+  slopes = numpy.empty(len(knots))
+  slopes[0], slopes[-1] = secants[0], secants[-1]
+  if len(knots) > 2:
+    left, right = secants[:-1], secants[1:]
+    leftWeight, rightWeight = 2 * widths[1:] + widths[:-1], widths[1:] + 2 * widths[:-1]
+    sameSign = left * right > 0
+    slopes[1:-1] = 0.0
+    slopes[1:-1][sameSign] = (leftWeight + rightWeight)[sameSign] / (leftWeight[sameSign] / left[sameSign] + rightWeight[sameSign] / right[sameSign])
+  clamped = numpy.clip(distances, knots[0], knots[-1])
+  segments = numpy.clip(numpy.searchsorted(knots, clamped, side="right") - 1, 0, len(knots) - 2)
+  width = widths[segments]
+  s = (clamped - knots[segments]) / width
+  return ((2 * s ** 3 - 3 * s ** 2 + 1) * heights[segments] + (s ** 3 - 2 * s ** 2 + s) * width * slopes[segments]
+          + (-2 * s ** 3 + 3 * s ** 2) * heights[segments + 1] + (s ** 3 - s ** 2) * width * slopes[segments + 1])
+
+
+def requireSimpleOutline(outline):
+  """The outline as an array running counterclockwise, refused when it repeats a point or crosses itself."""
+  outlineArray = bridgeMeshAccess.toArray(outline)
+  if outlineArray.ndim != 2 or outlineArray.shape[1] != 2 or len(outlineArray) < 3:
+    raise ValueError(f"An outline is at least three [x, y] points, got {outline!r}")
+  ends = numpy.roll(outlineArray, -1, axis=0)
+  if (numpy.linalg.norm(ends - outlineArray, axis=1) < 1e-6).any():
+    raise ValueError("The outline repeats a point; each point must differ from the one before it")
+  count = len(outlineArray)
+  for first in range(count):
+    for second in range(first + 2, count - (first == 0)):
+      if mathutils.geometry.intersect_line_line_2d(outlineArray[first], ends[first], outlineArray[second], ends[second]) is not None:
+        raise ValueError(f"The outline crosses itself: its sides from point {first} and from point {second}")
+  area = (outlineArray[:, 0] * ends[:, 1] - ends[:, 0] * outlineArray[:, 1]).sum() / 2
+  return outlineArray if area > 0 else outlineArray[::-1].copy()
+
+
+def resampledOutline(outlineArray, spacing):
+  """Points along the outline at most `spacing` apart, its own points among them so its corners stay sharp."""
+  points = []
+  for start, end in zip(outlineArray, numpy.roll(outlineArray, -1, axis=0)):
+    pieces = max(1, math.ceil(numpy.linalg.norm(end - start) / spacing - 1e-9))
+    points.extend(start + (end - start) * (numpy.arange(pieces) / pieces)[:, None])
+  return numpy.array(points)
+
+
+def surfaceHeightsBelow(sceneObject, plan):
+  """The height of the uppermost surface of an object at each [x, y] point, or -inf where there is none."""
+  depsgraph = bpy.context.evaluated_depsgraph_get()
+  tree = mathutils.bvhtree.BVHTree.FromObject(sceneObject, depsgraph)
+  inverse = sceneObject.matrix_world.inverted()
+  down = (inverse.to_3x3() @ mathutils.Vector((0.0, 0.0, -1.0))).normalized()
+  castFrom = max((sceneObject.matrix_world @ mathutils.Vector(corner)).z for corner in sceneObject.bound_box) + 1.0
+  heights = numpy.full(len(plan), -numpy.inf)
+  for index, (x, y) in enumerate(plan):
+    location, _, _, _ = tree.ray_cast(inverse @ mathutils.Vector((x, y, castFrom)), down)
+    if location is not None:
+      heights[index] = (sceneObject.matrix_world @ location).z
+  return heights
+
+
+def stitchColumns(left, right, heights):
+  """Triangles joining two vertical columns of vertex indices, each listed top to bottom, taking whichever next vertex stands higher."""
+  triangles, first, second = [], 0, 0
+  while first < len(left) - 1 or second < len(right) - 1:
+    if second == len(right) - 1 or (first < len(left) - 1 and heights[left[first + 1]] >= heights[right[second + 1]]):
+      triangles.append((left[first], left[first + 1], right[second]))
+      first += 1
+    else:
+      triangles.append((left[first], right[second + 1], right[second]))
+      second += 1
+  return triangles
+
+
+def createRockFromOutline(name, outline, top, underside, flare, spacing, ground, collection):
+  requireNewName(name)
+  if spacing <= 0:
+    raise ValueError(f"spacing must be positive, got {spacing}")
+  outlineArray = requireSimpleOutline(outline)
+  if not isinstance(underside, dict) or set(underside) != {"axis", "profile"}:
+    raise ValueError(f"underside is {{\"axis\": [[x, y], [x, y]], \"profile\": [[distance, height], ...]}}, got {underside!r}")
+  axis = bridgeMeshAccess.toArray(underside["axis"])
+  if axis.shape != (2, 2) or numpy.linalg.norm(axis[1] - axis[0]) < 1e-6:
+    raise ValueError(f"underside axis is two different [x, y] points, got {underside['axis']!r}")
+  undersideProfile = requireProfile("underside profile", underside["profile"], "distance along the axis, height")
+  flareProfile = None if flare is None else requireProfile("flare", flare, "distance inside a face, rise")
+  groundObject = None if ground is None else bridgeMeshAccess.requireMeshObject(ground)
+
+  boundary = resampledOutline(outlineArray, spacing)
+  low, high = outlineArray.min(0), outlineArray.max(0)
+  xs = numpy.arange(math.floor(low[0] / spacing), math.ceil(high[0] / spacing) + 1) * spacing
+  ys = numpy.arange(math.floor(low[1] / spacing), math.ceil(high[1] / spacing) + 1) * spacing
+  grid = numpy.stack(numpy.meshgrid(xs, ys), -1).reshape(-1, 2)
+  depthInside, _ = bridgeShaping.signedDistanceToOutline(grid, outlineArray)
+  interior = grid[depthInside > spacing / 2]
+  plan = numpy.vstack([boundary, interior])
+  coordinates, _, triangles, originals, _, _ = mathutils.geometry.delaunay_2d_cdt(
+    [mathutils.Vector(point) for point in plan], [], [list(range(len(boundary)))], 1, 1e-4, True)
+  if any(len(sources) != 1 for sources in originals):
+    raise ValueError(f"Points of the outline lie too close together to mesh at spacing {spacing:g}")
+  outputIndex = numpy.empty(len(plan), dtype=numpy.int64)
+  outputIndex[[sources[0] for sources in originals]] = numpy.arange(len(originals))
+  plan = numpy.array([[point.x, point.y] for point in coordinates])
+  rim = outputIndex[:len(boundary)]
+
+  axisDirection = (axis[1] - axis[0]) / numpy.linalg.norm(axis[1] - axis[0])
+  bottoms = smoothProfile((plan - axis[0]) @ axisDirection, undersideProfile)
+  if flareProfile is not None:
+    depth, _ = bridgeShaping.signedDistanceToOutline(plan, outlineArray)
+    bottoms = bottoms + smoothProfile(numpy.maximum(depth, 0.0), flareProfile)
+  tops = numpy.full(len(plan), float(top))
+  tucked = numpy.zeros(len(plan), dtype=bool)
+  if groundObject is not None:
+    groundHeights = surfaceHeightsBelow(groundObject, plan)
+    tucked = groundHeights >= top - groundTuck
+    tops[tucked] = groundHeights[tucked] - groundTuck
+  thickness = tops - bottoms
+  thinnest = int(thickness.argmin())
+  if thickness[thinnest] < minimumRockThickness:
+    raise ValueError(f"The underside comes within {minimumRockThickness:g} of the top at {roundVector(plan[thinnest], 1)}: {thickness[thinnest]:.1f} thick")
+
+  vertices = [(x, y, z) for (x, y), z in zip(plan, tops)] + [(x, y, z) for (x, y), z in zip(plan, bottoms)]
+  heights = list(tops) + list(bottoms)
+  faces = [tuple(triangle) for triangle in triangles] + [tuple(len(plan) + index for index in reversed(triangle)) for triangle in triangles]
+  columns = []
+  for index in rim:
+    rows = numpy.arange(math.ceil(bottoms[index] / spacing), math.floor(tops[index] / spacing) + 1)[::-1] * spacing
+    rows = rows[(rows < tops[index] - spacing / 4) & (rows > bottoms[index] + spacing / 4)]
+    column = [int(index)]
+    for row in rows:
+      column.append(len(vertices))
+      vertices.append((plan[index, 0], plan[index, 1], row))
+      heights.append(row)
+    columns.append(column + [len(plan) + int(index)])
+  for column, following in zip(columns, columns[1:] + columns[:1]):
+    faces.extend(stitchColumns(following, column, heights))
+
+  meshEditor = bmesh.new()
+  meshVertices = [meshEditor.verts.new(vertex) for vertex in vertices]
+  for face in faces:
+    meshEditor.faces.new([meshVertices[index] for index in face])
+  bmesh.ops.recalc_face_normals(meshEditor, faces=list(meshEditor.faces))
+  newObject = linkNewMesh(name, meshEditor, [0, 0, 0], [0, 0, 0], bridgeExport.terrainCollectionName if collection is None else collection)
+  return describeTransform(newObject) | bridgeMeshAccess.meshCounts(newObject) | {
+    "thinnest": {"thickness": round(float(thickness[thinnest]), 2), "at": roundVector(plan[thinnest], 1)},
+    "tuckedVertices": int(tucked.sum()),
+  }
 
 
 def transformObjects(names, translate, rotateDegrees, scale, location, rotationDegrees):
@@ -292,6 +456,7 @@ def measure(points, snapToSurface):
 commands = {
   "createPrimitive": (createPrimitive, True),
   "createTerrainGrid": (createTerrainGrid, True),
+  "createRockFromOutline": (createRockFromOutline, True),
   "transformObjects": (transformObjects, True),
   "duplicateObjects": (duplicateObjects, True),
   "joinObjects": (joinObjects, True),

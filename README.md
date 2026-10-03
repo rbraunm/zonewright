@@ -65,6 +65,7 @@ Edits address parts of a mesh with selectors instead of an interactive selection
 |---|---|---|
 | Blocking out | `createPrimitive` | Plane, grid, cube, cylinder, cone, or sphere built to an exact bounding size, origin at its base center (center for flat shapes) |
 | | `createTerrainGrid` | Flat grid with a vertex every `spacing` units, ready to sculpt |
+| | `createRockFromOutline` | Rock with an underside (a natural arch or bridge, an overhanging lip, a ledge off a wall) drawn as the rock around it is: an outline in plan with straight runs and jogs, sheer faces from a flat top, an underside drawn along an axis and flared up toward the faces, its top tucked under the ground it runs into so no lip or gap shows; meshed on a world grid, in the terrain collection |
 | | `transformObjects` | Relative or absolute location, rotation, and scale |
 | | `duplicateObjects` / `deleteObjects` | Copies (optionally sharing the mesh) and deletions |
 | | `organize` | Renames, parents (world transform kept), collections |
