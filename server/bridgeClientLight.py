@@ -8,7 +8,7 @@ import bpy
 
 groupName = "eqClientLight"
 # Raised whenever buildGroup changes, so a group saved in an older .blend is rebuilt in place.
-groupVersion = 5
+groupVersion = 6
 bakedAttribute = "eqColor"
 normalAttribute = "eqNormal"
 tintAttribute = "eqTint"
@@ -71,12 +71,18 @@ class GroupBuilder:
 
 
 def buildGroup(tree):
+  """Build the group's nodes. Its sockets are kept and only missing ones added: clearing them would drop every saved material's links
+  into the group, and a material saved before an input existed takes that input's default (added light: none)."""
   tree.nodes.clear()
-  tree.interface.clear()
   tree["eqVersion"] = groupVersion
+  sockets = {(item.in_out, item.name) for item in tree.interface.items_tree if item.item_type == "SOCKET"}
   for socketName, socketType in (("Base", "NodeSocketColor"), ("Baked", "NodeSocketColor"), ("Share", "NodeSocketFloat"), ("Normal", "NodeSocketVector"), ("Added", "NodeSocketColor")):
-    tree.interface.new_socket(socketName, in_out="INPUT", socket_type=socketType)
-  tree.interface.new_socket("Color", in_out="OUTPUT", socket_type="NodeSocketColor")
+    if ("INPUT", socketName) not in sockets:
+      socket = tree.interface.new_socket(socketName, in_out="INPUT", socket_type=socketType)
+      if socketName == "Added":
+        socket.default_value = (0.0, 0.0, 0.0, 1.0)
+  if ("OUTPUT", "Color") not in sockets:
+    tree.interface.new_socket("Color", in_out="OUTPUT", socket_type="NodeSocketColor")
   build = GroupBuilder(tree)
   inputs = build.node("NodeGroupInput").outputs
   toSun = build.node("ShaderNodeCombineXYZ", name="towardSun").outputs["Vector"]

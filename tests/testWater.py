@@ -192,3 +192,34 @@ def testWaterExportsTheClientsShadersAndSwimVolumes(stageBlenderServer, tmp_path
   assert pool["shader"] == "Opaque_MaxWater.fx" and fall["shader"] == "Opaque_MaxWaterFall.fx"
   assert pool["properties"]["e_TextureEnvironment0"] == "water_e.dds" and pool["properties"]["e_fWaterColor1"] == 0xFF000A1C
   assert exported["housing"] is None
+
+
+simulateOlderGroup = """
+tree = bpy.data.node_groups["eqClientLight"]
+tree["eqVersion"] = 4
+tree.interface.remove(tree.interface.items_tree["Added"])
+result = [item.name for item in tree.interface.items_tree]
+"""
+
+
+def testMaterialsSavedBeforeTheAddedLightInputDrawUnchanged(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await freshScene(session)
+    await basin(session)
+    grass = writePNG(tmp_path / "grass.png", 4, 4, (90, 120, 60, 255))
+    await session.expectSuccess("createMaterial", {"name": "grass", "diffuseTexture": str(grass)})
+    await session.expectSuccess("assignMaterial", {"objectName": "ground", "materialName": "grass"})
+    await session.expectSuccess("projectUVs", {"objectName": "ground", "method": "planar", "worldUnitsPerRepeat": 64, "direction": [0, 0, 1]})
+    await session.expectSuccess("setZoneProperties", {
+      "ambientColor": [0.3, 0.3, 0.3], "specialAmbientColor": [0, 0, 0], "bounceColor": [0, 0, 0], "sunColor": [0.6, 0.6, 0.6],
+      "sunAzimuthDegrees": 0, "sunElevationDegrees": 45, "fogColor": [0.5, 0.5, 0.5], "fogStart": 50, "fogEnd": 3000, "fogDensity": 0.1, "newEngineZone": False,
+    })
+    view = {"eye": [-150, -150, 80], "target": [0, 0, -10]}
+    current, _ = await session.expectImage("renderView", {"view": view})
+    older = (await session.expectSuccess("runPython", {"code": simulateOlderGroup}))["result"]
+    rebuilt, _ = await session.expectImage("renderView", {"view": view})
+    return current, older, rebuilt
+
+  current, older, rebuilt = stageBlenderServer.session(steps)
+  # A group saved before the added light input existed is rebuilt with it, and what it draws does not change.
+  assert "Added" not in older and rebuilt == current
