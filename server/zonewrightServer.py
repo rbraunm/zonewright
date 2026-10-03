@@ -46,9 +46,10 @@ server = MCPServer(
     "Hands and eyes in a headless Blender for building EverQuest zones, plus the pinned tooling, a survey of the client's zones, and a"
     " catalog of its graphical assets.\n\nBuild zones as a 3D environment artist does, not as a generator. Plan by intent: divide the"
     " zone into regions (createRegion) from the concept and give each its own intent before shaping or surfacing it, and work region by"
-    " region at any scale. Decide by hand: masks (slope, height, near a path) and generators (warp, roughen, scatter) are helpers inside"
-    " an area you chose, never a rule applied across the whole zone; paint surfacing into layers by region and stroke (paintSurface),"
-    " shape its edges deliberately (editSurface). Iterate rough to fine and look after every pass (renderView at eye height and from"
+    " region at any scale. Decide by hand: a slope or height recipe belongs to a region, as the client's terrain ecosystems do (each"
+    " painted area its own palette and thresholds, targeted height bands, softened edges), and generators (warp, roughen, scatter) work"
+    " inside an area you chose; never one hard rule and one palette across the whole zone. Paint surfacing into layers by region and"
+    " stroke (paintSurface) and shape its edges deliberately (editSurface). Iterate rough to fine and look after every pass (renderView at eye height and from"
     " above); take back what does not work (passes, resetRegion, rebuildRegion, clearRegion, eraseSurface): removing is a way of adding."
     " Steer by the EQ worlds: compareWithClientZones against reference zones, and the catalog's measured use of each asset. The"
     " author-zone skill and docs/zoneWorkflow.md in the zonewright repository hold the procedure."
@@ -1023,7 +1024,7 @@ selectorHelp = (
   " {\"facing\": {\"direction\": [x,y,z], \"withinDegrees\": d}}, {\"slope\": {\"minimumDegrees\": a, \"maximumDegrees\": b}} (0 flat, 90 vertical, over 90 overhanging), {\"height\": {\"minimum\": z, \"maximum\": z}}, {\"nearPath\": {\"path\": [[x,y,z], ...], \"radius\": r}} (horizontal distance), {\"material\": name}, {\"vertexGroup\": name}, {\"insideObject\": closedMeshName}, {\"region\": regionName} (inside a region createRegion made),"
   " {\"and\": [selectors]}, {\"or\": [selectors]}, {\"not\": selector}. Shapes test vertex positions, or face centers for face operations."
   " A selector that matches nothing is an error. Masks such as slope and height pick within an area you chose (a region, a stroke);"
-  " they are helpers, not a design to apply across a zone."
+  " a recipe belongs to a region, not to the whole zone."
 )
 allSelector = {"all": True}
 
@@ -1273,8 +1274,9 @@ async def removeSurfaceLayer(context: Context, objectName: str, name: str):
 
 @guardedTool(description=(
   "Paint a material into a surfacing layer where the selector says, as an artist paints by intent: a region, a stroke along a path"
-  " (nearPath with a radius), around a point (sphere), or masks combined with them. Slope, height, and other masks help pick faces"
-  " inside an area you chose; they are not a design to apply across the zone. edgeNoise {featureSize, amplitude, seed} moves the"
+  " (nearPath with a radius), around a point (sphere), or masks combined with them. A slope or height mask inside a region is a recipe"
+  " as the client's terrain ecosystems use them (rock on that region's steep ground, a band of ground at chosen heights); one hard rule"
+  " across the whole zone is not. edgeNoise {featureSize, amplitude, seed} moves the"
   " painted edge in and out by smooth noise so it wanders as a painted edge does instead of tracing a circle, a line, or the grid." + selectorHelp))
 async def paintSurface(context: Context, objectName: str, layer: str, material: str, selector: dict, edgeNoise: dict | None = None):
   return await callBridge(context, "paintSurface", {"objectName": objectName, "layer": layer, "material": material, "selector": selector, "edgeNoise": edgeNoise})
