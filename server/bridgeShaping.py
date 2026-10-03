@@ -24,7 +24,8 @@ noiseBasis = "PERLIN_ORIGINAL"
 noiseSpread = 0.278
 maximumOctaves = 8
 roughenDirections = ("normal", "up")
-# horizontal keeps heights, surface moves along the surface, full moves in every direction.
+# horizontal keeps heights and moves every height at a spot alike, so a wall bends without shearing; surface moves along the surface;
+# full moves in every direction.
 warpPlanes = ("horizontal", "surface", "full")
 # A cell's diagonal turns only when that shortens the height step across the cell by more than this share of the mesh's edge length,
 # so flat and evenly sloping cells keep theirs.
@@ -35,6 +36,10 @@ diagonalStretch = 1.5
 # turned away.
 diagonalSliverShare = 0.05
 diagonalSweeps = 4
+# Two neighbors on either side of one break both snap onto it unless they would land closer than this share of an edge apart along
+# it (where a warp squeezed the grid); then only the nearer snaps, as both would fold the faces between them. A rim slide that would
+# land this close to a neighbor (one snapped onto a break lying on the rim) is not made either.
+breakCrowding = 0.35
 
 
 def falloffWeights(normalizedDistances, curve):
@@ -122,10 +127,12 @@ def sculpt(objectName, mode, strokeFractions, nearestPoints, strength, curve, di
     updated = profileStroke(sceneObject, positions, affected, strength)
   moved = numpy.linalg.norm(updated - positions, axis=1)
   writeWorldPositions(sceneObject, updated)
-  result = {"affectedVertices": int((moved > 1e-9).sum()), "largestMove": round(float(moved.max()), 3), "foldedFaces": bridgeMeshAccess.foldedFaceCount(sceneObject, positions, updated)}
-  if mode in profileModes:
-    result |= triangulateAlongContours(sceneObject, updated, moved > 1e-9)
-  return result
+  shaped = moved > 1e-9
+  result = {"affectedVertices": int(shaped.sum()), "largestMove": round(float(moved.max()), 3)}
+  if mode not in profileModes:
+    return result | {"foldedFaces": bridgeMeshAccess.foldedFaceCount(sceneObject, positions, updated)}
+  triangulation = triangulateAlongContours(sceneObject, updated, shaped)
+  return result | {"foldedFaces": overturnedFaceCount(sceneObject, updated, shaped)} | triangulation
 
 
 def sculptAtPoint(objectName, mode, center, radius, strength, falloff, direction, iterations):
@@ -159,6 +166,13 @@ def medianEdgeLength(sceneObject, positions, vertexMask):
   return float(numpy.median(numpy.linalg.norm(positions[edges[:, 0]] - positions[edges[:, 1]], axis=1)))
 
 
+def overturnedFaceCount(sceneObject, worldPositions, vertexMask):
+  """Faces touching the masked vertices that lie flat or face down seen from above: on ground shaped by moves up and down, folds."""
+  loopTotals, loopVertices = bridgeMeshAccess.faceLoops(sceneObject)
+  touching = numpy.add.reduceat(vertexMask[loopVertices].astype(numpy.int64), numpy.cumsum(loopTotals) - loopTotals) > 0
+  return int((touching & (bridgeMeshAccess.faceNormals(sceneObject, worldPositions)[:, 2] <= 0)).sum())
+
+
 def profileAlongPath(sceneObject, positions, affected, strength, path, radii, profileArray, mode, conformRim, conformBreaks):
   """Move vertices toward the path floor plus the profile height: carve lowers those above it, fill raises those below it. With
   conformBreaks, the vertices nearest each break of the profile (each point between its first and last) first slide sideways onto
@@ -168,6 +182,9 @@ def profileAlongPath(sceneObject, positions, affected, strength, path, radii, pr
   fractions, floors, radiiHere, nearest = bridgeMeshAccess.strokeAlongPath(positions, path, radii, horizontal=True)
   lateral = fractions * radiiHere
   border = bridgeMeshAccess.boundaryVertexMask(sceneObject)
+  meshEdges = numpy.empty(len(sceneObject.data.edges) * 2, dtype=numpy.int64)
+  sceneObject.data.edges.foreach_get("vertices", meshEdges)
+  meshEdges = meshEdges.reshape(-1, 2).T
   if conformBreaks:
     if len(profileArray) < 3:
       raise ValueError("conformBreaks needs a profile with breaks: points between its first and last")
@@ -175,8 +192,16 @@ def profileAlongPath(sceneObject, positions, affected, strength, path, radii, pr
     offsets = breakLaterals - lateral[:, None]
     closest = numpy.abs(offsets).argmin(axis=1)
     slide = offsets[numpy.arange(len(offsets)), closest]
-    reach = 0.5 * medianEdgeLength(sceneObject, positions, affected)
-    snapping = affected & (numpy.abs(slide) <= reach) & (lateral > 0) & ~border
+    edgeLength = medianEdgeLength(sceneObject, positions, affected)
+    snapping = affected & (numpy.abs(slide) <= 0.5 * edgeLength) & (lateral > 0) & ~border
+    first, second = meshEdges
+    pairs = snapping[first] & snapping[second] & (closest[first] == closest[second]) & (numpy.sign(slide[first]) != numpy.sign(slide[second]))
+    first, second = first[pairs], second[pairs]
+    outwardOfFirst = (positions[first, :2] - nearest[first]) / lateral[first, None]
+    apart = positions[second, :2] - positions[first, :2]
+    alongBreak = numpy.abs(outwardOfFirst[:, 0] * apart[:, 1] - outwardOfFirst[:, 1] * apart[:, 0])
+    crowded = alongBreak < breakCrowding * edgeLength
+    snapping[numpy.where(numpy.abs(slide[first]) > numpy.abs(slide[second]), first, second)[crowded]] = False
     outward = (positions[snapping, :2] - nearest[snapping]) / lateral[snapping, None]
     positions = positions.copy()
     positions[snapping, :2] += outward * slide[snapping, None]
@@ -190,10 +215,17 @@ def profileAlongPath(sceneObject, positions, affected, strength, path, radii, pr
     heightsAboveFloor = positions[:, 2] - floors
     contourLateral = numpy.interp(heightsAboveFloor, profileArray[:, 1], profileArray[:, 0]) * radiiHere
     slide = contourLateral - lateral
-    maximumSlide = 0.75 * medianEdgeLength(sceneObject, positions, moving)
-    sliding = affected & ~moving & (heightsAboveFloor > profileArray[0, 1]) & (heightsAboveFloor < profileArray[-1, 1]) & (slide < 0) & (-slide <= maximumSlide) & (lateral > 0) & ~border
+    rimEdgeLength = medianEdgeLength(sceneObject, positions, moving)
+    sliding = affected & ~moving & (heightsAboveFloor > profileArray[0, 1]) & (heightsAboveFloor < profileArray[-1, 1]) & (slide < 0) & (-slide <= 0.75 * rimEdgeLength) & (lateral > 0) & ~border
     outward = (positions[sliding, :2] - nearest[sliding]) / lateral[sliding, None]
     updated[sliding, :2] += outward * slide[sliding, None]
+    first, second = meshEdges
+    touching = sliding[first] | sliding[second]
+    first, second = first[touching], second[touching]
+    crowded = numpy.linalg.norm(updated[first, :2] - updated[second, :2], axis=1) < breakCrowding * rimEdgeLength
+    larger = numpy.where(numpy.abs(slide[first]) > numpy.abs(slide[second]), first, second)
+    staying = numpy.where(sliding[first] & sliding[second], larger, numpy.where(sliding[first], first, second))[crowded]
+    updated[staying, :2] = positions[staying, :2]
   return updated
 
 
@@ -436,7 +468,7 @@ def triangulateAlongContours(sceneObject, worldPositions, vertexMask):
         turning.append(edge)
     if not turning:
       break
-    turned += len(bmesh.ops.rotate_edges(meshEditor, edges=turning)["edges"])
+    turned += sum(bmesh.utils.edge_rotate(edge) is not None for edge in turning)
   meshEditor.to_mesh(sceneObject.data)
   meshEditor.free()
   sceneObject.data.update()
@@ -523,7 +555,10 @@ def warp(objectName, featureSize, amplitude, seed, plane, selector, fadeDistance
     raise ValueError(f"plane must be one of {list(warpPlanes)}, got '{plane}'")
   positions, normals = bridgeMeshAccess.readVertexArrays(sceneObject)
   weights = maskWeights(sceneObject, selector, fadeDistance, positions)
-  vectors = numpy.array([list(mathutils.noise.noise_vector(mathutils.Vector(point), noise_basis=noiseBasis)) for point in noiseSamplePoints(positions, featureSize, seed)])
+  samplePositions = positions.copy()
+  if plane == "horizontal":
+    samplePositions[:, 2] = 0
+  vectors = numpy.array([list(mathutils.noise.noise_vector(mathutils.Vector(point), noise_basis=noiseBasis)) for point in noiseSamplePoints(samplePositions, featureSize, seed)])
   if plane == "horizontal":
     vectors[:, 2] = 0
   elif plane == "surface":

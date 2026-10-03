@@ -197,8 +197,12 @@ evaluated.to_mesh_clear()
 """
 
 
+def planarSignedArea(points):
+  return sum(x0 * y1 - x1 * y0 for (x0, y0, _), (x1, y1, _) in zip(points, points[1:] + points[:1])) / 2
+
+
 def planarArea(points):
-  return abs(sum(x0 * y1 - x1 * y0 for (x0, y0, _), (x1, y1, _) in zip(points, points[1:] + points[:1]))) / 2
+  return abs(planarSignedArea(points))
 
 
 def testFillTriangulatesAlongItsBreaksAtAnyAngle(stageBlenderServer):
@@ -290,7 +294,7 @@ def testFillOnAWarpedGridLeavesNoFoldedTriangles(stageBlenderServer):
     await freshScene(session)
     await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [320, 320], "spacing": 8, "location": [0, 0, 0]})
     await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "bend"})
-    await session.expectSuccess("warp", {"objectName": "ground", "featureSize": 60, "amplitude": 3, "seed": 1})
+    await session.expectSuccess("warp", {"objectName": "ground", "featureSize": 60, "amplitude": 6, "seed": 1})
     await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "mesa"})
     await session.expectSuccess("sculptAlongPath", {
       "objectName": "ground", "mode": "fill", "path": [[-140, -60, 0], [-20, 30, 0], [140, 10, 0]], "radii": [50, 60, 45], "strength": 1,
@@ -301,10 +305,47 @@ def testFillOnAWarpedGridLeavesNoFoldedTriangles(stageBlenderServer):
   shaped = stageBlenderServer.session(steps)
   vertices = shaped["vertices"]
 
-  def signedArea(face):
-    points = [vertices[index] for index in face]
-    return sum(x0 * y1 - x1 * y0 for (x0, y0, _), (x1, y1, _) in zip(points, points[1:] + points[:1])) / 2
-
-  areas = [signedArea(face) for face in shaped["faces"]]
+  areas = [planarSignedArea([vertices[index] for index in face]) for face in shaped["faces"]]
   assert sum(area <= 0 for area in areas) == 0
   assert sum(area < 0.1 * 8 * 8 / 2 for area in areas) == 0
+
+
+def testCarveWhoseLastBreakMeetsTheGroundFoldsNothing(stageBlenderServer):
+  # The break at 0.8 stands 20 above the floor, exactly at the ground: break snapping and rim sliding aim at one contour from either
+  # side.
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [320, 320], "spacing": 8, "location": [0, 0, 0]})
+    await session.expectSuccess("sculptAlongPath", {
+      "objectName": "ground", "mode": "carve", "path": [[-150, -40, -20], [150, 40, -20]], "radius": 60, "strength": 1,
+      "profile": [[0, 0], [0.5, 10], [0.8, 20], [1, 30]], "conformBreaks": True,
+    })
+    return (await session.expectSuccess("runPython", {"code": "objectName = 'ground'" + readShapedMesh}))["result"]
+
+  shaped = stageBlenderServer.session(steps)
+  vertices = shaped["vertices"]
+  areas = [planarSignedArea([vertices[index] for index in face]) for face in shaped["faces"]]
+  assert sum(area <= 0 for area in areas) == 0
+  assert sum(area < 0.1 * 8 * 8 / 2 for area in areas) == 0
+
+
+def testCarveIntoASteepWallFoldsNothing(stageBlenderServer):
+  # A stepped canyon, then a terrace bowl cut into its wall at an angle: break snapping and rim sliding over steep, uneven ground.
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [480, 480], "spacing": 8, "location": [0, 0, 0]})
+    canyon = await session.expectSuccess("sculptAlongPath", {
+      "objectName": "ground", "mode": "carve", "path": [[-240, -30, -200], [240, 30, -200]], "radius": 150, "strength": 1,
+      "profile": [[0, 0], [0.1, 10], [0.3, 30], [0.38, 110], [0.46, 120], [0.58, 190], [0.66, 200], [0.85, 210], [1, 260]], "conformBreaks": True,
+    })
+    terrace = await session.expectSuccess("sculptAlongPath", {
+      "objectName": "ground", "mode": "carve", "path": [[-60, 140, -40], [40, 100, -40], [140, 40, -38]], "radius": 60, "strength": 1,
+      "profile": [[0, 0], [0.6, 4], [0.8, 30], [1, 100]], "conformBreaks": True,
+    })
+    return canyon, terrace, (await session.expectSuccess("runPython", {"code": "objectName = 'ground'" + readShapedMesh}))["result"]
+
+  canyon, terrace, shaped = stageBlenderServer.session(steps)
+  vertices = shaped["vertices"]
+  areas = [planarSignedArea([vertices[index] for index in face]) for face in shaped["faces"]]
+  assert (canyon["foldedFaces"], terrace["foldedFaces"]) == (0, 0)
+  assert sum(area <= 0 for area in areas) == 0

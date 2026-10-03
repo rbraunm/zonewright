@@ -110,6 +110,25 @@ def testWarpBendsShapesSidewaysAndCanBeTakenBack(stageBlenderServer):
   assert numpy.allclose(muted, cone)
 
 
+def testHorizontalWarpMovesEveryHeightAlike(stageBlenderServer):
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    await newGrid(session, "flat")
+    await newGrid(session, "cliff")
+    await session.expectSuccess("moveVertices", {"objectName": "cliff", "selector": {"box": {"minimum": [0, -100, -1], "maximum": [100, 100, 1]}}, "offset": [0, 0, 300]})
+    flatBefore, cliffBefore = await worldVertices(session, "flat"), await worldVertices(session, "cliff")
+    for name in ("flat", "cliff"):
+      await session.expectSuccess("warp", {"objectName": name, "featureSize": 40, "amplitude": 6, "seed": 5})
+    return flatBefore, cliffBefore, await worldVertices(session, "flat"), await worldVertices(session, "cliff")
+
+  flatBefore, cliffBefore, flatAfter, cliffAfter = stageBlenderServer.session(steps)
+  # Half the cliff grid stands 300 above the flat one; a horizontal warp moves each spot in the plane alike at any height, so a wall's
+  # top and foot move together instead of shearing past each other.
+  assert numpy.abs(cliffBefore[:, 2]).max() == 300
+  assert numpy.abs((flatAfter - flatBefore)[:, :2]).max() > 1
+  assert numpy.allclose((cliffAfter - cliffBefore)[:, :2], (flatAfter - flatBefore)[:, :2], atol=1e-9)
+
+
 def testWarpCountsTheFacesItTurnsOver(stageBlenderServer):
   async def steps(session):
     await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
