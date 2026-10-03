@@ -62,7 +62,7 @@ EQG terrain is a mesh, not a height grid, so a zone can have near-vertical walls
 - **Resolution where it is needed:** a grid stretched down a steep wall becomes a few long triangles, so steep areas are refined (more vertices on the wall) before they are shaped.
 - **Shaping along the surface:** brushes, warp, and roughen move vertices along the surface normal, which on a wall is sideways: that is how ledges, alcoves, and overhangs are made, and how cliffs get breakup.
 - **Caves:** cut into a wall along a path with an irregular cutter, then shaped and roughened inside.
-- **Arches and bridges:** a rough cross-section swept along a path, then broken up, kept in the terrain so it is walked on and exported as ground.
+- **Arches and bridges:** what is left of the layered rock where the gorge cut under it, not something laid across: the top is the plateau's own surface, the sides are the gorge walls carried on, the strata run through it and into the walls, and the opening is cut from below as one broad curve, the lintel thickening into the abutments. It is its own piece in the terrain, so it is walked on and exported as ground, with its hidden parts running into the rock around it.
 
 A pass holds one offset per vertex, so refining and cutting, which change the vertices, first collapse the passes into the base. That fits coarse to fine: forms are settled on the coarse grid, collapsed, refined, and shaped further in new passes.
 

@@ -76,7 +76,7 @@ def collectConstruction(outputPath):
 
 
 class SolidSurfaces:
-  """Ray casts against every rendered mesh in the scene (terrain, rock masses, placed objects), not regions or other helpers."""
+  """Ray casts against every rendered mesh in the scene (terrain and placed objects), not regions or other helpers."""
 
   def __init__(self):
     depsgraph = bpy.context.evaluated_depsgraph_get()

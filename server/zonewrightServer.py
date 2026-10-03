@@ -1047,23 +1047,6 @@ async def createTerrainGrid(context: Context, name: str, size: list[float], spac
 
 
 @guardedTool()
-async def createRockMass(
-  context: Context, name: str, path: list[list[float]], widths: list[float], thicknesses: list[float], spacing: float, squareness: float = 4.0,
-  collection: str | None = None,
-):
-  """Sculpt a mass of rock that has an underside, which ground shaped from above cannot have: a natural arch over a gorge, an
-  overhanging lip, a ledge standing out from a wall. It runs along `path` [[x, y, z], ...] with its top on the path (a walkable deck
-  where the path is gentle); at each path point `widths` sets how wide it is and `thicknesses` how deep it runs below its top, both
-  changing smoothly between points without overshooting them, so an arch is thick where it springs from the walls and thin over the
-  gap. Its cross-section is rounded at `squareness` 2 and boxier, its top flatter, above that. Run the path's ends into the walls or
-  ground it grows from. It is meshed about every `spacing` units, like the ground around it, and goes into the terrain collection (or
-  `collection`), so it exports as part of the zone's terrain. Whether a form is its own piece or part of the ground depends on the
-  landform; a rock mass should look part of the rock around it, so shape it further (shaping passes, warp, roughen) and surface it
-  with that rock's recipe."""
-  return await callBridge(context, "createRockMass", {"name": name, "path": path, "widths": widths, "thicknesses": thicknesses, "spacing": spacing, "squareness": squareness, "collection": collection})
-
-
-@guardedTool()
 async def transformObjects(
   context: Context, names: list[str], translate: list[float] | None = None, rotateDegrees: list[float] | None = None, scale: list[float] | None = None,
   location: list[float] | None = None, rotationDegrees: list[float] | None = None,
@@ -1110,7 +1093,7 @@ async def measure(context: Context, points: list[list[float]], snapToSurface: bo
 
 @guardedTool()
 async def walkRoute(context: Context, path: list[list[float]], sampleSpacing: float = 4.0):
-  """Walk a route as a player would, over the zone's rendered surfaces (terrain, rock masses, placed objects): from its first point,
+  """Walk a route as a player would, over the zone's rendered surfaces (terrain and placed objects): from its first point,
   following the footing underfoot past each point of `path` [[x, y, z], ...], whose heights only need to be near the footing (so a
   route can run over an arch or under it). Judged for a player 6 units tall who walks slopes up to 60 degrees: the route's length
   across the ground, its steepest slope, its narrowest footing (how far it runs to each side before a drop or a wall; null beyond 60),

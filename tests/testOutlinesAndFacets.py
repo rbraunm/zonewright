@@ -54,7 +54,7 @@ result = float((counts[inverse.ravel()] >= 4).mean())
 
   async def steps(session):
     await freshScene(session)
-    await session.expectSuccess("createRockMass", {"name": "rock", "path": [[-80, 0, 40], [0, 20, 60], [80, 0, 40]], "widths": [60, 70, 60], "thicknesses": [50, 60, 50], "spacing": 6, "squareness": 2})
+    await session.expectSuccess("createPrimitive", {"kind": "sphere", "name": "rock", "size": [160, 70, 60], "location": [0, 0, 0], "segments": 64})
     rounded = (await session.expectSuccess("runPython", {"code": measureFacets}))["result"]
     faceted = await session.expectSuccess("facet", {"objectName": "rock", "cellSize": 30, "seed": 3})
     planar = (await session.expectSuccess("runPython", {"code": measureFacets}))["result"]
