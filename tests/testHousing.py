@@ -55,26 +55,28 @@ def testPlotBorderOpensTowardItsStreetAndItsPriceFollowsTheRules(stageBlenderSer
     await freshScene(session)
     await flatGround(session, tmp_path)
     await session.expectSuccess("setZoneHousing", decision)
-    placed = await session.expectSuccess("placePlot", {"address": "101 Test Street", "center": [0, 0], "facingDegrees": 90, "items": 60, "pets": 4, "features": ["view"]})
+    placed = await session.expectSuccess("placePlot", {"address": "101 Test Street", "center": [0, 0], "facingDegrees": 90, "items": 120, "pets": 6, "features": ["view"]})
+    lowTier = await session.expectSuccess("placePlot", {"address": "103 Test Street", "center": [0, 300], "facingDegrees": 90, "items": 90, "pets": 4})
     border = (await session.expectSuccess("runPython", {"code": "plotName = '101 Test Street'\n" + readBorder}))["result"]
     overridden = await session.expectSuccess("editPlot", {"address": "101 Test Street", "pricePlatinum": 200})
     restored = await session.expectSuccess("editPlot", {"address": "101 Test Street", "pricePlatinum": 0})
     smaller = await session.expectSuccess("editPlot", {"address": "101 Test Street", "size": [120, 120]})
     smallerBorder = (await session.expectSuccess("runPython", {"code": "plotName = '101 Test Street'\n" + readBorder}))["result"]
     overlapping = await session.expectSuccess("placePlot", {"address": "102 Test Street", "center": [60, 0], "facingDegrees": 90})
-    return placed, border, overridden, restored, smaller, smallerBorder, overlapping
+    return placed, lowTier, border, overridden, restored, smaller, smallerBorder, overlapping
 
-  placed, border, overridden, restored, smaller, smallerBorder, overlapping = stageBlenderServer.session(steps)
+  placed, lowTier, border, overridden, restored, smaller, smallerBorder, overlapping = stageBlenderServer.session(steps)
   # Facing east (+X), the border's open side (the model's -x wall) opens east, and the border's middle stands on the plot's center.
   assert numpy.allclose(border["openSide"], [1, 0, 0], atol=1e-6)
   assert numpy.allclose(border["middle"][:2], [0, 0], atol=1e-3) and border["name"] == "101 Test Street border"
-  # (84 + (60 - 50) * 4.2 + (4 - 6) * 7) * 1.25 = 140; upkeep a tenth.
-  assert placed["pricePlatinum"] == 140 and placed["upkeepPlatinumPerDay"] == 14 and [step["step"] for step in placed["steps"]][-1] == "view x1.25"
-  assert overridden["pricePlatinum"] == 200 and overridden["derivedPlatinum"] == 140 and overridden["overridden"]
-  assert restored["pricePlatinum"] == 140 and not restored["overridden"]
+  # Live's top tier, 120 items and 6 pets, is its 126pp, and the view raises it: 126 * 1.25 = 157.5; its bottom tier, 90 and 4, is 42pp.
+  assert placed["pricePlatinum"] == 158 and placed["upkeepPlatinumPerDay"] == 15.8 and [step["step"] for step in placed["steps"]][-1] == "view x1.25"
+  assert lowTier["pricePlatinum"] == 42 and lowTier["items"] == 90 and lowTier["pets"] == 4
+  assert overridden["pricePlatinum"] == 200 and overridden["derivedPlatinum"] == 158 and overridden["overridden"]
+  assert restored["pricePlatinum"] == 158 and not restored["overridden"]
   # 120 x 120: the border scales as a door's size does, in whole percents, and the price by area.
   assert smaller["border"]["size"] == 71 and numpy.allclose(smallerBorder["scale"], 0.71)
-  assert smaller["pricePlatinum"] == round((84 * 120 * 120 / (169.1 * 170.1) + 42 - 14) * 1.25)
+  assert smaller["pricePlatinum"] == round((84 * 120 * 120 / (169.1 * 170.1) + 15 * 2.1 + 10.5) * 1.25)
   assert overlapping["overlaps"][0]["plot"] == "101 Test Street"
 
 
@@ -149,7 +151,7 @@ def testStreetOfPlotsExportsTheZonesHousingFile(stageBlenderServer, tmp_path):
   first = plots["101 Main Street"]
   # The server's axes swap the zone's x and y; facing south (the street) the border's heading is 128 (EQ +x, zone +Y), opening away.
   assert first["center"] == [round(left["center"][1], 3), round(left["center"][0], 3), 0.0] and first["heading"] == 128
-  assert plots["102 Main Street"]["heading"] == 384 and first["kind"] == "plot" and first["pricePlatinum"] == 84 and first["capacity"] == 50
+  assert plots["102 Main Street"]["heading"] == 384 and first["kind"] == "plot" and first["pricePlatinum"] == 84 and first["capacity"] == 105 and first["pets"] == 5
   doors = {door["door"]: door for door in housingFile["doors"]}
   assert doors[first["door"]]["name"] == "OBP_LOTSQUARE" and doors[first["door"]]["openType"] == 160 and doors[first["door"]]["size"] == 100
   assert math.dist(doors[first["door"]]["position"][:2], first["center"][:2]) < 1.5

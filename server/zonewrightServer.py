@@ -1687,7 +1687,8 @@ plotHelp = (
   " it; guides draw in renderView (guides false hides them) and never export. `facingDegrees` is the way its entrance faces, toward its"
   " street (0 = +Y, clockwise). Sizes are [across, along] (along runs from the entrance to the back); the default is the stock plot:"
   " player 169.1 x 170.1, guild 351.2 x 699.8, as Sunrise Hills' are; any size can be given. items and pets default to the zone's"
-  " pricing (player 50 and 6, guild 210 and 12, Peridot's launch values). Look at every plot from the street at eye height and from"
+  " pricing (player 105 and 5, guild 210 and 12, Live's limits; Live's other player tiers are 90 and 4, 120 and 6). Look at every plot"
+  " from the street at eye height and from"
   " above, and grade it (gradePlot) so it sits level."
 )
 
@@ -1701,8 +1702,9 @@ async def setZoneHousing(
   else, such as along its main road), featured (a housing area is one of the zone's parts), or primary (the zone is for housing);
   `intent`, what housing is for here; `placement`, where Peridot hosts its plots: "world" (in the public zone itself, its world plots)
   or "neighborhood" (instanced neighborhoods made from this zone); `plotBudget` {"player": n, "guild": n}, how many plots it means to
-  have; `pricing`, changes to its price rules: basePlatinum and defaultItems and defaultPets per kind, platinumPerItem and
-  platinumPerPet for allowances above or below the defaults, featureMultipliers {feature: multiplier} (prominent 1.5, secluded 1.5,
+  have; `pricing`, changes to its price rules: basePlatinum and defaultItems and defaultPets per kind (player 84pp for 105 items and 5
+  pets, guild 21pp for 210 and 12, Live's), platinumPerItem and platinumPerPet for allowances above or below the defaults (2.1 and 10.5,
+  which price Live's other tiers at Live's prices), featureMultipliers {feature: multiplier} (prominent 1.5, secluded 1.5,
   view 1.25, waterfront 1.25, sheltered 1.25, remote 0.75, swamp 0.5 to start; add any), upkeepShare (a tenth: upkeep a day is a tenth
   of the price, as on Live); `routes` [[[x, y], ...], ...], the zone's main routes, from which assessPlot judges how prominent a plot is.
   Calls change what they name and keep the rest. Returns the decision, its plots, and any overlaps."""

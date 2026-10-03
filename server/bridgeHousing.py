@@ -33,14 +33,15 @@ borderArchive = "stonesquare.eqg"
 # The open type of a plot border door (EQSWITCH_REALESTATE_PLOT).
 borderOpenType = 160
 eqHeadingUnits = 512
-# Pricing as Live's Sunrise Hills priced its plots: 84pp for the middle tier's 50 items at Peridot's launch capacities (40, 50, 60;
-# 42pp and 126pp for the others, 4.2pp an item), a guild plot 21pp; upkeep a tenth of the price a day. Features scale the price.
+# Pricing at Live's plot limits: the middle tier's 105 items and 5 pets at 84pp, and per item and per pet so that Live's other tiers
+# come out at its prices (90 items and 4 pets 42pp, 120 and 6 126pp); a guild plot 210 items and 12 pets at 21pp; upkeep a tenth of the
+# price a day. Features scale the price.
 defaultPricing = {
   "basePlatinum": {"player": 84, "guild": 21},
-  "defaultItems": {"player": 50, "guild": 210},
-  "defaultPets": {"player": 6, "guild": 12},
-  "platinumPerItem": 4.2,
-  "platinumPerPet": 7.0,
+  "defaultItems": {"player": 105, "guild": 210},
+  "defaultPets": {"player": 5, "guild": 12},
+  "platinumPerItem": 2.1,
+  "platinumPerPet": 10.5,
   "featureMultipliers": {"prominent": 1.5, "secluded": 1.5, "view": 1.25, "waterfront": 1.25, "sheltered": 1.25, "remote": 0.75, "swamp": 0.5},
   "upkeepShare": 0.1,
 }
