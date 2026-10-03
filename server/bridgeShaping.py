@@ -26,6 +26,14 @@ maximumOctaves = 8
 roughenDirections = ("normal", "up")
 # horizontal keeps heights, surface moves along the surface, full moves in every direction.
 warpPlanes = ("horizontal", "surface", "full")
+# A cell's diagonal turns only when that shortens the height step across the cell by more than this share of the mesh's edge length,
+# so flat and evenly sloping cells keep theirs.
+diagonalTurnMargin = 0.05
+# A cell's other diagonal is about as long as its own; a much longer one would reach across two cells.
+diagonalStretch = 1.5
+# A triangle under this share of its cell's area is a sliver: no diagonal turns to make one, and one is always turned away.
+diagonalSliverShare = 0.05
+diagonalSweeps = 4
 
 
 def falloffWeights(normalizedDistances, curve):
@@ -113,7 +121,10 @@ def sculpt(objectName, mode, strokeFractions, nearestPoints, strength, curve, di
     updated = profileStroke(sceneObject, positions, affected, strength)
   moved = numpy.linalg.norm(updated - positions, axis=1)
   writeWorldPositions(sceneObject, updated)
-  return {"affectedVertices": int((moved > 1e-9).sum()), "largestMove": round(float(moved.max()), 3), "foldedFaces": bridgeMeshAccess.foldedFaceCount(sceneObject, positions, updated)}
+  result = {"affectedVertices": int((moved > 1e-9).sum()), "largestMove": round(float(moved.max()), 3), "foldedFaces": bridgeMeshAccess.foldedFaceCount(sceneObject, positions, updated)}
+  if mode in profileModes:
+    result |= triangulateAlongContours(sceneObject, updated, moved > 1e-9)
+  return result
 
 
 def sculptAtPoint(objectName, mode, center, radius, strength, falloff, direction, iterations):
@@ -357,6 +368,84 @@ def cleanupMesh(objectName, mergeDistance, recalculateNormals):
   return {"before": before, "after": after, "mergedVertices": before["vertices"] - after["vertices"]}
 
 
+def faceSignature(face, layers):
+  return face.material_index, face.smooth, tuple(face[layer] for layer in layers)
+
+
+def planarTurn(first, second, third):
+  return (second[0] - first[0]) * (third[1] - first[1]) - (second[1] - first[1]) * (third[0] - first[0])
+
+
+def diagonalTurnGain(edge, heights, planar, margin, layers):
+  """How much turning an edge between two triangles to their cell's other diagonal improves the cell: infinite when it removes a
+  sliver (three corners snapped onto one break), else how much it shortens the height step along the diagonal; 0 when that would not
+  follow the contours better, would fold, stretch, or sliver the cell, or would merge faces of different material or surfacing."""
+  faces = edge.link_faces
+  if len(faces) != 2 or len(faces[0].verts) != 3 or len(faces[1].verts) != 3 or faceSignature(faces[0], layers) != faceSignature(faces[1], layers):
+    return 0.0
+  first, second = (vertex.index for vertex in edge.verts)
+  across = [next(vertex.index for vertex in face.verts if vertex.index not in (first, second)) for face in faces]
+  ring = [planar[first], planar[across[0]], planar[second], planar[across[1]]]
+  turns = [planarTurn(ring[index], ring[(index + 1) % 4], ring[(index + 2) % 4]) for index in range(4)]
+  straight = 1e-9 * sum(abs(turn) for turn in turns)
+  if not (all(turn >= -straight for turn in turns) or all(turn <= straight for turn in turns)):
+    return 0.0
+  if math.dist(planar[across[0]], planar[across[1]]) > diagonalStretch * math.dist(planar[first], planar[second]):
+    return 0.0
+  current = [abs(planarTurn(planar[first], planar[second], planar[corner])) / 2 for corner in across]
+  turned = [abs(planarTurn(planar[across[0]], planar[across[1]], planar[corner])) / 2 for corner in (first, second)]
+  sliverArea = diagonalSliverShare * sum(current)
+  if min(turned) < sliverArea:
+    return 0.0
+  if min(current) < sliverArea:
+    return math.inf
+  gain = abs(heights[first] - heights[second]) - abs(heights[across[0]] - heights[across[1]])
+  return gain if gain > margin else 0.0
+
+
+def triangulateAlongContours(sceneObject, worldPositions, vertexMask):
+  """Split the quads around the masked vertices into triangles and turn each cell's diagonal to the one with the smaller height step,
+  so the triangulation runs along the ground's contours: a ledge or cliff edge crossing the grid stays a clean line instead of notching
+  where it steps to the next row. Vertices never move, so shaping passes keep what they hold."""
+  if not vertexMask.any():
+    return {"splitCells": 0, "turnedDiagonals": 0}
+  heights = worldPositions[:, 2].tolist()
+  planar = worldPositions[:, :2].tolist()
+  margin = diagonalTurnMargin * medianEdgeLength(sceneObject, worldPositions, vertexMask)
+  meshEditor = bridgeMeshAccess.loadBMesh(sceneObject)
+  layers = [layer for kind in ("bool", "float", "int", "string") for layer in getattr(meshEditor.faces.layers, kind).values()]
+  maskedVertices = [meshEditor.verts[index] for index in numpy.flatnonzero(vertexMask)]
+  quads = list({face for vertex in maskedVertices for face in vertex.link_faces if len(face.verts) == 4})
+  bmesh.ops.triangulate(meshEditor, faces=quads, quad_method="FIXED")
+  turned = 0
+  for _ in range(diagonalSweeps):
+    gains = {}
+    for edge in {edge for vertex in maskedVertices for face in vertex.link_faces for edge in face.edges}:
+      gain = diagonalTurnGain(edge, heights, planar, margin, layers)
+      if gain > 0:
+        gains[edge] = gain
+    claimed, turning = set(), []
+    for edge in sorted(gains, key=gains.get, reverse=True):
+      if claimed.isdisjoint(edge.link_faces):
+        claimed.update(edge.link_faces)
+        turning.append(edge)
+    if not turning:
+      break
+    turned += len(bmesh.ops.rotate_edges(meshEditor, edges=turning)["edges"])
+  meshEditor.to_mesh(sceneObject.data)
+  meshEditor.free()
+  sceneObject.data.update()
+  return {"splitCells": len(quads), "turnedDiagonals": turned}
+
+
+def followContours(objectName, selector):
+  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  mask = bridgeMeshAccess.evaluateSelector(selector, sceneObject, "vertices")
+  bridgeMeshAccess.requireSelection(mask, selector, sceneObject, "vertices")
+  positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
+  return triangulateAlongContours(sceneObject, positions, mask) | bridgeMeshAccess.meshCounts(sceneObject)
+
+
 def maskWeights(sceneObject, selector, fadeDistance, positions):
   """1 inside the selection and 0 outside; with fadeDistance, rising smoothly from the selection's edge over that distance, so a
   masked change leaves no step at the edge."""
@@ -452,6 +541,7 @@ commands = {
   "booleanCut": (booleanCut, True),
   "decimate": (decimate, True),
   "cleanupMesh": (cleanupMesh, True),
+  "followContours": (followContours, True),
   "roughen": (roughen, True),
   "warp": (warp, True),
 }

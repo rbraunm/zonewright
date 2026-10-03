@@ -186,3 +186,98 @@ def testCarveConformSlidesRimVerticesOntoTheContour(stageBlenderServer):
     assert abs(abs(new[0] - new[1]) / math.sqrt(2) - rimLateral) < 1e-3
   assert "conformRim needs profile heights that rise" in nonRising
   assert max(abs(x) for x, _, _ in crossed) == 100 and max(abs(y) for _, y, _ in crossed) == 100
+
+
+readShapedMesh = """
+depsgraph = bpy.context.evaluated_depsgraph_get()
+evaluated = bpy.data.objects[objectName].evaluated_get(depsgraph)
+mesh = evaluated.to_mesh()
+result = {"vertices": [list(vertex.co) for vertex in mesh.vertices], "faces": [list(polygon.vertices) for polygon in mesh.polygons]}
+evaluated.to_mesh_clear()
+"""
+
+
+def planarArea(points):
+  return abs(sum(x0 * y1 - x1 * y0 for (x0, y0, _), (x1, y1, _) in zip(points, points[1:] + points[:1]))) / 2
+
+
+def testFillTriangulatesAlongItsBreaksAtAnyAngle(stageBlenderServer):
+  # A mesa: a cap, a cliff, a ledge, and a slope, with breaks 18, 24, and 30 units from the path.
+  profile = [[0, 30], [0.45, 28], [0.6, 12], [0.75, 10], [1, 0]]
+  breakLaterals = [18, 24, 30]
+  angles = [30, 45]
+
+  async def steps(session):
+    await freshScene(session)
+    results = {}
+    for index, angle in enumerate(angles):
+      name = f"ground{angle}"
+      await session.expectSuccess("createTerrainGrid", {"name": name, "size": [240, 240], "spacing": 8, "location": [300 * index, 0, 0]})
+      await session.expectSuccess("addShapingPass", {"objectName": name, "name": "mesa"})
+      direction = (math.cos(math.radians(angle)), math.sin(math.radians(angle)))
+      path = [[300 * index - 150 * direction[0], -150 * direction[1], 0], [300 * index + 150 * direction[0], 150 * direction[1], 0]]
+      stroke = await session.expectSuccess("sculptAlongPath", {
+        "objectName": name, "mode": "fill", "path": path, "radius": 40, "strength": 1, "profile": profile, "conformBreaks": True,
+      })
+      shaped = (await session.expectSuccess("runPython", {"code": f"objectName = '{name}'" + readShapedMesh}))["result"]
+      await session.expectSuccess("setShapingPass", {"objectName": name, "name": "mesa", "muted": True})
+      muted = (await session.expectSuccess("runPython", {"code": f"objectName = '{name}'" + readShapedMesh}))["result"]
+      results[angle] = (stroke, shaped, muted, direction)
+    return results
+
+  results = stageBlenderServer.session(steps)
+  # Vertex coordinates are the grid's own, centered on the path.
+  for angle, (stroke, shaped, muted, direction) in results.items():
+    vertices = shaped["vertices"]
+
+    def lateral(vertex):
+      return abs(vertex[0] * direction[1] - vertex[1] * direction[0])
+
+    def along(vertex):
+      return vertex[0] * direction[0] + vertex[1] * direction[1]
+
+    interior = [face for face in shaped["faces"] if all(abs(along(vertices[index])) < 100 for index in face)]
+    straddling = [
+      face for face in interior for breakLateral in breakLaterals
+      if min(lateral(vertices[index]) for index in face) < breakLateral - 0.01 and max(lateral(vertices[index]) for index in face) > breakLateral + 0.01
+    ]
+    slivers = [face for face in shaped["faces"] if planarArea([vertices[index] for index in face]) < 0.1 * 8 * 8 / 2]
+    assert stroke["splitCells"] > 0 and stroke["foldedFaces"] == 0, (angle, stroke)
+    assert straddling == [], (angle, len(straddling), len(interior))
+    assert slivers == [], (angle, len(slivers))
+    assert max(abs(z) for _, _, z in muted["vertices"]) == 0 and len(muted["vertices"]) == 31 * 31
+
+
+def testFollowContoursTurnsDiagonalsAlongAStep(stageBlenderServer):
+  # A step across the grid's diagonal: 10 on one side, 0 on the other, 5 on the line.
+  stepHeights = """
+for vertex in bpy.data.objects[objectName].data.vertices:
+  across = vertex.co.x - direction * vertex.co.y
+  vertex.co.z = 10 if across > 1e-3 else (5 if across > -1e-3 else 0)
+"""
+
+  async def steps(session):
+    await freshScene(session)
+    results = {}
+    for index, direction in enumerate([1, -1]):
+      name = f"step{index}"
+      await session.expectSuccess("createTerrainGrid", {"name": name, "size": [80, 80], "spacing": 8, "location": [100 * index, 0, 0]})
+      await session.expectSuccess("runPython", {"code": f"objectName = '{name}'\ndirection = {direction}" + stepHeights})
+      before = (await session.expectSuccess("runPython", {"code": f"objectName = '{name}'" + readShapedMesh}))["result"]
+      followed = await session.expectSuccess("followContours", {"objectName": name})
+      after = (await session.expectSuccess("runPython", {"code": f"objectName = '{name}'" + readShapedMesh}))["result"]
+      results[direction] = (before, followed, after)
+    return results
+
+  results = stageBlenderServer.session(steps)
+
+  def spanningStep(mesh):
+    return [face for face in mesh["faces"] if {0, 10} <= {round(mesh["vertices"][index][2]) for index in face}]
+
+  for before, followed, after in results.values():
+    assert len(spanningStep(before)) == 10 and spanningStep(after) == []
+    assert (followed["splitCells"], followed["faces"]) == (100, 200)
+    assert after["vertices"] == before["vertices"]
+  # The fixed split runs one way across every cell, so it already follows one grid's step; the other turns the 10 cells the step
+  # crosses and the 9 on each side that touch its line.
+  assert sorted(followed["turnedDiagonals"] for _, followed, _ in results.values()) == [0, 28]

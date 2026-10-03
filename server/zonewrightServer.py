@@ -1108,7 +1108,7 @@ async def sculptAlongPath(
   context: Context, objectName: str, mode: str, path: list[list[float]], strength: float, radius: float | None = None, radii: list[float] | None = None,
   falloff: str = "smooth", direction: list[float] | None = None, iterations: int = 1, profile: list[list[float]] | None = None, conformRim: bool | None = None, conformBreaks: bool = False,
 ):
-  """Sculpt along a polyline path [[x,y,z], ...] within `radius`, or within `radii` (one per path point, the stroke widening or narrowing evenly between them, so one stroke carves a canyon that pinches to a gorge): raise, lower, crease, smooth, flatten as in sculptAtPoint; carve, which cuts vertically down to the path's own heights shaped by `profile` [[lateralFraction, heightAboveFloor], ...] from 0 (center) to 1 (edge); or fill, which raises ground up to such a profile (a mesa: a flat cap, a cliff, a slope at the base). carve and fill strength is a fraction, and their path can be a single point (a pit or a butte). With conformRim (carve only, on by default; needs rising profile heights), vertices just outside the cut slide onto the rim contour so the edge follows the profile rather than the grid; the mesh's open edge stays put. With conformBreaks (carve and fill), the vertices nearest each break of the profile slide onto its contour first, so stepped profiles (strata, ledges, terraces) make clean lines along the path instead of zigzags across the grid. Results count foldedFaces: faces the move turned over, a sign it was too strong for the mesh's spacing. With shaping passes, the change goes into the active pass."""
+  """Sculpt along a polyline path [[x,y,z], ...] within `radius`, or within `radii` (one per path point, the stroke widening or narrowing evenly between them, so one stroke carves a canyon that pinches to a gorge): raise, lower, crease, smooth, flatten as in sculptAtPoint; carve, which cuts vertically down to the path's own heights shaped by `profile` [[lateralFraction, heightAboveFloor], ...] from 0 (center) to 1 (edge); or fill, which raises ground up to such a profile (a mesa: a flat cap, a cliff, a slope at the base). carve and fill strength is a fraction, and their path can be a single point (a pit or a butte). With conformRim (carve only, on by default; needs rising profile heights), vertices just outside the cut slide onto the rim contour so the edge follows the profile rather than the grid; the mesh's open edge stays put. With conformBreaks (carve and fill), the vertices nearest each break of the profile slide onto its contour first, so stepped profiles (strata, ledges, terraces) make clean lines along the path instead of zigzags across the grid. carve and fill then triangulate the cells they shaped along the contours, as followContours does (splitCells, turnedDiagonals). Results count foldedFaces: faces the move turned over, a sign it was too strong for the mesh's spacing. With shaping passes, the change goes into the active pass."""
   return await callBridge(context, "sculptAlongPath", {"objectName": objectName, "mode": mode, "path": path, "radius": radius, "radii": radii, "strength": strength, "falloff": falloff, "direction": direction, "iterations": iterations, "profile": profile, "conformRim": conformRim, "conformBreaks": conformBreaks})
 
 
@@ -1212,6 +1212,16 @@ async def decimate(context: Context, objectName: str, ratio: float):
 async def cleanupMesh(context: Context, objectName: str, mergeDistance: float = 0.01, recalculateNormals: bool = True):
   """Merge vertices closer than mergeDistance, dissolve degenerate geometry, and make face normals consistent."""
   return await callBridge(context, "cleanupMesh", {"objectName": objectName, "mergeDistance": mergeDistance, "recalculateNormals": recalculateNormals})
+
+
+@guardedTool(description=(
+  "Triangulate the selected part of a terrain along its contours: split its quads into triangles and turn each cell's diagonal to the"
+  " one with the smaller height step, never leaving a sliver, so ledges and cliff edges that cross the grid run as clean lines instead"
+  " of notching where they step to the next row. carve and fill do this where they shape; use it after warp, roughen, or changing"
+  " passes. Vertices never move, so shaping passes keep what they hold; cells whose two triangles differ in material or surfacing keep"
+  " their diagonal." + selectorHelp))
+async def followContours(context: Context, objectName: str, selector: dict = allSelector):
+  return await callBridge(context, "followContours", {"objectName": objectName, "selector": selector})
 
 
 @guardedTool()
