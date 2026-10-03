@@ -274,6 +274,71 @@ async def getZoneSurvey(context: Context, zone: str):
   }
 
 
+comparedMeasures = {
+  "dimensions.footprint": "Ground area the terrain spans, square units.",
+  "construction.terrainTriangles": "Triangles in the terrain.",
+  "construction.terrainTrianglesPer10kSquareUnits": "Terrain triangle density: how finely the ground is modeled.",
+  "construction.terrainTextures": "Distinct textures on the terrain.",
+  "construction.terrainIslandTriangleShare": "Share of terrain triangles in material regions of one or two triangles: speckle rather than surfaced areas.",
+  "construction.terrainSteepShare": "Share of terrain area steeper than 50 degrees: cliffs and walls modeled into the ground.",
+  "construction.steepOnTerrainShare": "Share of all steep area that is terrain rather than placed models.",
+  "construction.terrainPaintedShare": "Share of terrain area painted from palette maps or blended in the shader.",
+  "content.placementCount": "Objects placed on the terrain.",
+}
+comparedFormats = ("wld", "eqgz", "eqtzp")
+
+
+def sceneGeometry(collected):
+  """The scene's triangles shaped as the zone survey's geometry, so surveyFields measures them as it measures a client zone."""
+  arrays = numpy.load(collected["arrays"])
+  triangles, isObject = arrays["triangles"], arrays["triangleIsObject"]
+  terrainVertices = arrays["vertices"][numpy.unique(triangles[~isObject])]
+  return {
+    "vertices": arrays["vertices"], "triangles": triangles, "triangleTextures": arrays["triangleTextures"], "triangleIsObject": isObject,
+    "triangleSurfaces": numpy.zeros(len(triangles), dtype=numpy.int8), "triangleUVAreas": numpy.full(len(triangles), numpy.nan),
+    "trianglePainted": numpy.zeros(len(triangles), dtype=bool), "textureNames": collected["textureNames"],
+    "terrainBounds": (terrainVertices.min(0), terrainVertices.max(0)), "tileShape": None, "format": "eqgz",
+  }
+
+
+def percentileRank(values, value):
+  below = sum(1 for other in values if other < value)
+  equal = sum(1 for other in values if other == value)
+  return round(100 * (below + equal / 2) / len(values))
+
+
+@guardedTool()
+async def compareWithClientZones(context: Context, formats: list[str] = ["eqgz"], zones: list[str] | None = None):
+  """Measure the open scene's zone as the zone survey measures the client's (its terrain collection as the terrain, every other rendered
+  mesh and collection instance as placed on it) and place each measure among the client's zones of the given formats (wld, eqgz, eqtzp;
+  EQG zones by default, the 2011-era target), or among the named `zones` (such as the references a zone is modeled on): the zone's
+  value, the client zones' 10th, 25th, 50th, 75th, and 90th percentiles, and the zone's percentile among them. Use it after each pass to
+  steer by how the client's own zones are built rather than by taste alone."""
+  unknown = sorted(set(formats) - set(comparedFormats))
+  if unknown or not formats:
+    raise ToolError(f"formats are among {list(comparedFormats)}, got {formats}")
+  collected = await callBridge(context, "collectConstruction", {"outputPath": str(toolingRoot / "review" / "construction.npz")})
+  geometry = sceneGeometry(collected)
+  frames = surveyFields.triangleFrames(geometry)
+  ours = {"dimensions": surveyFields.measureDimensions(geometry, frames), "construction": surveyFields.measureConstruction(geometry, frames), "content": {"placementCount": collected["placements"]}}
+  clientRoot = zoneSources.resolveClientRoot()
+  zoneNames = [zone.lower() for zone in zones] if zones is not None else None
+  try:
+    rows = await anyio.to_thread.run_sync(zoneSurvey.surveyMeasured, clientRoot, toolingRoot, zoneNames, ["dimensions", "content", "construction"], progressReporter(context))
+  except ValueError as error:
+    raise ToolError(str(error)) from error
+  clientRows = [row for row in rows.values() if row["format"] in formats and "error" not in row]
+  measures = {}
+  for measure, meaning in comparedMeasures.items():
+    group, field = measure.split(".")
+    values = sorted(row[group][field] for row in clientRows if row[group].get(field) is not None)
+    value = ours[group][field]
+    measures[measure] = {"zone": value, "clientZones": len(values), "meaning": meaning} | ({
+      label: values[min(len(values) - 1, int(len(values) * share))] for label, share in (("p10", 0.1), ("p25", 0.25), ("median", 0.5), ("p75", 0.75), ("p90", 0.9))
+    } | {"percentile": percentileRank(values, value) if value is not None else None} if values else {})
+  return {"formats": formats, "clientZones": sorted({row["zone"] for row in clientRows}) if zones is not None else len(clientRows), "textures": collected["textureNames"], "measures": measures}
+
+
 @guardedTool()
 def getZoneNotes(zone: str):
   """Brewall map labels for a zone: place names for design notes, not geometry or scale."""

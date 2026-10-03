@@ -196,6 +196,80 @@ def measureRegions(geometry, frames):
   return {"regionCount": len(geometry["regionNames"]), "regionsByKind": dict(sorted(kinds.items()))}
 
 
+# Steeper than this is a cliff or wall rather than a slope.
+cliffDegrees = 50
+# A material region of at most this many triangles is an island: speckle rather than a surfaced area.
+islandTriangles = 2
+
+
+def weldedVertexIDs(vertices):
+  """One id per distinct position: zone files split vertices along material borders, which hides those borders from shared-index adjacency."""
+  _, ids = numpy.unique(numpy.round(vertices, 2), axis=0, return_inverse=True)
+  return ids.ravel()
+
+
+def sharedEdges(vertexIDs, triangles):
+  """Pairs of triangles that share an edge."""
+  corners = vertexIDs[triangles]
+  sides = numpy.sort(numpy.stack([corners[:, [0, 1]], corners[:, [1, 2]], corners[:, [2, 0]]], axis=1).reshape(-1, 2), axis=1)
+  owners = numpy.repeat(numpy.arange(len(triangles)), 3)
+  keys = sides[:, 0].astype(numpy.int64) * (int(vertexIDs.max()) + 1) + sides[:, 1]
+  order = numpy.argsort(keys, kind="stable")
+  matching = numpy.flatnonzero(keys[order][1:] == keys[order][:-1])
+  return owners[order[matching]], owners[order[matching + 1]]
+
+
+def connectedLabels(count, first, second):
+  """Connected components over the given pairs, by hooking roots to the smaller label and jumping pointers until stable."""
+  labels = numpy.arange(count)
+  while True:
+    lowest = numpy.minimum(labels[first], labels[second])
+    numpy.minimum.at(labels, labels[first], lowest)
+    numpy.minimum.at(labels, labels[second], lowest)
+    while True:
+      jumped = labels[labels]
+      if numpy.array_equal(jumped, labels):
+        break
+      labels = jumped
+    if numpy.array_equal(labels[first], labels[second]):
+      return labels
+
+
+def islandShare(vertices, triangles, materials):
+  """The share of triangles in material regions of at most islandTriangles triangles."""
+  if not len(triangles):
+    return None
+  first, second = sharedEdges(weldedVertexIDs(vertices), triangles)
+  same = materials[first] == materials[second]
+  labels = connectedLabels(len(triangles), first[same], second[same])
+  sizes = numpy.bincount(labels, minlength=len(triangles))
+  return round(float((sizes[labels] <= islandTriangles).mean()), 4)
+
+
+def measureConstruction(geometry, frames):
+  """How the zone is built: its terrain (the zone's own meshes: an EQG zone's .ter, a classic zone's region meshes, an EQ terrain zone's
+  tiles) against what is placed on it. Placed classic objects are not measured, and an EQ terrain zone surfaces its tiles by ecosystem
+  rather than by face, so those measures are None there."""
+  _, areas, normalZ = frames
+  terrain = ~geometry["triangleIsObject"]
+  footprintBounds = geometry["terrainBounds"] if geometry["terrainBounds"] is not None else (geometry["vertices"].min(0), geometry["vertices"].max(0))
+  footprint = float((footprintBounds[1][0] - footprintBounds[0][0]) * (footprintBounds[1][1] - footprintBounds[0][1]))
+  steep = numpy.degrees(numpy.arccos(numpy.clip(normalZ, -1, 1))) >= cliffDegrees
+  terrainArea = float(areas[terrain].sum())
+  steepTerrain, steepObjects = float(areas[terrain & steep].sum()), float(areas[~terrain & steep].sum())
+  faceSurfaced = geometry["format"] != "eqtzp"
+  textures = geometry["triangleTextures"][terrain]
+  return {
+    "terrainTriangles": int(terrain.sum()),
+    "terrainTrianglesPer10kSquareUnits": round(int(terrain.sum()) / footprint * 10000, 2) if footprint > 0 else None,
+    "terrainTextures": int(len(numpy.unique(textures[textures >= 0]))) if faceSurfaced else None,
+    "terrainIslandTriangleShare": islandShare(geometry["vertices"], geometry["triangles"][terrain], geometry["triangleTextures"][terrain]) if faceSurfaced else None,
+    "terrainSteepShare": round(steepTerrain / terrainArea, 4) if terrainArea else None,
+    "steepOnTerrainShare": round(steepTerrain / (steepTerrain + steepObjects), 4) if geometry["format"] != "wld" and steepTerrain + steepObjects else None,
+    "terrainPaintedShare": round(float(areas[terrain & geometry["trianglePainted"]].sum()) / terrainArea, 4) if faceSurfaced and terrainArea else None,
+  }
+
+
 # Bump a group's version when its method or output changes; only that group is recomputed.
 measuredGroups = {
   "dimensions": (1, measureDimensions),
@@ -203,6 +277,7 @@ measuredGroups = {
   "verticality": (1, measureVerticality),
   "content": (2, measureContent),
   "regions": (1, measureRegions),
+  "construction": (1, measureConstruction),
 }
 
 

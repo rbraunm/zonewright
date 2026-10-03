@@ -22,6 +22,7 @@ class GeometryBuilder:
     self.surfaceChunks = []
     self.uvAreaChunks = []
     self.objectChunks = []
+    self.paintedChunks = []
     self.vertexCount = 0
     self.textureIndex = {}
     self.droppedTriangles = collections.Counter()
@@ -31,9 +32,10 @@ class GeometryBuilder:
       return -1
     return self.textureIndex.setdefault(textureName, len(self.textureIndex))
 
-  def add(self, vertices, triangles, triangleTextures, triangleSurfaces, uvs, isObject):
-    """A mesh's triangles; uvs (one per vertex, or None where the source has none) give each triangle's area in texture repeats, and
-    isObject marks a placed object rather than the zone's own terrain or region meshes."""
+  def add(self, vertices, triangles, triangleTextures, triangleSurfaces, uvs, isObject, trianglePainted):
+    """A mesh's triangles; uvs (one per vertex, or None where the source has none) give each triangle's area in texture repeats,
+    isObject marks a placed object rather than the zone's own terrain or region meshes, and trianglePainted marks triangles whose
+    material paints its ground from a palette map or blends textures."""
     self.vertexChunks.append(vertices)
     self.triangleChunks.append(triangles + self.vertexCount)
     self.textureChunks.append(triangleTextures)
@@ -45,6 +47,7 @@ class GeometryBuilder:
       edges = corners[:, 1:] - corners[:, :1]
       self.uvAreaChunks.append(numpy.abs(edges[:, 0, 0] * edges[:, 1, 1] - edges[:, 0, 1] * edges[:, 1, 0]) / 2)
     self.objectChunks.append(numpy.full(len(triangles), isObject))
+    self.paintedChunks.append(numpy.broadcast_to(numpy.asarray(trianglePainted, dtype=bool), (len(triangles),)).copy())
     self.vertexCount += len(vertices)
 
   def build(self, **details):
@@ -55,9 +58,15 @@ class GeometryBuilder:
       "triangleSurfaces": numpy.concatenate(self.surfaceChunks),
       "triangleUVAreas": numpy.concatenate(self.uvAreaChunks),
       "triangleIsObject": numpy.concatenate(self.objectChunks),
+      "trianglePainted": numpy.concatenate(self.paintedChunks),
       "textureNames": list(self.textureIndex),
       "droppedTriangles": dict(sorted(self.droppedTriangles.items())),
     } | details
+
+
+def eqgMaterialPainted(material):
+  """A material that paints ground from a palette map, choosing among detail textures, or blends textures in its shader."""
+  return "e_TexturePalette0" in material["properties"] or "blend" in material["shader"].lower()
 
 
 def eqgMaterialSurface(material):
@@ -84,11 +93,12 @@ def addEQGModel(builder, model, placement, isObject):
     vertices, triangles, uvs = vertices[finite], remap[triangles[keptTriangles]], uvs[finite]
   materialTextures = numpy.array([builder.textureID(material["properties"].get("e_TextureDiffuse0", "").lower() or None) for material in model["materials"]] + [-1], dtype=numpy.int64)
   materialSurfaces = numpy.array([eqgMaterialSurface(material) for material in model["materials"]] + [surfaceCode["invisible"]], dtype=numpy.int8)
+  materialPainted = numpy.array([eqgMaterialPainted(material) for material in model["materials"]] + [False], dtype=bool)
   # Material -1 (no material) indexes the trailing entry.
   triangleMaterials = model["triangleMaterials"][keptTriangles]
   materialIndices = numpy.where(triangleMaterials < 0, len(model["materials"]), triangleMaterials)
   placed = vertices @ placement["transform"].T + placement["position"] if "transform" in placement else eqgFiles.placeVertices(vertices, placement)
-  builder.add(placed, triangles, materialTextures[materialIndices], materialSurfaces[materialIndices], uvs, isObject)
+  builder.add(placed, triangles, materialTextures[materialIndices], materialSurfaces[materialIndices], uvs, isObject, materialPainted[materialIndices])
 
 
 def addPlacements(builder, library, placements, isObject):
@@ -131,7 +141,7 @@ def buildWLDGeometry(clientRoot, source):
     if len(materialIndices) and int(materialIndices.max()) >= len(mesh["materials"]):
       raise ValueError(f"{source['zone']}: mesh '{mesh['name']}' uses material {int(materialIndices.max())} of {len(mesh['materials'])}")
     triangleSurfaces = numpy.where(mesh["isPassable"] & (materialSurfaces[materialIndices] == surfaceCode["solid"]), surfaceCode["passable"], materialSurfaces[materialIndices]).astype(numpy.int8)
-    builder.add(mesh["vertices"], mesh["triangles"], materialTextures[materialIndices], triangleSurfaces, mesh["uvs"], False)
+    builder.add(mesh["vertices"], mesh["triangles"], materialTextures[materialIndices], triangleSurfaces, mesh["uvs"], False, False)
   geometry = builder.build(placementCounts=wldPlacementCounts(archive), regionNames=wldRegionNames(worldFile), missingModels=[], missingAssetArchives=[])
   return geometry | {"terrainBounds": (geometry["vertices"].min(0), geometry["vertices"].max(0))}
 
@@ -166,7 +176,7 @@ def buildTerrainGeometry(clientRoot, source):
     # Height rows run along y and columns along x, as the client lays out a tile's vertices.
     vertices = numpy.stack([tile["x"] + columns.ravel() * spacing, tile["y"] + rows.ravel() * spacing, tile["heights"].ravel().astype(numpy.float64)], axis=1)
     gridTriangles = eqgTerrain.tileTriangles(tile["quadFlags"])
-    builder.add(vertices, gridTriangles, numpy.full(len(gridTriangles), builder.textureID(tile["baseLayer"]), dtype=numpy.int64), numpy.full(len(gridTriangles), surfaceCode["solid"], dtype=numpy.int8), None, False)
+    builder.add(vertices, gridTriangles, numpy.full(len(gridTriangles), builder.textureID(tile["baseLayer"]), dtype=numpy.int64), numpy.full(len(gridTriangles), surfaceCode["solid"], dtype=numpy.int8), None, False, False)
   tilesByOrigin = {(tile["x"], tile["y"]): tile for tile in terrain["tiles"]}
   missingModels, placementCounts = set(), collections.Counter()
   for placement in terrain["placements"]:
@@ -189,4 +199,4 @@ geometryBuilders = {"wld": buildWLDGeometry, "eqgz": buildEQGGeometry, "eqtzp": 
 
 
 def buildGeometry(clientRoot, source):
-  return geometryBuilders[source["format"]](clientRoot, source)
+  return geometryBuilders[source["format"]](clientRoot, source) | {"format": source["format"]}

@@ -66,8 +66,10 @@ def testZoneSurveyReturnsEveryGroup(stageServer):
   server = stageSurveyServer(stageServer)
   survey, _ = server.callToolExpectingSuccess("getZoneSurvey", {"zone": "befallen"})
   variant = survey["variants"]["befallen:wld"]
-  assert sorted(variant) == ["content", "dimensions", "format", "interpreted", "regions", "surfaces", "verticality", "zone"]
+  assert sorted(variant) == ["construction", "content", "dimensions", "format", "interpreted", "regions", "surfaces", "verticality", "zone"]
   assert variant["interpreted"] == {}
+  # A classic zone's placed objects are not built for the survey, so what share of steep area they hold is not measured.
+  assert variant["construction"]["steepOnTerrainShare"] is None and variant["construction"]["terrainTextures"] > 0
   assert variant["surfaces"]["areaByKind"]["solid"] > 0
   assert survey["brewallLabelCount"] > 0
 

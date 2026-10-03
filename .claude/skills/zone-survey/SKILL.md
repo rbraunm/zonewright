@@ -18,6 +18,7 @@ The survey caches what zonewright knows about every zone in the EverQuest client
 | `verticality` | A 128 x 128 grid of vertical probes: share of columns with a floor, share of floors with geometry overhead (enclosed), share with 1, 2, 3, 4+ walkable levels |
 | `content` | Texture count and top textures by area, placement count, distinct models, top placed models, missing models and asset archives |
 | `regions` | Water, lava, zone-line, and other regions from the zone data |
+| `construction` | How the zone is built: terrain triangles and density, textures on the terrain, the share of terrain triangles in material islands of one or two triangles (vertices welded by position), the terrain's steep share, how much steep area is terrain rather than placed models, and how much ground is painted from palette maps or blended |
 
 - `surveyZones(zones, groups, sortBy, limit)` returns rows for the named zones, or every zone when `zones` is omitted, sorted descending by a dotted path such as `dimensions.triangleCount`. Request only the groups the question needs.
 - `getZoneSurvey(zone)` returns every group for one zone, both lanes.

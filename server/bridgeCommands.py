@@ -10,6 +10,7 @@ import bridgeDressing
 import bridgeEnvironment
 import bridgeExport
 import bridgePasses
+import bridgeReview
 import bridgeModels
 import bridgeObjects
 import bridgeShaping
@@ -234,7 +235,7 @@ commands = {
   "pick": (pick, False),
   "renderPasses": (renderPasses, False),
   "renderModelThumbnails": (bridgeViews.renderModelThumbnails, False),
-} | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands | bridgeModels.commands | bridgeExport.commands | bridgePasses.commands | bridgeEnvironment.commands
+} | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands | bridgeModels.commands | bridgeExport.commands | bridgePasses.commands | bridgeEnvironment.commands | bridgeReview.commands
 
 
 def dispatch(command, arguments):
