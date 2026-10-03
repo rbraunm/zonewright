@@ -129,11 +129,17 @@ def sculpt(objectName, mode, strokeFractions, nearestPoints, strength, curve, di
     updated -= strength * weights[:, None] * heights[:, None] * pushDirection
   else:
     updated, unsnapped = profileStroke(sceneObject, positions, affected, strength)
+    return finishProfileStroke(sceneObject, positions, updated, unsnapped)
   moved = numpy.linalg.norm(updated - positions, axis=1)
   writeWorldPositions(sceneObject, updated)
-  shaped = moved > 1e-9
-  if mode not in profileModes:
-    return {"affectedVertices": int(shaped.sum()), "largestMove": round(float(moved.max()), 3), "foldedFaces": bridgeMeshAccess.foldedFaceCount(sceneObject, positions, updated)}
+  return {"affectedVertices": int((moved > 1e-9).sum()), "largestMove": round(float(moved.max()), 3), "foldedFaces": bridgeMeshAccess.foldedFaceCount(sceneObject, positions, updated)}
+
+
+def finishProfileStroke(sceneObject, positions, updated, unsnapped):
+  """Write a carve or fill, triangulate what it shaped along the contours, and put back any snapped vertices that leave their cell no
+  diagonal facing up."""
+  writeWorldPositions(sceneObject, updated)
+  shaped = numpy.linalg.norm(updated - positions, axis=1) > 1e-9
   triangulation = triangulateAlongContours(sceneObject, updated, shaped) | {"keptOffContours": 0}
   for _ in range(snapRepairs):
     returning = overturnedVertexMask(sceneObject, updated, shaped) & (numpy.abs(updated[:, :2] - unsnapped[:, :2]).max(axis=1) > 1e-9)
@@ -200,6 +206,36 @@ def movedToProfile(positions, affected, strength, targets, mode):
   return updated
 
 
+def meshEdgeEnds(sceneObject):
+  edges = numpy.empty(len(sceneObject.data.edges) * 2, dtype=numpy.int64)
+  sceneObject.data.edges.foreach_get("vertices", edges)
+  return edges.reshape(-1, 2).T
+
+
+def snapOntoBreaks(sceneObject, positions, affected, coordinate, breakCoordinates, directions, border):
+  """Slide each affected vertex within half an edge of a break sideways along its direction (the way coordinate grows) onto that
+  break, except where it would land almost on a neighbor snapping onto the same break from the other side. breakCoordinates holds
+  each vertex's breaks; returns the slid positions and their coordinates."""
+  offsets = breakCoordinates - coordinate[:, None]
+  closest = numpy.abs(offsets).argmin(axis=1)
+  rows = numpy.arange(len(offsets))
+  slide = offsets[rows, closest]
+  edgeLength = medianEdgeLength(sceneObject, positions, affected)
+  snapping = affected & (numpy.abs(slide) <= 0.5 * edgeLength) & (numpy.linalg.norm(directions, axis=1) > 0.5) & ~border
+  first, second = meshEdgeEnds(sceneObject)
+  pairs = snapping[first] & snapping[second] & (closest[first] == closest[second]) & (numpy.sign(slide[first]) != numpy.sign(slide[second]))
+  first, second = first[pairs], second[pairs]
+  apart = positions[second, :2] - positions[first, :2]
+  alongBreak = numpy.abs(directions[first, 0] * apart[:, 1] - directions[first, 1] * apart[:, 0])
+  crowded = alongBreak < breakCrowding * edgeLength
+  snapping[numpy.where(numpy.abs(slide[first]) > numpy.abs(slide[second]), first, second)[crowded]] = False
+  positions = positions.copy()
+  positions[snapping, :2] += directions[snapping] * slide[snapping, None]
+  coordinate = coordinate.copy()
+  coordinate[snapping] = breakCoordinates[snapping, closest[snapping]]
+  return positions, coordinate
+
+
 def profileAlongPath(sceneObject, positions, affected, strength, path, radii, profileArray, mode, conformRim, conformBreaks):
   """Move vertices toward the path floor plus the profile height: carve lowers those above it, fill raises those below it. With
   conformBreaks, the vertices nearest each break of the profile (each point between its first and last) first slide sideways onto
@@ -210,31 +246,14 @@ def profileAlongPath(sceneObject, positions, affected, strength, path, radii, pr
   lateral = fractions * radiiHere
   unsnapped = movedToProfile(positions, affected, strength, floors + numpy.interp(numpy.clip(fractions, 0, 1), profileArray[:, 0], profileArray[:, 1]), mode)
   border = bridgeMeshAccess.boundaryVertexMask(sceneObject)
-  meshEdges = numpy.empty(len(sceneObject.data.edges) * 2, dtype=numpy.int64)
-  sceneObject.data.edges.foreach_get("vertices", meshEdges)
-  meshEdges = meshEdges.reshape(-1, 2).T
+  outwards = numpy.zeros((len(positions), 2))
+  away = lateral > 0
+  outwards[away] = (positions[away, :2] - nearest[away]) / lateral[away, None]
   if conformBreaks:
     if len(profileArray) < 3:
       raise ValueError("conformBreaks needs a profile with breaks: points between its first and last")
-    breakLaterals = profileArray[1:-1, 0][None, :] * radiiHere[:, None]
-    offsets = breakLaterals - lateral[:, None]
-    closest = numpy.abs(offsets).argmin(axis=1)
-    slide = offsets[numpy.arange(len(offsets)), closest]
-    edgeLength = medianEdgeLength(sceneObject, positions, affected)
-    snapping = affected & (numpy.abs(slide) <= 0.5 * edgeLength) & (lateral > 0) & ~border
-    first, second = meshEdges
-    pairs = snapping[first] & snapping[second] & (closest[first] == closest[second]) & (numpy.sign(slide[first]) != numpy.sign(slide[second]))
-    first, second = first[pairs], second[pairs]
-    outwardOfFirst = (positions[first, :2] - nearest[first]) / lateral[first, None]
-    apart = positions[second, :2] - positions[first, :2]
-    alongBreak = numpy.abs(outwardOfFirst[:, 0] * apart[:, 1] - outwardOfFirst[:, 1] * apart[:, 0])
-    crowded = alongBreak < breakCrowding * edgeLength
-    snapping[numpy.where(numpy.abs(slide[first]) > numpy.abs(slide[second]), first, second)[crowded]] = False
-    outward = (positions[snapping, :2] - nearest[snapping]) / lateral[snapping, None]
-    positions = positions.copy()
-    positions[snapping, :2] += outward * slide[snapping, None]
-    lateral[snapping] = breakLaterals[snapping, closest[snapping]]
-    fractions[snapping] = profileArray[1:-1, 0][closest[snapping]]
+    positions, lateral = snapOntoBreaks(sceneObject, positions, affected, lateral, profileArray[1:-1, 0][None, :] * radiiHere[:, None], outwards, border)
+    fractions = lateral / radiiHere
   targets = floors + numpy.interp(numpy.clip(fractions, 0, 1), profileArray[:, 0], profileArray[:, 1])
   updated = movedToProfile(positions, affected, strength, targets, mode)
   moving = updated[:, 2] != positions[:, 2]
@@ -244,9 +263,8 @@ def profileAlongPath(sceneObject, positions, affected, strength, path, radii, pr
     slide = contourLateral - lateral
     rimEdgeLength = medianEdgeLength(sceneObject, positions, moving)
     sliding = affected & ~moving & (heightsAboveFloor > profileArray[0, 1]) & (heightsAboveFloor < profileArray[-1, 1]) & (slide < 0) & (-slide <= 0.75 * rimEdgeLength) & (lateral > 0) & ~border
-    outward = (positions[sliding, :2] - nearest[sliding]) / lateral[sliding, None]
-    updated[sliding, :2] += outward * slide[sliding, None]
-    first, second = meshEdges
+    updated[sliding, :2] += outwards[sliding] * slide[sliding, None]
+    first, second = meshEdgeEnds(sceneObject)
     touching = sliding[first] | sliding[second]
     first, second = first[touching], second[touching]
     crowded = numpy.linalg.norm(updated[first, :2] - updated[second, :2], axis=1) < breakCrowding * rimEdgeLength
@@ -254,6 +272,84 @@ def profileAlongPath(sceneObject, positions, affected, strength, path, radii, pr
     staying = numpy.where(sliding[first] & sliding[second], larger, numpy.where(sliding[first], first, second))[crowded]
     updated[staying, :2] = positions[staying, :2]
   return updated, unsnapped
+
+
+def signedDistanceToOutline(points, outline):
+  """Each point's distance from a closed outline, positive inside it, and the direction in plan in which that distance grows."""
+  starts, ends = outline, numpy.roll(outline, -1, axis=0)
+  segments = ends - starts
+  along = numpy.clip(((points[:, None, :2] - starts[None]) * segments[None]).sum(2) / (segments * segments).sum(1)[None], 0, 1)
+  nearest = starts[None] + along[:, :, None] * segments[None]
+  distances = numpy.linalg.norm(points[:, None, :2] - nearest, axis=2)
+  closest = distances.argmin(axis=1)
+  rows = numpy.arange(len(points))
+  distance, nearestPoint = distances[rows, closest], nearest[rows, closest]
+  inside = bridgeMeshAccess.insidePolygon(points[:, :2], outline)
+  away = numpy.zeros((len(points), 2))
+  apart = distance > 1e-9
+  away[apart] = (points[apart, :2] - nearestPoint[apart]) / distance[apart, None]
+  return numpy.where(inside, distance, -distance), numpy.where(inside[:, None], away, -away)
+
+
+def sculptOutline(objectName, mode, outline, base, profile, strength, conformBreaks):
+  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  if mode not in profileModes:
+    raise ValueError(f"mode must be one of {list(profileModes)}, got '{mode}'")
+  if not 0 < strength <= 1:
+    raise ValueError(f"strength is a fraction in (0, 1], got {strength}")
+  outlineArray = bridgeMeshAccess.toArray(outline)
+  if outlineArray.ndim != 2 or outlineArray.shape[1] != 2 or len(outlineArray) < 3:
+    raise ValueError(f"An outline is at least three [x, y] points, got {outline!r}")
+  profileArray = bridgeMeshAccess.toArray(profile)
+  if profileArray.ndim != 2 or profileArray.shape[1] != 2 or len(profileArray) < 2 or (numpy.diff(profileArray[:, 0]) <= 0).any():
+    raise ValueError("profile is [[signedDistance, heightAboveBase], ...] with distances rising (negative outside the outline, positive inside)")
+  if conformBreaks and len(profileArray) < 3:
+    raise ValueError("conformBreaks needs a profile with breaks: points between its first and last")
+  positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
+  distance, directions = signedDistanceToOutline(positions, outlineArray)
+  affected = distance >= profileArray[0, 0]
+  if not affected.any():
+    raise ValueError(f"No vertices of '{objectName}' lie within {-profileArray[0, 0]:g} of the outline or inside it")
+  unsnapped = movedToProfile(positions, affected, strength, base + numpy.interp(distance, profileArray[:, 0], profileArray[:, 1]), mode)
+  snapped = positions
+  if conformBreaks:
+    breaks = numpy.broadcast_to(profileArray[1:-1, 0][None, :], (len(positions), len(profileArray) - 2))
+    snapped, distance = snapOntoBreaks(sceneObject, positions, affected, distance, breaks, directions, bridgeMeshAccess.boundaryVertexMask(sceneObject))
+  updated = movedToProfile(snapped, affected, strength, base + numpy.interp(distance, profileArray[:, 0], profileArray[:, 1]), mode)
+  return finishProfileStroke(sceneObject, positions, updated, unsnapped)
+
+
+def facet(objectName, selector, cellSize, strength, seed, fadeDistance):
+  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  if cellSize <= 0 or not 0 < strength <= 1:
+    raise ValueError(f"cellSize must be positive and strength a fraction in (0, 1], got {cellSize} and {strength}")
+  positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
+  weights = maskWeights(sceneObject, selector, fadeDistance, positions)
+  selected = numpy.flatnonzero(weights > 0)
+  points = positions[selected]
+  low = points.min(axis=0)
+  counts = numpy.ceil((points.max(axis=0) - low) / cellSize).astype(numpy.int64) + 1
+  cellIndices = numpy.stack(numpy.meshgrid(*[numpy.arange(count) for count in counts], indexing="ij"), axis=-1).reshape(-1, 3)
+  seeds = low + (cellIndices + numpy.random.default_rng(seed).uniform(0, 1, cellIndices.shape)) * cellSize
+  tree = mathutils.kdtree.KDTree(len(seeds))
+  for index, seedPoint in enumerate(seeds):
+    tree.insert(seedPoint, index)
+  tree.balance()
+  cells = numpy.array([tree.find(point)[1] for point in points])
+  moves = numpy.zeros_like(points)
+  facets = 0
+  for cell in numpy.unique(cells):
+    members = numpy.flatnonzero(cells == cell)
+    if len(members) < 3:
+      continue
+    centered = points[members] - points[members].mean(axis=0)
+    normal = numpy.linalg.eigh(centered.T @ centered)[1][:, 0]
+    moves[members] = -(centered @ normal)[:, None] * normal
+    facets += 1
+  updated = positions.copy()
+  updated[selected] += strength * weights[selected, None] * moves
+  writeWorldPositions(sceneObject, updated)
+  return moveSummary(sceneObject, positions, updated) | {"facets": facets}
 
 
 def sculptAlongPath(objectName, mode, path, radius, radii, strength, falloff, direction, iterations, profile, conformRim, conformBreaks):
@@ -600,6 +696,8 @@ commands = {
   "moveVertices": (moveVertices, True),
   "sculptAtPoint": (sculptAtPoint, True),
   "sculptAlongPath": (sculptAlongPath, True),
+  "sculptOutline": (sculptOutline, True),
+  "facet": (facet, True),
   "deleteFaces": (deleteFaces, True),
   "extrudeFaces": (extrudeFaces, True),
   "insetFaces": (insetFaces, True),

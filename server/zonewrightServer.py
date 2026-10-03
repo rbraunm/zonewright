@@ -1141,6 +1141,23 @@ async def sculptAlongPath(
 
 
 @guardedTool()
+async def sculptOutline(
+  context: Context, objectName: str, mode: str, outline: list[list[float]], base: float, profile: list[list[float]], strength: float = 1.0,
+  conformBreaks: bool = True,
+):
+  """Carve or fill ground by distance from a closed outline [[x, y], ...] drawn in plan, for forms an artist draws rather than
+  sweeps: a cliff line with straight runs and sharp jogs, a jointed slot, an angular mesa or terrace. `profile` [[signedDistance,
+  heightAboveBase], ...] gives the height above `base` by distance from the outline, positive inside it and negative outside, the
+  distances rising; deeper inside than its last distance it holds the last height, and farther outside than its first it leaves the
+  ground alone. carve lowers ground above the profile, fill raises ground below it, `strength` a fraction. Every ledge runs parallel to
+  the outline: its corners stay angular inside it (within half an edge) and round outside it. With conformBreaks (on by default), the vertices nearest each break
+  of the profile slide onto it first, so its ledges and cliff edges are clean lines; then the shaped cells are triangulated along the
+  contours as followContours does, and snapped vertices that would leave a cell no diagonal facing up are put back (keptOffContours).
+  With shaping passes, the change goes into the active pass."""
+  return await callBridge(context, "sculptOutline", {"objectName": objectName, "mode": mode, "outline": outline, "base": base, "profile": profile, "strength": strength, "conformBreaks": conformBreaks})
+
+
+@guardedTool()
 async def addShapingPass(context: Context, objectName: str, name: str):
   """Add a named shaping pass to a mesh and make it active: vertex moves and sculpting go into the active pass, which can later be
   turned up or down, muted, removed, or collapsed, so a shaping step is revised without redoing the others. Tools that change faces
@@ -1197,6 +1214,16 @@ async def warp(
     "objectName": objectName, "featureSize": featureSize, "amplitude": amplitude, "seed": seed, "plane": plane, "selector": selector,
     "fadeDistance": fadeDistance,
   })
+
+
+@guardedTool(description=(
+  "Flatten the selected part of a mesh into planar facets about `cellSize` across: each patch of vertices is pressed onto the plane"
+  " that best fits it (by `strength`, 1 fully flat), so rock reads as broad faces meeting at sharp edges, as the client's natural"
+  " terrain is built, and the texture carries the fine detail, where warp and roughen would leave smooth or bumpy noise. The same"
+  " `seed` gives the same facets; `fadeDistance` ramps it in from the selection's edge. Use it in its own shaping pass, confined to the"
+  " rock it should shape." + selectorHelp))
+async def facet(context: Context, objectName: str, cellSize: float, strength: float = 1.0, seed: int = 0, selector: dict = allSelector, fadeDistance: float = 0.0):
+  return await callBridge(context, "facet", {"objectName": objectName, "selector": selector, "cellSize": cellSize, "strength": strength, "seed": seed, "fadeDistance": fadeDistance})
 
 
 @guardedTool(description="Delete the selected faces of a mesh, with edges and vertices left unused; for example the terrain inside a rock that should form its own cave floor ({\"insideObject\": \"rockName\"})." + selectorHelp)
