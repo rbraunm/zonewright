@@ -22,7 +22,7 @@ import machineProfile
 import zoneSources
 
 indexFormat = 10
-modelCacheFormat = 17
+modelCacheFormat = 18
 actorTrailingBytes = 4
 staticKinds = ("wldStatic",)
 defaultAppearance = {
@@ -351,6 +351,34 @@ def eqgMaterialTextures(materials, triangleMaterials, diffuseSwaps):
   return textures, alphaModes
 
 
+liquidShaders = {"opaque_maxwater.fx": "water", "opaque_maxwaterfall.fx": "waterfall", "opaque_maxlava.fx": "lava"}
+slideProperties = ("e_fSlide1X", "e_fSlide1Y", "e_fSlide2X", "e_fSlide2Y")
+
+
+def liquidColor(value):
+  return [((value >> shift) & 0xFF) / 255 for shift in (16, 8, 0)]
+
+
+def eqgLiquid(material):
+  """A material drawn with one of the client's liquid shaders as the preview draws liquids: its liquid, its shader values, and its
+  textures beyond the diffuse; None for any other material. The client's own materials leave some of these out (about one water material
+  in thirty has no environment map); what a material leaves out is left out here, and the preview draws without it."""
+  liquid = liquidShaders.get(material["shader"].lower())
+  if liquid is None:
+    return None
+  properties = material["properties"]
+  values = {"slides": [properties[name] for name in slideProperties]} if all(name in properties for name in slideProperties) else {}
+  textureKeys = {"water": {"normal": "e_TextureNormal0", "environment": "e_TextureEnvironment0"}, "waterfall": {}, "lava": {"normal": "e_TextureNormal0", "secondDiffuse": "e_TextureDiffuse1"}}[liquid]
+  if liquid == "water":
+    values |= {key: properties[name] for key, name in (("fresnelBias", "e_fFresnelBias"), ("fresnelPower", "e_fFresnelPower"), ("reflectionAmount", "e_fReflectionAmount")) if name in properties}
+    values |= {key: liquidColor(properties[name]) for key, name in (("reflectionColor", "e_fReflectionColor"), ("waterColor1", "e_fWaterColor1"), ("waterColor2", "e_fWaterColor2")) if name in properties}
+  return {"liquid": liquid, "values": values, "textures": {key: properties[name].lower() for key, name in textureKeys.items() if properties.get(name)}}
+
+
+def eqgLiquids(materials, triangleMaterials):
+  return [eqgLiquid(materials[index]) if index >= 0 else None for index in triangleMaterials]
+
+
 def staticEQGUVs(uvs):
   """A static (boneless) EQG model's texture coordinates as Blender counts them, v up from a texture's bottom: measured against
   screenshots, the Neighborhood's map board and guild gate show upright only with v flipped, while skinned models (a Drakkin's face)
@@ -358,15 +386,17 @@ def staticEQGUVs(uvs):
   return uvs * (1, -1) + (0, 1)
 
 
-def meshPart(vertices, triangles, uvs, textures, alphaModes, lighting=None):
+def meshPart(vertices, triangles, uvs, textures, alphaModes, lighting=None, liquids=None):
   """Drawn triangles only; triangles with non-finite vertices are dropped and counted. lighting is the file's per-vertex normals and
-  RGBA colors as the client lights them ({normals, colors}), or None for a mesh lit without them."""
+  RGBA colors as the client lights them ({normals, colors}), or None for a mesh lit without them; liquids, each triangle's liquid
+  (eqgLiquid) or None."""
   finite = triangleKeep(vertices, triangles)
   keep = numpy.array([texture is not None for texture in textures], dtype=bool) & finite
   keptTextures = [texture for texture, kept in zip(textures, keep) if kept]
   return {
     "vertices": vertices, "triangles": triangles[keep], "uvs": uvs, "textures": keptTextures, "alphaModes": [mode for mode, kept in zip(alphaModes, keep) if kept],
     "tints": [eqLooks.untinted] * len(keptTextures), "dropped": int((~finite).sum()), "lighting": lighting,
+    "liquids": [None] * len(keptTextures) if liquids is None else [liquid for liquid, kept in zip(liquids, keep) if kept],
   }
 
 
@@ -828,7 +858,7 @@ def buildModel(clientRoot, cacheRoot, modelName, zoneName, source=None, appearan
 def writePartsCache(modelFolder, parts, textureHolders, label):
   """Write parts as one mesh (model.npz) with its textures into a cache folder; returns where each texture came from, the missing
   ones, dropped triangles, and bounds. Lighting is written when every part carries it."""
-  vertexChunks, triangleChunks, uvChunks, textures, alphaModes, tints = [], [], [], [], [], []
+  vertexChunks, triangleChunks, uvChunks, textures, alphaModes, tints, liquids = [], [], [], [], [], [], []
   offset = 0
   for part in parts:
     vertexChunks.append(part["vertices"])
@@ -837,6 +867,7 @@ def writePartsCache(modelFolder, parts, textureHolders, label):
     textures += part["textures"]
     alphaModes += part["alphaModes"]
     tints += part["tints"]
+    liquids += part.get("liquids") or [None] * len(part["textures"])
     offset += len(part["vertices"])
   triangles = numpy.concatenate(triangleChunks)
   if len(triangles) == 0:
@@ -861,7 +892,8 @@ def writePartsCache(modelFolder, parts, textureHolders, label):
   textureSources = {}
   # A texture absent from every linked archive is absent for the client too; its faces are drawn as missing and reported.
   missingTextures = []
-  for textureName in sorted(set(textures)):
+  liquidTextureNames = {name for liquid in liquids if liquid is not None for name in liquid["textures"].values()}
+  for textureName in sorted(set(textures) | liquidTextureNames):
     if textureName.startswith("terrain:"):
       continue
     holder = next((candidate for candidate in textureHolders if textureName in candidate.entries), None)
@@ -875,14 +907,22 @@ def writePartsCache(modelFolder, parts, textureHolders, label):
     holder = next(candidate for candidate in textureHolders if candidate.archivePath.name.lower() == holderName)
     fileNames[textureName], readable = eqTextures.readableTexture(textureName, holder.read(textureName))
     (modelFolder / fileNames[textureName]).write_bytes(readable)
-  # Triangles index a palette of materials (texture file, alpha mode, tint).
+  # Triangles index a palette of materials (texture file, alpha mode, tint, liquid). A liquid names its textures by their cached files;
+  # one whose texture is missing keeps the rest.
+  def liquidKey(liquid):
+    if liquid is None:
+      return ""
+    found = {key: fileNames[name] for key, name in liquid["textures"].items() if name in fileNames}
+    return json.dumps(liquid | {"textures": found}, sort_keys=True)
+
   palette, triangleMaterials = {}, numpy.empty(len(textures), dtype=numpy.int32)
-  for index, key in enumerate(zip(textures, alphaModes, tints)):
+  for index, key in enumerate(zip(textures, alphaModes, tints, (liquidKey(liquid) for liquid in liquids))):
     triangleMaterials[index] = palette.setdefault(key, len(palette))
   numpy.savez(
     modelFolder / "model.npz", vertices=vertices.astype(numpy.float32), triangles=triangles.astype(numpy.int32), uvs=uvs.astype(numpy.float32),
-    materialTextures=numpy.array([fileNames.get(texture, texture) for texture, _, _ in palette]), materialAlphaModes=numpy.array([alphaMode for _, alphaMode, _ in palette]),
-    materialTints=numpy.array([tint for _, _, tint in palette], dtype=numpy.uint32), triangleMaterials=triangleMaterials, missingTextures=numpy.array(missingTextures, dtype=str),
+    materialTextures=numpy.array([fileNames.get(texture, texture) for texture, _, _, _ in palette]), materialAlphaModes=numpy.array([alphaMode for _, alphaMode, _, _ in palette]),
+    materialTints=numpy.array([tint for _, _, tint, _ in palette], dtype=numpy.uint32), materialLiquids=numpy.array([liquid for _, _, _, liquid in palette], dtype=str),
+    triangleMaterials=triangleMaterials, missingTextures=numpy.array(missingTextures, dtype=str),
     **{key: value.astype(numpy.float32) if value.dtype == numpy.float64 else value for key, value in (lighting | terrainAttributes).items()},
   )
   return {

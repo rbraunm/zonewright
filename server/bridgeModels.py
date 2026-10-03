@@ -10,6 +10,7 @@ import numpy
 import bridgeClientLight
 import bridgeMeshAccess
 import bridgeObjects
+import bridgeSurfacing
 
 alphaThreshold = 0.5
 missingTextureColor = (1.0, 0.0, 1.0, 1.0)
@@ -61,6 +62,19 @@ def modelMaterial(folder, textureName, alphaMode, tint, lit):
     colorInputs[1].default_value = (*(((tint >> shift) & 0xFF) / 255 for shift in (16, 8, 0)), 1.0)
     baseColor = next(socket for socket in multiply.outputs if socket.type == "RGBA")
   bridgeClientLight.surfaceOutput(material, baseColor, diffuse.outputs["Alpha"], alphaMode, lit, alphaThreshold)
+  return material
+
+
+def liquidModelMaterial(folder, textureName, liquid, lit):
+  """A client liquid material, drawn as the preview draws liquids (bridgeSurfacing.liquidNodes), reused across objects from one cache."""
+  materialName = f"eq_{os.path.basename(folder)}_{textureName}_{liquid['liquid']}{'_lit' if lit else ''}"
+  material = bpy.data.materials.get(materialName)
+  if material is not None and material.node_tree.nodes[bridgeSurfacing.diffuseNodeName].image.filepath == os.path.join(folder, textureName):
+    return material
+  material = bpy.data.materials.new(materialName)
+  material.use_nodes = True
+  paths = {key: os.path.join(folder, name) for key, name in liquid["textures"].items()}
+  bridgeSurfacing.liquidNodes(material, liquid["liquid"], liquid["values"], os.path.join(folder, textureName), paths, lit)
   return material
 
 
@@ -153,12 +167,16 @@ def buildModelMesh(folder, meshName):
     tints = mesh.color_attributes.new(bridgeClientLight.tintAttribute, "FLOAT_COLOR", "POINT")
     tints.data.foreach_set("color", (data["vertexTints"].astype(numpy.float32) / 255).ravel())
   missing = {str(name) for name in data["missingTextures"]}
-  for textureName, alphaMode, tint in zip(data["materialTextures"], data["materialAlphaModes"], data["materialTints"]):
+  for textureName, alphaMode, tint, liquid in zip(data["materialTextures"], data["materialAlphaModes"], data["materialTints"], data["materialLiquids"]):
     key = (str(textureName), str(alphaMode), int(tint), lit)
     if key[0].startswith("terrain:"):
       mesh.materials.append(terrainMaterial(folder, int(key[0].split(":")[1])))
+    elif key[0] in missing:
+      mesh.materials.append(missingTextureMaterial(key[0]))
+    elif str(liquid):
+      mesh.materials.append(liquidModelMaterial(folder, key[0], json.loads(str(liquid)), lit))
     else:
-      mesh.materials.append(missingTextureMaterial(key[0]) if key[0] in missing else modelMaterial(folder, *key))
+      mesh.materials.append(modelMaterial(folder, *key))
   mesh.polygons.foreach_set("material_index", data["triangleMaterials"].astype(numpy.int32))
   mesh.update()
   mesh.validate()

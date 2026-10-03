@@ -1,6 +1,7 @@
 """An EQG zone archive from what bridgeExport collects from a scene: the terrain (.ter) placed at the origin as TER_<zone>, each model
-(.mod) at its placements, a version 1 .zon with the scene's point lights, and every material's textures as DDS. No baked light yet:
-placements carry no .lit. The scene's emitters go beside the archive in the client's emitter list, which the client reads loose."""
+(.mod) at its placements, a version 1 .zon with the water bodies' swim volumes and the scene's point lights, and every material's
+textures as DDS. No baked light yet: placements carry no .lit. The scene's emitters go beside the archive in the client's emitter
+list, which the client reads loose."""
 import os
 import re
 from pathlib import Path
@@ -48,9 +49,15 @@ def zoneArchive(collected):
     writerMaterials = []
     for name in names:
       material = materials[name]
+      liquid = material["liquid"]
       writerMaterials.append({
         "name": name, "diffuseTexture": texture(material["diffusePath"]),
         "normalTexture": texture(material["normalPath"]) if material["normalPath"] is not None else None, "cutout": material["cutout"],
+        "liquid": None if liquid is None else {
+          "liquid": liquid["liquid"], "values": liquid["values"],
+          "environmentTexture": texture(liquid["environmentPath"]) if liquid["environmentPath"] else None,
+          "secondDiffuseTexture": texture(liquid["secondDiffusePath"]) if liquid["secondDiffusePath"] else None,
+        },
       })
     index = {name: position for position, name in enumerate(names)}
     prefix = entry["arrays"]
@@ -63,11 +70,12 @@ def zoneArchive(collected):
     files[entry["file"]] = model("mod", entry)
   placements = [{"model": terrainFile, "name": f"TER_{zone}", "position": (0.0, 0.0, 0.0), "rotation": (0.0, 0.0, 0.0), "scale": 1.0}]
   placements += [{key: placement[key] for key in ("model", "name", "position", "rotation", "scale")} for placement in collected["placements"]]
-  files[f"{zone}.zon"] = eqgWriter.zoneBytes([terrainFile] + [entry["file"] for entry in collected["models"]], placements, collected["lights"])
+  files[f"{zone}.zon"] = eqgWriter.zoneBytes([terrainFile] + [entry["file"] for entry in collected["models"]], placements, collected["regions"], collected["lights"])
   data = eqgWriter.archiveBytes(files)
   return data, {
     "zone": zone, "bytes": len(data), "terrainTriangles": len(collected["terrain"]["materials"]),
     "modelTriangles": {entry["file"]: len(entry["materials"]) for entry in collected["models"]},
     "placements": len(collected["placements"]), "lights": len(collected["lights"]), "emitters": len(collected["emitters"]),
+    "regions": [region["name"] for region in collected["regions"]],
     "textures": sorted(textureSources), "materials": sorted(materials),
   }

@@ -609,8 +609,8 @@ async def setZoneProperties(
 
 
 @guardedTool()
-async def renderView(context: Context, view: dict, shading: str = "client", bandHeight: float = 50.0):
-  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground at [x,y], or with z on the ground within 50 units below it, for caves and under overhangs; heading 0 = +Y, clockwise; eye 5.5 above the ground; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog. shading "client" draws the zone as the client does; "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout."""
+async def renderView(context: Context, view: dict, shading: str = "client", bandHeight: float = 50.0, guides: bool = True):
+  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground at [x,y], or with z on the ground within 50 units below it, for caves and under overhangs; heading 0 = +Y, clockwise; eye 5.5 above the ground; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog. shading "client" draws the zone as the client does; "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout. Guides (plot outlines) draw unless guides is false."""
   outputPath = newRenderPath()
   figureModel = None
   zone = await callBridge(context, "getZoneProperties", {})
@@ -618,7 +618,7 @@ async def renderView(context: Context, view: dict, shading: str = "client", band
   if "standAt" in view and "newEngineZone" in zone:
     figure = await anyio.to_thread.run_sync(spawnModel, None, figureModelCode, figureHeight, bool(zone["newEngineZone"]))
     figureModel = {key: figure[key] for key in ("folder", "scale", "avatarHeight")}
-  description = await callBridge(context, "renderView", {"view": view, "outputPath": str(outputPath), "figureModel": figureModel, "shading": shading, "bandHeight": bandHeight})
+  description = await callBridge(context, "renderView", {"view": view, "outputPath": str(outputPath), "figureModel": figureModel, "shading": shading, "bandHeight": bandHeight, "guides": guides})
   return [Image(data=outputPath.read_bytes(), format="png"), description]
 
 
@@ -826,9 +826,14 @@ async def exportZone(context: Context, path: str):
   its object's transform (copies sharing a mesh and without modifiers share one model) and every collection instance a model of its
   collection's meshes; a placed object takes one uniform scale. Materials must come from createMaterial: diffuse and normal map export
   as Opaque_MaxCB1.fx, diffuse only as Opaque_MaxC1.fx, a cutout (diffuse only) as Chroma_MPLBasicAT.fx. DDS textures are stored
-  unchanged, others as uncompressed DDS with power-of-two sides. Point lights placed with placeLight go into the .zon; emitters placed with
-  placeEmitter go into <zone>_EnvironmentEmitters.txt beside the archive (the client reads that list loose from its own folder). No baked
-  light is written yet."""
+  unchanged, others as uncompressed DDS with power-of-two sides; createLiquidMaterial materials export as the client's water, waterfall,
+  and lava shaders with their values. Water bodies' swim volumes go into the .zon as AWT_ (water) and ALV_ (lava) regions. Point lights
+  placed with placeLight go into the .zon; emitters placed with placeEmitter go into <zone>_EnvironmentEmitters.txt beside the archive
+  (the client reads that list loose from its own folder). A zone with housing (setZoneHousing) also gets <zone>_housing.json beside the
+  archive, its plots as Peridot's plot content gives them (address, border door, center and heading in the server's axes, size across
+  and along, price, upkeep, item capacity, pets, features) with their border doors (OBP_LOTSQUARE or OBP_GUILDSQUARE, open type 160,
+  in the server's axes and EQ heading), and <zone>_assets.txt naming stonesquare.eqg, which holds the border models. Guides and plot
+  borders are not exported as geometry. No baked light is written yet."""
   archivePath = Path(path)
   if not archivePath.is_absolute() or archivePath.suffix != ".eqg" or not archivePath.parent.is_dir():
     raise ToolError(f"'{path}' is not an absolute .eqg path in an existing folder")
@@ -840,15 +845,28 @@ async def exportZone(context: Context, path: str):
     data, summary = await anyio.to_thread.run_sync(eqgExport.zoneArchive, collected)
     emitterListPath = archivePath.parent / f"{zone}_EnvironmentEmitters.txt"
     emitterList = eqEmitters.emitterListText(collected["emitters"]) if collected["emitters"] else None
+    housing = collected["housing"]
+    housingPath = archivePath.parent / f"{zone}_housing.json"
+    assetListPath = archivePath.parent / f"{zone}_assets.txt"
+    hasPlots = housing is not None and bool(housing["plots"])
     archivePath.write_bytes(data)
-    # A list left from an earlier export would place emitters this scene no longer has.
+    # Lists left from an earlier export would place emitters or plots this scene no longer has.
     if emitterList is None:
       emitterListPath.unlink(missing_ok=True)
     else:
       emitterListPath.write_bytes(emitterList.encode("latin1"))
+    if hasPlots:
+      housingPath.write_text(json.dumps({"zone": zone} | housing, indent=1), encoding="ascii")
+      assetListPath.write_bytes("".join(f"{archive}\r\n" for archive in housing["assets"]).encode("latin1"))
+    else:
+      housingPath.unlink(missing_ok=True)
+      assetListPath.unlink(missing_ok=True)
   except (OSError, ValueError) as error:
     raise ToolError(f"{type(error).__name__}: {error}") from error
-  return summary | {"path": str(archivePath), "emitterList": str(emitterListPath) if emitterList is not None else None}
+  return summary | {
+    "path": str(archivePath), "emitterList": str(emitterListPath) if emitterList is not None else None,
+    "housing": None if housing is None else {"role": housing["housing"]["role"], "plots": len(housing["plots"]), "file": str(housingPath) if hasPlots else None, "assetList": str(assetListPath) if hasPlots else None},
+  }
 
 
 def passArrays(passes):
@@ -1025,6 +1043,7 @@ selectorHelp = (
   " {\"box\": {\"minimum\": [x,y,z], \"maximum\": [x,y,z]}}, {\"cylinder\": {\"center\": [x,y], \"radius\": r, \"bottom\": z, \"top\": z}},"
   " {\"facing\": {\"direction\": [x,y,z], \"withinDegrees\": d}}, {\"slope\": {\"minimumDegrees\": a, \"maximumDegrees\": b}} (0 flat, 90 vertical, over 90 overhanging), {\"height\": {\"minimum\": z, \"maximum\": z}}, {\"nearPath\": {\"path\": [[x,y,z], ...], \"radius\": r}} (horizontal distance), {\"material\": name}, {\"vertexGroup\": name}, {\"insideObject\": closedMeshName}, {\"region\": regionName} (inside a region createRegion made),"
   " {\"noise\": {\"featureSize\": f, \"share\": s, \"seed\": n}} (patches about f across covering about the fraction s of the surface, for breaking up one material with another),"
+  " {\"underWater\": waterBodyName} (under a pool or river's surface: its bed), {\"nearWater\": {\"water\": name, \"distance\": d}} (out of the water but within d of its surface: wet banks),"
   " {\"and\": [selectors]}, {\"or\": [selectors]}, {\"not\": selector}. Shapes test vertex positions, or face centers for face operations."
   " A selector that matches nothing is an error. Masks such as slope and height pick within an area you chose (a region, a stroke);"
   " a recipe belongs to a region, not to the whole zone."
@@ -1433,21 +1452,22 @@ async def clearRegion(context: Context, region: str, terrainObject: str, shaping
   return await callBridge(context, "clearRegion", {"region": region, "terrainObject": terrainObject, "shaping": shaping, "surfacing": surfacing, "objects": objects, "fadeDistance": fadeDistance})
 
 
+def catalogTexturePath(texture):
+  """A texture given as an absolute path, or as a catalog texture id (texture/<name>@<hash>), which uses the catalog's extracted file."""
+  if texture is None or not texture.startswith("texture/"):
+    return texture
+  asset = catalogCall(catalog.requireAsset, texture)
+  if "file" not in asset["measured"]:
+    raise ToolError(f"{texture} has no readable file: {asset['measured'].get('problem')}")
+  return asset["measured"]["file"]
+
+
 @guardedTool()
 async def createMaterial(context: Context, name: str, diffuseTexture: str, normalTexture: str | None = None, cutout: bool = False, alphaThreshold: float = 0.5):
   """A Phase 1 material: diffuse texture, optional normal map, no shine; cutout makes the diffuse alpha a hard alpha test for foliage
   cards. A texture is an absolute path or a catalog texture id (texture/<name>@<hash>), which uses the catalog's extracted file. The
   material is kept in the file whether or not anything uses it yet."""
-
-  def texturePath(texture):
-    if texture is None or not texture.startswith("texture/"):
-      return texture
-    asset = catalogCall(catalog.requireAsset, texture)
-    if "file" not in asset["measured"]:
-      raise ToolError(f"{texture} has no readable file: {asset['measured'].get('problem')}")
-    return asset["measured"]["file"]
-
-  return await callBridge(context, "createMaterial", {"name": name, "diffuseTexture": texturePath(diffuseTexture), "normalTexture": texturePath(normalTexture), "cutout": cutout, "alphaThreshold": alphaThreshold})
+  return await callBridge(context, "createMaterial", {"name": name, "diffuseTexture": catalogTexturePath(diffuseTexture), "normalTexture": catalogTexturePath(normalTexture), "cutout": cutout, "alphaThreshold": alphaThreshold})
 
 
 @guardedTool(description="Assign a material to the selected faces of a mesh without surfacing layers, adding a material slot if needed: for objects and blockout. A zone's terrain is surfaced by painting into layers (addSurfaceLayer, paintSurface)." + selectorHelp)
@@ -1494,6 +1514,295 @@ async def linkKitAsset(
 ):
   """Link a collection marked as an asset in a kit .blend (absolute path) and place an instance of it."""
   return await callBridge(context, "linkKitAsset", {"kitPath": kitPath, "assetName": assetName, "instanceName": instanceName, "location": location, "rotationDegrees": rotationDegrees, "scale": scale, "collection": collection})
+
+
+# Water
+
+liquidDefaults = {
+  # The client's own new-water settings (Resources/WaterSwap/WaterSwap.ini, [NewWater]) and the slides most of its water materials use.
+  "water": {"fresnelBias": 0.25, "fresnelPower": 8.0, "reflectionAmount": 0.7, "reflectionColor": [1.0, 1.0, 1.0], "waterColor1": [0.0, 0.04, 0.11], "waterColor2": [0.0, 0.23, 0.17], "slides": [0.02, 0.02, 0.03, 0.03]},
+  # The slides the client's waterfall and lava materials use most.
+  "waterfall": {"slides": [0.0, 0.3, 0.0, 0.2]},
+  "lava": {"slides": [0.01, 0.0, 0.0, 0.03]},
+}
+
+
+@guardedTool()
+async def createLiquidMaterial(
+  context: Context, name: str, liquid: str, diffuseTexture: str, normalTexture: str | None = None, environmentTexture: str | None = None,
+  secondDiffuseTexture: str | None = None, fresnelBias: float | None = None, fresnelPower: float | None = None, reflectionAmount: float | None = None,
+  reflectionColor: list[float] | None = None, waterColor1: list[float] | None = None, waterColor2: list[float] | None = None, slides: list[float] | None = None,
+):
+  """A liquid material, the one exception to Phase 1's diffuse-and-normal rule: `liquid` "water" (the client's Opaque_MaxWater.fx: a
+  diffuse, normalTexture, environmentTexture, fresnelBias and fresnelPower, reflectionAmount and reflectionColor, waterColor1 and
+  waterColor2), "waterfall" (Opaque_MaxWaterFall.fx: a diffuse), or "lava" (Opaque_MaxLava.fx: a diffuse, secondDiffuseTexture, and
+  normalTexture); each takes `slides` [first x, first y, second x, second y], how fast its two texture layers scroll. Values left out
+  take the client's own (water: its WaterSwap.ini new water; slides: what most of its materials use). Colors are three numbers from 0
+  to 1. A texture is an absolute path or a catalog texture id (texture/<name>@<hash>). The preview draws it still, as the client's DX9
+  effects draw it: water takes no color from its diffuse (the client's older effects do) but runs from waterColor1 seen from above to
+  waterColor2 at grazing angles, lit like any surface, rippled by its normal map at the texture coordinates and twice them (so the
+  normal map repeats as often as the surface's texture coordinates do), and mirrors its environment by fresnel (the preview takes the
+  environment cube map's average color); a waterfall is its diffuse, lit, as see-through as its alpha; lava is its two diffuses
+  averaged. Pools, rivers, and falls (floodWater, runWater, pourWaterfall) take these materials."""
+  if liquid not in liquidDefaults:
+    raise ToolError(f"liquid is one of {list(liquidDefaults)}, got '{liquid}'")
+  given = {
+    "fresnelBias": fresnelBias, "fresnelPower": fresnelPower, "reflectionAmount": reflectionAmount, "reflectionColor": reflectionColor,
+    "waterColor1": waterColor1, "waterColor2": waterColor2, "slides": slides,
+  }
+  stray = sorted(key for key, value in given.items() if value is not None and key not in liquidDefaults[liquid])
+  if stray:
+    raise ToolError(f"A {liquid} material does not take {stray}; it takes {list(liquidDefaults[liquid])}")
+  values = liquidDefaults[liquid] | {key: value for key, value in given.items() if value is not None}
+  return await callBridge(context, "createLiquidMaterial", {
+    "name": name, "liquid": liquid, "diffuseTexture": catalogTexturePath(diffuseTexture), "normalTexture": catalogTexturePath(normalTexture),
+    "environmentTexture": catalogTexturePath(environmentTexture), "secondDiffuseTexture": catalogTexturePath(secondDiffuseTexture), "values": values,
+  })
+
+
+waterBodyHelp = (
+  " A water body is one named object in the water collection, rebuilt from what it was made from whenever editWater or"
+  " shapeWaterExtent changes it, against the ground as it then is; look at it after every change (renderView close at the shore and"
+  " from above), then adjust. Its surface reaches a little under its banks so no seam shows; the swim volumes the client needs (AWT_"
+  " boxes, ALV_ for lava) are derived from it at export (getWaterVolumes shows them). The ground is every rendered mesh that is not"
+  " water, a guide, or a plot border. The result's `built` reports what the build found: a pool or river's deepest point and where it"
+  " runs off the end of the ground (a zone edge used as a source or an end, or a leak to bound)."
+)
+
+
+@guardedTool(description=(
+  "Flood a pool: from `seed` [x, y] (where the water must stand over ground) out over every grid point with ground below `level`,"
+  " point to neighbouring point, within the `within` outline [[x, y], ...] when given; a flood that spreads without filling (into open"
+  " ground) is refused, to be bounded with `within`, a lower level, or shapeWaterExtent. Meshed every `spacing` units, its flat cells"
+  " merged, the material repeating every `worldUnitsPerRepeat` units. A starting point: shape it with editWater (level, seed, within)"
+  " and shapeWaterExtent, and its bed with carveWaterBed." + waterBodyHelp
+))
+async def floodWater(
+  context: Context, name: str, seed: list[float], level: float, material: str, within: list[list[float]] | None = None,
+  spacing: float = 8.0, worldUnitsPerRepeat: float = 64.0, collection: str | None = None,
+):
+  return await callBridge(context, "floodWater", {
+    "name": name, "seed": seed, "level": level, "within": within, "spacing": spacing, "worldUnitsPerRepeat": worldUnitsPerRepeat,
+    "material": material, "collection": collection,
+  })
+
+
+@guardedTool(description=(
+  "Run a river along `path` [[x, y, level], ...], downstream in order, its surface at each point's level and falling evenly between"
+  " them (a drop is a fall: end one river at the lip, pourWaterfall, start the next below), spreading over the ground below its level"
+  " within `reach` of the path. Mapped along the path (v downstream, u across) so its texture flows with it. A path may start or end at"
+  " the edge of the ground, as a river entering or leaving the zone. Carve its channel first (sculptAlongPath) where the ground has none."
+  " A starting point: adjust with editWater (path, reach) and shapeWaterExtent." + waterBodyHelp
+))
+async def runWater(
+  context: Context, name: str, path: list[list[float]], reach: float, material: str, spacing: float = 8.0, worldUnitsPerRepeat: float = 64.0,
+  collection: str | None = None,
+):
+  return await callBridge(context, "runWater", {
+    "name": name, "path": path, "reach": reach, "spacing": spacing, "worldUnitsPerRepeat": worldUnitsPerRepeat, "material": material,
+    "collection": collection,
+  })
+
+
+@guardedTool(description=(
+  "Pour a waterfall from `lip` [[x, y, z], ...], the edge the water goes over, running from the fall's left edge to its right as seen"
+  " from in front of it: a sheet that starts a little back from the lip, turns over it, and drops to `bottom`, carried out from the face"
+  " by `throw` at the bottom (out as the square root of the drop, as falling water goes) and `spread` times as wide there; rows every"
+  " `spacing` units, the texture repeating every `worldUnitsPerRepeat` down and across. The result's built.insideRock lists rows that pass"
+  " inside the rock (raise throw or move the lip) and closestToRock how near the sheet comes. Its waterfall material scrolls in the"
+  " client; give the pool below its own body." + waterBodyHelp
+))
+async def pourWaterfall(
+  context: Context, name: str, lip: list[list[float]], bottom: float, material: str, throw: float = 6.0, spread: float = 1.0,
+  spacing: float = 8.0, worldUnitsPerRepeat: float = 64.0, collection: str | None = None,
+):
+  return await callBridge(context, "pourWaterfall", {
+    "name": name, "lip": lip, "bottom": bottom, "throw": throw, "spread": spread, "spacing": spacing, "worldUnitsPerRepeat": worldUnitsPerRepeat,
+    "material": material, "collection": collection,
+  })
+
+
+@guardedTool(description=(
+  "Change what a water body is made from and build it again against the ground as it is now: a pool's level, seed, within (an empty"
+  " list removes it), spacing, worldUnitsPerRepeat, or strokes (an empty list clears them); a river's path, reach, spacing,"
+  " worldUnitsPerRepeat, or strokes; a fall's lip, bottom, throw, spread, spacing, or worldUnitsPerRepeat; any body's material. With"
+  " nothing to change it only rebuilds, for after the ground under it has changed." + waterBodyHelp
+))
+async def editWater(
+  context: Context, name: str, level: float | None = None, seed: list[float] | None = None, within: list[list[float]] | None = None,
+  path: list[list[float]] | None = None, reach: float | None = None, lip: list[list[float]] | None = None, bottom: float | None = None,
+  throw: float | None = None, spread: float | None = None, spacing: float | None = None, worldUnitsPerRepeat: float | None = None,
+  strokes: list[dict] | None = None, material: str | None = None,
+):
+  changes = {
+    "level": level, "seed": seed, "within": within, "path": path, "reach": reach, "lip": lip, "bottom": bottom, "throw": throw,
+    "spread": spread, "spacing": spacing, "worldUnitsPerRepeat": worldUnitsPerRepeat, "strokes": strokes,
+  }
+  return await callBridge(context, "editWater", {"name": name, "changes": {key: value for key, value in changes.items() if value is not None}, "material": material})
+
+
+@guardedTool(description=(
+  "Stroke where a pool or river may spread, as an artist paints a mask: mode \"add\" lets it flood an `area` its bounds left out (a"
+  " cove past its within outline, a backwater beyond a river's reach), \"remove\" stops it where it leaks (a stroke across a gap in"
+  " the bank); `area` is {\"circle\": {\"center\": [x, y], \"radius\": r}} or {\"polygon\": [[x, y], ...]}. Strokes apply in order"
+  " and are kept, so later edits keep them; editWater with strokes [] clears them." + waterBodyHelp
+))
+async def shapeWaterExtent(context: Context, name: str, mode: str, area: dict):
+  return await callBridge(context, "shapeWaterExtent", {"name": name, "mode": mode, "area": area})
+
+
+@guardedTool()
+async def carveWaterBed(context: Context, name: str, objectName: str, depth: float, shoreWidth: float):
+  """Lower the ground (objectName) under a pool or river: `depth` under its surface from `shoreWidth` out from the shore, rising
+  smoothly to the surface at the shore, so the waterline stays where it is; ground already deeper stays. With shaping passes it goes
+  into the active pass. Paint the bed and wet banks with paintSurface's underWater and nearWater selectors."""
+  return await callBridge(context, "carveWaterBed", {"name": name, "objectName": objectName, "depth": depth, "shoreWidth": shoreWidth})
+
+
+@guardedTool()
+async def getWater(context: Context):
+  """Every water body: its kind, what it is made from, its material, its levels and plan bounds, and its mesh counts."""
+  return await callBridge(context, "getWater", {})
+
+
+@guardedTool()
+async def getWaterVolumes(context: Context, name: str):
+  """The swim volumes export would write under a pool or river: boxes whose tops stay within a unit of its surface and whose bottoms
+  lie under the deepest ground beneath, each AWT_ (water) or ALV_ (lava) and named for the body."""
+  return await callBridge(context, "describeWaterVolumes", {"name": name})
+
+
+# Housing
+
+def borderModelFolder(kind):
+  """The plot border model as the client loads it in the Neighborhood, the zone that links its archive (stonesquare.eqg); exportZone
+  lists that archive in the zone's own <zone>_assets.txt."""
+  folder, _ = eqModel("neighborhood", {"player": "OBP_LOTSQUARE", "guild": "OBP_GUILDSQUARE"}[kind])
+  return str(folder)
+
+
+plotHelp = (
+  " A plot is a guide on the ground (its outline, and an arrow out of its entrance side) with the client's own border model (a player's"
+  " OBP_LOTSQUARE, a guild's OBP_GUILDSQUARE, sized as a door's size scales it, in whole percents) at its center, as players will see"
+  " it; guides draw in renderView (guides false hides them) and never export. `facingDegrees` is the way its entrance faces, toward its"
+  " street (0 = +Y, clockwise). Sizes are [across, along] (along runs from the entrance to the back); the default is the stock plot:"
+  " player 169.1 x 170.1, guild 351.2 x 699.8, as Sunrise Hills' are; any size can be given. items and pets default to the zone's"
+  " pricing (player 50 and 6, guild 210 and 12, Peridot's launch values). Look at every plot from the street at eye height and from"
+  " above, and grade it (gradePlot) so it sits level."
+)
+
+
+@guardedTool()
+async def setZoneHousing(
+  context: Context, role: str | None = None, intent: str | None = None, placement: str | None = None, plotBudget: dict | None = None,
+  pricing: dict | None = None, routes: list[list[list[float]]] | None = None,
+):
+  """The zone's housing decision, made before any plot: `role` none (no housing), incidental (a few plots in a zone for something
+  else, such as along its main road), featured (a housing area is one of the zone's parts), or primary (the zone is for housing);
+  `intent`, what housing is for here; `placement`, where Peridot hosts its plots: "world" (in the public zone itself, its world plots)
+  or "neighborhood" (instanced neighborhoods made from this zone); `plotBudget` {"player": n, "guild": n}, how many plots it means to
+  have; `pricing`, changes to its price rules: basePlatinum and defaultItems and defaultPets per kind, platinumPerItem and
+  platinumPerPet for allowances above or below the defaults, featureMultipliers {feature: multiplier} (prominent 1.5, secluded 1.5,
+  view 1.25, waterfront 1.25, sheltered 1.25, remote 0.75, swamp 0.5 to start; add any), upkeepShare (a tenth: upkeep a day is a tenth
+  of the price, as on Live); `routes` [[[x, y], ...], ...], the zone's main routes, from which assessPlot judges how prominent a plot is.
+  Calls change what they name and keep the rest. Returns the decision, its plots, and any overlaps."""
+  return await callBridge(context, "setZoneHousing", {"role": role, "intent": intent, "placement": placement, "plotBudget": plotBudget, "pricing": pricing, "routes": routes})
+
+
+@guardedTool()
+async def getHousing(context: Context):
+  """The zone's housing decision and every plot: address, kind, center, facing, size, allowances, features, price with each step that
+  led to it, upkeep, and border size; plot counts against its budget; and overlapping plots, which export refuses."""
+  return await callBridge(context, "getHousing", {})
+
+
+@guardedTool(description=(
+  "Place one plot at `center` [x, y], its address its name (\"101 Canyon Way\"); its height is the ground's under its center unless"
+  " `height` is given. `features` (from the zone's featureMultipliers) and `pricePlatinum` (an override of the derived price) set its"
+  " price. The result gives its price and any plots it overlaps." + plotHelp
+))
+async def placePlot(
+  context: Context, address: str, center: list[float], facingDegrees: float, kind: str = "player", size: list[float] | None = None,
+  height: float | None = None, items: int | None = None, pets: int | None = None, features: list[str] | None = None,
+  pricePlatinum: int | None = None, collection: str | None = None,
+):
+  folder = await anyio.to_thread.run_sync(borderModelFolder, kind) if kind in ("player", "guild") else None
+  return await callBridge(context, "placePlot", {
+    "address": address, "kind": kind, "center": center, "facingDegrees": facingDegrees, "size": size, "height": height, "items": items,
+    "pets": pets, "tags": features, "pricePlatinum": pricePlatinum, "borderFolder": folder, "collection": collection,
+  })
+
+
+@guardedTool(description=(
+  "Change one plot: newAddress, kind, center (its height follows the ground unless `height` is given), facingDegrees, size, height,"
+  " items, pets, features (replacing its list), pricePlatinum (an override; 0 returns it to its derived price). A plot whose kind or"
+  " size changes gets a new border. Grade it again after moving it." + plotHelp
+))
+async def editPlot(
+  context: Context, address: str, newAddress: str | None = None, kind: str | None = None, center: list[float] | None = None,
+  facingDegrees: float | None = None, size: list[float] | None = None, height: float | None = None, items: int | None = None,
+  pets: int | None = None, features: list[str] | None = None, pricePlatinum: int | None = None,
+):
+  folder = None
+  if kind is not None or size is not None:
+    current = await callBridge(context, "getHousing", {})
+    plot = next((entry for entry in current["plots"] if entry["address"] == address), None)
+    if plot is None:
+      raise ToolError(f"No plot '{address}'")
+    newKind = kind or plot["kind"]
+    if newKind not in ("player", "guild"):
+      raise ToolError(f"kind is player or guild, got '{newKind}'")
+    folder = await anyio.to_thread.run_sync(borderModelFolder, newKind)
+  return await callBridge(context, "editPlot", {
+    "address": address, "newAddress": newAddress, "kind": kind, "center": center, "facingDegrees": facingDegrees, "size": size,
+    "height": height, "items": items, "pets": pets, "tags": features, "pricePlatinum": pricePlatinum, "borderFolder": folder,
+  })
+
+
+@guardedTool()
+async def removePlot(context: Context, address: str, gradedObject: str | None = None):
+  """Remove a plot and its border. With `gradedObject`, the terrain it was graded on, its grading pass goes too and the ground returns
+  to what it was; otherwise the graded ground stays."""
+  return await callBridge(context, "removePlot", {"address": address, "terrainObject": gradedObject})
+
+
+@guardedTool()
+async def gradePlot(context: Context, address: str, objectName: str, margin: float = 10.0, batterDegrees: float = 35.0):
+  """Level the ground (objectName) under a plot and `margin` around it to the plot's height, in its own shaping pass ("grade
+  <address>"), cutting into ground above it and filling ground below it, each meeting the ground around at `batterDegrees`, as a
+  builder's cut and fill slopes do. Grading again (after moving the plot) replaces what the pass held; removing the pass takes the
+  grading back. A plot standing far off the ground around it is refused: move it or change its height. Look at the cut and fill
+  slopes in a render; paint them like the rest of the ground."""
+  return await callBridge(context, "gradePlot", {"address": address, "objectName": objectName, "margin": margin, "batterDegrees": batterDegrees})
+
+
+@guardedTool()
+async def assessPlot(context: Context, address: str):
+  """Measure a plot where it lies: the ground under it (unevenness, tilt, the cut and fill to level it), what rises and falls beyond each
+  side, its entrance point (for walkRoute from the street), water beside it, how high it stands over its surroundings, how enclosed it
+  is, rock over it, its nearest plot and route, how much of the zone's main routes see it, and overlaps; and the features those
+  suggest, for pricing (set them with editPlot features). The measures check what a picture shows; look at the plot too."""
+  return await callBridge(context, "assessPlot", {"address": address})
+
+
+@guardedTool()
+async def layOutPlots(
+  context: Context, street: str, path: list[list[float]], side: str = "both", kind: str = "player", size: list[float] | None = None,
+  firstNumber: int = 101, gap: float = 20.0, setback: float = 20.0, items: int | None = None, pets: int | None = None,
+  features: list[str] | None = None, collection: str | None = None,
+):
+  """A starting point for a row of plots along a street: stations along `path` [[x, y], ...] a plot's width plus `gap` apart, each plot
+  `setback` from the path on `side` (left, right, or both, looking along the path), facing the street, addressed "<number> <street>"
+  from firstNumber in order along it (left before right at each station). Plots that would overlap another or find no ground are
+  skipped and listed. Then look at each one and adjust it (editPlot, gradePlot, assessPlot): a street of identical plots is a draft,
+  not a neighborhood."""
+  if kind not in ("player", "guild"):
+    raise ToolError(f"kind is player or guild, got '{kind}'")
+  folder = await anyio.to_thread.run_sync(borderModelFolder, kind)
+  return await callBridge(context, "layOutPlots", {
+    "street": street, "path": path, "side": side, "kind": kind, "size": size, "firstNumber": firstNumber, "gap": gap, "setback": setback,
+    "items": items, "pets": pets, "tags": features, "borderFolder": folder, "collection": collection,
+  })
 
 
 

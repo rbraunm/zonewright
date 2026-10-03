@@ -6,21 +6,32 @@ import statistics
 import bmesh
 import bpy
 import mathutils
+import mathutils.bvhtree
 import mathutils.kdtree
 import numpy
 
 import bridgeNoise
 
-selectorKeys = ("all", "sphere", "box", "cylinder", "facing", "slope", "height", "nearPath", "material", "vertexGroup", "insideObject", "region", "noise", "and", "or", "not")
+selectorKeys = (
+  "all", "sphere", "box", "cylinder", "facing", "slope", "height", "nearPath", "material", "vertexGroup", "insideObject", "region", "noise",
+  "underWater", "nearWater", "and", "or", "not",
+)
 selectorFields = {
   "sphere": ("center", "radius"), "box": ("minimum", "maximum"), "cylinder": ("center", "radius", "bottom", "top"),
   "facing": ("direction", "withinDegrees"), "slope": ("minimumDegrees", "maximumDegrees"), "height": ("minimum", "maximum"),
-  "nearPath": ("path", "radius"), "noise": ("featureSize", "share", "seed"),
+  "nearPath": ("path", "radius"), "noise": ("featureSize", "share", "seed"), "nearWater": ("water", "distance"),
 }
 # A region is a vertical prism over an outline: an area of the zone chosen for what it is to become, its intent kept in this property.
 regionIntentProperty = "zonewrightRegionIntent"
 # A mesh surfaced by layers keeps their order in this property; its face materials are composed from them.
 surfaceLayersProperty = "zonewrightSurfaceLayers"
+# A water body (bridgeWater) keeps what it was made from in this property, so every edit rebuilds it from that against the ground.
+waterProperty = "zonewrightWater"
+# A guide is drawn to design with (a plot's outline) and never exported; a plot's border is a server-placed door, exported in the
+# zone's housing file rather than its geometry.
+guideProperty = "zonewrightGuide"
+plotBorderProperty = "zonewrightPlotBorder"
+waterReach = 100000.0
 
 
 def requireObject(name):
@@ -62,6 +73,66 @@ def insidePolygon(points, outline):
 def insideRegion(regionObject, worldPoints):
   outline, bottom, top = regionShape(regionObject)
   return insidePolygon(worldPoints[:, :2], outline) & (worldPoints[:, 2] >= bottom) & (worldPoints[:, 2] <= top)
+
+
+def requireWater(name):
+  waterObject = requireObject(name)
+  if waterObject.type != "MESH" or waterProperty not in waterObject:
+    raise ValueError(f"'{name}' is not a water body; floodWater, runWater, and pourWaterfall make them")
+  return waterObject
+
+
+def isDesignAid(sceneObject):
+  """Guides and plot borders: drawn in views, but not the zone's own geometry."""
+  return guideProperty in sceneObject or plotBorderProperty in sceneObject
+
+
+def worldTriangles(sceneObjects):
+  """The evaluated meshes of objects as world positions and triangles, all in one."""
+  depsgraph = bpy.context.evaluated_depsgraph_get()
+  positions, triangles, offset = [], [], 0
+  for sceneObject in sceneObjects:
+    evaluated = sceneObject.evaluated_get(depsgraph)
+    mesh = evaluated.to_mesh()
+    try:
+      mesh.calc_loop_triangles()
+      coordinates = numpy.empty(len(mesh.vertices) * 3)
+      mesh.vertices.foreach_get("co", coordinates)
+      corners = numpy.empty(len(mesh.loop_triangles) * 3, dtype=numpy.int64)
+      mesh.loop_triangles.foreach_get("vertices", corners)
+    finally:
+      evaluated.to_mesh_clear()
+    positions.append(worldPositions(sceneObject, coordinates.reshape(-1, 3)))
+    triangles.append(corners.reshape(-1, 3) + offset)
+    offset += len(positions[-1])
+  if not positions:
+    return numpy.zeros((0, 3)), numpy.zeros((0, 3), dtype=numpy.int64)
+  return numpy.concatenate(positions), numpy.concatenate(triangles)
+
+
+def worldTree(sceneObjects):
+  """A BVH tree over objects in world space, its faces wound as the meshes wind them."""
+  positions, triangles = worldTriangles(sceneObjects)
+  if len(triangles) == 0:
+    raise ValueError(f"{[sceneObject.name for sceneObject in sceneObjects]} have no faces")
+  return mathutils.bvhtree.BVHTree.FromPolygons(positions.tolist(), triangles.tolist())
+
+
+def underWaterMask(waterObject, positions):
+  """Which points lie under a water body's surface."""
+  tree = worldTree([waterObject])
+  up = mathutils.Vector((0.0, 0.0, 1.0))
+  return numpy.array([tree.ray_cast(mathutils.Vector(point), up, waterReach)[0] is not None for point in positions], dtype=bool)
+
+
+def nearWaterMask(waterObject, positions, distance):
+  """Which points lie out of a water body but within distance of its surface, which reaches a little under its banks."""
+  if distance <= 0:
+    raise ValueError(f"The nearWater selector's distance must be positive, got {distance}")
+  tree = worldTree([waterObject])
+  under = underWaterMask(waterObject, positions)
+  near = numpy.array([tree.find_nearest(mathutils.Vector(point), distance)[0] is not None for point in positions], dtype=bool)
+  return near & ~under
 
 
 def requireMeshObject(name):
@@ -288,6 +359,10 @@ def evaluateSelector(selector, sceneObject, elementKind):
     return insideMask(requireMeshObject(value), positions)
   if key == "region":
     return insideRegion(requireRegion(value), positions)
+  if key == "underWater":
+    return underWaterMask(requireWater(value), positions)
+  if key == "nearWater":
+    return nearWaterMask(requireWater(value["water"]), positions, value["distance"])
   if key == "noise":
     if not 0 < value["share"] < 1:
       raise ValueError(f"The noise selector's share is a fraction between 0 and 1, got {value['share']}")

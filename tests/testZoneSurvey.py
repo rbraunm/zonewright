@@ -22,7 +22,7 @@ def testTechnicalLaneMeasuresEachZoneFormat(stageServer):
   rows = rowsByVariant(result)
   assert rows["gfaydark:wld"]["dimensions"]["terrainSize"] == [5521.0, 5459.4, 900.3]
   assert rows["gfaydark:wld"]["dimensions"]["triangleCount"] == 74981
-  assert rows["arena2:eqgz:loose"]["dimensions"]["terrainSize"] == [2255.2, 2392.8, 396.7]
+  assert rows["arena2:eqgz:loose"]["dimensions"]["terrainSize"] == [2392.8, 2255.2, 396.7]
   assert rows["arena2:eqgz:loose"]["dimensions"]["allGeometrySize"] == [5831.2, 7840.0, 737.3]
   assert rows["steamfontmts:eqtzp"]["dimensions"]["terrainSize"] == [4608.0, 5760.0, 472.7]
   assert rows["steamfontmts:eqtzp"]["dimensions"]["tileShape"] == {"quadsPerTile": 16, "unitsPerVertex": 12.0}

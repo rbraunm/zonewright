@@ -98,8 +98,8 @@ def parseModel(modelBytes, sourceName):
 
 
 def parseZone(zoneBytes, sourceName):
-  """EQGZ .zon: model names, object placements, region names, and lights (name, position, RGB 0-1, radius). Version 2 appends per-vertex
-  baked light to each object."""
+  """EQGZ .zon: model names, object placements, regions (name, center, three turns, half extents), and lights (name, position, RGB 0-1,
+  radius). Version 2 appends per-vertex baked light to each object."""
   if zoneBytes[:4] != b"EQGZ":
     raise ValueError(f"{sourceName}: not an EQGZ zone")
   version, stringLength, modelCount, objectCount, regionCount, lightCount = struct.unpack_from("<6I", zoneBytes, 4)
@@ -129,9 +129,10 @@ def parseZone(zoneBytes, sourceName):
       "scale": scale,
       "colors": colors,
     })
-  regionNames = []
+  regions = []
   for _ in range(regionCount):
-    regionNames.append(readString(stringTable, struct.unpack_from("<I", zoneBytes, position)[0]))
+    nameOffset, *values = struct.unpack_from("<I9f", zoneBytes, position)
+    regions.append({"name": readString(stringTable, nameOffset), "center": tuple(values[:3]), "rotation": tuple(values[3:6]), "halfExtents": tuple(values[6:])})
     position += zoneRegionBytes
   lights = []
   for _ in range(lightCount):
@@ -140,7 +141,7 @@ def parseZone(zoneBytes, sourceName):
     position += zoneLightBytes
   if position != len(zoneBytes):
     raise ValueError(f"{sourceName}: zone data ends at {position} of {len(zoneBytes)} bytes")
-  return {"version": version, "modelNames": modelNames, "placements": placements, "regionNames": regionNames, "lights": lights}
+  return {"version": version, "modelNames": modelNames, "placements": placements, "regions": regions, "lights": lights}
 
 
 def placementMatrix(placement):
@@ -156,8 +157,18 @@ def placementMatrix(placement):
   return aroundZ @ aroundY @ aroundX * placement["scale"]
 
 
+def drawnTransform(placement):
+  """The matrix and offset the client draws a placed model with: a terrain (.ter) where its own vertices are, whatever its placement
+  says (in every zone measured, only so does the ground meet the trees, posts, and crates standing on it), any other model turned,
+  scaled, and moved by its placement (as the RoF2 client's actors hold them)."""
+  if placement["model"].endswith(".ter"):
+    return numpy.identity(3), numpy.zeros(3)
+  return placementMatrix(placement), numpy.array(placement["position"], dtype=numpy.float64)
+
+
 def placeVertices(vertices, placement):
-  return vertices @ placementMatrix(placement).T + placement["position"]
+  matrix, offset = drawnTransform(placement)
+  return vertices @ matrix.T + offset
 
 
 def parseSkinnedModel(modelBytes, sourceName):

@@ -66,6 +66,14 @@ EQG terrain is a mesh, not a height grid, so a zone can have near-vertical walls
 
 A pass holds one offset per vertex, so refining and cutting, which change the vertices, first collapse the passes into the base. That fits coarse to fine: forms are settled on the coarse grid, collapsed, refined, and shaped further in new passes.
 
+### Water
+
+Water is laid in body by body, each a named object rebuilt from what it was made from whenever it changes, against the ground as it is then: a pool floods from a point to a level over the ground below it; a river follows a path of falling levels over the ground below its level within reach of the path, cut square at its ends; a fall hangs from a lip, turning over the edge and arcing out as it drops. Their surfaces reach a little under their banks so no seam shows at the waterline. A broad tool makes a starting point (a flood, a river along a whole channel); strokes and edits shape it (a removed stroke across a leak, a raised level, a moved lip), with a look after each. The client's swim volumes (`AWT_` boxes in the `.zon`) are derived from the surfaces at export, so they follow every edit; the surfaces export with the client's own water and waterfall shaders.
+
+### Housing
+
+A zone decides its housing before any plot exists: whether it has any, how central it is, what it is for, where the server hosts it (the public zone or instanced neighborhoods), how many plots, how they are priced, and its main routes. Plots are then placed one at a time, each an outline with the client's own border model as players will see it, graded level in its own shaping pass, assessed where it lies (the ground, drops and walls around it, water, view, seclusion, how much of the main routes see it), and priced from the zone's rules and its features. Export writes the zone's housing file in the shape Peridot's housing reads (plots, their border doors, prices, capacities) and lists the border models' archive for the zone.
+
 ### Arrangement
 
 - **Explicit sets:** one call places many linked copies of a model or kit asset, each with its own position, heading, pitch, roll, and scale, which are exactly what an EQ placement holds.

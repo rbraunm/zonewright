@@ -76,6 +76,32 @@ def testModelsReadBackThroughTheModelReader(kind):
   ]
 
 
+def testLiquidMaterialsCarryTheClientsShaderProperties():
+  values = {"fresnelBias": 0.25, "fresnelPower": 8.0, "reflectionAmount": 0.7, "reflectionColor": [1, 1, 1], "waterColor1": [0, 0.04, 0.11], "waterColor2": [0, 0.23, 0.17], "slides": [0.02, 0.02, 0.03, 0.03]}
+  materials = [
+    {"name": "pond", "diffuseTexture": "water_c.dds", "normalTexture": "water_n.dds", "cutout": False, "liquid": {"liquid": "water", "values": values, "environmentTexture": "water_e.dds"}},
+    {"name": "falls", "diffuseTexture": "fall_c.dds", "normalTexture": None, "cutout": False, "liquid": {"liquid": "waterfall", "values": {"slides": [0, 0.3, 0, 0.2]}}},
+    {"name": "magma", "diffuseTexture": "lava_c.dds", "normalTexture": "lava_n.dds", "cutout": False, "liquid": {"liquid": "lava", "values": {"slides": [0.01, 0, 0, 0.03]}, "secondDiffuseTexture": "lava2_c.dds"}},
+  ]
+  data = eqgWriter.modelBytes("mod", materials, [[0, 0, 0]] * 3, [[0, 0, 1]] * 3, [[0, 0]] * 3, [[0, 1, 2]], [0])
+  pond, falls, magma = eqgFiles.parseModel(data, "liquids.mod")["materials"]
+  assert pond["shader"] == "Opaque_MaxWater.fx" and falls["shader"] == "Opaque_MaxWaterFall.fx" and magma["shader"] == "Opaque_MaxLava.fx"
+  # Colors are 0xAARRGGBB, as the client's water materials hold them (its most common first color is 0xFF00191C).
+  assert pond["properties"] == pytest.approx({
+    "e_TextureDiffuse0": "water_c.dds", "e_TextureNormal0": "water_n.dds", "e_TextureEnvironment0": "water_e.dds", "e_fFresnelBias": 0.25,
+    "e_fFresnelPower": 8.0, "e_fWaterColor1": 0xFF000A1C, "e_fWaterColor2": 0xFF003B2B, "e_fReflectionAmount": 0.7, "e_fReflectionColor": 0xFFFFFFFF,
+    "e_fSlide1X": 0.02, "e_fSlide1Y": 0.02, "e_fSlide2X": 0.03, "e_fSlide2Y": 0.03,
+  })
+  assert falls["properties"] == pytest.approx({"e_TextureDiffuse0": "fall_c.dds", "e_fSlide1X": 0, "e_fSlide1Y": 0.3, "e_fSlide2X": 0, "e_fSlide2Y": 0.2})
+  assert list(magma["properties"])[:3] == ["e_TextureDiffuse0", "e_TextureDiffuse1", "e_TextureNormal0"] and magma["properties"]["e_TextureDiffuse1"] == "lava2_c.dds"
+
+
+def testARegionWithoutExtentIsRefused():
+  placements = [{"model": "ter_test.ter", "name": "TER_test", "position": (0.0, 0.0, 0.0), "rotation": (0.0, 0.0, 0.0), "scale": 1.0}]
+  with pytest.raises(ValueError, match="positive half extents"):
+    eqgWriter.zoneBytes(["ter_test.ter"], placements, [{"name": "AWT_flat", "center": (0, 0, 0), "halfExtents": (4.0, 4.0, 0.0)}], [])
+
+
 def testACutoutWithANormalMapIsRefused():
   material = {"name": "card", "diffuseTexture": "card_c.dds", "normalTexture": "card_n.dds", "cutout": True}
   with pytest.raises(ValueError, match="cutout with a normal map"):
@@ -88,18 +114,20 @@ def testZoneReadsBackThroughTheZoneReader():
     {"model": "obj_rock.mod", "name": "OBJ_rock01", "position": (12.5, -3.0, 4.0), "rotation": (1.5, 0.25, -0.5), "scale": 2.0},
   ]
   lights = [{"name": "LIT_torch01", "position": (5.0, 6.0, 7.5), "color": (1.0, 0.5, 0.25), "radius": 60.0}]
-  zone = eqgFiles.parseZone(eqgWriter.zoneBytes(["ter_test.ter", "obj_rock.mod"], placements, lights), "test.zon")
-  assert zone["modelNames"] == ["ter_test.ter", "obj_rock.mod"] and zone["regionNames"] == [] and zone["lights"] == lights
+  regions = [{"name": "AWT_pool01", "center": (8.0, -4.0, -6.5), "halfExtents": (16.0, 8.0, 7.5)}]
+  zone = eqgFiles.parseZone(eqgWriter.zoneBytes(["ter_test.ter", "obj_rock.mod"], placements, regions, lights), "test.zon")
+  assert zone["modelNames"] == ["ter_test.ter", "obj_rock.mod"] and zone["lights"] == lights
+  assert zone["regions"] == [regions[0] | {"rotation": (0.0, 0.0, 0.0)}]
   assert [placement["model"] for placement in zone["placements"]] == ["ter_test.ter", "obj_rock.mod"]
   rock = zone["placements"][1]
   assert rock["name"] == "OBJ_rock01" and rock["position"] == (12.5, -3.0, 4.0) and rock["rotation"] == (1.5, 0.25, -0.5) and rock["scale"] == 2.0
-  assert struct.unpack_from("<I", eqgWriter.zoneBytes(["ter_test.ter"], placements[:1], []), 4)[0] == 1
+  assert struct.unpack_from("<I", eqgWriter.zoneBytes(["ter_test.ter"], placements[:1], [], []), 4)[0] == 1
 
 
 def testALightOutsideTheClientsRangesIsRefused():
   placements = [{"model": "ter_test.ter", "name": "TER_test", "position": (0.0, 0.0, 0.0), "rotation": (0.0, 0.0, 0.0), "scale": 1.0}]
   with pytest.raises(ValueError, match="positive radius and RGB in 0-1"):
-    eqgWriter.zoneBytes(["ter_test.ter"], placements, [{"name": "LIT_sun", "position": (0, 0, 0), "color": (2.0, 1.0, 1.0), "radius": 10.0}])
+    eqgWriter.zoneBytes(["ter_test.ter"], placements, [], [{"name": "LIT_sun", "position": (0, 0, 0), "color": (2.0, 1.0, 1.0), "radius": 10.0}])
 
 
 def testLitIsMagicCountAndOneD3DColorPerVertex():

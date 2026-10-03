@@ -20,7 +20,7 @@ import eqTextures
 import eqWorldFile
 import zoneSources
 
-zoneCacheFormat = 4
+zoneCacheFormat = 5
 readFormats = ("wld", "eqtzp", "eqgz")
 # A model's vertex light where its file gives none: no baked light and the full share of scene light, an assumption until the client's
 # lighting of EQG objects is traced.
@@ -203,7 +203,8 @@ def placedEQGPart(model, transform, position, colors):
   textures, alphaModes = eqModels.eqgMaterialTextures(model["materials"], model["triangleMaterials"], {})
   normals = model["normals"] @ numpy.linalg.inv(transform)
   normals /= numpy.maximum(numpy.linalg.norm(normals, axis=1, keepdims=True), 1e-12)
-  return eqModels.meshPart(model["vertices"] @ transform.T + position, model["triangles"], eqModels.staticEQGUVs(model["uvs"]), textures, alphaModes, {"normals": normals, "colors": colors})
+  return eqModels.meshPart(model["vertices"] @ transform.T + position, model["triangles"], eqModels.staticEQGUVs(model["uvs"]), textures, alphaModes,
+    {"normals": normals, "colors": colors}, eqModels.eqgLiquids(model["materials"], model["triangleMaterials"]))
 
 
 class TerrainObjects:
@@ -409,7 +410,7 @@ def eqgZoneParts(library, zone, zoneArchive, label):
       notFitting.append(placement["name"])
       colors = None
     rgba = bytesRGBA(colors) if colors is not None and len(colors) else numpy.tile(numpy.array(unlitColor, dtype=numpy.uint8), (vertexCount, 1))
-    parts.append(placedEQGPart(model, eqgFiles.placementMatrix(placement), numpy.array(placement["position"]), rgba))
+    parts.append(placedEQGPart(model, *eqgFiles.drawnTransform(placement), rgba))
     placedCounts[placement["model"]] = placedCounts.get(placement["model"], 0) + 1
   if not parts:
     raise ValueError(f"{label}: none of its {len(zone['placements'])} placements has a model in {[archive.archivePath.name for archive in library.archives]}")

@@ -9,6 +9,7 @@ import mathutils
 import numpy
 
 import bridgeClientLight
+import bridgeMeshAccess
 import bridgeModels
 
 requiredZoneKeys = (
@@ -47,16 +48,17 @@ def requireZone(zone):
 
 
 class PreviewScene:
-  """A scene holding links to the open scene's renderable objects plus the preview's own camera and world, the client's lighting set
-  from the zone. Where nothing is drawn shows the fog color; the client's sky is not drawn yet."""
+  """A scene holding links to the open scene's renderable objects (guides, such as plot outlines, only when asked for) plus the
+  preview's own camera and world, the client's lighting set from the zone. Where nothing is drawn shows the fog color; the client's sky
+  is not drawn yet."""
 
-  def __init__(self, sourceScene, zone):
+  def __init__(self, sourceScene, zone, guides=True):
     requireZone(zone)
     self.zone = zone
     self.createdObjects = []
     self.scene = bpy.data.scenes.new(previewName)
     for sourceObject in sourceScene.objects:
-      if sourceObject.type not in ("LIGHT", "CAMERA") and not sourceObject.hide_render:
+      if sourceObject.type not in ("LIGHT", "CAMERA") and not sourceObject.hide_render and (guides or bridgeMeshAccess.guideProperty not in sourceObject):
         self.scene.collection.objects.link(sourceObject)
     self.camera = self.addObject(bpy.data.objects.new(previewName + "Camera", bpy.data.cameras.new(previewName + "Camera")))
     self.camera.data.sensor_fit = "VERTICAL"
@@ -306,11 +308,11 @@ def roundVector(vector, digits=3):
   return [round(float(component), digits) for component in vector]
 
 
-def renderView(sourceScene, zone, view, outputPath, figureModel, shading, bandHeight):
+def renderView(sourceScene, zone, view, outputPath, figureModel, shading, bandHeight, guides):
   if shading not in viewShadings:
     raise ValueError(f"shading must be one of {list(viewShadings)}, got '{shading}'")
   # A map or a layout drawing is for reading the shape, so neither is fogged.
-  preview = PreviewScene(sourceScene, zone | {"fogDensity": 0.0} if "map" in view or shading == "layout" else zone)
+  preview = PreviewScene(sourceScene, zone | {"fogDensity": 0.0} if "map" in view or shading == "layout" else zone, guides)
   try:
     description = placeCamera(preview, view, figureModel)
     if shading == "layout":

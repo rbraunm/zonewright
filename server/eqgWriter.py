@@ -1,5 +1,5 @@
 """EQG zone files as the client reads them: PFS archives, EQGM models and EQGT terrain (version 2), EQGZ zones (version 1, the
-version the client loads from inside an archive), EQGP baked light, and uncompressed DDS textures."""
+version the client loads from inside an archive) with their region boxes, EQGP baked light, and uncompressed DDS textures."""
 import struct
 import zlib
 
@@ -15,6 +15,10 @@ crcPolynomial = 0x04C11DB7
 shaderOpaqueBump = "Opaque_MaxCB1.fx"
 shaderOpaque = "Opaque_MaxC1.fx"
 shaderCutout = "Chroma_MPLBasicAT.fx"
+# The client's liquid shaders, each with the properties its zones' materials carry.
+liquidShaders = {"water": "Opaque_MaxWater.fx", "waterfall": "Opaque_MaxWaterFall.fx", "lava": "Opaque_MaxLava.fx"}
+# Material property value types: a float, a string (a texture's name), and a color (0xAARRGGBB).
+propertyFloat, propertyString, propertyColor = 0, 2, 3
 
 
 def crcTable():
@@ -93,11 +97,42 @@ class StringTable:
 
 
 def materialShader(material):
+  if material.get("liquid") is not None:
+    return liquidShaders[material["liquid"]["liquid"]]
   if material["cutout"]:
     if material["normalTexture"] is not None:
       raise ValueError(f"Material '{material['name']}' is a cutout with a normal map; the client's cutout shader with normals also needs coverage and fallback textures, so a cutout exports diffuse only")
     return shaderCutout
   return shaderOpaqueBump if material["normalTexture"] is not None else shaderOpaque
+
+
+def colorValue(color):
+  return 0xFF000000 | (round(color[0] * 255) << 16) | (round(color[1] * 255) << 8) | round(color[2] * 255)
+
+
+def materialProperties(material):
+  """A material's shader properties as (name, type, value): its textures, and for a liquid its shader values in the order the client's
+  own liquid materials list them."""
+  liquid = material.get("liquid")
+  properties = [("e_TextureDiffuse0", propertyString, material["diffuseTexture"])]
+  if liquid is not None and liquid["liquid"] == "lava":
+    properties.append(("e_TextureDiffuse1", propertyString, liquid["secondDiffuseTexture"]))
+  if material["normalTexture"] is not None:
+    properties.append(("e_TextureNormal0", propertyString, material["normalTexture"]))
+  if liquid is None:
+    return properties
+  missing = [key for key, needed in (("environmentTexture", liquid["liquid"] == "water"), ("secondDiffuseTexture", liquid["liquid"] == "lava")) if needed and not liquid.get(key)]
+  if missing or (liquid["liquid"] in ("water", "lava") and material["normalTexture"] is None):
+    raise ValueError(f"Liquid material '{material['name']}' ({liquid['liquid']}) lacks {missing or ['normalTexture']}")
+  values = liquid["values"]
+  if liquid["liquid"] == "water":
+    properties += [
+      ("e_TextureEnvironment0", propertyString, liquid["environmentTexture"]), ("e_fFresnelBias", propertyFloat, values["fresnelBias"]),
+      ("e_fFresnelPower", propertyFloat, values["fresnelPower"]), ("e_fWaterColor1", propertyColor, colorValue(values["waterColor1"])),
+      ("e_fWaterColor2", propertyColor, colorValue(values["waterColor2"])), ("e_fReflectionAmount", propertyFloat, values["reflectionAmount"]),
+      ("e_fReflectionColor", propertyColor, colorValue(values["reflectionColor"])),
+    ]
+  return properties + [(name, propertyFloat, value) for name, value in zip(("e_fSlide1X", "e_fSlide1Y", "e_fSlide2X", "e_fSlide2Y"), values["slides"])]
 
 
 def modelBytes(kind, materials, positions, normals, uvs, triangles, triangleMaterials):
@@ -116,12 +151,15 @@ def modelBytes(kind, materials, positions, normals, uvs, triangles, triangleMate
   strings = StringTable()
   materialRecords = bytearray()
   for index, material in enumerate(materials):
-    properties = [("e_TextureDiffuse0", material["diffuseTexture"])]
-    if material["normalTexture"] is not None:
-      properties.append(("e_TextureNormal0", material["normalTexture"]))
+    properties = materialProperties(material)
     materialRecords += struct.pack("<4I", index, strings.offset(material["name"]), strings.offset(materialShader(material)), len(properties))
-    for propertyName, value in properties:
-      materialRecords += struct.pack("<3I", strings.offset(propertyName), 2, strings.offset(value))
+    for propertyName, propertyType, value in properties:
+      if propertyType == propertyString:
+        materialRecords += struct.pack("<3I", strings.offset(propertyName), propertyType, strings.offset(value))
+      elif propertyType == propertyFloat:
+        materialRecords += struct.pack("<2If", strings.offset(propertyName), propertyType, value)
+      else:
+        materialRecords += struct.pack("<3I", strings.offset(propertyName), propertyType, value)
   vertexType = numpy.dtype([("position", "<f4", 3), ("normal", "<f4", 3), ("uv", "<f4", 2)])
   vertices = numpy.empty(len(positions), dtype=vertexType)
   vertices["position"], vertices["normal"], vertices["uv"] = positions, normals, uvs
@@ -133,9 +171,10 @@ def modelBytes(kind, materials, positions, normals, uvs, triangles, triangleMate
   return header + bytes(strings.data) + bytes(materialRecords) + vertices.tobytes() + triangleRecords.tobytes()
 
 
-def zoneBytes(modelNames, placements, lights):
+def zoneBytes(modelNames, placements, regions, lights):
   """An EQGZ zone, version 1: model file names, then placements (model, name, position, heading about Z, then the turns about Y and X,
-  in radians, and one scale), no regions, then lights (name, position, RGB 0-1, radius)."""
+  in radians, and one scale), then regions (a name whose prefix says what the region is, such as AWT_ for water, and a box: its center,
+  three turns written 0 so it lines up with the zone's axes, and its half extents), then lights (name, position, RGB 0-1, radius)."""
   strings = StringTable()
   modelOffsets = [strings.offset(name) for name in modelNames]
   modelIndex = {name: index for index, name in enumerate(modelNames)}
@@ -143,13 +182,18 @@ def zoneBytes(modelNames, placements, lights):
   for placement in placements:
     records += struct.pack("<iI7f", modelIndex[placement["model"]], strings.offset(placement["name"]), *placement["position"],
       *placement["rotation"], placement["scale"])
+  regionRecords = bytearray()
+  for region in regions:
+    if min(region["halfExtents"]) <= 0:
+      raise ValueError(f"Region '{region['name']}' needs positive half extents, got {list(region['halfExtents'])}")
+    regionRecords += struct.pack("<I9f", strings.offset(region["name"]), *region["center"], 0.0, 0.0, 0.0, *region["halfExtents"])
   lightRecords = bytearray()
   for light in lights:
     if light["radius"] <= 0 or not all(0 <= component <= 1 for component in light["color"]):
       raise ValueError(f"Light '{light['name']}' needs a positive radius and RGB in 0-1, got {light['radius']} and {list(light['color'])}")
     lightRecords += struct.pack("<I7f", strings.offset(light["name"]), *light["position"], *light["color"], light["radius"])
-  header = b"EQGZ" + struct.pack("<6I", zoneVersion, len(strings.data), len(modelNames), len(placements), 0, len(lights))
-  return header + bytes(strings.data) + struct.pack(f"<{len(modelOffsets)}I", *modelOffsets) + bytes(records) + bytes(lightRecords)
+  header = b"EQGZ" + struct.pack("<6I", zoneVersion, len(strings.data), len(modelNames), len(placements), len(regions), len(lights))
+  return header + bytes(strings.data) + struct.pack(f"<{len(modelOffsets)}I", *modelOffsets) + bytes(records) + bytes(regionRecords) + bytes(lightRecords)
 
 
 def litBytes(colors):

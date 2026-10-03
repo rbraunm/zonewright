@@ -1,8 +1,8 @@
 """What an EQG zone export takes from the open scene. The `terrain` collection's meshes become the zone's terrain, merged in world
 coordinates; every other rendered mesh becomes a model placed at its object's transform (copies sharing a mesh and without modifiers
-share one model), and every collection instance a model of its collection's meshes. Writes the meshes to modelArrays.npz and
-returns the models, materials, and placements. Runs under Blender's Python."""
-import math
+share one model), and every collection instance a model of its collection's meshes. Guides and plot borders are not the zone's
+geometry and are left out. Writes the meshes to modelArrays.npz and returns the models, materials, placements, the water bodies' swim
+volumes, and the zone's housing. Runs under Blender's Python."""
 import os
 import re
 
@@ -10,30 +10,40 @@ import bpy
 import numpy
 
 import bridgeEnvironment
+import bridgeHousing
+import bridgeMeshAccess
 import bridgeSurfacing
+import bridgeWater
 
 terrainCollectionName = "terrain"
 modelArraysFileName = "modelArrays.npz"
 uniformScaleTolerance = 1e-5
 
 
+def nodeImagePath(material, nodeName):
+  """The file a material's named texture node shows, or None without that node."""
+  node = material.node_tree.nodes.get(nodeName) if material.node_tree else None
+  if node is None or node.image is None:
+    return None
+  image = node.image
+  if image.source != "FILE" or image.packed_file is not None:
+    raise ValueError(f"Material '{material.name}' uses image '{image.name}', which is not a file on disk")
+  return os.path.normpath(bpy.path.abspath(image.filepath, library=image.library))
+
+
 def materialRecord(material):
-  """A createMaterial material's textures (absolute paths) and cutout flag; any other material is refused, as only these map onto
-  the client's shaders."""
-  diffuse = material.node_tree.nodes.get(bridgeSurfacing.diffuseNodeName) if material.node_tree else None
-  if diffuse is None or diffuse.image is None or bridgeSurfacing.cutoutPropertyName not in material:
-    raise ValueError(f"Material '{material.name}' was not made by createMaterial; zone export reads only those")
-  normal = material.node_tree.nodes.get(bridgeSurfacing.normalNodeName)
-
-  def imagePath(image):
-    if image.source != "FILE" or image.packed_file is not None:
-      raise ValueError(f"Material '{material.name}' uses image '{image.name}', which is not a file on disk")
-    return os.path.normpath(bpy.path.abspath(image.filepath, library=image.library))
-
-  return {
-    "name": material.name, "diffusePath": imagePath(diffuse.image),
-    "normalPath": imagePath(normal.image) if normal is not None and normal.image is not None else None, "cutout": bool(material[bridgeSurfacing.cutoutPropertyName]),
-  }
+  """A createMaterial material's textures (absolute paths) and cutout flag, or a createLiquidMaterial material's textures and shader
+  values; any other material is refused, as only these map onto the client's shaders."""
+  diffusePath = nodeImagePath(material, bridgeSurfacing.diffuseNodeName)
+  liquid = bridgeSurfacing.liquidOf(material)
+  if diffusePath is None or (liquid is None and bridgeSurfacing.cutoutPropertyName not in material):
+    raise ValueError(f"Material '{material.name}' was not made by createMaterial or createLiquidMaterial; zone export reads only those")
+  record = {"name": material.name, "diffusePath": diffusePath, "normalPath": nodeImagePath(material, bridgeSurfacing.normalNodeName), "liquid": None, "cutout": False}
+  if liquid is None:
+    return record | {"cutout": bool(material[bridgeSurfacing.cutoutPropertyName])}
+  return record | {"liquid": liquid | {
+    "environmentPath": nodeImagePath(material, bridgeSurfacing.environmentNodeName), "secondDiffusePath": nodeImagePath(material, bridgeSurfacing.secondDiffuseNodeName),
+  }}
 
 
 def meshArrays(sceneObject, depsgraph, matrix, materialNames):
@@ -121,7 +131,7 @@ def collectZoneExport(outputFolder, zoneName):
   terrainObjects = {member.name for member in terrainCollection.all_objects}
   terrainParts, models, placements, lights, emitters = [], {}, [], [], []
   for sceneObject in scene.objects:
-    if sceneObject.hide_render or sceneObject.type == "CAMERA":
+    if sceneObject.hide_render or sceneObject.type == "CAMERA" or bridgeMeshAccess.isDesignAid(sceneObject):
       continue
     if sceneObject.type == "LIGHT":
       lights.append(bridgeEnvironment.lightRecord(sceneObject))
@@ -181,6 +191,7 @@ def collectZoneExport(outputFolder, zoneName):
   return {
     "zone": zoneName, "arrays": os.path.join(outputFolder, modelArraysFileName), "terrain": {"file": f"ter_{zoneName}.ter", "materials": terrain["materials"], "arrays": "terrain"},
     "models": modelList, "materials": list(materials.values()), "placements": placementList, "lights": lights, "emitters": emitters,
+    "regions": bridgeWater.waterVolumes(), "housing": bridgeHousing.collectHousing(),
   }
 
 

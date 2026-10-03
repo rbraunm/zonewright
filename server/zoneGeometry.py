@@ -158,7 +158,7 @@ def buildEQGGeometry(clientRoot, source):
   placementCounts, missingModels = addPlacements(builder, library, [placement for placement in zone["placements"] if not placement["model"].endswith(".ter")], True)
   if not builder.vertexChunks:
     raise ValueError(f"{source['zone']}: none of the {len(zone['placements'])} placements has a model in {[archive.archivePath.name for archive in library.archives]}")
-  geometry = builder.build(placementCounts=placementCounts, regionNames=zone["regionNames"], missingModels=missingModels, missingAssetArchives=missingArchives)
+  geometry = builder.build(placementCounts=placementCounts, regionNames=[region["name"] for region in zone["regions"]], missingModels=missingModels, missingAssetArchives=missingArchives)
   terrainVertices = geometry["vertices"][:terrainVertexCount]
   return geometry | {"terrainBounds": (terrainVertices.min(0), terrainVertices.max(0)) if terrainVertexCount else None}
 

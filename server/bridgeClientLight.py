@@ -8,7 +8,7 @@ import bpy
 
 groupName = "eqClientLight"
 # Raised whenever buildGroup changes, so a group saved in an older .blend is rebuilt in place.
-groupVersion = 4
+groupVersion = 5
 bakedAttribute = "eqColor"
 normalAttribute = "eqNormal"
 tintAttribute = "eqTint"
@@ -74,7 +74,7 @@ def buildGroup(tree):
   tree.nodes.clear()
   tree.interface.clear()
   tree["eqVersion"] = groupVersion
-  for socketName, socketType in (("Base", "NodeSocketColor"), ("Baked", "NodeSocketColor"), ("Share", "NodeSocketFloat"), ("Normal", "NodeSocketVector")):
+  for socketName, socketType in (("Base", "NodeSocketColor"), ("Baked", "NodeSocketColor"), ("Share", "NodeSocketFloat"), ("Normal", "NodeSocketVector"), ("Added", "NodeSocketColor")):
     tree.interface.new_socket(socketName, in_out="INPUT", socket_type=socketType)
   tree.interface.new_socket("Color", in_out="OUTPUT", socket_type="NodeSocketColor")
   build = GroupBuilder(tree)
@@ -100,7 +100,8 @@ def buildGroup(tree):
   colorInputs = [socket for socket in fogged.inputs if socket.type == "RGBA"]
   tree.links.new(visibility, fogged.inputs["Factor"])
   tree.links.new(build.color("fogColor"), colorInputs[0])
-  tree.links.new(lit, colorInputs[1])
+  # A shader's own unlit term (water's mirrored environment) adds to the lit color before fog, as the client's water effect adds it.
+  tree.links.new(build.vectorMath("ADD", lit, inputs["Added"]), colorInputs[1])
   shareColor = build.node("ShaderNodeCombineXYZ")
   for axis in "XYZ":
     tree.links.new(inputs["Share"], shareColor.inputs[axis])
@@ -150,7 +151,7 @@ def applyEnvironment(zone):
   nodes["fogDensity"].outputs["Value"].default_value = zone["fogDensity"]
 
 
-def surfaceOutput(material, baseColor, alpha, alphaMode, lit, threshold, normal=None):
+def surfaceOutput(material, baseColor, alpha, alphaMode, lit, threshold, normal=None, added=None):
   """Finish a material as the client draws it: the base color lit and fogged, emitted unlit, with the alpha mode's transparency. A lit
   mesh carries the file's baked colors and normals as attributes; any other surface has no baked light, the full share of scene
   light, and its geometric normal or the given one (a normal map's)."""
@@ -161,6 +162,10 @@ def surfaceOutput(material, baseColor, alpha, alphaMode, lit, threshold, normal=
   lighting = tree.nodes.new("ShaderNodeGroup")
   lighting.node_tree = group()
   links.new(baseColor, lighting.inputs["Base"])
+  if added is not None:
+    links.new(added, lighting.inputs["Added"])
+  else:
+    lighting.inputs["Added"].default_value = (0.0, 0.0, 0.0, 1.0)
   if lit:
     baked = tree.nodes.new("ShaderNodeAttribute")
     baked.attribute_type = "GEOMETRY"

@@ -10,6 +10,7 @@ import bridgeAuthoring
 import bridgeDressing
 import bridgeEnvironment
 import bridgeExport
+import bridgeHousing
 import bridgePasses
 import bridgeReview
 import bridgeModels
@@ -17,6 +18,7 @@ import bridgeObjects
 import bridgeShaping
 import bridgeSurfacing
 import bridgeViews
+import bridgeWater
 from bridgeState import requireNoUnsavedChanges, state
 
 zonePropertyName = "zonewrightZone"
@@ -211,8 +213,8 @@ def getZoneProperties():
   return readZoneProperties(bpy.context.scene)
 
 
-def renderView(view, outputPath, figureModel, shading, bandHeight):
-  return bridgeViews.renderView(bpy.context.scene, readZoneProperties(bpy.context.scene), view, outputPath, figureModel, shading, bandHeight)
+def renderView(view, outputPath, figureModel, shading, bandHeight, guides):
+  return bridgeViews.renderView(bpy.context.scene, readZoneProperties(bpy.context.scene), view, outputPath, figureModel, shading, bandHeight, guides)
 
 
 def pick(view, pixel):
@@ -236,7 +238,7 @@ commands = {
   "pick": (pick, False),
   "renderPasses": (renderPasses, False),
   "renderModelThumbnails": (bridgeViews.renderModelThumbnails, False),
-} | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands | bridgeModels.commands | bridgeExport.commands | bridgePasses.commands | bridgeEnvironment.commands | bridgeReview.commands | bridgeAuthoring.commands
+} | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands | bridgeModels.commands | bridgeExport.commands | bridgePasses.commands | bridgeEnvironment.commands | bridgeReview.commands | bridgeAuthoring.commands | bridgeWater.commands | bridgeHousing.commands
 
 
 def dispatch(command, arguments):
