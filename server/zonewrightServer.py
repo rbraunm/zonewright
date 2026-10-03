@@ -1362,8 +1362,9 @@ async def eraseSurface(context: Context, objectName: str, layer: str, selector: 
 @guardedTool(description=(
   "Edit a surfacing layer's painted area at its edges, within the selector, `steps` faces at a time: grow it outward, shrink it inward,"
   " or smooth it (each face takes the value most of itself and its neighbours hold, which absorbs islands and evens ragged edges); or"
-  " clean it, every island of a material and every hole in one smaller than `minimumArea` square units taken over by what surrounds"
-  " it, as an artist picks off stray specks." + selectorHelp))
+  " clean it, as an artist picks off the stray specks they see: every speck of a material and every hole in one smaller than"
+  " `minimumArea` square units, as the surface shows it with every layer, is taken over in this layer by the material it borders most,"
+  " where this layer or one beneath it decides what shows." + selectorHelp))
 async def editSurface(
   context: Context, objectName: str, layer: str, operation: str, steps: int = 1, selector: dict = allSelector, minimumArea: float | None = None,
 ):
@@ -1396,13 +1397,15 @@ async def cutContours(context: Context, objectName: str, levels: list[float], di
   " into `layer` and mapped so the texture's bottom edge lies on the border and its top `width` away, repeating along the border every"
   " worldUnitsPerRepeat units. For a texture that tiles across but not down, such as sand blending up into rock at a wall's foot. Only"
   " faces lying wholly within `width` are painted; those straddling it are counted (straddlingFaces): cut a contour at `width` first"
-  " (cutContours with distanceFrom) so the strip ends on a modeled edge." + selectorHelp))
+  " (cutContours with distanceFrom) so the strip ends on a modeled edge. With onlyAbove, only faces lying above the border are painted:"
+  " the foot of a wall, where rock rises from the ground, and not the lip of a ledge, where ground ends above rock falling away." + selectorHelp))
 async def paintTransition(
   context: Context, objectName: str, layer: str, material: str, selector: dict, toward: dict, width: float, worldUnitsPerRepeat: float,
+  onlyAbove: bool = False,
 ):
   return await callBridge(context, "paintTransition", {
     "objectName": objectName, "layer": layer, "material": material, "selector": selector, "toward": toward, "width": width,
-    "worldUnitsPerRepeat": worldUnitsPerRepeat,
+    "worldUnitsPerRepeat": worldUnitsPerRepeat, "onlyAbove": onlyAbove,
   })
 
 
@@ -1433,7 +1436,8 @@ async def clearRegion(context: Context, region: str, terrainObject: str, shaping
 @guardedTool()
 async def createMaterial(context: Context, name: str, diffuseTexture: str, normalTexture: str | None = None, cutout: bool = False, alphaThreshold: float = 0.5):
   """A Phase 1 material: diffuse texture, optional normal map, no shine; cutout makes the diffuse alpha a hard alpha test for foliage
-  cards. A texture is an absolute path or a catalog texture id (texture/<name>@<hash>), which uses the catalog's extracted file."""
+  cards. A texture is an absolute path or a catalog texture id (texture/<name>@<hash>), which uses the catalog's extracted file. The
+  material is kept in the file whether or not anything uses it yet."""
 
   def texturePath(texture):
     if texture is None or not texture.startswith("texture/"):

@@ -32,6 +32,8 @@ def createMaterial(name, diffuseTexture, normalTexture, cutout, alphaThreshold):
   diffuseImage = loadImage(diffuseTexture, "Non-Color")
   normalImage = loadImage(normalTexture, "Non-Color") if normalTexture is not None else None
   material = bpy.data.materials.new(name)
+  # A material made for later painting is kept when the file is saved, whether or not anything uses it yet.
+  material.use_fake_user = True
   material.use_nodes = True
   nodes = material.node_tree.nodes
   links = material.node_tree.links

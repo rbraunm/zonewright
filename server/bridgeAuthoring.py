@@ -132,15 +132,24 @@ def materialSlot(sceneObject, materialName):
   return slot
 
 
-def compose(sceneObject):
-  """Each face shows the topmost unmuted layer covering it, else the materials the faces had when the first layer was added."""
+def shownSurface(sceneObject):
+  """The material each face shows (the topmost unmuted layer covering it, else the material it had when the first layer was added)
+  and the position in the layer order of the layer that decides it, -1 for the base."""
   mesh = sceneObject.data
   materialIndices = readFaceInts(mesh, baseAttributeName)
-  for layer in layerOrder(sceneObject):
+  deciders = numpy.full(len(materialIndices), -1)
+  for position, layer in enumerate(layerOrder(sceneObject)):
     if not layer["muted"]:
       values = readFaceInts(mesh, layerAttributePrefix + layer["name"])
-      materialIndices = numpy.where(values != uncovered, values, materialIndices)
-  mesh.polygons.foreach_set("material_index", materialIndices)
+      covered = values != uncovered
+      materialIndices = numpy.where(covered, values, materialIndices)
+      deciders = numpy.where(covered, position, deciders)
+  return materialIndices, deciders
+
+
+def compose(sceneObject):
+  mesh = sceneObject.data
+  mesh.polygons.foreach_set("material_index", shownSurface(sceneObject)[0])
   mesh.update()
   return describeLayers(sceneObject)
 
@@ -303,9 +312,12 @@ def editSurface(objectName, layer, operation, steps, selector, minimumArea):
   before = values.copy()
   if operation == "clean":
     positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
-    values = cleanedValues(mesh, values, within, faceAreas(sceneObject, positions), minimumArea)
+    shown, deciders = shownSurface(sceneObject)
+    position = [entry["name"] for entry in layerOrder(sceneObject)].index(layer)
+    cleaned = cleanedValues(mesh, shown, within & (deciders <= position), faceAreas(sceneObject, positions), minimumArea)
+    values = numpy.where(cleaned != shown, cleaned, values)
     writeFaceInts(mesh, layerAttributePrefix + layer, values)
-    return {"changed": int((values != before).sum())} | compose(sceneObject)
+    return {"changed": int((cleaned != shown).sum())} | compose(sceneObject)
   for _ in range(steps):
     updated = values.copy()
     if operation == "grow":
@@ -502,8 +514,8 @@ def faceComponents(first, second, count):
 
 
 def cleanedValues(mesh, values, within, areas, minimumArea):
-  """Values with every piece of one value smaller than minimumArea (islands of a material, holes in it) lying inside the face mask
-  taken over by the value it shares the most edges with."""
+  """Values with every piece of one value smaller than minimumArea (a speck of a material, a hole in one) lying wholly inside the face
+  mask taken over by the value it shares the most edges with."""
   first, second = faceNeighbourPairs(mesh)
   values = values.copy()
   for _ in range(cleanRounds):
@@ -558,11 +570,12 @@ def borderChains(segments):
   return chains
 
 
-def paintTransition(objectName, layer, material, selector, toward, width, worldUnitsPerRepeat):
+def paintTransition(objectName, layer, material, selector, toward, width, worldUnitsPerRepeat, onlyAbove):
   """Paint the faces lying wholly within `width` of where the faces picked by `selector` meet those picked by `toward`, on the
   selector's side, and map them so the texture's bottom edge lies on that border and its top `width` away, repeating along the border
   every worldUnitsPerRepeat units: how a transition texture blends one ground into the next. Faces straddling `width` are left and
-  counted; cut a contour there first (cutContours with distanceFrom) so the strip ends on a modeled edge."""
+  counted; cut a contour there first (cutContours with distanceFrom) so the strip ends on a modeled edge. With onlyAbove, only faces
+  lying above the nearest point of the border are painted: a wall's foot, not the lip where ground ends above rock falling away."""
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   requireLayer(sceneObject, layer)
   if width <= 0 or worldUnitsPerRepeat <= 0:
@@ -598,8 +611,12 @@ def paintTransition(objectName, layer, material, selector, toward, width, worldU
   # A face between two stretches of border has every corner near one, yet its middle lies far from both: no strip runs across it.
   centered = numpy.zeros(len(loopTotals), dtype=bool)
   centers = faceCenters(sceneObject)
-  centered[near] = [border.nearest(centers[face])[0] <= reach for face in numpy.flatnonzero(near)]
-  strip = near & centered & (farthest <= reach)
+  above = numpy.ones(len(loopTotals), dtype=bool)
+  for face in numpy.flatnonzero(near):
+    distance, segment, along = border.nearest(centers[face])
+    centered[face] = distance <= reach
+    above[face] = centers[face][2] > (border.starts[segment] + along * border.spans[segment])[2]
+  strip = near & centered & (farthest <= reach) & (above | (not onlyAbove))
   straddling = near & ~strip
   stripLoops = numpy.flatnonzero(strip[loopFaces])
   stripVertices = loopVertices[stripLoops]

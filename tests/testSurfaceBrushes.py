@@ -14,7 +14,9 @@ if 'UVMap' in mesh.uv_layers:
   mesh.uv_layers['UVMap'].data.foreach_get('uv', uvs)
 loopVertices = numpy.empty(len(mesh.loops), dtype=numpy.int64)
 mesh.loops.foreach_get('vertex_index', loopVertices)
-result = {'values': values.tolist(), 'uvs': uvs.reshape(-1, 2).tolist(), 'loopVertices': loopVertices.tolist(),
+shown = numpy.empty(len(mesh.polygons), dtype=numpy.int32)
+mesh.polygons.foreach_get('material_index', shown)
+result = {'values': values.tolist(), 'shown': shown.tolist(), 'uvs': uvs.reshape(-1, 2).tolist(), 'loopVertices': loopVertices.tolist(),
   'faces': [list(polygon.vertices) for polygon in mesh.polygons], 'loopStarts': [polygon.loop_start for polygon in mesh.polygons]}
 """
 
@@ -102,31 +104,44 @@ def testConformSurfaceEdgesLeavesBordersOnCreasesAlone(stageBlenderServer, tmp_p
   assert conformed["movedVertices"] == 0 and conformed["changedFaces"] == 0
 
 
-def testEditSurfaceCleanTakesOverSmallPieces(stageBlenderServer, tmp_path):
+def testEditSurfaceCleanTakesOverTheSpecksThatShow(stageBlenderServer, tmp_path):
   async def steps(session):
     await freshScene(session)
     await twoMaterials(session, tmp_path)
     await stripedGround(session, "ground", 128, 8)
-    await session.expectSuccess("addSurfaceLayer", {"objectName": "ground", "name": "patch"})
+    for layer in ("floor", "patch", "top"):
+      await session.expectSuccess("addSurfaceLayer", {"objectName": "ground", "name": layer})
+    await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "floor", "material": "sand", "selector": {"all": True}})
+    await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "floor", "material": "stone", "selector": {"sphere": {"center": [-40, -40, 0], "radius": 7}}})
     await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "patch", "material": "stone", "selector": {"box": {"minimum": [-64, -64, -1], "maximum": [0, 64, 1]}}})
     await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "patch", "material": "sand", "selector": {"sphere": {"center": [-30, 0, 0], "radius": 7}}})
     await session.expectSuccess("eraseSurface", {"objectName": "ground", "layer": "patch", "selector": {"sphere": {"center": [-36, 36, 0], "radius": 7}}})
     await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "patch", "material": "stone", "selector": {"sphere": {"center": [36, -36, 0], "radius": 7}}})
-    dirty = (await session.expectSuccess("runPython", surface("ground", "patch")))["result"]
+    await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "top", "material": "stone", "selector": {"box": {"minimum": [16, 16, -1], "maximum": [64, 64, 1]}}})
+    await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "patch", "material": "sand", "selector": {"sphere": {"center": [36, 36, 0], "radius": 7}}})
     cleaned = await session.expectSuccess("editSurface", {"objectName": "ground", "layer": "patch", "operation": "clean", "minimumArea": 500})
-    clean = (await session.expectSuccess("runPython", surface("ground", "patch")))["result"]
+    floorBefore = (await session.expectSuccess("runPython", surface("ground", "floor")))["result"]
+    floorCleaned = await session.expectSuccess("editSurface", {"objectName": "ground", "layer": "floor", "operation": "clean", "minimumArea": 500})
+    patch = (await session.expectSuccess("runPython", surface("ground", "patch")))["result"]
+    floor = (await session.expectSuccess("runPython", surface("ground", "floor")))["result"]
+    vertices = (await session.expectSuccess("runPython", shaped("ground")))["result"]["vertices"]
     missing = await session.expectError("editSurface", {"objectName": "ground", "layer": "patch", "operation": "clean"})
     stray = await session.expectError("editSurface", {"objectName": "ground", "layer": "patch", "operation": "grow", "minimumArea": 10})
-    return dirty, cleaned, clean, missing, stray
+    return floorBefore, floorCleaned, cleaned, patch, floor, vertices, missing, stray
 
-  dirty, cleaned, clean, missing, stray = stageBlenderServer.session(steps)
-  # Material slots follow the order materials were first painted: stone, then sand.
-  stone, sand = 0, 1
-  assert set(dirty["values"]) == {stone, sand, -1}
-  # The stone half (256 of the 512 triangles) stays whole: the sand speck and the hole in it are stone again, and the stone speck on the
-  # uncovered half is gone.
-  assert set(clean["values"]) == {stone, -1} and clean["values"].count(stone) == 256
-  assert cleaned["changed"] == sum(1 for old, new in zip(dirty["values"], clean["values"]) if old != new) > 0
+  floorBefore, floorCleaned, cleaned, patch, floor, vertices, missing, stray = stageBlenderServer.session(steps)
+  sand, stone = 0, 1
+  centers = [[sum(vertices[index][axis] for index in face) / 3 for axis in range(2)] for face in patch["faces"]]
+  # What shows afterwards: stone over the left half and the top layer's corner, sand everywhere else. The sand speck and the hole in
+  # the patch's stone half are stone again, and the patch's stone speck on the sand half is sand.
+  expected = [stone if x < 0 or (x > 16 and y > 16) else sand for x, y in centers]
+  assert patch["shown"] == expected
+  # The patch's sand under the top layer's stone does not show, so it stays; the hole is filled in the patch.
+  assert any(value == sand for value, (x, y) in zip(patch["values"], centers) if x > 16 and y > 16)
+  assert all(value == stone for value, (x, _) in zip(patch["values"], centers) if x < 0)
+  # The floor's stone speck lies under the patch's stone, so cleaning the floor changes nothing that shows and leaves it.
+  assert floorCleaned["changed"] == 0 and floor["values"] == floorBefore["values"]
+  assert cleaned["changed"] > 0
   assert "clean needs a minimumArea" in missing and "only clean takes one" in stray
 
 
@@ -205,3 +220,45 @@ def testMeasureSnapsOntoRenderedGroundThroughRegions(stageBlenderServer):
 
   measured = stageBlenderServer.session(steps)
   assert measured["points"] == [[0.0, 0.0, 5.0]]
+
+
+def testPaintTransitionOnlyAboveSkipsLedgeLips(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await freshScene(session)
+    await twoMaterials(session, tmp_path)
+    await stripedGround(session, "ground", 256, 8)
+    await session.expectSuccess("sculptOutline", {"objectName": "ground", "mode": "fill", "outline": [[-40, -200], [40, -200], [40, 200], [-40, 200]], "base": 0, "profile": [[-24, 0], [0, 60], [10, 60]], "conformBreaks": False})
+    await session.expectSuccess("addSurfaceLayer", {"objectName": "ground", "name": "ground"})
+    await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "ground", "material": "sand", "selector": {"all": True}})
+    await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "ground", "material": "stone", "selector": {"slope": {"minimumDegrees": 40, "maximumDegrees": 180}}})
+    await session.expectSuccess("cutContours", {"objectName": "ground", "levels": [12], "distanceFrom": {"material": "sand"}, "selector": {"material": "stone"}})
+    await session.expectSuccess("addSurfaceLayer", {"objectName": "ground", "name": "blend"})
+    both = await session.expectSuccess("paintTransition", {"objectName": "ground", "layer": "blend", "material": "sand", "selector": {"material": "stone"}, "toward": {"material": "sand"}, "width": 12, "worldUnitsPerRepeat": 32})
+    bothSurface = (await session.expectSuccess("runPython", surface("ground", "blend")))["result"]
+    await session.expectSuccess("eraseSurface", {"objectName": "ground", "layer": "blend", "selector": {"all": True}})
+    foot = await session.expectSuccess("paintTransition", {"objectName": "ground", "layer": "blend", "material": "sand", "selector": {"material": "stone"}, "toward": {"material": "sand"}, "width": 12, "worldUnitsPerRepeat": 32, "onlyAbove": True})
+    footSurface = (await session.expectSuccess("runPython", surface("ground", "blend")))["result"]
+    shape = (await session.expectSuccess("runPython", shaped("ground")))["result"]
+    return both, bothSurface, foot, footSurface, shape
+
+  both, bothSurface, foot, footSurface, shape = stageBlenderServer.session(steps)
+
+  def paintedHeights(surfaceResult):
+    return [sum(shape["vertices"][index][2] for index in face) / 3 for face, value in zip(surfaceResult["faces"], surfaceResult["values"]) if value != -1]
+
+  # The mesa's walls meet sand at their foot (z 0) and at their top (z 60). Without onlyAbove the strip runs along both; with it,
+  # only up from the foot.
+  assert any(z > 40 for z in paintedHeights(bothSurface)) and any(z < 20 for z in paintedHeights(bothSurface))
+  assert foot["painted"] > 0 and all(z < 20 for z in paintedHeights(footSurface)) and foot["painted"] < both["painted"]
+
+
+def testCreatedMaterialsSurviveSavingUnused(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await freshScene(session)
+    await twoMaterials(session, tmp_path)
+    await session.expectSuccess("saveFile", {"path": str(tmp_path / "unused.blend")})
+    await session.expectSuccess("openFile", {"path": str(tmp_path / "unused.blend")})
+    return await session.expectSuccess("getSceneSummary", {})
+
+  summary = stageBlenderServer.session(steps)
+  assert {"sand", "stone"} <= {material["name"] for material in summary["materials"]}

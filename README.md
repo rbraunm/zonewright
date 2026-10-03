@@ -87,9 +87,9 @@ Edits address parts of a mesh with selectors instead of an interactive selection
 | Surfacing | `addSurfaceLayer` / `setSurfaceLayer` / `removeSurfaceLayer` | Named, ordered surfacing layers on a mesh; each face shows the topmost unmuted layer covering it |
 | | `paintSurface` / `eraseSurface` | Paint or erase a material in a layer by region, stroke, or point, with optional noise on the painted edge |
 | | `conformSurfaceEdges` | Brings a layer's edges onto the mesh's own edges along a smooth line: vertices slide along their edges onto the evened border in every shaping pass, carrying UVs, so borders run on modeled edges without saw teeth or one-face islands |
-| | `paintTransition` | Paints a transition texture as a strip along where two grounds meet, mapped so the texture's bottom edge lies on the border and it repeats along it; faces straddling the strip's width are counted |
+| | `paintTransition` | Paints a transition texture as a strip along where two grounds meet, mapped so the texture's bottom edge lies on the border and it repeats along it; optionally only above the border (a wall's foot, not a ledge's lip); faces straddling the strip's width are counted |
 | | `cutContours` | Cuts faces along lines of equal height, or of equal distance from a material's border, as an edge loop is added: each crossed edge and face splits in every shaping pass with UVs and paint carried, so bands, strata, and strips end on modeled edges |
-| | `editSurface` | Grow, shrink, or smooth a layer's painted area at its edges, or clean out islands and holes below an area |
+| | `editSurface` | Grow, shrink, or smooth a layer's painted area at its edges, or clean it: specks and holes below an area, as every layer together shows them, taken over by what surrounds them |
 | Reworking | `resetRegion` / `rebuildRegion` / `clearRegion` | Take shaping passes back in an area; span it from its surroundings or level it; or clear a region's shaping, surfacing, and placed objects at once |
 | Surfacing | `createMaterial` | Diffuse texture, optional normal map, no shine; optional alpha-tested cutout; textures by path or by asset catalog id |
 | | `assignMaterial` | Material on selected faces |
