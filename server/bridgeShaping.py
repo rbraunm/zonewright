@@ -9,6 +9,7 @@ import mathutils.noise
 import numpy
 
 import bridgeMeshAccess
+import bridgeNoise
 import bridgePasses
 
 falloffCurves = ("constant", "linear", "smooth", "sharp")
@@ -18,10 +19,6 @@ fractionModes = ("smooth", "flatten", "carve", "fill")
 profileModes = ("carve", "fill")
 booleanOperations = ("DIFFERENCE", "UNION", "INTERSECT")
 creasePinch = 0.25
-noiseBasis = "PERLIN_ORIGINAL"
-# The standard deviation of a PERLIN_ORIGINAL sample, and of each component of its noise vector, measured over 20000 random points;
-# dividing by it makes an amplitude the typical move.
-noiseSpread = 0.278
 maximumOctaves = 8
 roughenDirections = ("normal", "up")
 # horizontal keeps heights and moves every height at a spot alike, so a wall bends without shearing; surface moves along the surface;
@@ -36,6 +33,10 @@ diagonalStretch = 1.5
 # turned away.
 diagonalSliverShare = 0.05
 diagonalSweeps = 4
+# A vertex this close to a level already lies on it, and a cut runs through it.
+contourTolerance = 1e-6
+# Halvings that place a cut on a distance level along its edge: 2 to the -20th of the edge.
+contourBisections = 20
 # Two neighbors on either side of one break both snap onto it unless they would land closer than this share of an edge apart along
 # it (where a warp squeezed the grid); then only the nearer snaps, as both would fold the faces between them. A rim slide that would
 # land this close to a neighbor (one snapped onto a break lying on the rim) is not made either.
@@ -606,6 +607,74 @@ def followContours(objectName, selector):
   return triangulateAlongContours(sceneObject, positions, mask) | bridgeMeshAccess.meshCounts(sceneObject)
 
 
+def cutContours(objectName, levels, distanceFrom, selector):
+  """Cut the selected faces along level lines, as an artist adds an edge loop: lines of equal height, or with distanceFrom, of equal
+  distance from the border of the faces it picks. Each crossed edge splits where the line crosses it (the new vertex placed alike in
+  every shaping pass, with UVs and face paint carried over) and each crossed face splits along the line."""
+  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  if not levels or len(set(levels)) != len(levels):
+    raise ValueError(f"levels is a list of different values, got {levels!r}")
+  within = bridgeMeshAccess.evaluateSelector(selector, sceneObject, "faces")
+  bridgeMeshAccess.requireSelection(within, selector, sceneObject, "faces")
+  positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
+  tree = None
+  if distanceFrom is None:
+    values = positions[:, 2].tolist()
+  else:
+    if min(levels) <= 0:
+      raise ValueError(f"Distances from a border are positive, got {levels!r}")
+    picked = bridgeMeshAccess.evaluateSelector(distanceFrom, sceneObject, "faces")
+    bridgeMeshAccess.requireSelection(picked, distanceFrom, sceneObject, "faces")
+    border = bridgeMeshAccess.faceBorderEdges(sceneObject, picked, ~picked)
+    if not len(border):
+      raise ValueError(f"The faces {distanceFrom!r} picks have no border on '{objectName}'")
+    edges = bridgeMeshAccess.meshEdges(sceneObject.data)
+    tree = bridgeMeshAccess.BorderDistance(positions[edges[border, 0]], positions[edges[border, 1]])
+    loopTotals, loopVertices = bridgeMeshAccess.faceLoops(sceneObject)
+    measured = numpy.unique(loopVertices[numpy.repeat(within, loopTotals)])
+    values = [math.inf] * len(positions)
+    for vertex in measured:
+      values[vertex] = tree.nearest(positions[vertex])[0]
+  points = list(positions)
+  meshEditor = bridgeMeshAccess.loadBMesh(sceneObject)
+  cutting = {meshEditor.faces[index] for index in numpy.flatnonzero(within)}
+  splitEdges = splitFaces = 0
+  for level in sorted(levels):
+    onLevel = set()
+    for edge in sorted({edge for face in cutting for edge in face.edges}, key=lambda edge: edge.index):
+      start, end = edge.verts
+      below, above = values[start.index] - level, values[end.index] - level
+      if below * above < 0:
+        fraction = below / (below - above)
+        if tree is not None:
+          # Distance from a border does not change evenly along an edge; find where it reaches the level.
+          low, high = 0.0, 1.0
+          for _ in range(contourBisections):
+            middle = (low + high) / 2
+            distance = tree.nearest(points[start.index] + middle * (points[end.index] - points[start.index]))[0]
+            low, high = (middle, high) if (distance - level) * below > 0 else (low, middle)
+          fraction = (low + high) / 2
+        _, vertex = bmesh.utils.edge_split(edge, start, fraction)
+        vertex.index = len(values)
+        values.append(level)
+        points.append(points[start.index] + fraction * (points[end.index] - points[start.index]))
+        onLevel.add(vertex)
+        splitEdges += 1
+    for face in list(cutting):
+      corners = [vertex for vertex in face.verts if vertex in onLevel or abs(values[vertex.index] - level) <= contourTolerance]
+      if len(corners) == 2 and not any(edge in face.edges for edge in corners[0].link_edges if corners[1] in edge.verts):
+        newFace, _ = bmesh.utils.face_split(face, corners[0], corners[1])
+        cutting.add(newFace)
+        splitFaces += 1
+    meshEditor.edges.index_update()
+  polygons = [face for face in cutting if face.is_valid and len(face.verts) > 3]
+  bmesh.ops.triangulate(meshEditor, faces=polygons, quad_method="BEAUTY", ngon_method="BEAUTY")
+  meshEditor.to_mesh(sceneObject.data)
+  meshEditor.free()
+  sceneObject.data.update()
+  return {"splitEdges": splitEdges, "splitFaces": splitFaces} | bridgeMeshAccess.meshCounts(sceneObject)
+
+
 def maskWeights(sceneObject, selector, fadeDistance, positions):
   """1 inside the selection and 0 outside; with fadeDistance, rising smoothly from the selection's edge over that distance, so a
   masked change leaves no step at the edge."""
@@ -627,25 +696,6 @@ def maskWeights(sceneObject, selector, fadeDistance, positions):
   return weights
 
 
-def noiseSamplePoints(positions, featureSize, seed):
-  if featureSize <= 0:
-    raise ValueError(f"featureSize must be positive, got {featureSize}")
-  return positions / featureSize + numpy.random.default_rng(seed).uniform(-1000, 1000, 3)
-
-
-def fractalNoise(points, octaves, roughness):
-  """Perlin noise summed over octaves, each twice the frequency of the last and `roughness` times its amplitude, scaled to a standard
-  deviation of 1. The octaves are nearly independent, so their spreads add in quadrature."""
-  total = numpy.zeros(len(points))
-  amplitude, frequency, squareSum = 1.0, 1.0, 0.0
-  for _ in range(octaves):
-    total += amplitude * numpy.array([mathutils.noise.noise(mathutils.Vector(point * frequency), noise_basis=noiseBasis) for point in points])
-    squareSum += amplitude * amplitude
-    amplitude *= roughness
-    frequency *= 2
-  return total / (noiseSpread * math.sqrt(squareSum))
-
-
 def moveSummary(sceneObject, positions, updated):
   moved = numpy.linalg.norm(updated - positions, axis=1)
   return {
@@ -663,7 +713,7 @@ def roughen(objectName, featureSize, amplitude, octaves, roughness, seed, direct
     raise ValueError(f"direction must be one of {list(roughenDirections)}, got '{direction}'")
   positions, normals = bridgeMeshAccess.readVertexArrays(sceneObject)
   weights = maskWeights(sceneObject, selector, fadeDistance, positions)
-  values = fractalNoise(noiseSamplePoints(positions, featureSize, seed), octaves, roughness)
+  values = bridgeNoise.fractalNoise(bridgeNoise.noiseSamplePoints(positions, featureSize, seed), octaves, roughness)
   pushDirections = normals if direction == "normal" else numpy.broadcast_to((0.0, 0.0, 1.0), normals.shape)
   updated = positions + (amplitude * values * weights)[:, None] * pushDirections
   writeWorldPositions(sceneObject, updated)
@@ -681,12 +731,12 @@ def warp(objectName, featureSize, amplitude, seed, plane, selector, fadeDistance
   samplePositions = positions.copy()
   if plane == "horizontal":
     samplePositions[:, 2] = 0
-  vectors = numpy.array([list(mathutils.noise.noise_vector(mathutils.Vector(point), noise_basis=noiseBasis)) for point in noiseSamplePoints(samplePositions, featureSize, seed)])
+  vectors = numpy.array([list(mathutils.noise.noise_vector(mathutils.Vector(point), noise_basis=bridgeNoise.noiseBasis)) for point in bridgeNoise.noiseSamplePoints(samplePositions, featureSize, seed)])
   if plane == "horizontal":
     vectors[:, 2] = 0
   elif plane == "surface":
     vectors -= (vectors * normals).sum(1)[:, None] * normals
-  vectors /= noiseSpread * math.sqrt(3 if plane == "full" else 2)
+  vectors /= bridgeNoise.noiseSpread * math.sqrt(3 if plane == "full" else 2)
   updated = positions + amplitude * weights[:, None] * vectors
   writeWorldPositions(sceneObject, updated)
   return moveSummary(sceneObject, positions, updated)
@@ -707,6 +757,7 @@ commands = {
   "decimate": (decimate, True),
   "cleanupMesh": (cleanupMesh, True),
   "followContours": (followContours, True),
+  "cutContours": (cutContours, True),
   "roughen": (roughen, True),
   "warp": (warp, True),
 }

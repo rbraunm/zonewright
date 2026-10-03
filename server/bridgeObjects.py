@@ -432,9 +432,10 @@ def measure(points, snapToSurface):
   if not points:
     raise ValueError("measure needs at least one point")
   measured = []
+  rendered = [sceneObject.name for sceneObject in bpy.context.scene.objects if sceneObject.type == "MESH" and not sceneObject.hide_render]
   for point in points:
     if snapToSurface:
-      hit = bridgeMeshAccess.rayCast(point, (0, 0, -1), measureCastDistance)
+      hit = bridgeMeshAccess.rayCast(point, (0, 0, -1), measureCastDistance, rendered)
       if hit is None:
         raise ValueError(f"No surface below {point}")
       measured.append(hit[0])

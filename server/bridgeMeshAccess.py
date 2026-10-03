@@ -1,13 +1,22 @@
 """World-space mesh access and selectors: which vertices, edges, or faces of a mesh an operation touches. Runs under Blender's Python."""
 import contextlib
 import math
+import statistics
 
 import bmesh
 import bpy
 import mathutils
+import mathutils.kdtree
 import numpy
 
-selectorKeys = ("all", "sphere", "box", "cylinder", "facing", "slope", "height", "nearPath", "material", "vertexGroup", "insideObject", "region", "and", "or", "not")
+import bridgeNoise
+
+selectorKeys = ("all", "sphere", "box", "cylinder", "facing", "slope", "height", "nearPath", "material", "vertexGroup", "insideObject", "region", "noise", "and", "or", "not")
+selectorFields = {
+  "sphere": ("center", "radius"), "box": ("minimum", "maximum"), "cylinder": ("center", "radius", "bottom", "top"),
+  "facing": ("direction", "withinDegrees"), "slope": ("minimumDegrees", "maximumDegrees"), "height": ("minimum", "maximum"),
+  "nearPath": ("path", "radius"), "noise": ("featureSize", "share", "seed"),
+}
 # A region is a vertical prism over an outline: an area of the zone chosen for what it is to become, its intent kept in this property.
 regionIntentProperty = "zonewrightRegionIntent"
 # A mesh surfaced by layers keeps their order in this property; its face materials are composed from them.
@@ -237,6 +246,8 @@ def evaluateSelector(selector, sceneObject, elementKind):
   if not isinstance(selector, dict) or len(selector) != 1 or next(iter(selector)) not in selectorKeys:
     raise ValueError(f"A selector is one of {list(selectorKeys)} as a single-key object, got {selector!r}")
   key, value = next(iter(selector.items()))
+  if key in selectorFields and (not isinstance(value, dict) or set(value) != set(selectorFields[key])):
+    raise ValueError(f"The {key} selector is {{\"{key}\": {{{', '.join(selectorFields[key])}}}}}, got {selector!r}")
   if elementKind == "vertices":
     positions, normals = readVertexArrays(sceneObject)
   else:
@@ -277,6 +288,12 @@ def evaluateSelector(selector, sceneObject, elementKind):
     return insideMask(requireMeshObject(value), positions)
   if key == "region":
     return insideRegion(requireRegion(value), positions)
+  if key == "noise":
+    if not 0 < value["share"] < 1:
+      raise ValueError(f"The noise selector's share is a fraction between 0 and 1, got {value['share']}")
+    # The noise is close to normally distributed with a spread of 1, so this threshold keeps about `share` of the surface.
+    threshold = statistics.NormalDist().inv_cdf(1 - value["share"])
+    return bridgeNoise.fractalNoise(bridgeNoise.noiseSamplePoints(positions, value["featureSize"], value["seed"]), 2, 0.5) > threshold
   if key == "vertexGroup":
     groupMask = vertexGroupMask(sceneObject, value)
     if elementKind == "vertices":
@@ -288,6 +305,53 @@ def evaluateSelector(selector, sceneObject, elementKind):
     masks = [evaluateSelector(part, sceneObject, elementKind) for part in value]
     return numpy.logical_and.reduce(masks) if key == "and" else numpy.logical_or.reduce(masks)
   return ~evaluateSelector(value, sceneObject, elementKind)
+
+
+def meshEdges(mesh):
+  edges = numpy.empty(len(mesh.edges) * 2, dtype=numpy.int64)
+  mesh.edges.foreach_get("vertices", edges)
+  return edges.reshape(-1, 2)
+
+
+def faceBorderEdges(sceneObject, side, other):
+  """The mesh edges where a face of one face mask meets a face of the other."""
+  mesh = sceneObject.data
+  loopEdges = numpy.empty(len(mesh.loops), dtype=numpy.int64)
+  mesh.loops.foreach_get("edge_index", loopEdges)
+  loopTotals, _ = faceLoops(sceneObject)
+  loopFaces = numpy.repeat(numpy.arange(len(loopTotals)), loopTotals)
+  edgeSide = numpy.bincount(loopEdges, weights=side[loopFaces], minlength=len(mesh.edges))
+  edgeOther = numpy.bincount(loopEdges, weights=other[loopFaces], minlength=len(mesh.edges))
+  return numpy.flatnonzero((edgeSide > 0) & (edgeOther > 0))
+
+
+class BorderDistance:
+  """Exact distances from points to a border made of segments between mesh positions: samples along the segments in a KD tree find
+  the segments near a point, and the nearest of those gives the distance, the segment, and how far along it."""
+
+  def __init__(self, starts, ends):
+    self.starts, self.spans = starts, ends - starts
+    lengths = numpy.linalg.norm(self.spans, axis=1)
+    self.step = max(float(numpy.median(lengths)) / 4, 1e-6)
+    counts = numpy.maximum(numpy.ceil(lengths / self.step).astype(numpy.int64), 1)
+    self.owners = numpy.repeat(numpy.arange(len(starts)), counts + 1)
+    fractions = numpy.concatenate([numpy.arange(count + 1) / count for count in counts])
+    samples = starts[self.owners] + fractions[:, None] * self.spans[self.owners]
+    self.reach = float((lengths / counts).max()) / 2
+    self.tree = mathutils.kdtree.KDTree(len(samples))
+    for index, sample in enumerate(samples):
+      self.tree.insert(sample, index)
+    self.tree.balance()
+
+  def nearest(self, point):
+    """The distance from a point to the border, the nearest segment, and the fraction along it of the nearest point on it."""
+    _, _, sampled = self.tree.find(point)
+    segments = numpy.unique(self.owners[[index for _, index, _ in self.tree.find_range(point, sampled + self.reach)]])
+    spans = self.spans[segments]
+    fractions = numpy.clip(((point - self.starts[segments]) * spans).sum(axis=1) / numpy.maximum((spans * spans).sum(axis=1), 1e-12), 0, 1)
+    distances = numpy.linalg.norm(self.starts[segments] + fractions[:, None] * spans - point, axis=1)
+    best = int(distances.argmin())
+    return float(distances[best]), int(segments[best]), float(fractions[best])
 
 
 def requireSelection(mask, selector, sceneObject, elementKind):

@@ -59,7 +59,7 @@ Nothing runs stale code. Every tool checks the server's own loaded source files 
 
 ### Artist toolkit
 
-Edits address parts of a mesh with selectors instead of an interactive selection: `{"all": true}`, `{"sphere": {center, radius}}`, `{"box": {minimum, maximum}}`, `{"cylinder": {center: [x, y], radius, bottom, top}}`, `{"facing": {direction, withinDegrees}}`, `{"slope": {minimumDegrees, maximumDegrees}}` (0 flat, 90 vertical, over 90 overhanging), `{"height": {minimum, maximum}}`, `{"nearPath": {path, radius}}`, `{"material": name}`, `{"vertexGroup": name}`, `{"insideObject": closedMeshName}`, and `{"and": [...]}`, `{"or": [...]}`, `{"not": selector}`. Shapes test vertex positions in world units, or face centers for face operations. A selector that matches nothing is an error.
+Edits address parts of a mesh with selectors instead of an interactive selection: `{"all": true}`, `{"sphere": {center, radius}}`, `{"box": {minimum, maximum}}`, `{"cylinder": {center: [x, y], radius, bottom, top}}`, `{"facing": {direction, withinDegrees}}`, `{"slope": {minimumDegrees, maximumDegrees}}` (0 flat, 90 vertical, over 90 overhanging), `{"height": {minimum, maximum}}`, `{"nearPath": {path, radius}}`, `{"material": name}`, `{"vertexGroup": name}`, `{"insideObject": closedMeshName}`, `{"region": regionName}`, `{"noise": {featureSize, share, seed}}` (patches of smooth noise covering about `share` of the surface, for breaking up one material with another), and `{"and": [...]}`, `{"or": [...]}`, `{"not": selector}`. Shapes test vertex positions in world units, or face centers for face operations. A selector that matches nothing is an error.
 
 | Activity | Tool | Does |
 |---|---|---|
@@ -86,7 +86,10 @@ Edits address parts of a mesh with selectors instead of an interactive selection
 | Planning | `createRegion` / `editRegion` / `getRegions` | Regions: vertical prisms over an outline marking what an area is to become, with its written intent; never rendered or exported; the `region` selector confines any tool to one |
 | Surfacing | `addSurfaceLayer` / `setSurfaceLayer` / `removeSurfaceLayer` | Named, ordered surfacing layers on a mesh; each face shows the topmost unmuted layer covering it |
 | | `paintSurface` / `eraseSurface` | Paint or erase a material in a layer by region, stroke, or point, with optional noise on the painted edge |
-| | `editSurface` | Grow, shrink, or smooth a layer's painted area at its edges |
+| | `conformSurfaceEdges` | Brings a layer's edges onto the mesh's own edges along a smooth line: vertices slide along their edges onto the evened border in every shaping pass, carrying UVs, so borders run on modeled edges without saw teeth or one-face islands |
+| | `paintTransition` | Paints a transition texture as a strip along where two grounds meet, mapped so the texture's bottom edge lies on the border and it repeats along it; faces straddling the strip's width are counted |
+| | `cutContours` | Cuts faces along lines of equal height, or of equal distance from a material's border, as an edge loop is added: each crossed edge and face splits in every shaping pass with UVs and paint carried, so bands, strata, and strips end on modeled edges |
+| | `editSurface` | Grow, shrink, or smooth a layer's painted area at its edges, or clean out islands and holes below an area |
 | Reworking | `resetRegion` / `rebuildRegion` / `clearRegion` | Take shaping passes back in an area; span it from its surroundings or level it; or clear a region's shaping, surfacing, and placed objects at once |
 | Surfacing | `createMaterial` | Diffuse texture, optional normal map, no shine; optional alpha-tested cutout; textures by path or by asset catalog id |
 | | `assignMaterial` | Material on selected faces |
