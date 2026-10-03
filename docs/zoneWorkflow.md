@@ -4,6 +4,8 @@ How a zone is built with zonewright, and what the tools need to support it. A zo
 
 ## Principles
 
+- **Intent before tools, region by region.** Each area of a zone is planned for what it is to become, from the concept and references, and kept as a region with its intent. Shaping, surfacing, and dressing are then done region by region at any scale. Masks, noise, scatter, and recipes are brushes and helpers inside an area that was chosen; a single rule applied across the whole zone reads as generated.
+- **Steer by the EQ worlds.** How the client's own zones are built is measured (the zone survey's `construction` group) and the zone in progress is compared with them after each pass (`compareWithClientZones`), so judgment rests on EQ's practice rather than on taste alone.
 - **Coarse to fine.** Each pass works at its own scale and resolution: big forms on a coarse grid, then refinement, then breakup and detail. Nothing is detailed before its position and shape are settled, because detail on something that moves is wasted.
 - **Look after every pass.** A pass is judged from where players stand (eye-height views along the routes) and from above (layout), against the reference and against EQ scale (a 6-unit character, walkable slopes, run distances). The judgment decides the next pass, which may be a correction, a reduction, or a removal.
 - **Passes stay adjustable.** A terrain pass can be turned up, turned down, or removed after later passes are made, so a bad pass costs one change, not a rebuild. Arrangements keep their transforms as data and can be regenerated or re-settled after the ground under them changes.
@@ -14,10 +16,10 @@ How a zone is built with zonewright, and what the tools need to support it. A zo
 
 | Pass | Purpose | Works on |
 |---|---|---|
-| 1. Layout | The playable space at gameplay scale: size, routes, landmarks, zone lines, sightlines. Fast and disposable. | A coarse terrain grid (about 32 units), route paths, proxy blocks for landmarks and buildings |
+| 1. Layout | The playable space at gameplay scale: size, routes, landmarks, zone lines, sightlines; then the regions, each with its intent. Fast and disposable. | A coarse terrain grid (about 32 units), route paths, proxy blocks for landmarks and buildings, regions |
 | 2. Primary forms | Hills, valleys, ridges, cliffs, basins, and the routes graded into them; proxies replaced by building masses | Terrain at its working resolution (8 to 16 units), large brushes |
 | 3. Secondary forms | Breaking regularity: no perfect cones or circles, uneven ridgelines, gullies down slopes, ledges, rock outcrops | Warp and medium-scale noise in their own passes; outcrops placed and sunk |
-| 4. Surfacing | Materials by region, slope, height, and route; transitions between them; texture scale kept even | Material assignment by masks, UV projection |
+| 4. Surfacing | Materials painted by intent, region by region: each region's ground, strata, paths, accents; edges shaped deliberately; transitions between them; texture scale kept even | Surfacing layers painted by region and stroke, edge edits, UV projection |
 | 5. Dressing | Props and clusters that make places: explicit sets placed by hand and generated sets (rows, rings, scatter) with varied scale, heading, and tilt | Linked copies of models and kit assets, settled on the ground |
 | 6. Detail | Fine breakup on terrain away from routes; small props and debris | Fine noise passes masked by slope and distance from routes |
 | 7. Review | Problems (floating or buried props, unwalkable route slopes, texture stretch), budgets, export round trip | Checks and views |
@@ -26,6 +28,22 @@ Any pass can send the work back to an earlier one.
 
 ## What the tools need
 
+### Regions
+
+A region is a vertical prism over an outline with its intent written on it (`createRegion`): "north guild terrace: packed earth, dwellings carved into the back wall". Regions are seen in Blender and never rendered or exported. The `{"region": name}` selector confines every tool to one, so shaping, surfacing, and dressing happen inside a decided area.
+
+### Surfacing layers
+
+A terrain's face materials are composed from named, ordered layers (`addSurfaceLayer`): each face shows the topmost unmuted layer covering it, else the materials it had before layering. A layer is painted by region, along a stroke, or at a point (`paintSurface`), with noise on its edge so it wanders as a painted edge does; its edges are grown, shrunk, or smoothed (`editSurface`); it is erased, muted, reordered, or removed to take a decision back. This matches how most of the client's EQG terrains are surfaced: per-face materials in clean regions whose borders follow modeled edges.
+
+### Taking an area back
+
+`resetRegion` takes shaping passes back inside an area, faded at its edge; `rebuildRegion` spans the area's heights smoothly from the ground around it (a blank slate that already fits) or levels it; `clearRegion` does both kinds at once along with erasing its surfacing and deleting the objects placed in it. Every EQG zone has one terrain mesh, so areas are reworked inside it rather than split into separate meshes.
+
+### Measured against the client
+
+The zone survey's `construction` group measures every client zone: terrain triangle density, textures on the terrain, the share of terrain triangles in one- or two-triangle material islands, steep share, steep area on terrain rather than placed models, painted share, and placements. `compareWithClientZones` measures the open scene the same way and places each measure among chosen client zones by percentile. The `author-zone` skill lists the EQG distributions.
+
 ### Terrain passes
 
 Each shaping operation writes into a named pass on the terrain (a Blender shape key over the terrain's base shape). Passes are listed, and each can be set to any strength, muted, removed, or collapsed into the base. Export draws the terrain as the passes combine. A change of resolution (subdividing) collapses the passes first, since a pass holds one offset per vertex.
@@ -33,7 +51,7 @@ Each shaping operation writes into a named pass on the terrain (a Blender shape 
 - **Rough:** large forms from a few inputs: a mound or basin at a point, a ridge or valley along a path with a cross-section profile, a plateau.
 - **Refine:** the point and path brushes (raise, lower, smooth, flatten, crease, carve), and grading a route so it reads as a path.
 - **Breakup:** warp (moving vertices sideways by smooth noise, so round shapes stop being round) and roughen (fractal noise up and down, by feature size, amplitude, and octaves), each in its own pass and limited by a mask.
-- **Masks** shared by every terrain and surfacing tool: slope range, height range, distance from a route, and the existing selectors.
+- **Masks** shared by every terrain and surfacing tool: slope range, height range, distance from a route, regions, and the existing selectors; they pick within an area chosen by intent.
 
 The usual sequence for natural ground: rough forms, look, warp, look, medium roughen, look, smooth where it went too far, carve routes and channels, fine roughen masked off the routes, look. Any pass that does not help is turned down or removed.
 
@@ -61,7 +79,7 @@ A pass holds one offset per vertex, so refining and cutting, which change the ve
 
 ### Surfacing and lighting from the catalog
 
-Textures, light styles, and particle emitters come from the asset catalog ([assetCatalog.md](assetCatalog.md)): surveyed from client zones, looked at on contact sheets, and described once in a shared vocabulary, so a need ("red layered rock for steep faces") finds them and each use starts from how the client's own zones used them. EQ terrain zones' ecosystems are recipes for the surfacing pass: which texture goes on which slopes and heights, at what repeat.
+Textures, light styles, and particle emitters come from the asset catalog ([assetCatalog.md](assetCatalog.md)): surveyed from client zones, looked at on contact sheets, and described once in a shared vocabulary, so a need ("red layered rock for steep faces") finds them and each use starts from how the client's own zones used them. EQ terrain zones' ecosystems are recipes for the surfacing pass: which texture goes on which slopes and heights, at what repeat. Their artists painted which ecosystem covers which area, and the rules apply only inside it.
 
 ### Later
 

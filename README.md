@@ -79,6 +79,11 @@ Edits address parts of a mesh with selectors instead of an interactive selection
 | | `roughen` | Fractal noise of a chosen feature size and amplitude (the typical move) along each vertex's normal (sideways on walls) or straight up; seeded, masked, faded; used coarse first, then finer, each in its own pass |
 | Iterating | `addShapingPass` / `setShapingPass` | Shaping goes into a named pass on the mesh (a shape key) that can be turned up or down (-1 to 2), muted, or made active later, so one step is revised without redoing the others; export writes the passes combined |
 | | `removeShapingPass` / `collapseShapingPasses` | Take a pass out, or fold the passes into the base so faces can change again (tools that change faces refuse while passes exist) |
+| Planning | `createRegion` / `editRegion` / `getRegions` | Regions: vertical prisms over an outline marking what an area is to become, with its written intent; never rendered or exported; the `region` selector confines any tool to one |
+| Surfacing | `addSurfaceLayer` / `setSurfaceLayer` / `removeSurfaceLayer` | Named, ordered surfacing layers on a mesh; each face shows the topmost unmuted layer covering it |
+| | `paintSurface` / `eraseSurface` | Paint or erase a material in a layer by region, stroke, or point, with optional noise on the painted edge |
+| | `editSurface` | Grow, shrink, or smooth a layer's painted area at its edges |
+| Reworking | `resetRegion` / `rebuildRegion` / `clearRegion` | Take shaping passes back in an area; span it from its surroundings or level it; or clear a region's shaping, surfacing, and placed objects at once |
 | Surfacing | `createMaterial` | Diffuse texture, optional normal map, no shine; optional alpha-tested cutout; textures by path or by asset catalog id |
 | | `assignMaterial` | Material on selected faces |
 | | `projectUVs` | Planar or box projection at a set number of world units per texture repeat |

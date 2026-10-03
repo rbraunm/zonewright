@@ -42,7 +42,17 @@ serverDirectory = Path(__file__).resolve().parent
 
 server = MCPServer(
   "zonewright",
-  instructions="Hands and eyes in a headless Blender for building EverQuest zones, plus the pinned tooling and a survey of the client's zones.",
+  instructions=(
+    "Hands and eyes in a headless Blender for building EverQuest zones, plus the pinned tooling, a survey of the client's zones, and a"
+    " catalog of its graphical assets.\n\nBuild zones as a 3D environment artist does, not as a generator. Plan by intent: divide the"
+    " zone into regions (createRegion) from the concept and give each its own intent before shaping or surfacing it, and work region by"
+    " region at any scale. Decide by hand: masks (slope, height, near a path) and generators (warp, roughen, scatter) are helpers inside"
+    " an area you chose, never a rule applied across the whole zone; paint surfacing into layers by region and stroke (paintSurface),"
+    " shape its edges deliberately (editSurface). Iterate rough to fine and look after every pass (renderView at eye height and from"
+    " above); take back what does not work (passes, resetRegion, rebuildRegion, clearRegion, eraseSurface): removing is a way of adding."
+    " Steer by the EQ worlds: compareWithClientZones against reference zones, and the catalog's measured use of each asset. The"
+    " author-zone skill and docs/zoneWorkflow.md in the zonewright repository hold the procedure."
+  ),
 )
 
 
@@ -1012,7 +1022,8 @@ selectorHelp = (
   " {\"box\": {\"minimum\": [x,y,z], \"maximum\": [x,y,z]}}, {\"cylinder\": {\"center\": [x,y], \"radius\": r, \"bottom\": z, \"top\": z}},"
   " {\"facing\": {\"direction\": [x,y,z], \"withinDegrees\": d}}, {\"slope\": {\"minimumDegrees\": a, \"maximumDegrees\": b}} (0 flat, 90 vertical, over 90 overhanging), {\"height\": {\"minimum\": z, \"maximum\": z}}, {\"nearPath\": {\"path\": [[x,y,z], ...], \"radius\": r}} (horizontal distance), {\"material\": name}, {\"vertexGroup\": name}, {\"insideObject\": closedMeshName}, {\"region\": regionName} (inside a region createRegion made),"
   " {\"and\": [selectors]}, {\"or\": [selectors]}, {\"not\": selector}. Shapes test vertex positions, or face centers for face operations."
-  " A selector that matches nothing is an error."
+  " A selector that matches nothing is an error. Masks such as slope and height pick within an area you chose (a region, a stroke);"
+  " they are helpers, not a design to apply across a zone."
 )
 allSelector = {"all": True}
 
@@ -1130,8 +1141,9 @@ async def collapseShapingPasses(context: Context, objectName: str):
   "Roughen the selected vertices of a mesh with fractal noise: bumps about `featureSize` units across, moving vertices `amplitude` units"
   " as a typical (root mean square) move, the largest about three times that, along each vertex's normal (`direction` normal: sideways on a wall, so cliffs break up too) or straight up. `octaves` (1-8) add finer"
   " noise, each twice as fine and `roughness` times as strong. The same `seed` gives the same noise. `fadeDistance` ramps the effect"
-  " in from the selection's edge so a mask leaves no step. Use it in its own shaping pass, coarse first (large featureSize, few octaves),"
-  " then finer, turning each pass up or down after looking." + selectorHelp))
+  " in from the selection's edge so a mask leaves no step. Use it in its own shaping pass, confined to a region at that region's own scale"
+  " rather than over the whole zone, coarse first (large featureSize, few octaves), then finer, turning each pass up or down after looking."
+  + selectorHelp))
 async def roughen(
   context: Context, objectName: str, featureSize: float, amplitude: float, octaves: int = 4, roughness: float = 0.5, seed: int = 0,
   direction: str = "normal", selector: dict = allSelector, fadeDistance: float = 0.0,
@@ -1147,7 +1159,7 @@ async def roughen(
   " mean square) move and the largest about three times that, so round"
   " and straight shapes (a sculpted cone hill, a carved channel) stop being regular. `plane` horizontal keeps heights and bends the shape"
   " sideways; surface moves along the surface; full moves in every direction. The same `seed` gives the same warp; `fadeDistance` ramps"
-  " it in from the selection's edge. Use it in its own shaping pass." + selectorHelp))
+  " it in from the selection's edge. Use it in its own shaping pass, confined to a region." + selectorHelp))
 async def warp(
   context: Context, objectName: str, featureSize: float, amplitude: float, seed: int = 0, plane: str = "horizontal",
   selector: dict = allSelector, fadeDistance: float = 0.0,
@@ -1320,7 +1332,7 @@ async def createMaterial(context: Context, name: str, diffuseTexture: str, norma
   return await callBridge(context, "createMaterial", {"name": name, "diffuseTexture": texturePath(diffuseTexture), "normalTexture": texturePath(normalTexture), "cutout": cutout, "alphaThreshold": alphaThreshold})
 
 
-@guardedTool(description="Assign a material to the selected faces of a mesh, adding a material slot if needed." + selectorHelp)
+@guardedTool(description="Assign a material to the selected faces of a mesh without surfacing layers, adding a material slot if needed: for objects and blockout. A zone's terrain is surfaced by painting into layers (addSurfaceLayer, paintSurface)." + selectorHelp)
 async def assignMaterial(context: Context, objectName: str, materialName: str, selector: dict = allSelector):
   return await callBridge(context, "assignMaterial", {"objectName": objectName, "materialName": materialName, "selector": selector})
 

@@ -11,13 +11,13 @@ Work from the catalog (`docs/assetCatalog.md`), not from guesses about file name
 
 - Ask in the catalog's words: `findAssets` with `categories`, `tags`, and `text` (`"red sandstone cliff"`). These search descriptions.
 - Narrow by what was measured, for described and undescribed textures alike: `colors`, `minimumSide`, `tiles`, and `usedOn` (slope bands where the texture covers most of its area: `flat`, `slope`, `steep`, `vertical`, `overhang`).
-- Learn from the client's own recipes: an EQ terrain zone's ecosystems (`findAssets` kind `ecosystem`) say which textures its artists put on which slopes and heights, and at what repeat.
+- Learn from the client's own recipes: an EQ terrain zone's ecosystems (`findAssets` kind `ecosystem`) say which textures its artists put on which slopes and heights, and at what repeat. Its artists painted which ecosystem covers which area; the slope and height rules only apply inside it, and that is how to use them.
 - Look before choosing: `viewTextures` with the candidates, `tiled: true`, and `cellSide: 256` for the finalists.
 
 ## Applying textures
 
 - `createMaterial` takes catalog ids directly (`texture/<name>@<hash>`) for the diffuse and its normal map (the diffuse's `pairsWith` or `materialRoles`).
-- Assign by the terrain's own shape, as the client's recipes do: `assignMaterial` with `slope` selectors for rock on steep faces, `height` for river beds and ledges, `nearPath` for trails.
+- Surface terrain by intent, region by region (the `author-zone` skill): a surfacing layer per decision (`addSurfaceLayer`), painted by region and by stroke (`paintSurface` with `{"region": ...}`, `nearPath` strokes, points), with `edgeNoise` so edges wander, and edges evened or moved with `editSurface`. Slope, height, and route masks help pick faces inside the stroke or region; never surface a whole terrain by one rule. `assignMaterial` is for objects and blockout only.
 - Scale with `projectUVs`: the description's `worldUnitsPerRepeat`, else the measured `unitsPerRepeat` of its main use. Use `box` projection on cliffs so steep faces do not stretch.
 - Where two ground materials meet, use a transition texture (Phase 1 has no shader blending): look for `category: transition` or textures that tile one way (`seamRatios` low across, high down).
 - Judge in the client's light: `renderView` with the default client shading at eye height, not only in layout shading.
