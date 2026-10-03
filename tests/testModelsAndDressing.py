@@ -136,6 +136,30 @@ def testFillRaisesGroundToAProfileAndLeavesHigherGround(stageBlenderServer):
   assert heightAt(50, 0) == 0
 
 
+def testCarveConformsVerticesOntoTheProfilesBreaks(stageBlenderServer):
+  readVertices = "result = [list(vertex.co) for vertex in bpy.data.objects['ground'].data.vertices]"
+  # A ledge: the floor at -20 out to 45% of the radius (18 units), then a wall up to the ground.
+  carve = {"objectName": "ground", "mode": "carve", "path": [[-100, 0, -20], [100, 0, -20]], "radius": 40, "strength": 1, "profile": [[0, 0], [0.45, 2], [1, 25]], "conformRim": False}
+
+  async def steps(session):
+    results = {}
+    for conform in (False, True):
+      await freshScene(session)
+      await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [96, 96], "spacing": 8, "location": [0, 0, 0]})
+      await session.expectSuccess("sculptAlongPath", carve | {"conformBreaks": conform})
+      results[conform] = (await session.expectSuccess("runPython", {"code": readVertices}))["result"]
+    return results
+
+  results = stageBlenderServer.session(steps)
+  # The grid lines at y = +-16 lie within half an edge (4 units) of the break at 18; with conformBreaks they move onto it at the
+  # break's height, so the ledge's edge runs straight along the cut instead of falling between grid lines. The vertices on the
+  # grid's open edge (x = +-48) stay, as the border never slides.
+  assert not any(abs(abs(y) - 18) < 1e-3 for _, y, _ in results[False])
+  snapped = [(y, z) for x, y, z in results[True] if abs(abs(y) - 18) < 1e-3]
+  assert len(snapped) == 2 * 11 and all(abs(z - (-18)) < 1e-3 for _, z in snapped)
+  assert not any(abs(abs(y) - 16) < 1e-3 and abs(x) < 48 for x, y, _ in results[True])
+
+
 def testCarveConformSlidesRimVerticesOntoTheContour(stageBlenderServer):
   path = [[-100, -100, -20], [100, 100, -20]]
   profile = [[0, 0], [0.5, 10], [1, 30]]

@@ -147,12 +147,29 @@ def medianEdgeLength(sceneObject, positions, vertexMask):
   return float(numpy.median(numpy.linalg.norm(positions[edges[:, 0]] - positions[edges[:, 1]], axis=1)))
 
 
-def profileAlongPath(sceneObject, positions, affected, strength, path, radii, profileArray, mode, conformRim):
+def profileAlongPath(sceneObject, positions, affected, strength, path, radii, profileArray, mode, conformRim, conformBreaks):
   """Move vertices toward the path floor plus the profile height: carve lowers those above it, fill raises those below it. With
+  conformBreaks, the vertices nearest each break of the profile (each point between its first and last) first slide sideways onto
+  that break's contour, so ledges and cliff bands run along the path as clean lines instead of zigzagging across the grid. With
   conformRim (carve only), untouched vertices just outside the cut slide sideways onto the rim contour so the edge follows the profile
   instead of the grid. The mesh's open edge never slides, so a cut running off the terrain keeps its border."""
   fractions, floors, radiiHere, nearest = bridgeMeshAccess.strokeAlongPath(positions, path, radii, horizontal=True)
   lateral = fractions * radiiHere
+  border = bridgeMeshAccess.boundaryVertexMask(sceneObject)
+  if conformBreaks:
+    if len(profileArray) < 3:
+      raise ValueError("conformBreaks needs a profile with breaks: points between its first and last")
+    breakLaterals = profileArray[1:-1, 0][None, :] * radiiHere[:, None]
+    offsets = breakLaterals - lateral[:, None]
+    closest = numpy.abs(offsets).argmin(axis=1)
+    slide = offsets[numpy.arange(len(offsets)), closest]
+    reach = 0.5 * medianEdgeLength(sceneObject, positions, affected)
+    snapping = affected & (numpy.abs(slide) <= reach) & (lateral > 0) & ~border
+    outward = (positions[snapping, :2] - nearest[snapping]) / lateral[snapping, None]
+    positions = positions.copy()
+    positions[snapping, :2] += outward * slide[snapping, None]
+    lateral[snapping] = breakLaterals[snapping, closest[snapping]]
+    fractions[snapping] = profileArray[1:-1, 0][closest[snapping]]
   targets = floors + numpy.interp(numpy.clip(fractions, 0, 1), profileArray[:, 0], profileArray[:, 1])
   updated = positions.copy()
   moving = affected & ((positions[:, 2] > targets) if mode == "carve" else (positions[:, 2] < targets))
@@ -162,13 +179,13 @@ def profileAlongPath(sceneObject, positions, affected, strength, path, radii, pr
     contourLateral = numpy.interp(heightsAboveFloor, profileArray[:, 1], profileArray[:, 0]) * radiiHere
     slide = contourLateral - lateral
     maximumSlide = 0.75 * medianEdgeLength(sceneObject, positions, moving)
-    sliding = affected & ~moving & (heightsAboveFloor > profileArray[0, 1]) & (heightsAboveFloor < profileArray[-1, 1]) & (slide < 0) & (-slide <= maximumSlide) & (lateral > 0) & ~bridgeMeshAccess.boundaryVertexMask(sceneObject)
+    sliding = affected & ~moving & (heightsAboveFloor > profileArray[0, 1]) & (heightsAboveFloor < profileArray[-1, 1]) & (slide < 0) & (-slide <= maximumSlide) & (lateral > 0) & ~border
     outward = (positions[sliding, :2] - nearest[sliding]) / lateral[sliding, None]
     updated[sliding, :2] += outward * slide[sliding, None]
   return updated
 
 
-def sculptAlongPath(objectName, mode, path, radius, radii, strength, falloff, direction, iterations, profile, conformRim):
+def sculptAlongPath(objectName, mode, path, radius, radii, strength, falloff, direction, iterations, profile, conformRim, conformBreaks):
   if (radius is None) == (radii is None):
     raise ValueError("Give either radius (the whole stroke) or radii (one per path point)")
   strokeRadii = [radius] * len(path) if radii is None else radii
@@ -182,6 +199,8 @@ def sculptAlongPath(objectName, mode, path, radius, radii, strength, falloff, di
     conformRim = mode == "carve"
   if conformRim and mode != "carve":
     raise ValueError("conformRim slides a carve's rim; only carve takes it")
+  if conformBreaks and mode not in profileModes:
+    raise ValueError(f"conformBreaks shapes a profile's breaks; only {' and '.join(profileModes)} take it")
   horizontal = mode in profileModes
   profileArray = validatedProfile(profile, conformRim) if mode in profileModes else None
 
@@ -194,7 +213,7 @@ def sculptAlongPath(objectName, mode, path, radius, radii, strength, falloff, di
     objectName, mode,
     lambda positions: bridgeMeshAccess.strokeAlongPath(positions, path, strokeRadii, horizontal)[0],
     nearestPoints, strength, falloff, direction, iterations,
-    lambda sceneObject, positions, affected, profileStrength: profileAlongPath(sceneObject, positions, affected, profileStrength, path, strokeRadii, profileArray, mode, conformRim),
+    lambda sceneObject, positions, affected, profileStrength: profileAlongPath(sceneObject, positions, affected, profileStrength, path, strokeRadii, profileArray, mode, conformRim, conformBreaks),
   )
 
 
