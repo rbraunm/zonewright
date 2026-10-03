@@ -1045,6 +1045,23 @@ async def createTerrainGrid(context: Context, name: str, size: list[float], spac
 
 
 @guardedTool()
+async def createRockMass(
+  context: Context, name: str, path: list[list[float]], widths: list[float], thicknesses: list[float], spacing: float, squareness: float = 4.0,
+  collection: str | None = None,
+):
+  """Sculpt a mass of rock that has an underside, which ground shaped from above cannot have: a natural arch over a gorge, an
+  overhanging lip, a ledge standing out from a wall. It runs along `path` [[x, y, z], ...] with its top on the path (a walkable deck
+  where the path is gentle); at each path point `widths` sets how wide it is and `thicknesses` how deep it runs below its top, both
+  changing smoothly between points without overshooting them, so an arch is thick where it springs from the walls and thin over the
+  gap. Its cross-section is rounded at `squareness` 2 and boxier, its top flatter, above that. Run the path's ends into the walls or
+  ground it grows from. It is meshed about every `spacing` units, like the ground around it, and goes into the terrain collection (or
+  `collection`), so it exports as part of the zone's terrain. Whether a form is its own piece or part of the ground depends on the
+  landform; a rock mass should look part of the rock around it, so shape it further (shaping passes, warp, roughen) and surface it
+  with that rock's recipe."""
+  return await callBridge(context, "createRockMass", {"name": name, "path": path, "widths": widths, "thicknesses": thicknesses, "spacing": spacing, "squareness": squareness, "collection": collection})
+
+
+@guardedTool()
 async def transformObjects(
   context: Context, names: list[str], translate: list[float] | None = None, rotateDegrees: list[float] | None = None, scale: list[float] | None = None,
   location: list[float] | None = None, rotationDegrees: list[float] | None = None,
@@ -1089,6 +1106,17 @@ async def measure(context: Context, points: list[list[float]], snapToSurface: bo
   return await callBridge(context, "measure", {"points": points, "snapToSurface": snapToSurface})
 
 
+@guardedTool()
+async def walkRoute(context: Context, path: list[list[float]], sampleSpacing: float = 4.0):
+  """Walk a route as a player would, over the zone's rendered surfaces (terrain, rock masses, placed objects): from its first point,
+  following the footing underfoot past each point of `path` [[x, y, z], ...], whose heights only need to be near the footing (so a
+  route can run over an arch or under it). Judged for a player 6 units tall who walks slopes up to 60 degrees: the route's length
+  across the ground, its steepest slope, its narrowest footing (how far it runs to each side before a drop or a wall; null beyond 60),
+  its lowest headroom, every problem (too steep, too low, a drop, a rise too steep to climb), and a profile along the way. Use it on
+  decks, ramps, ledges, and the ways into an area."""
+  return await callBridge(context, "walkRoute", {"path": path, "sampleSpacing": sampleSpacing})
+
+
 @guardedTool(description="Move the selected vertices of a mesh by `offset` [x, y, z] world units. With `falloff` {center, radius, curve: constant|linear|smooth|sharp} the move fades with distance from the center; this is the precise, fine-detail edit. With shaping passes, the move goes into the active pass." + selectorHelp)
 async def moveVertices(context: Context, objectName: str, selector: dict, offset: list[float], falloff: dict | None = None):
   return await callBridge(context, "moveVertices", {"objectName": objectName, "selector": selector, "offset": offset, "falloff": falloff})
@@ -1108,7 +1136,7 @@ async def sculptAlongPath(
   context: Context, objectName: str, mode: str, path: list[list[float]], strength: float, radius: float | None = None, radii: list[float] | None = None,
   falloff: str = "smooth", direction: list[float] | None = None, iterations: int = 1, profile: list[list[float]] | None = None, conformRim: bool | None = None, conformBreaks: bool = False,
 ):
-  """Sculpt along a polyline path [[x,y,z], ...] within `radius`, or within `radii` (one per path point, the stroke widening or narrowing evenly between them, so one stroke carves a canyon that pinches to a gorge): raise, lower, crease, smooth, flatten as in sculptAtPoint; carve, which cuts vertically down to the path's own heights shaped by `profile` [[lateralFraction, heightAboveFloor], ...] from 0 (center) to 1 (edge); or fill, which raises ground up to such a profile (a mesa: a flat cap, a cliff, a slope at the base). carve and fill strength is a fraction, and their path can be a single point (a pit or a butte). With conformRim (carve only, on by default; needs rising profile heights), vertices just outside the cut slide onto the rim contour so the edge follows the profile rather than the grid; the mesh's open edge stays put. With conformBreaks (carve and fill), the vertices nearest each break of the profile slide onto its contour first, so stepped profiles (strata, ledges, terraces) make clean lines along the path instead of zigzags across the grid. carve and fill then triangulate the cells they shaped along the contours, as followContours does (splitCells, turnedDiagonals). Results count foldedFaces: faces the move turned over, a sign it was too strong for the mesh's spacing. With shaping passes, the change goes into the active pass."""
+  """Sculpt along a polyline path [[x,y,z], ...] within `radius`, or within `radii` (one per path point, the stroke widening or narrowing evenly between them, so one stroke carves a canyon that pinches to a gorge): raise, lower, crease, smooth, flatten as in sculptAtPoint; carve, which cuts vertically down to the path's own heights shaped by `profile` [[lateralFraction, heightAboveFloor], ...] from 0 (center) to 1 (edge); or fill, which raises ground up to such a profile (a mesa: a flat cap, a cliff, a slope at the base). carve and fill strength is a fraction, and their path can be a single point (a pit or a butte). With conformRim (carve only, on by default; needs rising profile heights), vertices just outside the cut slide onto the rim contour so the edge follows the profile rather than the grid; the mesh's open edge stays put. With conformBreaks (carve and fill), the vertices nearest each break of the profile slide onto its contour first, so stepped profiles (strata, ledges, terraces) make clean lines along the path instead of zigzags across the grid. carve and fill then triangulate the cells they shaped along the contours, as followContours does (splitCells, turnedDiagonals), and put back where the plain cut leaves them any snapped vertices that leave their cell no diagonal facing up (keptOffContours). Results count foldedFaces: faces the move turned over, a sign it was too strong for the mesh's spacing. With shaping passes, the change goes into the active pass."""
   return await callBridge(context, "sculptAlongPath", {"objectName": objectName, "mode": mode, "path": path, "radius": radius, "radii": radii, "strength": strength, "falloff": falloff, "direction": direction, "iterations": iterations, "profile": profile, "conformRim": conformRim, "conformBreaks": conformBreaks})
 
 
@@ -1159,7 +1187,7 @@ async def roughen(
   "Warp the selected vertices of a mesh (the result counts foldedFaces, faces turned over: too much warp for the spacing): move them by smooth noise about `featureSize` units across, `amplitude` units as a typical (root"
   " mean square) move and the largest about three times that, so round"
   " and straight shapes (a sculpted cone hill, a carved channel) stop being regular. `plane` horizontal keeps heights and bends the shape"
-  " sideways; surface moves along the surface; full moves in every direction. The same `seed` gives the same warp; `fadeDistance` ramps"
+  " sideways, moving every height at a spot alike so walls bend without shearing; surface moves along the surface; full moves in every direction. The same `seed` gives the same warp; `fadeDistance` ramps"
   " it in from the selection's edge. Use it in its own shaping pass, confined to a region." + selectorHelp))
 async def warp(
   context: Context, objectName: str, featureSize: float, amplitude: float, seed: int = 0, plane: str = "horizontal",

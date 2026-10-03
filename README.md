@@ -71,6 +71,7 @@ Edits address parts of a mesh with selectors instead of an interactive selection
 | | `joinObjects` | Merges meshes into one object, such as a trunk and canopy into one tree |
 | Shaping | `moveVertices` | Moves selected vertices, optionally fading with distance from a center: the fine-detail edit |
 | | `sculptAtPoint` / `sculptAlongPath` | Raise, lower, crease, smooth, flatten around a point or along a path, whose width can change from point to point (`radii`); fill raises ground to a cross-section profile (mesas, buttes; a one-point path makes a round one); carve cuts down to a path's heights through a cross-section profile, sliding the vertices just outside the cut onto the rim contour (`conformRim`) and the vertices nearest each break of a stepped profile onto that break's contour (`conformBreaks`), so ledges and strata run as clean lines; carve and fill triangulate the cells they shape along the contours |
+| | `createRockMass` | Rock with an underside, which ground shaped from above cannot have (a natural arch, an overhanging lip, a ledge off a wall): swept along a path with its top on the path, its width and depth below set per point and changing smoothly without overshooting, meshed at the ground's spacing, in the terrain collection so it exports as terrain |
 | | `deleteFaces` | Removes selected faces, such as the terrain inside a rock that forms its own cave floor |
 | | `extrudeFaces`, `insetFaces`, `bevelEdges`, `subdivide` | Topology edits on selected faces or edges |
 | | `booleanCut` | Cuts openings with a cutter mesh; refuses a cut that would erase the mesh |
@@ -98,6 +99,7 @@ Edits address parts of a mesh with selectors instead of an interactive selection
 | | `placeEmitters` | Particle emitters (empties holding a client emitter definition); `exportZone` writes them to `<zone>_EnvironmentEmitters.txt` |
 | Inspecting | `getObjectDetail` | Transform, bounds, counts, faces per material, UV density, modifiers, vertex groups |
 | | `measure` | Surface heights, distances, height changes, and slopes between points |
+| | `walkRoute` | Walks a route over the rendered surfaces as a player 6 tall who climbs slopes up to 60 degrees: length, steepest slope, narrowest footing to a drop or wall on each side, lowest headroom, and every problem (too steep, too low, a drop, a rise), over an arch or under it |
 
 A view is `{"camera": name}`, `{"eye": [x,y,z], "target": [x,y,z]}`, `{"map": {"center": [x,y], "width": w}}` (straight down, orthographic, north up, no fog), or `{"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p}`. Heading 0 looks along +Y and turns clockwise seen from above; positive pitch looks up. `standAt` [x, y] stands on the highest ground there; [x, y, z] finds the ground by casting down from just above the point, so it works inside caves, puts the eye 5.5 units above it, and stands a scale figure ahead: the client's own dark elf female at the race-default height 5, drawn at the client's scale for the zone's `newEngineZone`, walked up to 15 units along the ground like a player (walls, drops, and climbs stop her) and facing the camera.
 

@@ -4,10 +4,8 @@ import re
 import numpy
 
 import zoneGeometry
+from playerScale import playerHeight, walkableNormalZ
 
-playerHeight = 6.0
-# EQEmu's navmesh agent climbs slopes up to 60 degrees; the client's own limit is unconfirmed.
-walkableNormalZ = 0.5
 probeColumnsPerSide = 128
 slopeBandEdges = (0, 15, 30, 45, 60, 75, 90)
 elevationPercentiles = (5, 25, 50, 75, 95)

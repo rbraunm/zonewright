@@ -7,6 +7,7 @@ import bpy
 import mathutils
 import numpy
 
+import bridgeExport
 import bridgeMeshAccess
 import bridgePasses
 
@@ -14,6 +15,8 @@ roundShapes = ("cylinder", "cone", "sphere")
 eulerModes = ("XYZ", "XZY", "YXZ", "YZX", "ZXY", "ZYX")
 measureCastDistance = 100000.0
 primitiveKinds = ("plane", "grid", "cube") + roundShapes
+splineSamplesPerSegment = 64
+sectionSamples = 720
 
 
 def roundVector(vector, digits=3):
@@ -108,6 +111,107 @@ def createTerrainGrid(name, size, spacing, location, collection):
   fitToSize(meshEditor, [size[0], size[1], 0], flat=True)
   newObject = linkNewMesh(name, meshEditor, location, [0, 0, 0], collection)
   return describeTransform(newObject) | bridgeMeshAccess.meshCounts(newObject) | {"spacing": spacing}
+
+
+def catmullRom(points):
+  """Dense samples of a centripetal Catmull-Rom curve through the points, with each sample's fractional index along them."""
+  controls = numpy.vstack([2 * points[0] - points[1], points, 2 * points[-1] - points[-2]])
+  samples, indices = [], []
+  for segment in range(len(points) - 1):
+    p0, p1, p2, p3 = controls[segment:segment + 4]
+    t1 = numpy.linalg.norm(p1 - p0) ** 0.5
+    t2 = t1 + numpy.linalg.norm(p2 - p1) ** 0.5
+    t3 = t2 + numpy.linalg.norm(p3 - p2) ** 0.5
+    steps = numpy.arange(splineSamplesPerSegment) / splineSamplesPerSegment
+    t = (t1 + (t2 - t1) * steps)[:, None]
+    a1 = ((t1 - t) * p0 + t * p1) / t1
+    a2 = ((t2 - t) * p1 + (t - t1) * p2) / (t2 - t1)
+    a3 = ((t3 - t) * p2 + (t - t2) * p3) / (t3 - t2)
+    b1 = ((t2 - t) * a1 + t * a2) / t2
+    b2 = ((t3 - t) * a2 + (t - t1) * a3) / (t3 - t1)
+    samples.append(((t2 - t) * b1 + (t - t1) * b2) / (t2 - t1))
+    indices.append(segment + steps)
+  return numpy.vstack(samples + [points[-1:]]), numpy.concatenate(indices + [[len(points) - 1]])
+
+
+def monotoneCurve(values, fractionalIndices):
+  """Values given at each control point, between them a smooth curve that never overshoots them (cubic Hermite with Fritsch-Butland
+  slopes), so a thickness that narrows to a span and widens again never dips below its narrowest."""
+  values = numpy.asarray(values, dtype=numpy.float64)
+  slopes = numpy.diff(values)
+  tangents = numpy.empty(len(values))
+  tangents[0], tangents[-1] = slopes[0], slopes[-1]
+  left, right = slopes[:-1], slopes[1:]
+  sameSign = left * right > 0
+  tangents[1:-1] = 0.0
+  tangents[1:-1][sameSign] = 2 * left[sameSign] * right[sameSign] / (left[sameSign] + right[sameSign])
+  segments = numpy.minimum(numpy.floor(fractionalIndices).astype(numpy.int64), len(values) - 2)
+  s = fractionalIndices - segments
+  return ((2 * s ** 3 - 3 * s ** 2 + 1) * values[segments] + (s ** 3 - 2 * s ** 2 + s) * tangents[segments]
+          + (-2 * s ** 3 + 3 * s ** 2) * values[segments + 1] + (s ** 3 - s ** 2) * tangents[segments + 1])
+
+
+def superellipseOutline(squareness):
+  """A unit superellipse from its top, clockwise seen along the path, densely sampled: lateral and vertical, each -1 to 1."""
+  angles = numpy.pi / 2 - numpy.linspace(0, 2 * numpy.pi, sectionSamples, endpoint=False)
+  cosines, sines = numpy.cos(angles), numpy.sin(angles)
+  return numpy.column_stack([numpy.sign(cosines) * numpy.abs(cosines) ** (2 / squareness), numpy.sign(sines) * numpy.abs(sines) ** (2 / squareness)])
+
+
+def evenlyAround(outline, count):
+  """count points evenly spaced along a closed outline, the first at its first point."""
+  closed = numpy.vstack([outline, outline[:1]])
+  lengths = numpy.concatenate([[0.0], numpy.cumsum(numpy.linalg.norm(numpy.diff(closed, axis=0), axis=1))])
+  targets = numpy.linspace(0, lengths[-1], count, endpoint=False)
+  return numpy.column_stack([numpy.interp(targets, lengths, closed[:, axis]) for axis in range(2)])
+
+
+def createRockMass(name, path, widths, thicknesses, spacing, squareness, collection):
+  requireNewName(name)
+  pathArray = bridgeMeshAccess.toArray(path)
+  if pathArray.ndim != 2 or pathArray.shape[1] != 3 or len(pathArray) < 2:
+    raise ValueError(f"A path is at least two [x, y, z] points, got {path!r}")
+  if (numpy.linalg.norm(numpy.diff(pathArray, axis=0), axis=1) < 1e-6).any():
+    raise ValueError("The path repeats a point; each point must differ from the one before it")
+  for label, values in (("widths", widths), ("thicknesses", thicknesses)):
+    if len(values) != len(pathArray) or min(values) <= 0:
+      raise ValueError(f"{label} are one positive value per path point ({len(pathArray)}), got {values!r}")
+  if spacing <= 0 or squareness < 1:
+    raise ValueError(f"spacing must be positive and squareness at least 1, got {spacing} and {squareness}")
+  samples, fractionalIndices = catmullRom(pathArray)
+  arcLengths = numpy.concatenate([[0.0], numpy.cumsum(numpy.linalg.norm(numpy.diff(samples, axis=0), axis=1))])
+  ringCount = max(2, math.ceil(arcLengths[-1] / spacing) + 1)
+  ringArcs = numpy.linspace(0, arcLengths[-1], ringCount)
+  centers = numpy.column_stack([numpy.interp(ringArcs, arcLengths, samples[:, axis]) for axis in range(3)])
+  tangents = numpy.gradient(samples, axis=0)
+  ringTangents = numpy.column_stack([numpy.interp(ringArcs, arcLengths, tangents[:, axis]) for axis in range(2)])
+  horizontal = numpy.linalg.norm(ringTangents, axis=1)
+  if (horizontal < 1e-9).any():
+    raise ValueError("The path runs straight up or down somewhere; a rock mass follows a path that travels across")
+  laterals = numpy.column_stack([-ringTangents[:, 1], ringTangents[:, 0], numpy.zeros(ringCount)]) / horizontal[:, None]
+  ringIndices = numpy.interp(ringArcs, arcLengths, fractionalIndices)
+  halfWidths = monotoneCurve(widths, ringIndices) / 2
+  halfThicknesses = monotoneCurve(thicknesses, ringIndices) / 2
+  outline = superellipseOutline(squareness)
+  perimeters = [numpy.linalg.norm(numpy.diff(numpy.vstack([outline, outline[:1]]) * [a, b], axis=0), axis=1).sum() for a, b in zip(halfWidths, halfThicknesses)]
+  sectionCount = max(8, 4 * math.ceil(max(perimeters) / spacing / 4))
+  meshEditor = bmesh.new()
+  rings = []
+  for center, lateral, a, b in zip(centers, laterals, halfWidths, halfThicknesses):
+    section = evenlyAround(outline * [a, b], sectionCount)
+    points = center + section[:, :1] * lateral + (section[:, 1:] - b) * numpy.array([0.0, 0.0, 1.0])
+    rings.append([meshEditor.verts.new(point) for point in points])
+  for ring, nextRing in zip(rings, rings[1:]):
+    for index in range(sectionCount):
+      following = (index + 1) % sectionCount
+      meshEditor.faces.new((ring[index], ring[following], nextRing[following], nextRing[index]))
+  for ring in (rings[0], rings[-1]):
+    middle = meshEditor.verts.new(numpy.mean([vertex.co for vertex in ring], axis=0))
+    for index in range(sectionCount):
+      meshEditor.faces.new((middle, ring[index], ring[(index + 1) % sectionCount]))
+  bmesh.ops.recalc_face_normals(meshEditor, faces=list(meshEditor.faces))
+  newObject = linkNewMesh(name, meshEditor, [0, 0, 0], [0, 0, 0], bridgeExport.terrainCollectionName if collection is None else collection)
+  return describeTransform(newObject) | bridgeMeshAccess.meshCounts(newObject) | {"length": round(float(arcLengths[-1]), 1), "rings": ringCount, "sectionPoints": sectionCount}
 
 
 def transformObjects(names, translate, rotateDegrees, scale, location, rotationDegrees):
@@ -292,6 +396,7 @@ def measure(points, snapToSurface):
 commands = {
   "createPrimitive": (createPrimitive, True),
   "createTerrainGrid": (createTerrainGrid, True),
+  "createRockMass": (createRockMass, True),
   "transformObjects": (transformObjects, True),
   "duplicateObjects": (duplicateObjects, True),
   "joinObjects": (joinObjects, True),
