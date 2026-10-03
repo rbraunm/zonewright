@@ -1010,7 +1010,7 @@ async def pick(context: Context, view: dict, pixel: list[int]):
 selectorHelp = (
   " A selector picks part of a mesh by world position or surface: {\"all\": true}, {\"sphere\": {\"center\": [x,y,z], \"radius\": r}},"
   " {\"box\": {\"minimum\": [x,y,z], \"maximum\": [x,y,z]}}, {\"cylinder\": {\"center\": [x,y], \"radius\": r, \"bottom\": z, \"top\": z}},"
-  " {\"facing\": {\"direction\": [x,y,z], \"withinDegrees\": d}}, {\"slope\": {\"minimumDegrees\": a, \"maximumDegrees\": b}} (0 flat, 90 vertical, over 90 overhanging), {\"height\": {\"minimum\": z, \"maximum\": z}}, {\"nearPath\": {\"path\": [[x,y,z], ...], \"radius\": r}} (horizontal distance), {\"material\": name}, {\"vertexGroup\": name}, {\"insideObject\": closedMeshName},"
+  " {\"facing\": {\"direction\": [x,y,z], \"withinDegrees\": d}}, {\"slope\": {\"minimumDegrees\": a, \"maximumDegrees\": b}} (0 flat, 90 vertical, over 90 overhanging), {\"height\": {\"minimum\": z, \"maximum\": z}}, {\"nearPath\": {\"path\": [[x,y,z], ...], \"radius\": r}} (horizontal distance), {\"material\": name}, {\"vertexGroup\": name}, {\"insideObject\": closedMeshName}, {\"region\": regionName} (inside a region createRegion made),"
   " {\"and\": [selectors]}, {\"or\": [selectors]}, {\"not\": selector}. Shapes test vertex positions, or face centers for face operations."
   " A selector that matches nothing is an error."
 )
@@ -1216,6 +1216,92 @@ async def placeEmitters(context: Context, emitters: list[dict], collection: str 
   beside the archive; the preview does not draw them yet. The asset catalog (findAssets kind emitter) says what each definition shows
   and under which names client zones place it."""
   return await callBridge(context, "placeEmitters", {"emitters": [emitter | {"alwaysVisible": None} for emitter in emitters], "collection": collection})
+
+
+@guardedTool()
+async def createRegion(context: Context, name: str, outline: list[list[float]], bottom: float, top: float, intent: str):
+  """Mark an area of the zone for what it is to become: a vertical prism over `outline` ([[x, y], ...], in order) from `bottom` to
+  `top`, kept in the regions collection (seen in Blender, never rendered or exported) with its `intent` ("north guild terrace: packed
+  earth, dwellings carved into the back wall"). A zone is planned as regions first and each is shaped, surfaced, and dressed for its
+  own intent; the {"region": name} selector confines any tool to one."""
+  return await callBridge(context, "createRegion", {"name": name, "outline": outline, "bottom": bottom, "top": top, "intent": intent})
+
+
+@guardedTool()
+async def editRegion(context: Context, name: str, outline: list[list[float]] | None = None, bottom: float | None = None, top: float | None = None, intent: str | None = None):
+  """Change a region's outline, bottom, top, or intent as the plan changes."""
+  return await callBridge(context, "editRegion", {"name": name, "outline": outline, "bottom": bottom, "top": top, "intent": intent})
+
+
+@guardedTool()
+async def getRegions(context: Context):
+  """Every region with its intent, outline, height span, and area: the zone's plan."""
+  return await callBridge(context, "getRegions", {})
+
+
+@guardedTool()
+async def addSurfaceLayer(context: Context, objectName: str, name: str):
+  """Add a named surfacing layer on top of a mesh's others. Each face shows the topmost unmuted layer that covers it, else the material it
+  had before the first layer, so surfacing is built up and revised layer by layer (a region's ground, a stratum, a path, accents) and a
+  decision is taken back by erasing, muting, or removing its layer. A layered mesh takes materials only through its layers."""
+  return await callBridge(context, "addSurfaceLayer", {"objectName": objectName, "name": name})
+
+
+@guardedTool()
+async def setSurfaceLayer(context: Context, objectName: str, name: str, muted: bool | None = None, position: int | None = None):
+  """Mute or unmute a surfacing layer, or move it to `position` (0 is the bottom)."""
+  return await callBridge(context, "setSurfaceLayer", {"objectName": objectName, "name": name, "muted": muted, "position": position})
+
+
+@guardedTool()
+async def removeSurfaceLayer(context: Context, objectName: str, name: str):
+  """Remove a surfacing layer and what it painted."""
+  return await callBridge(context, "removeSurfaceLayer", {"objectName": objectName, "name": name})
+
+
+@guardedTool(description=(
+  "Paint a material into a surfacing layer where the selector says, as an artist paints by intent: a region, a stroke along a path"
+  " (nearPath with a radius), around a point (sphere), or masks combined with them. Slope, height, and other masks help pick faces"
+  " inside an area you chose; they are not a design to apply across the zone. edgeNoise {featureSize, amplitude, seed} moves the"
+  " painted edge in and out by smooth noise so it wanders as a painted edge does instead of tracing a circle, a line, or the grid." + selectorHelp))
+async def paintSurface(context: Context, objectName: str, layer: str, material: str, selector: dict, edgeNoise: dict | None = None):
+  return await callBridge(context, "paintSurface", {"objectName": objectName, "layer": layer, "material": material, "selector": selector, "edgeNoise": edgeNoise})
+
+
+@guardedTool(description="Erase a surfacing layer where the selector says, with the same edgeNoise as paintSurface, so the layers beneath show again." + selectorHelp)
+async def eraseSurface(context: Context, objectName: str, layer: str, selector: dict, edgeNoise: dict | None = None):
+  return await callBridge(context, "eraseSurface", {"objectName": objectName, "layer": layer, "selector": selector, "edgeNoise": edgeNoise})
+
+
+@guardedTool(description=(
+  "Edit a surfacing layer's painted area at its edges, within the selector, `steps` faces at a time: grow it outward, shrink it inward,"
+  " or smooth it (each face takes the value most of itself and its neighbours hold, which absorbs islands and evens ragged edges)." + selectorHelp))
+async def editSurface(context: Context, objectName: str, layer: str, operation: str, steps: int = 1, selector: dict = allSelector):
+  return await callBridge(context, "editSurface", {"objectName": objectName, "layer": layer, "operation": operation, "steps": steps, "selector": selector})
+
+
+@guardedTool(description=(
+  "Take shaping back inside the selector (usually a region): each named shaping pass, or every pass, loses what it moved there, faded"
+  " out over fadeDistance from the edge so the area rejoins its surroundings. Removing is a way of adding: take an area back to its"
+  " earlier form, then shape it again." + selectorHelp))
+async def resetRegion(context: Context, objectName: str, selector: dict, passes: list[str] | None = None, fadeDistance: float = 0.0):
+  return await callBridge(context, "resetRegion", {"objectName": objectName, "selector": selector, "passes": passes, "fadeDistance": fadeDistance})
+
+
+@guardedTool(description=(
+  "Give the selector's area (usually a region) a fresh start: mode surroundings spans its heights smoothly from the ground around it,"
+  " a blank slate already joined to its surroundings; mode height levels it to `height`. Faded in over fadeDistance from the edge;"
+  " with shaping passes, the change goes into the active pass." + selectorHelp))
+async def rebuildRegion(context: Context, objectName: str, selector: dict, mode: str, height: float | None = None, fadeDistance: float = 0.0):
+  return await callBridge(context, "rebuildRegion", {"objectName": objectName, "selector": selector, "mode": mode, "height": height, "fadeDistance": fadeDistance})
+
+
+@guardedTool()
+async def clearRegion(context: Context, region: str, terrainObject: str, shaping: str = "keep", surfacing: bool = False, objects: bool = False, fadeDistance: float = 0.0):
+  """Take a region back to start it again, in one stroke: its shaping kept, reset (passes taken back), or rebuilt (spanned from the
+  ground around it), faded over fadeDistance; its surfacing erased from every layer of the terrain; and the objects placed in it
+  (models, lights, emitters) deleted."""
+  return await callBridge(context, "clearRegion", {"region": region, "terrainObject": terrainObject, "shaping": shaping, "surfacing": surfacing, "objects": objects, "fadeDistance": fadeDistance})
 
 
 @guardedTool()

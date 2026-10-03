@@ -54,6 +54,8 @@ def createMaterial(name, diffuseTexture, normalTexture, cutout, alphaThreshold):
 
 def assignMaterial(objectName, materialName, selector):
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  if bridgeMeshAccess.surfaceLayersProperty in sceneObject:
+    raise ValueError(f"'{objectName}' is surfaced by layers, which set its face materials; paint into a layer with paintSurface instead")
   material = bpy.data.materials.get(materialName)
   if material is None:
     raise ValueError(f"No material named '{materialName}'")

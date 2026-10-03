@@ -1,4 +1,5 @@
 """Blocking out, organizing, and inspecting objects. Runs under Blender's Python."""
+import json
 import math
 
 import bmesh
@@ -256,6 +257,7 @@ def getObjectDetail(name):
       "vertexGroups": [group.name for group in sceneObject.vertex_groups],
       "sharedMeshUsers": mesh.users,
       "shapingPasses": bridgePasses.passList(sceneObject),
+    "surfaceLayers": json.loads(sceneObject[bridgeMeshAccess.surfaceLayersProperty]) if bridgeMeshAccess.surfaceLayersProperty in sceneObject else [],
     }
   if sceneObject.instance_type == "COLLECTION" and sceneObject.instance_collection is not None:
     detail["instanceCollection"] = sceneObject.instance_collection.name

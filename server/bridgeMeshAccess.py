@@ -7,7 +7,11 @@ import bpy
 import mathutils
 import numpy
 
-selectorKeys = ("all", "sphere", "box", "cylinder", "facing", "slope", "height", "nearPath", "material", "vertexGroup", "insideObject", "and", "or", "not")
+selectorKeys = ("all", "sphere", "box", "cylinder", "facing", "slope", "height", "nearPath", "material", "vertexGroup", "insideObject", "region", "and", "or", "not")
+# A region is a vertical prism over an outline: an area of the zone chosen for what it is to become, its intent kept in this property.
+regionIntentProperty = "zonewrightRegionIntent"
+# A mesh surfaced by layers keeps their order in this property; its face materials are composed from them.
+surfaceLayersProperty = "zonewrightSurfaceLayers"
 
 
 def requireObject(name):
@@ -17,6 +21,38 @@ def requireObject(name):
   if sceneObject is None:
     raise ValueError(f"No object named '{name}' in scene '{bpy.context.scene.name}'")
   return sceneObject
+
+
+def requireRegion(name):
+  regionObject = requireObject(name)
+  if regionObject.type != "MESH" or regionIntentProperty not in regionObject:
+    raise ValueError(f"'{name}' is not a region; createRegion makes one")
+  return regionObject
+
+
+def regionShape(regionObject):
+  """A region's outline [x, y] in world units, in order, and the heights of its bottom and top."""
+  coordinates = numpy.empty(len(regionObject.data.vertices) * 3)
+  regionObject.data.vertices.foreach_get("co", coordinates)
+  world = worldPositions(regionObject, coordinates.reshape(-1, 3))
+  sides = len(world) // 2
+  return world[:sides, :2], float(world[:, 2].min()), float(world[:, 2].max())
+
+
+def insidePolygon(points, outline):
+  """Which [x, y] points lie inside a closed outline, by counting crossings of a ray toward +x."""
+  inside = numpy.zeros(len(points), dtype=bool)
+  for (x1, y1), (x2, y2) in zip(outline, numpy.roll(outline, -1, axis=0)):
+    straddles = (y1 > points[:, 1]) != (y2 > points[:, 1])
+    with numpy.errstate(divide="ignore", invalid="ignore"):
+      crossingX = x1 + (points[:, 1] - y1) * (x2 - x1) / (y2 - y1)
+    inside ^= straddles & (points[:, 0] < crossingX)
+  return inside
+
+
+def insideRegion(regionObject, worldPoints):
+  outline, bottom, top = regionShape(regionObject)
+  return insidePolygon(worldPoints[:, :2], outline) & (worldPoints[:, 2] >= bottom) & (worldPoints[:, 2] <= top)
 
 
 def requireMeshObject(name):
@@ -239,6 +275,8 @@ def evaluateSelector(selector, sceneObject, elementKind):
     return vertexMask
   if key == "insideObject":
     return insideMask(requireMeshObject(value), positions)
+  if key == "region":
+    return insideRegion(requireRegion(value), positions)
   if key == "vertexGroup":
     groupMask = vertexGroupMask(sceneObject, value)
     if elementKind == "vertices":
