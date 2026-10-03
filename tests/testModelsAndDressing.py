@@ -349,3 +349,44 @@ def testCarveIntoASteepWallFoldsNothing(stageBlenderServer):
   areas = [planarSignedArea([vertices[index] for index in face]) for face in shaped["faces"]]
   assert (canyon["foldedFaces"], terrace["foldedFaces"]) == (0, 0)
   assert sum(area <= 0 for area in areas) == 0
+
+
+def testScarpFilledOverAWarpedGridFoldsNothing(stageBlenderServer):
+  # A broad warp and a long, bending scarp: where a ledge line crosses the squeezed grid, a vertex from below can snap onto it between
+  # two that snapped from above, leaving its cell no diagonal that both faces up and has area. The grid is triangulated beforehand
+  # with each of its two diagonals throughout, as earlier shaping leaves it.
+  tilt = """
+for vertex in bpy.data.objects[objectName].data.vertices:
+  vertex.co.z = slope * (vertex.co.x + direction * vertex.co.y)
+"""
+
+  async def steps(session):
+    await freshScene(session)
+    results = []
+    for direction in (1, -1):
+      name = f"ground{direction}"
+      await session.expectSuccess("createTerrainGrid", {"name": name, "size": [1024, 1104], "spacing": 16, "location": [1104, 1560, 700]})
+      await session.expectSuccess("runPython", {"code": f"objectName = '{name}'; slope = 0.1; direction = {direction}" + tilt})
+      await session.expectSuccess("followContours", {"objectName": name})
+      await session.expectSuccess("runPython", {"code": f"objectName = '{name}'; slope = 0; direction = {direction}" + tilt})
+      await session.expectSuccess("addShapingPass", {"objectName": name, "name": "bend"})
+      await session.expectSuccess("warp", {
+        "objectName": name, "featureSize": 900, "amplitude": 100, "seed": 3,
+        "selector": {"box": {"minimum": [-4200, -2090, -100], "maximum": [4200, 2090, 1000]}}, "fadeDistance": 300,
+      })
+      await session.expectSuccess("addShapingPass", {"objectName": name, "name": "scarp"})
+      scarp = await session.expectSuccess("sculptAlongPath", {
+        "objectName": name, "mode": "fill", "path": [[-600, 1950, 700], [0, 1750, 700], [700, 1850, 700], [1300, 1600, 700], [2000, 1550, 700], [2500, 1800, 700]],
+        "radii": [400, 500, 450, 550, 550, 450], "strength": 1, "profile": [[0, 480], [0.4, 470], [0.5, 360], [0.6, 340], [0.72, 170], [0.86, 50], [1, 0]],
+        "conformBreaks": True,
+      })
+      results.append((scarp, (await session.expectSuccess("runPython", {"code": f"objectName = '{name}'" + readShapedMesh}))["result"]))
+    return results
+
+  for scarp, shaped in stageBlenderServer.session(steps):
+    vertices = shaped["vertices"]
+    faces = [(planarSignedArea([vertices[index] for index in face]), max(vertices[index][2] for index in face) - min(vertices[index][2] for index in face)) for face in shaped["faces"]]
+    assert scarp["foldedFaces"] == 0
+    assert sum(area <= 0 for area, _ in faces) == 0
+    # A sliver lying flat along a ledge line shows nothing; one with relief would show as a spike.
+    assert [round(relief, 2) for area, relief in faces if area < 0.05 * 16 * 16 and relief > 0.5] == []

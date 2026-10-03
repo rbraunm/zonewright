@@ -40,6 +40,10 @@ diagonalSweeps = 4
 # it (where a warp squeezed the grid); then only the nearer snaps, as both would fold the faces between them. A rim slide that would
 # land this close to a neighbor (one snapped onto a break lying on the rim) is not made either.
 breakCrowding = 0.35
+# Where a cell is left with no diagonal that faces up (a vertex snapped onto a break between two that snapped from its other side),
+# carve and fill put that face's snapped vertices back where the plain cut leaves them, and triangulate again, this many times at
+# most.
+snapRepairs = 4
 
 
 def falloffWeights(normalizedDistances, curve):
@@ -124,15 +128,23 @@ def sculpt(objectName, mode, strokeFractions, nearestPoints, strength, curve, di
     heights = (positions - centroid) @ pushDirection
     updated -= strength * weights[:, None] * heights[:, None] * pushDirection
   else:
-    updated = profileStroke(sceneObject, positions, affected, strength)
+    updated, unsnapped = profileStroke(sceneObject, positions, affected, strength)
   moved = numpy.linalg.norm(updated - positions, axis=1)
   writeWorldPositions(sceneObject, updated)
   shaped = moved > 1e-9
-  result = {"affectedVertices": int(shaped.sum()), "largestMove": round(float(moved.max()), 3)}
   if mode not in profileModes:
-    return result | {"foldedFaces": bridgeMeshAccess.foldedFaceCount(sceneObject, positions, updated)}
-  triangulation = triangulateAlongContours(sceneObject, updated, shaped)
-  return result | {"foldedFaces": overturnedFaceCount(sceneObject, updated, shaped)} | triangulation
+    return {"affectedVertices": int(shaped.sum()), "largestMove": round(float(moved.max()), 3), "foldedFaces": bridgeMeshAccess.foldedFaceCount(sceneObject, positions, updated)}
+  triangulation = triangulateAlongContours(sceneObject, updated, shaped) | {"keptOffContours": 0}
+  for _ in range(snapRepairs):
+    returning = overturnedVertexMask(sceneObject, updated, shaped) & (numpy.abs(updated[:, :2] - unsnapped[:, :2]).max(axis=1) > 1e-9)
+    if not returning.any():
+      break
+    updated[returning] = unsnapped[returning]
+    writeWorldPositions(sceneObject, updated)
+    triangulation["turnedDiagonals"] += triangulateAlongContours(sceneObject, updated, shaped)["turnedDiagonals"]
+    triangulation["keptOffContours"] += int(returning.sum())
+  moved = numpy.linalg.norm(updated - positions, axis=1)
+  return {"affectedVertices": int((moved > 1e-9).sum()), "largestMove": round(float(moved.max()), 3), "foldedFaces": int(overturnedFaces(sceneObject, updated, shaped).sum())} | triangulation
 
 
 def sculptAtPoint(objectName, mode, center, radius, strength, falloff, direction, iterations):
@@ -166,11 +178,26 @@ def medianEdgeLength(sceneObject, positions, vertexMask):
   return float(numpy.median(numpy.linalg.norm(positions[edges[:, 0]] - positions[edges[:, 1]], axis=1)))
 
 
-def overturnedFaceCount(sceneObject, worldPositions, vertexMask):
+def overturnedFaces(sceneObject, worldPositions, vertexMask):
   """Faces touching the masked vertices that lie flat or face down seen from above: on ground shaped by moves up and down, folds."""
   loopTotals, loopVertices = bridgeMeshAccess.faceLoops(sceneObject)
   touching = numpy.add.reduceat(vertexMask[loopVertices].astype(numpy.int64), numpy.cumsum(loopTotals) - loopTotals) > 0
-  return int((touching & (bridgeMeshAccess.faceNormals(sceneObject, worldPositions)[:, 2] <= 0)).sum())
+  return touching & (bridgeMeshAccess.faceNormals(sceneObject, worldPositions)[:, 2] <= 0)
+
+
+def overturnedVertexMask(sceneObject, worldPositions, vertexMask):
+  loopTotals, loopVertices = bridgeMeshAccess.faceLoops(sceneObject)
+  corners = numpy.zeros(len(worldPositions), dtype=bool)
+  corners[loopVertices[numpy.repeat(overturnedFaces(sceneObject, worldPositions, vertexMask), loopTotals)]] = True
+  return corners
+
+
+def movedToProfile(positions, affected, strength, targets, mode):
+  """carve lowers the affected vertices above their targets toward them; fill raises those below."""
+  updated = positions.copy()
+  moving = affected & ((positions[:, 2] > targets) if mode == "carve" else (positions[:, 2] < targets))
+  updated[moving, 2] -= strength * (positions[moving, 2] - targets[moving])
+  return updated
 
 
 def profileAlongPath(sceneObject, positions, affected, strength, path, radii, profileArray, mode, conformRim, conformBreaks):
@@ -181,6 +208,7 @@ def profileAlongPath(sceneObject, positions, affected, strength, path, radii, pr
   instead of the grid. The mesh's open edge never slides, so a cut running off the terrain keeps its border."""
   fractions, floors, radiiHere, nearest = bridgeMeshAccess.strokeAlongPath(positions, path, radii, horizontal=True)
   lateral = fractions * radiiHere
+  unsnapped = movedToProfile(positions, affected, strength, floors + numpy.interp(numpy.clip(fractions, 0, 1), profileArray[:, 0], profileArray[:, 1]), mode)
   border = bridgeMeshAccess.boundaryVertexMask(sceneObject)
   meshEdges = numpy.empty(len(sceneObject.data.edges) * 2, dtype=numpy.int64)
   sceneObject.data.edges.foreach_get("vertices", meshEdges)
@@ -208,9 +236,8 @@ def profileAlongPath(sceneObject, positions, affected, strength, path, radii, pr
     lateral[snapping] = breakLaterals[snapping, closest[snapping]]
     fractions[snapping] = profileArray[1:-1, 0][closest[snapping]]
   targets = floors + numpy.interp(numpy.clip(fractions, 0, 1), profileArray[:, 0], profileArray[:, 1])
-  updated = positions.copy()
-  moving = affected & ((positions[:, 2] > targets) if mode == "carve" else (positions[:, 2] < targets))
-  updated[moving, 2] -= strength * (positions[moving, 2] - targets[moving])
+  updated = movedToProfile(positions, affected, strength, targets, mode)
+  moving = updated[:, 2] != positions[:, 2]
   if conformRim:
     heightsAboveFloor = positions[:, 2] - floors
     contourLateral = numpy.interp(heightsAboveFloor, profileArray[:, 1], profileArray[:, 0]) * radiiHere
@@ -226,7 +253,7 @@ def profileAlongPath(sceneObject, positions, affected, strength, path, radii, pr
     larger = numpy.where(numpy.abs(slide[first]) > numpy.abs(slide[second]), first, second)
     staying = numpy.where(sliding[first] & sliding[second], larger, numpy.where(sliding[first], first, second))[crowded]
     updated[staying, :2] = positions[staying, :2]
-  return updated
+  return updated, unsnapped
 
 
 def sculptAlongPath(objectName, mode, path, radius, radii, strength, falloff, direction, iterations, profile, conformRim, conformBreaks):
