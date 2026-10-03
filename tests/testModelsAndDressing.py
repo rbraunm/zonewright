@@ -281,3 +281,30 @@ for vertex in bpy.data.objects[objectName].data.vertices:
   # The fixed split runs one way across every cell, so it already follows one grid's step; the other turns the 10 cells the step
   # crosses and the 9 on each side that touch its line.
   assert sorted(followed["turnedDiagonals"] for _, followed, _ in results.values()) == [0, 28]
+
+
+def testFillOnAWarpedGridLeavesNoFoldedTriangles(stageBlenderServer):
+  # Snapping slides vertices across a warped grid toward a curving break; three corners of a cell can land on the line with the
+  # middle one just past it.
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [320, 320], "spacing": 8, "location": [0, 0, 0]})
+    await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "bend"})
+    await session.expectSuccess("warp", {"objectName": "ground", "featureSize": 60, "amplitude": 3, "seed": 1})
+    await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "mesa"})
+    await session.expectSuccess("sculptAlongPath", {
+      "objectName": "ground", "mode": "fill", "path": [[-140, -60, 0], [-20, 30, 0], [140, 10, 0]], "radii": [50, 60, 45], "strength": 1,
+      "profile": [[0, 30], [0.45, 28], [0.6, 12], [0.75, 10], [1, 0]], "conformBreaks": True,
+    })
+    return (await session.expectSuccess("runPython", {"code": "objectName = 'ground'" + readShapedMesh}))["result"]
+
+  shaped = stageBlenderServer.session(steps)
+  vertices = shaped["vertices"]
+
+  def signedArea(face):
+    points = [vertices[index] for index in face]
+    return sum(x0 * y1 - x1 * y0 for (x0, y0, _), (x1, y1, _) in zip(points, points[1:] + points[:1])) / 2
+
+  areas = [signedArea(face) for face in shaped["faces"]]
+  assert sum(area <= 0 for area in areas) == 0
+  assert sum(area < 0.1 * 8 * 8 / 2 for area in areas) == 0

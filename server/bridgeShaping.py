@@ -31,7 +31,8 @@ warpPlanes = ("horizontal", "surface", "full")
 diagonalTurnMargin = 0.05
 # A cell's other diagonal is about as long as its own; a much longer one would reach across two cells.
 diagonalStretch = 1.5
-# A triangle under this share of its cell's area is a sliver: no diagonal turns to make one, and one is always turned away.
+# A triangle under this share of the square on the mesh's edge length is a sliver: no diagonal turns to make one, and one is always
+# turned away.
 diagonalSliverShare = 0.05
 diagonalSweeps = 4
 
@@ -376,25 +377,27 @@ def planarTurn(first, second, third):
   return (second[0] - first[0]) * (third[1] - first[1]) - (second[1] - first[1]) * (third[0] - first[0])
 
 
-def diagonalTurnGain(edge, heights, planar, margin, layers):
+def diagonalTurnGain(edge, heights, planar, margin, sliverArea, layers):
   """How much turning an edge between two triangles to their cell's other diagonal improves the cell: infinite when it removes a
-  sliver (three corners snapped onto one break), else how much it shortens the height step along the diagonal; 0 when that would not
-  follow the contours better, would fold, stretch, or sliver the cell, or would merge faces of different material or surfacing."""
+  sliver or a fold (three corners snapped onto one break, the middle one just past the line), else how much it shortens the height
+  step along the diagonal; 0 when that would not follow the contours better, would fold, stretch, or sliver the cell, or would merge
+  faces of different material or surfacing. Terrain faces up, so a face's winding seen from above is counterclockwise."""
   faces = edge.link_faces
   if len(faces) != 2 or len(faces[0].verts) != 3 or len(faces[1].verts) != 3 or faceSignature(faces[0], layers) != faceSignature(faces[1], layers):
     return 0.0
   first, second = (vertex.index for vertex in edge.verts)
+  winding = [vertex.index for vertex in faces[0].verts]
+  if winding[(winding.index(first) + 1) % 3] != second:
+    first, second = second, first
   across = [next(vertex.index for vertex in face.verts if vertex.index not in (first, second)) for face in faces]
-  ring = [planar[first], planar[across[0]], planar[second], planar[across[1]]]
-  turns = [planarTurn(ring[index], ring[(index + 1) % 4], ring[(index + 2) % 4]) for index in range(4)]
-  straight = 1e-9 * sum(abs(turn) for turn in turns)
-  if not (all(turn >= -straight for turn in turns) or all(turn <= straight for turn in turns)):
-    return 0.0
   if math.dist(planar[across[0]], planar[across[1]]) > diagonalStretch * math.dist(planar[first], planar[second]):
     return 0.0
-  current = [abs(planarTurn(planar[first], planar[second], planar[corner])) / 2 for corner in across]
-  turned = [abs(planarTurn(planar[across[0]], planar[across[1]], planar[corner])) / 2 for corner in (first, second)]
-  sliverArea = diagonalSliverShare * sum(current)
+
+  def area(a, b, c):
+    return planarTurn(planar[a], planar[b], planar[c]) / 2
+
+  current = [area(first, second, across[0]), area(second, first, across[1])]
+  turned = [area(first, across[1], across[0]), area(across[1], second, across[0])]
   if min(turned) < sliverArea:
     return 0.0
   if min(current) < sliverArea:
@@ -411,7 +414,8 @@ def triangulateAlongContours(sceneObject, worldPositions, vertexMask):
     return {"splitCells": 0, "turnedDiagonals": 0}
   heights = worldPositions[:, 2].tolist()
   planar = worldPositions[:, :2].tolist()
-  margin = diagonalTurnMargin * medianEdgeLength(sceneObject, worldPositions, vertexMask)
+  edgeLength = medianEdgeLength(sceneObject, worldPositions, vertexMask)
+  margin, sliverArea = diagonalTurnMargin * edgeLength, diagonalSliverShare * edgeLength * edgeLength
   meshEditor = bridgeMeshAccess.loadBMesh(sceneObject)
   layers = [layer for kind in ("bool", "float", "int", "string") for layer in getattr(meshEditor.faces.layers, kind).values()]
   maskedVertices = [meshEditor.verts[index] for index in numpy.flatnonzero(vertexMask)]
@@ -419,13 +423,14 @@ def triangulateAlongContours(sceneObject, worldPositions, vertexMask):
   bmesh.ops.triangulate(meshEditor, faces=quads, quad_method="FIXED")
   turned = 0
   for _ in range(diagonalSweeps):
+    meshEditor.edges.index_update()
     gains = {}
     for edge in {edge for vertex in maskedVertices for face in vertex.link_faces for edge in face.edges}:
-      gain = diagonalTurnGain(edge, heights, planar, margin, layers)
+      gain = diagonalTurnGain(edge, heights, planar, margin, sliverArea, layers)
       if gain > 0:
         gains[edge] = gain
     claimed, turning = set(), []
-    for edge in sorted(gains, key=gains.get, reverse=True):
+    for edge in sorted(gains, key=lambda edge: (-gains[edge], edge.index)):
       if claimed.isdisjoint(edge.link_faces):
         claimed.update(edge.link_faces)
         turning.append(edge)

@@ -75,7 +75,7 @@ Edits address parts of a mesh with selectors instead of an interactive selection
 | | `extrudeFaces`, `insetFaces`, `bevelEdges`, `subdivide` | Topology edits on selected faces or edges |
 | | `booleanCut` | Cuts openings with a cutter mesh; refuses a cut that would erase the mesh |
 | | `decimate` / `cleanupMesh` | Triangle reduction; merging, degenerate removal, and consistent normals |
-| | `followContours` | Triangulates selected terrain along its contours (each cell's diagonal the one with the smaller height step, never a sliver), so ledges and cliff edges crossing the grid don't notch where they step to the next row; keeps shaping passes |
+| | `followContours` | Triangulates selected terrain along its contours (each cell's diagonal the one with the smaller height step; never making a sliver, and turning away slivers and folds left by snapping), so ledges and cliff edges crossing the grid don't notch where they step to the next row; keeps shaping passes |
 | Breaking up | `warp` | Moves vertices by smooth noise (sideways, along the surface, or freely) so round and straight shapes stop being regular; seeded, masked, with a fade from the mask's edge |
 | | `roughen` | Fractal noise of a chosen feature size and amplitude (the typical move) along each vertex's normal (sideways on walls) or straight up; seeded, masked, faded; used coarse first, then finer, each in its own pass |
 | Iterating | `addShapingPass` / `setShapingPass` | Shaping goes into a named pass on the mesh (a shape key) that can be turned up or down (-1 to 2), muted, or made active later, so one step is revised without redoing the others; export writes the passes combined |
