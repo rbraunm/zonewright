@@ -49,8 +49,10 @@ server = MCPServer(
     " region at any scale. Decide by hand: a slope or height recipe belongs to a region, as the client's terrain ecosystems do (each"
     " painted area its own palette and thresholds, targeted height bands, softened edges), and generators (warp, roughen, scatter) work"
     " inside an area you chose; never one hard rule and one palette across the whole zone. Paint surfacing into layers by region and"
-    " stroke (paintSurface) and shape its edges deliberately (editSurface). Iterate rough to fine and look after every pass (renderView at eye height and from"
-    " above); take back what does not work (passes, resetRegion, rebuildRegion, clearRegion, eraseSurface): removing is a way of adding."
+    " stroke (paintSurface) and shape its edges deliberately (editSurface). Building a zone is visual iteration: iterate rough to fine and judge"
+    " every pass and every review in pictures (renderView at eye height, from above, and close on the part being worked from several sides);"
+    " measure, walkRoute, compareWithClientZones, and scripts check what a picture shows and never replace it. Take back what does not work"
+    " (passes, resetRegion, rebuildRegion, clearRegion, eraseSurface): removing is a way of adding."
     " Steer by the EQ worlds: compareWithClientZones against reference zones, and the catalog's measured use of each asset. The"
     " author-zone skill and docs/zoneWorkflow.md in the zonewright repository hold the procedure."
   ),

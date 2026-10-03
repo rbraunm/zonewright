@@ -7,7 +7,7 @@ How a zone is built with zonewright, and what the tools need to support it. A zo
 - **Intent before tools, region by region.** Each area of a zone is planned for what it is to become, from the concept and references, and kept as a region with its intent. Shaping, surfacing, and dressing are then done region by region at any scale. A slope or height recipe belongs to an area, as the client's terrain ecosystems do: they put rock on steep ground across most of a zone, but each painted area has its own palette and thresholds, height bands target features, and edges blend softly. Noise and scatter likewise work inside a chosen area. One hard rule with one palette across the whole zone reads as generated.
 - **Steer by the EQ worlds.** How the client's own zones are built is measured (the zone survey's `construction` group) and the zone in progress is compared with them after each pass (`compareWithClientZones`), so judgment rests on EQ's practice rather than on taste alone.
 - **Coarse to fine.** Each pass works at its own scale and resolution: big forms on a coarse grid, then refinement, then breakup and detail. Nothing is detailed before its position and shape are settled, because detail on something that moves is wasted.
-- **Look after every pass.** A pass is judged from where players stand (eye-height views along the routes) and from above (layout), against the reference and against EQ scale (a 6-unit character, walkable slopes, run distances). The judgment decides the next pass, which may be a correction, a reduction, or a removal.
+- **Look after every pass.** Building a zone is visual iteration: a pass is judged by looking at pictures of it, from where players stand (eye-height views along the routes), from above (layout), and close on the part being worked from several sides, against the reference and against EQ scale (a 6-unit character, walkable slopes, run distances). Measurements check what a picture shows; they never replace it. The judgment decides the next pass, which may be a correction, a reduction, or a removal.
 - **Passes stay adjustable.** A terrain pass can be turned up, turned down, or removed after later passes are made, so a bad pass costs one change, not a rebuild. Arrangements keep their transforms as data and can be regenerated or re-settled after the ground under them changes.
 - **Removing is a way of adding.** Carving a path, lowering a basin, deleting a face, or dialing a noise pass back to half are as normal as raising and placing. Shapes often read better after something is taken away.
 - **Layers of the zone are independent.** Terrain shape, surfaces, and placed objects change separately: re-sculpting re-seats the props on it, and retexturing does not touch shape.
@@ -74,8 +74,8 @@ A pass holds one offset per vertex, so refining and cutting, which change the ve
 
 ### Review
 
-- Framing a view on given objects, walk views at eye height along a route, and before-and-after comparisons of the same view across passes.
-- Checks: props floating above or buried in the ground, route segments steeper than walkable, texture stretch and uneven texture scale, triangle and object counts.
+- Framing a view on given objects, walk views at eye height along a route, and before-and-after comparisons of the same view across passes. Views come first.
+- Checks, which confirm what the views show: props floating above or buried in the ground, route segments steeper than walkable, texture stretch and uneven texture scale, triangle and object counts.
 
 ### Surfacing and lighting from the catalog
 

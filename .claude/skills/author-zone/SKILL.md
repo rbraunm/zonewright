@@ -12,7 +12,7 @@ zonewright gives you an artist's hands; use them as an artist would. The procedu
 - **Intent before tools.** Know what each area is to become, from the concept and references, before touching it. Write it down as a region (`createRegion`, with its intent).
 - **Region by region, at any scale.** A large zone is many regions, each with its own forms, palette, and dressing. Global operations are for blocking out only, and are then broken up per region.
 - **Recipes per region, decisions by hand.** The client's terrain zones put rock on steep slopes nearly everywhere, but as part of each painted area's recipe: each area has its own palette and slope thresholds, height bands target features (a sulfur band, river beds below the water line, grass above a height), and edges blend softly. Do the same: a slope or height recipe painted inside a region (`paintSurface` with the region and a mask), targeted bands, softened edges; and strokes and boundary edits for everything a rule cannot decide (`paintSurface`, `editSurface`).
-- **Rough to fine, look after every pass.** `renderView` at eye height (`standAt`) and from above (`map` with `shading: layout`); judge, then change, reduce, or remove.
+- **Rough to fine, judged in pictures after every pass.** Building a zone is visual iteration. Look at the result: `renderView` at eye height (`standAt`), from above (`map` with `shading: layout`), and close on the part being worked from several sides and from where players see it; judge what you see, then change, reduce, or remove. Numbers (`measure`, `walkRoute`, `compareWithClientZones`, a script's samples) check what a picture shows and never stand in for it; sweeps of sampled heights or ray casts are no way to judge a form.
 - **Removing is a way of adding.** Mute or turn down passes and layers, take an area back (`resetRegion`, `rebuildRegion`, `clearRegion`, `eraseSurface`), and do it again better.
 - **Steer by the EQ worlds, not taste alone.** `compareWithClientZones` after each pass (named reference zones of a similar kind work best); the asset catalog for what the client's artists used where.
 
@@ -45,7 +45,7 @@ Over the 52 EQ terrain zones: a median of 5 painted ecosystems per zone (10th to
 4. **Secondary forms, per region.** Break regularity deliberately: jogs drawn into outlines, rock pressed into facets (`facet`), and only then a little warp or roughen confined to the region (`{"region": name}` with a `fadeDistance`), at the region's own scale; smooth noise everywhere reads as ripples, not rock. Check `foldedFaces`; turn passes down where they overdo it.
 5. **Surfacing, per region.** Choose the palette from the catalog against the concept (`use-assets`). Add a surfacing layer per decision (the region's ground, a stratum band, a path, accents). Lay each region's recipe first (its ground; rock on its steep faces above that region's threshold; height bands for features), then paint by stroke what no rule decides, with `edgeNoise` so edges wander; smooth and grow or shrink edges with `editSurface` so no speckle remains near a threshold; put transition textures where materials meet.
 6. **Dressing, per region.** Place sets by hand and generated sets inside regions, varied in scale, heading, and tilt, settled on the ground; hundreds of placements is normal for EQ.
-7. **Review.** `compareWithClientZones` against the reference zones; walk the routes at eye height and with `walkRoute` (decks, ramps, ledges, the ways into each area: slope, footing, headroom); fix what reads wrong, region by region.
+7. **Review.** Look first: each area at eye height along its routes, from above, and each feature close from several sides. Then check what the pictures show with `compareWithClientZones` against the reference zones and `walkRoute` (decks, ramps, ledges, the ways into each area: slope, footing, headroom); fix what reads wrong, region by region, and look again.
 
 ## Starting an area over
 
@@ -62,4 +62,5 @@ Over the 52 EQ terrain zones: a median of 5 painted ecosystems per zone (10th to
 - Perfect circles, straight lines, and symmetric forms left as made.
 - Material edges that follow the grid; speckled faces near a threshold.
 - Declaring a pass done without looking at it from where a player stands.
+- Judging a form by numbers (sampled heights, ray casts, counts) instead of by looking at it.
 - Building at full detail before the layout is settled.
