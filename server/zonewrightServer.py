@@ -25,6 +25,7 @@ import eqgExport
 import eqModels
 import eqRaces
 import eqRecording
+import eqSky
 import eqZones
 import extensionCatalog
 import machineProfile
@@ -186,6 +187,19 @@ async def placeEQModel(context, folder, name, location, rotationDegrees, scale, 
     "avatarHeight": avatarHeight, "snapToGround": snapToGround, "collection": collection,
   })
   return placed | {"source": modelSummary(details)}
+
+
+async def resolveSky(sky):
+  """A sky {type, weather, hour, minute} resolved against the client's sky files (eqSky.skyState)."""
+  try:
+    return await anyio.to_thread.run_sync(eqSky.skyState, zoneSources.resolveClientRoot(), toolingRoot / "sky", sky)
+  except (OSError, ValueError) as error:
+    raise ToolError(str(error)) from error
+
+
+async def zoneSky(zone):
+  """The open zone's sky state for a preview, or None when it has no sky."""
+  return await resolveSky(zone["sky"]) if "sky" in zone else None
 
 
 def newRenderPath():
@@ -591,21 +605,33 @@ async def setZoneProperties(
   fogEnd: float | None = None,
   fogDensity: float | None = None,
   newEngineZone: bool | None = None,
+  sky: dict | str | None = None,
 ):
   """Set the zone's EQ properties stored in the .blend, in the client's lighting terms (docs/clientRendering.md): ambient, special
   ambient, bounce, and sun colors (0-1, raw as the client uses them); the direction toward the sun (azimuth 0 = +Y, clockwise;
-  elevation -90 to 90); fog color, start, end (also the far clip), and density (the client's default is 0.33); and newEngineZone,
+  elevation -90 to 90); fog color, start, end (also the far clip), and density (the client's default is 0.33); newEngineZone,
   the zone header's NewEngineZone, which sets the scale the client draws spawns at (the live dumps' zoneHeaders give it per zone;
-  EQEmu sends false for every zone)."""
+  EQEmu sends false for every zone); and sky, the client sky the zone draws: {type, weather, hour, minute}. type is the sky type the
+  client looks up, the zone's short name unless the server overrides it; a type sky.ini lacks gets the client's 'default' sky, as
+  every zone without its own does. weather defaults to the type's DefaultWeather. hour and minute place the sun, at its highest at
+  12:00 (a midday screenshot after the server's '#set time 12' matches 13:00). Previews draw the sky behind the zone and take the
+  ambient, bounce, sun color and direction, and fog color from it, so those cannot be set by hand while it is set, and setting it
+  drops any set before; sky "none" removes it. The result gives how the client resolves the sky and the light it supplies."""
   updates = {
     "ambientColor": ambientColor, "specialAmbientColor": specialAmbientColor, "bounceColor": bounceColor, "sunColor": sunColor,
     "sunAzimuthDegrees": sunAzimuthDegrees, "sunElevationDegrees": sunElevationDegrees, "fogColor": fogColor, "fogStart": fogStart,
-    "fogEnd": fogEnd, "fogDensity": fogDensity, "newEngineZone": newEngineZone,
+    "fogEnd": fogEnd, "fogDensity": fogDensity, "newEngineZone": newEngineZone, "sky": sky,
   }
   given = {key: value for key, value in updates.items() if value is not None}
   if not given:
     raise ToolError(f"setZoneProperties needs at least one of {list(updates)}")
-  return await callBridge(context, "setZoneProperties", {"updates": given})
+  if isinstance(sky, str):
+    if sky != "none":
+      raise ToolError(f"sky is {{type, weather, hour, minute}} or \"none\", got '{sky}'")
+    given["sky"] = None
+  stored = await callBridge(context, "setZoneProperties", {"updates": given})
+  resolved = await zoneSky(stored["zone"])
+  return stored | {"sky": None if resolved is None else {key: resolved[key] for key in ("chain", "dayFraction", "lightFrom", "environment")}}
 
 
 @guardedTool()
@@ -618,7 +644,10 @@ async def renderView(context: Context, view: dict, shading: str = "client", band
   if "standAt" in view and "newEngineZone" in zone:
     figure = await anyio.to_thread.run_sync(spawnModel, None, figureModelCode, figureHeight, bool(zone["newEngineZone"]))
     figureModel = {key: figure[key] for key in ("folder", "scale", "avatarHeight")}
-  description = await callBridge(context, "renderView", {"view": view, "outputPath": str(outputPath), "figureModel": figureModel, "shading": shading, "bandHeight": bandHeight, "guides": guides})
+  description = await callBridge(context, "renderView", {
+    "view": view, "outputPath": str(outputPath), "figureModel": figureModel, "shading": shading, "bandHeight": bandHeight, "guides": guides,
+    "sky": await zoneSky(zone),
+  })
   return [Image(data=outputPath.read_bytes(), format="png"), description]
 
 
@@ -1004,7 +1033,7 @@ async def calibrateShot(
     recorded = await placeRecorded(context, recordingPath, liveDumpsPath, (taken - start).total_seconds() * 1000, view["eye"], recordingReach, None)
   runFolder = toolingRoot / "calibration" / Path(screenshotPath).stem / datetime.datetime.now(datetime.UTC).strftime("%Y%m%d-%H%M%S")
   runFolder.mkdir(parents=True, exist_ok=True)
-  measured = passArrays((await callBridge(context, "renderPasses", {"view": view, "outputFolder": str(runFolder), "passNames": ["lit", "base", "normal", "baked", "share", "distance"]}))["passes"])
+  measured = passArrays((await callBridge(context, "renderPasses", {"view": view, "outputFolder": str(runFolder), "passNames": ["lit", "base", "normal", "baked", "share", "distance"], "sky": None}))["passes"])
   height, width = measured["lit"].shape[:2]
   screen = await anyio.to_thread.run_sync(eqCalibration.screenshotPixels, screenshotPath, width, height)
   givenFog = {"fogStart": fogStart, "fogEnd": fogEnd, "fogDensity": fogDensity} if all(fogGiven) else None
@@ -1016,7 +1045,7 @@ async def calibrateShot(
   if givenFog is None:
     environment |= {key: fit[key] for key in ("fogColor", "fogStart", "fogEnd", "fogDensity")}
   await callBridge(context, "setZoneProperties", {"updates": {key: fit[key] for key in lightingKeys} | environment})
-  rendered = passArrays((await callBridge(context, "renderPasses", {"view": view, "outputFolder": str(runFolder), "passNames": ["lit"]}))["passes"])["lit"]
+  rendered = passArrays((await callBridge(context, "renderPasses", {"view": view, "outputFolder": str(runFolder), "passNames": ["lit"], "sky": None}))["passes"])["lit"]
   background = numpy.concatenate([numpy.array(environment["fogColor"]), [1.0]])
   composited = rendered * rendered[..., 3:4] + background * (1 - rendered[..., 3:4])
   image, difference = eqCalibration.comparison(screen, numpy.concatenate([composited[..., :3], rendered[..., 3:4]], axis=2))
@@ -1035,7 +1064,7 @@ async def calibrateShot(
 @guardedTool()
 async def pick(context: Context, view: dict, pixel: list[int]):
   """What is under a pixel ([x, y] from the top-left of the 960x540 render) of a view: object, world position, normal, material, distance."""
-  return await callBridge(context, "pick", {"view": view, "pixel": pixel})
+  return await callBridge(context, "pick", {"view": view, "pixel": pixel, "sky": await zoneSky(await callBridge(context, "getZoneProperties", {}))})
 
 
 selectorHelp = (

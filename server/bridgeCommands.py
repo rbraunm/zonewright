@@ -19,13 +19,15 @@ import bridgeShaping
 import bridgeSurfacing
 import bridgeViews
 import bridgeWater
+import skyDrawing
 from bridgeState import requireNoUnsavedChanges, state
 
 zonePropertyName = "zonewrightZone"
 zonePropertyKeys = (
   "ambientColor", "specialAmbientColor", "bounceColor", "sunColor", "sunAzimuthDegrees", "sunElevationDegrees", "fogColor", "fogStart", "fogEnd",
-  "fogDensity", "newEngineZone",
+  "fogDensity", "newEngineZone", "sky",
 )
+skyKeys = {"type": str, "weather": str, "hour": int, "minute": int}
 fileImageSources = ("FILE", "SEQUENCE", "TILED")
 
 
@@ -187,11 +189,34 @@ def validateColor(name, color):
     raise ValueError(f"{name} must be three numbers from 0 to 1, got {color!r}")
 
 
+def validateSky(sky):
+  if not isinstance(sky, dict) or sorted(set(sky) - set(skyKeys)) or not {"type", "hour", "minute"} <= set(sky):
+    raise ValueError(f"sky must be {{type, weather (optional), hour, minute}}, got {sky!r}")
+  for key, value in sky.items():
+    if not isinstance(value, skyKeys[key]) or isinstance(value, bool) or (isinstance(value, str) and not value):
+      raise ValueError(f"sky {key} must be a {skyKeys[key].__name__}, got {value!r}")
+  if not 0 <= sky["hour"] <= 23 or not 0 <= sky["minute"] <= 59:
+    raise ValueError(f"sky hour must be 0-23 and minute 0-59, got {sky['hour']}:{sky['minute']}")
+
+
 def setZoneProperties(updates):
+  """Store zone properties; a sky None removes the sky. A sky supplies the light and the fog color, so setting one drops those that
+  were set by hand, and they cannot be set while it stays."""
   unknownKeys = sorted(set(updates) - set(zonePropertyKeys))
   if unknownKeys:
     raise ValueError(f"Unknown zone properties {unknownKeys}; known: {list(zonePropertyKeys)}")
   zone = readZoneProperties(bpy.context.scene) | updates
+  if zone.get("sky", "") is None:
+    del zone["sky"]
+  replaced = []
+  if "sky" in zone:
+    validateSky(zone["sky"])
+    supplied = sorted(set(updates) & set(skyDrawing.suppliedZoneKeys))
+    if supplied:
+      raise ValueError(f"The zone's sky supplies {supplied}; remove the sky (sky \"none\") to set them by hand")
+    replaced = sorted(set(zone) & set(skyDrawing.suppliedZoneKeys))
+    for key in replaced:
+      del zone[key]
   for colorKey in ("ambientColor", "specialAmbientColor", "bounceColor", "sunColor", "fogColor"):
     if colorKey in zone:
       validateColor(colorKey, zone[colorKey])
@@ -206,23 +231,32 @@ def setZoneProperties(updates):
   if "newEngineZone" in zone and not isinstance(zone["newEngineZone"], bool):
     raise ValueError(f"newEngineZone must be true or false, got {zone['newEngineZone']!r}")
   bpy.context.scene[zonePropertyName] = zone
-  return readZoneProperties(bpy.context.scene)
+  return {"zone": readZoneProperties(bpy.context.scene), "replacedBySky": replaced}
 
 
 def getZoneProperties():
   return readZoneProperties(bpy.context.scene)
 
 
-def renderView(view, outputPath, figureModel, shading, bandHeight, guides):
-  return bridgeViews.renderView(bpy.context.scene, readZoneProperties(bpy.context.scene), view, outputPath, figureModel, shading, bandHeight, guides)
+def previewZone(sky):
+  """The zone's properties for a preview, with what its sky supplies: the server resolves the stored sky against the client's files
+  and passes its state (eqSky.skyState)."""
+  zone = readZoneProperties(bpy.context.scene)
+  if ("sky" in zone) != (sky is not None):
+    raise ValueError("The zone's sky and the sky state passed for it disagree")
+  return zone | sky["environment"] if sky is not None else zone
 
 
-def pick(view, pixel):
-  return bridgeViews.pick(bpy.context.scene, readZoneProperties(bpy.context.scene), view, pixel)
+def renderView(view, outputPath, figureModel, shading, bandHeight, guides, sky):
+  return bridgeViews.renderView(bpy.context.scene, previewZone(sky), sky, view, outputPath, figureModel, shading, bandHeight, guides)
 
 
-def renderPasses(view, outputFolder, passNames):
-  return bridgeViews.renderPasses(bpy.context.scene, readZoneProperties(bpy.context.scene), view, outputFolder, passNames)
+def pick(view, pixel, sky):
+  return bridgeViews.pick(bpy.context.scene, previewZone(sky), view, pixel)
+
+
+def renderPasses(view, outputFolder, passNames, sky):
+  return bridgeViews.renderPasses(bpy.context.scene, previewZone(sky), view, outputFolder, passNames)
 
 
 commands = {

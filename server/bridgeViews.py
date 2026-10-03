@@ -11,6 +11,7 @@ import numpy
 import bridgeClientLight
 import bridgeMeshAccess
 import bridgeModels
+import skyDrawing
 
 requiredZoneKeys = (
   "ambientColor", "specialAmbientColor", "bounceColor", "sunColor", "sunAzimuthDegrees", "sunElevationDegrees", "fogColor", "fogStart", "fogEnd",
@@ -34,6 +35,8 @@ figureMinimumDistance = 3.0
 figureSideOffset = 1.5
 mapClearance = 100.0
 viewShadings = ("client", "layout")
+# The sky is soft everywhere, so an equirectangular image at about a fifth of a degree a pixel draws it.
+skyImageHeight = 1024
 # Layout shading lights from the northwest, as relief maps do, so slopes read the same whatever the zone's sun.
 layoutLightDirection = (-0.5, 0.5, 0.7071)
 layoutAmbient = 0.3
@@ -44,17 +47,19 @@ layoutHeightColors = ((0.0, (0.22, 0.36, 0.26)), (0.35, (0.58, 0.56, 0.36)), (0.
 def requireZone(zone):
   missing = [key for key in requiredZoneKeys if key not in zone]
   if missing:
-    raise ValueError(f"Zone properties missing: {missing}; set them with setZoneProperties")
+    raise ValueError(f"Zone properties missing: {missing}; set them with setZoneProperties (a sky supplies the light and the fog color)")
 
 
 class PreviewScene:
   """A scene holding links to the open scene's renderable objects (guides, such as plot outlines, only when asked for) plus the
-  preview's own camera and world, the client's lighting set from the zone. Where nothing is drawn shows the fog color; the client's sky
-  is not drawn yet."""
+  preview's own camera and world, the client's lighting set from the zone. Where nothing is drawn shows the fog color, or the zone's
+  sky (eqSky's state) once drawSky places it for the camera."""
 
-  def __init__(self, sourceScene, zone, guides=True):
+  def __init__(self, sourceScene, zone, guides=True, sky=None):
     requireZone(zone)
     self.zone = zone
+    self.sky = sky
+    self.skyImage = None
     self.createdObjects = []
     self.scene = bpy.data.scenes.new(previewName)
     for sourceObject in sourceScene.objects:
@@ -107,6 +112,24 @@ class PreviewScene:
     background.inputs["Strength"].default_value = 1.0
     self.scene.world = world
 
+  def drawSky(self):
+    """The zone's sky behind everything, as the client draws it for the camera's height, which moves its horizon band."""
+    if self.sky is None:
+      return
+    textures = {texture["path"]: numpy.load(texture["path"]) for satellite in self.sky["satellites"] for texture in satellite["textures"]}
+    width = 2 * skyImageHeight
+    colors = skyDrawing.skyColors(skyDrawing.equirectangularDirections(width, skyImageHeight), self.sky, self.camera.location.z, textures)
+    pixels = numpy.ones((colors.shape[0], 4), dtype=numpy.float32)
+    pixels[:, :3] = colors
+    self.skyImage = bpy.data.images.new(previewName + "Sky", width, skyImageHeight, alpha=False, float_buffer=True)
+    self.skyImage.colorspace_settings.name = "Non-Color"
+    self.skyImage.pixels.foreach_set(pixels.ravel())
+    nodes = self.scene.world.node_tree.nodes
+    environment = nodes.new("ShaderNodeTexEnvironment")
+    environment.image = self.skyImage
+    environment.interpolation = "Linear"
+    self.scene.world.node_tree.links.new(environment.outputs["Color"], nodes["Background"].inputs["Color"])
+
   def depsgraph(self):
     with bpy.context.temp_override(scene=self.scene, view_layer=self.scene.view_layers[0]):
       return bpy.context.evaluated_depsgraph_get()
@@ -133,6 +156,8 @@ class PreviewScene:
         bpy.data.meshes.remove(data)
     override = self.scene.view_layers[0].material_override
     bpy.data.worlds.remove(self.scene.world)
+    if self.skyImage is not None:
+      bpy.data.images.remove(self.skyImage)
     bpy.data.scenes.remove(self.scene)
     if override is not None:
       bpy.data.materials.remove(override)
@@ -308,13 +333,15 @@ def roundVector(vector, digits=3):
   return [round(float(component), digits) for component in vector]
 
 
-def renderView(sourceScene, zone, view, outputPath, figureModel, shading, bandHeight, guides):
+def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, bandHeight, guides):
   if shading not in viewShadings:
     raise ValueError(f"shading must be one of {list(viewShadings)}, got '{shading}'")
-  # A map or a layout drawing is for reading the shape, so neither is fogged.
-  preview = PreviewScene(sourceScene, zone | {"fogDensity": 0.0} if "map" in view or shading == "layout" else zone, guides)
+  # A map or a layout drawing is for reading the shape, so neither is fogged nor has a sky.
+  shapeOnly = "map" in view or shading == "layout"
+  preview = PreviewScene(sourceScene, zone | {"fogDensity": 0.0} if shapeOnly else zone, guides, None if shapeOnly else sky)
   try:
     description = placeCamera(preview, view, figureModel)
+    preview.drawSky()
     if shading == "layout":
       description["heightRange"] = list(applyLayoutShading(preview, bandHeight))
       description["bandHeight"] = bandHeight
