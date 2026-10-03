@@ -1,5 +1,6 @@
-"""The open scene's zone gathered as the zone survey gathers a client zone, so it is measured by the same methods: the terrain
-collection's meshes are its terrain, every other rendered mesh and collection instance is placed on it. Runs under Blender's Python."""
+"""The open scene's zone gathered as the zone survey gathers a client zone, so it is measured by the same methods: what export ships
+(bridgeExport.exportedObjects), the terrain collection's meshes as its terrain and every other mesh and collection instance placed on
+it. Runs under Blender's Python."""
 import os
 
 import math
@@ -42,21 +43,15 @@ def triangulated(sceneObject, depsgraph, matrix):
 
 def collectConstruction(outputPath):
   """Writes the zone's triangles to outputPath (.npz) and returns its texture names and placement count."""
-  scene = bpy.context.scene
   depsgraph = bpy.context.evaluated_depsgraph_get()
-  terrainCollection = bpy.data.collections.get(bridgeExport.terrainCollectionName)
-  if terrainCollection is None or not any(member.type == "MESH" for member in terrainCollection.all_objects):
-    raise ValueError(f"The scene has no '{bridgeExport.terrainCollectionName}' collection with meshes; its meshes are the zone's terrain")
-  terrainNames = {member.name for member in terrainCollection.all_objects}
+  shipped, _ = bridgeExport.exportedObjects()
   parts, placements = [], 0
-  for sceneObject in scene.objects:
-    if sceneObject.hide_render or sceneObject.type in ("LIGHT", "CAMERA"):
-      continue
-    if sceneObject.type == "MESH":
-      isTerrain = sceneObject.name in terrainNames
+  for sceneObject, role in shipped:
+    if role in ("terrain", "mesh"):
+      isTerrain = role == "terrain"
       parts.append((not isTerrain, triangulated(sceneObject, depsgraph, sceneObject.matrix_world)))
       placements += not isTerrain
-    elif sceneObject.type == "EMPTY" and sceneObject.instance_type == "COLLECTION" and sceneObject.instance_collection is not None:
+    elif role == "instance":
       collection = sceneObject.instance_collection
       offset = mathutils.Matrix.Translation(-collection.instance_offset)
       for member in collection.all_objects:

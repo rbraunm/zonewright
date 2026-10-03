@@ -4,6 +4,7 @@ empty whose eqEmitterDefinition and eqEmitterLifespan properties hold the client
 field, and eqEmitterAlwaysVisible the field some lists add. The preview draws neither yet. Runs under Blender's Python."""
 import bpy
 
+import bridgeMeshAccess
 import bridgeObjects
 
 radiusProperty = "eqRadius"
@@ -19,8 +20,15 @@ def validatedLight(light):
   return light
 
 
-def placeLights(lights, collection):
-  """Point lights named, placed, colored, and reaching as given: [{name, position, color, radius}]."""
+def requireClientContent(clientContent):
+  if clientContent is not None and clientContent not in bridgeMeshAccess.clientContentKinds:
+    raise ValueError(f"clientContent must be None or one of {list(bridgeMeshAccess.clientContentKinds)}, got {clientContent!r}")
+
+
+def placeLights(lights, collection, clientContent):
+  """Point lights named, placed, colored, and reaching as given: [{name, position, color, radius}]; clientContent marks those an
+  imported zone brings (bridgeMeshAccess.clientContentKinds)."""
+  requireClientContent(clientContent)
   destination = bridgeObjects.targetCollection(collection)
   placed = []
   for light in map(validatedLight, lights):
@@ -29,13 +37,17 @@ def placeLights(lights, collection):
     data[radiusProperty] = float(light["radius"])
     lightObject = bpy.data.objects.new(light["name"], data)
     lightObject.location = light["position"]
+    if clientContent is not None:
+      lightObject[bridgeMeshAccess.clientContentProperty] = clientContent
     destination.objects.link(lightObject)
     placed.append(lightObject.name)
   return {"lights": len(placed), "collection": destination.name, "names": placed}
 
 
-def placeEmitters(emitters, collection):
-  """Emitter empties named, placed, and showing the given definitions: [{name, position, definition, lifespan, alwaysVisible (or None)}]."""
+def placeEmitters(emitters, collection, clientContent):
+  """Emitter empties named, placed, and showing the given definitions: [{name, position, definition, lifespan, alwaysVisible (or None)}];
+  clientContent marks those an imported zone brings."""
+  requireClientContent(clientContent)
   destination = bridgeObjects.targetCollection(collection)
   placed = []
   for emitter in emitters:
@@ -51,6 +63,8 @@ def placeEmitters(emitters, collection):
     emitterObject[lifespanProperty] = emitter["lifespan"]
     if emitter.get("alwaysVisible") is not None:
       emitterObject[alwaysVisibleProperty] = emitter["alwaysVisible"]
+    if clientContent is not None:
+      emitterObject[bridgeMeshAccess.clientContentProperty] = clientContent
     destination.objects.link(emitterObject)
     placed.append(emitterObject.name)
   return {"emitters": len(placed), "collection": destination.name, "names": placed}

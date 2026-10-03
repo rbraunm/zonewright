@@ -1,5 +1,6 @@
 """World-space mesh access and selectors: which vertices, edges, or faces of a mesh an operation touches. Runs under Blender's Python."""
 import contextlib
+import json
 import math
 import statistics
 
@@ -31,6 +32,10 @@ waterProperty = "zonewrightWater"
 # zone's housing file rather than its geometry.
 guideProperty = "zonewrightGuide"
 plotBorderProperty = "zonewrightPlotBorder"
+# What placed client content is, so export leaves it out and says why: spawns and doors are the server's data, client objects do not
+# export yet, and imported zones are reference.
+clientContentProperty = "zonewrightClientContent"
+clientContentKinds = ("spawn", "door", "object", "zone", "zoneFile")
 waterReach = 100000.0
 
 
@@ -80,6 +85,11 @@ def requireWater(name):
   if waterObject.type != "MESH" or waterProperty not in waterObject:
     raise ValueError(f"'{name}' is not a water body; floodWater, runWater, and pourWaterfall make them")
   return waterObject
+
+
+def surfaceLayers(sceneObject):
+  """A mesh's surfacing layers, bottom first: [{name, muted}]."""
+  return json.loads(sceneObject[surfaceLayersProperty]) if surfaceLayersProperty in sceneObject else []
 
 
 def isDesignAid(sceneObject):

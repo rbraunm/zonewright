@@ -112,3 +112,32 @@ def testExportRefusesWhatAZoneFileCannotHold(stageBlenderServer, tmp_path):
   assert "'pillar' is scaled (1.0, 2.0, 1.0); a placed model takes one positive scale" in stretched
   assert "no 'terrain' collection with meshes" in noTerrain
   assert not (tmp_path / "testplot.eqg").exists()
+
+
+def testExportLeavesOutWhatIsNotTheZonesOwnAndSaysWhy(stageBlenderServer, tmp_path):
+  texture = tmp_path / "ground.png"
+  Image.fromarray(patternedRGBA(16, 4)).save(texture)
+  archivePath = tmp_path / "testplot.eqg"
+
+  async def steps(session):
+    await buildPlot(session, texture, texture)
+    await session.expectSuccess("createRegion", {"name": "yard", "outline": [[-30, -30], [30, -30], [30, 30], [-30, 30]], "bottom": -10, "top": 30, "intent": "the yard"})
+    await session.expectSuccess("placeSpawn", {"zone": None, "model": "DAF", "name": "visitor", "height": 5, "location": [0, 0, 20], "headingDegrees": 0})
+    await session.expectSuccess("placeObject", {"zone": None, "model": "IT10800_ACTORDEF", "name": "kiln", "location": [10, 10, 0], "headingDegrees": 0})
+    await session.expectSuccess("runPython", {"code": "bpy.data.objects['pillar'].hide_render = True"})
+    await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "mound"})
+    await session.expectSuccess("setShapingPass", {"objectName": "ground", "name": "mound", "muted": True})
+    await session.expectSuccess("addSurfaceLayer", {"objectName": "ground", "name": "path"})
+    await session.expectSuccess("setSurfaceLayer", {"objectName": "ground", "name": "path", "muted": True})
+    return await session.expectSuccess("exportZone", {"path": str(archivePath)})
+
+  exported = stageBlenderServer.session(steps)
+  assert exported["excluded"] == [
+    {"reason": "a client object: client models do not export yet", "count": 1, "objects": ["kiln"]},
+    {"reason": "a client spawn: the server's data, not zone geometry", "count": 1, "objects": ["visitor"]},
+    {"reason": "a region: the plan", "count": 1, "objects": ["yard"]},
+    {"reason": "hidden from renders", "count": 1, "objects": ["pillar"]},
+  ]
+  assert exported["toConfirm"] == [{"object": "ground", "passesOff": ["mound"], "layersMuted": ["path"]}]
+  assert exported["modelTriangles"] == {"obj_crate.mod": 12}
+  assert sorted(eqArchive.EQArchive(archivePath).entries) == ["ground.dds", "obj_crate.mod", "ter_testplot.ter", "testplot.zon"]

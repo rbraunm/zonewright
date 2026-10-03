@@ -192,8 +192,11 @@ def modelObject(folder, name, scale, location, rotationDegrees):
   return modelObjectInstance
 
 
-def placeModel(modelFolder, name, location, rotationDegrees, scale, avatarHeight, snapToGround, collection):
-  """Place a cached EQ model with its origin at `location`; snapToGround instead stands the origin avatarHeight above the surface below, as the client stands a spawn."""
+def placeModel(modelFolder, name, location, rotationDegrees, scale, avatarHeight, snapToGround, collection, clientContent):
+  """Place a cached EQ model with its origin at `location`, marked as the client content it is (bridgeMeshAccess.clientContentKinds);
+  snapToGround instead stands the origin avatarHeight above the surface below, as the client stands a spawn."""
+  if clientContent not in bridgeMeshAccess.clientContentKinds:
+    raise ValueError(f"clientContent must be one of {list(bridgeMeshAccess.clientContentKinds)}, got {clientContent!r}")
   bridgeObjects.requireNewName(name)
   origin = mathutils.Vector(location)
   ground = None
@@ -204,6 +207,7 @@ def placeModel(modelFolder, name, location, rotationDegrees, scale, avatarHeight
     ground = hit[0]
     origin = ground + mathutils.Vector((0, 0, avatarHeight))
   placed = modelObject(modelFolder, name, scale, origin, rotationDegrees)
+  placed[bridgeMeshAccess.clientContentProperty] = clientContent
   bridgeObjects.targetCollection(collection).objects.link(placed)
   bpy.context.view_layer.update()
   return bridgeObjects.describeTransform(placed) | {"ground": ground and bridgeObjects.roundVector(ground), "dimensions": bridgeObjects.roundVector(placed.dimensions)}

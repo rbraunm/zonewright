@@ -1,8 +1,9 @@
 """What an EQG zone export takes from the open scene. The `terrain` collection's meshes become the zone's terrain, merged in world
 coordinates; every other rendered mesh becomes a model placed at its object's transform (copies sharing a mesh and without modifiers
-share one model), and every collection instance a model of its collection's meshes. Guides and plot borders are not the zone's
-geometry and are left out. Writes the meshes to modelArrays.npz and returns the models, materials, placements, the water bodies' swim
-volumes, and the zone's housing. Runs under Blender's Python."""
+share one model), and every collection instance a model of its collection's meshes. What is not the zone's own geometry (guides, plot
+borders, regions, placed client content, anything hidden from renders) is left out and listed with why. Writes the meshes to
+modelArrays.npz and returns the models, materials, placements, the water bodies' swim volumes, and the zone's housing. Runs under
+Blender's Python."""
 import os
 import re
 
@@ -18,6 +19,82 @@ import bridgeWater
 terrainCollectionName = "terrain"
 modelArraysFileName = "modelArrays.npz"
 uniformScaleTolerance = 1e-5
+clientContentReasons = {
+  "spawn": "a client spawn: the server's data, not zone geometry",
+  "door": "a client door: the server's data, not zone geometry",
+  "object": "a client object: client models do not export yet",
+  "zone": "part of an imported client zone: reference",
+  "zoneFile": "part of an imported zone archive: reference",
+}
+
+
+def exclusionReason(sceneObject):
+  """Why an object is not part of the exported zone, or None when it is."""
+  kind = sceneObject.get(bridgeMeshAccess.clientContentProperty)
+  if kind is not None:
+    return clientContentReasons[kind]
+  if sceneObject.type == "CAMERA":
+    return "a camera"
+  if bridgeMeshAccess.plotBorderProperty in sceneObject:
+    return "a plot border: exported as a door in the housing list"
+  if bridgeMeshAccess.guideProperty in sceneObject:
+    return "a guide"
+  if bridgeMeshAccess.regionIntentProperty in sceneObject:
+    return "a region: the plan"
+  if sceneObject.hide_render:
+    return "hidden from renders"
+  if sceneObject.type == "EMPTY" and not bridgeEnvironment.isEmitter(sceneObject) and not isCollectionInstance(sceneObject):
+    return "an empty with nothing to export"
+  return None
+
+
+def isCollectionInstance(sceneObject):
+  return sceneObject.type == "EMPTY" and sceneObject.instance_type == "COLLECTION" and sceneObject.instance_collection is not None
+
+
+def exportedObjects():
+  """What a zone export ships, each object with its role (terrain, mesh, instance, light, or emitter), and what it leaves out, each
+  with why. Nothing is unhidden, retagged, or removed."""
+  terrainCollection = bpy.data.collections.get(terrainCollectionName)
+  if terrainCollection is None or not any(member.type == "MESH" for member in terrainCollection.all_objects):
+    raise ValueError(f"The scene has no '{terrainCollectionName}' collection with meshes; its meshes become the zone's terrain")
+  terrainNames = {member.name for member in terrainCollection.all_objects}
+  shipped, excluded = [], []
+  for sceneObject in bpy.context.scene.objects:
+    reason = exclusionReason(sceneObject)
+    if reason is not None:
+      excluded.append({"object": sceneObject.name, "reason": reason})
+    elif sceneObject.name in terrainNames:
+      if sceneObject.type != "MESH":
+        raise ValueError(f"'{sceneObject.name}' in the terrain collection is a {sceneObject.type}; terrain takes meshes")
+      shipped.append((sceneObject, "terrain"))
+    elif sceneObject.type == "LIGHT":
+      shipped.append((sceneObject, "light"))
+    elif bridgeEnvironment.isEmitter(sceneObject):
+      shipped.append((sceneObject, "emitter"))
+    elif sceneObject.type == "MESH":
+      shipped.append((sceneObject, "mesh"))
+    elif isCollectionInstance(sceneObject):
+      shipped.append((sceneObject, "instance"))
+    else:
+      raise ValueError(f"'{sceneObject.name}' is a {sceneObject.type}; zone export takes meshes and collection instances")
+  if not any(role == "terrain" for _, role in shipped):
+    raise ValueError(f"Every mesh in the '{terrainCollectionName}' collection is left out: {[entry for entry in excluded if entry['object'] in terrainNames]}")
+  return shipped, sorted(excluded, key=lambda entry: entry["object"])
+
+
+def decisionsToConfirm(shipped):
+  """Shaping passes and surfacing layers that are off on shipped meshes: they leave the zone as if never made, which may be meant."""
+  decisions = []
+  for sceneObject, role in shipped:
+    if sceneObject.type != "MESH":
+      continue
+    keys = sceneObject.data.shape_keys
+    offPasses = [key.name for key in keys.key_blocks if key != keys.reference_key and (key.mute or key.value == 0)] if keys is not None else []
+    mutedLayers = [layer["name"] for layer in bridgeMeshAccess.surfaceLayers(sceneObject) if layer["muted"]]
+    if offPasses or mutedLayers:
+      decisions.append({"object": sceneObject.name, "passesOff": offPasses, "layersMuted": mutedLayers})
+  return decisions
 
 
 def nodeImagePath(material, nodeName):
@@ -125,30 +202,23 @@ def collectZoneExport(outputFolder, zoneName):
       materials[material.name] = materialRecord(material)
     return material.name
 
-  terrainCollection = bpy.data.collections.get(terrainCollectionName)
-  if terrainCollection is None or not any(member.type == "MESH" for member in terrainCollection.all_objects):
-    raise ValueError(f"The scene has no '{terrainCollectionName}' collection with meshes; its meshes become the zone's terrain")
-  terrainObjects = {member.name for member in terrainCollection.all_objects}
+  shipped, excluded = exportedObjects()
   terrainParts, models, placements, lights, emitters = [], {}, [], [], []
-  for sceneObject in scene.objects:
-    if sceneObject.hide_render or sceneObject.type == "CAMERA" or bridgeMeshAccess.isDesignAid(sceneObject):
-      continue
-    if sceneObject.type == "LIGHT":
+  for sceneObject, role in shipped:
+    if role == "light":
       lights.append(bridgeEnvironment.lightRecord(sceneObject))
       continue
-    if bridgeEnvironment.isEmitter(sceneObject):
+    if role == "emitter":
       emitters.append(bridgeEnvironment.emitterRecord(sceneObject))
       continue
-    if sceneObject.name in terrainObjects:
-      if sceneObject.type != "MESH":
-        raise ValueError(f"'{sceneObject.name}' in the terrain collection is a {sceneObject.type}; terrain takes meshes")
+    if role == "terrain":
       terrainParts.append(meshArrays(sceneObject, depsgraph, numpy.array(sceneObject.matrix_world), materialName))
       continue
-    if sceneObject.type == "MESH":
+    if role == "mesh":
       key = ("mesh", sceneObject.data.name) if not sceneObject.modifiers else ("object", sceneObject.name)
       if key not in models:
         models[key] = {"stem": fileStem(key[1]), "arrays": meshArrays(sceneObject, depsgraph, numpy.identity(4), materialName)}
-    elif sceneObject.type == "EMPTY" and sceneObject.instance_type == "COLLECTION" and sceneObject.instance_collection is not None:
+    else:
       collection = sceneObject.instance_collection
       key = ("collection", collection.name, collection.library.filepath if collection.library else "")
       if key not in models:
@@ -159,10 +229,6 @@ def collectZoneExport(outputFolder, zoneName):
         if others:
           raise ValueError(f"Collection '{collection.name}' holds {others}; a collection exports as one model of its meshes")
         models[key] = {"stem": fileStem(collection.name), "arrays": mergeArrays([meshArrays(member, depsgraph, offset @ numpy.array(member.matrix_world), materialName) for member in members])}
-    elif sceneObject.type == "EMPTY":
-      continue
-    else:
-      raise ValueError(f"'{sceneObject.name}' is a {sceneObject.type}; zone export takes meshes and collection instances")
     placements.append({"key": key, "object": sceneObject.name} | placementTransform(sceneObject))
   stems = [model["stem"] for model in models.values()]
   duplicates = sorted({stem for stem in stems if stems.count(stem) > 1})
@@ -191,7 +257,7 @@ def collectZoneExport(outputFolder, zoneName):
   return {
     "zone": zoneName, "arrays": os.path.join(outputFolder, modelArraysFileName), "terrain": {"file": f"ter_{zoneName}.ter", "materials": terrain["materials"], "arrays": "terrain"},
     "models": modelList, "materials": list(materials.values()), "placements": placementList, "lights": lights, "emitters": emitters,
-    "regions": bridgeWater.waterVolumes(), "housing": bridgeHousing.collectHousing(),
+    "regions": bridgeWater.waterVolumes(), "housing": bridgeHousing.collectHousing(), "excluded": excluded, "toConfirm": decisionsToConfirm(shipped),
   }
 
 

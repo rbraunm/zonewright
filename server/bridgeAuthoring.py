@@ -100,12 +100,8 @@ def getRegions():
 
 # Surfacing layers
 
-def layerOrder(sceneObject):
-  return json.loads(sceneObject[layerOrderProperty]) if layerOrderProperty in sceneObject else []
-
-
 def requireLayer(sceneObject, name):
-  layers = layerOrder(sceneObject)
+  layers = bridgeMeshAccess.surfaceLayers(sceneObject)
   if name not in [layer["name"] for layer in layers]:
     raise ValueError(f"'{sceneObject.name}' has no surfacing layer '{name}'; its layers: {[layer['name'] for layer in layers]}")
   return layers
@@ -138,7 +134,7 @@ def shownSurface(sceneObject):
   mesh = sceneObject.data
   materialIndices = readFaceInts(mesh, baseAttributeName)
   deciders = numpy.full(len(materialIndices), -1)
-  for position, layer in enumerate(layerOrder(sceneObject)):
+  for position, layer in enumerate(bridgeMeshAccess.surfaceLayers(sceneObject)):
     if not layer["muted"]:
       values = readFaceInts(mesh, layerAttributePrefix + layer["name"])
       covered = values != uncovered
@@ -158,7 +154,7 @@ def describeLayers(sceneObject):
   mesh = sceneObject.data
   slotNames = [slot.material.name if slot.material else None for slot in sceneObject.material_slots]
   described = []
-  for layer in layerOrder(sceneObject):
+  for layer in bridgeMeshAccess.surfaceLayers(sceneObject):
     values = readFaceInts(mesh, layerAttributePrefix + layer["name"])
     covered = values[values != uncovered]
     described.append({"name": layer["name"], "muted": layer["muted"], "faces": {slotNames[slot]: int((covered == slot).sum()) for slot in numpy.unique(covered)}})
@@ -166,12 +162,12 @@ def describeLayers(sceneObject):
 
 
 def hasSurfaceLayers(sceneObject):
-  return bool(layerOrder(sceneObject))
+  return bool(bridgeMeshAccess.surfaceLayers(sceneObject))
 
 
 def addSurfaceLayer(objectName, name):
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
-  layers = layerOrder(sceneObject)
+  layers = bridgeMeshAccess.surfaceLayers(sceneObject)
   if not name or name in [layer["name"] for layer in layers]:
     raise ValueError(f"'{objectName}' already has a surfacing layer '{name}'" if name else "A surfacing layer needs a name")
   mesh = sceneObject.data
@@ -313,7 +309,7 @@ def editSurface(objectName, layer, operation, steps, selector, minimumArea):
   if operation == "clean":
     positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
     shown, deciders = shownSurface(sceneObject)
-    position = [entry["name"] for entry in layerOrder(sceneObject)].index(layer)
+    position = [entry["name"] for entry in bridgeMeshAccess.surfaceLayers(sceneObject)].index(layer)
     cleaned = cleanedValues(mesh, shown, within & (deciders <= position), faceAreas(sceneObject, positions), minimumArea)
     values = numpy.where(cleaned != shown, cleaned, values)
     writeFaceInts(mesh, layerAttributePrefix + layer, values)
@@ -758,7 +754,7 @@ def clearRegion(region, terrainObject, shaping, surfacing, objects, fadeDistance
     outcome["shaping"] = rebuildRegion(terrainObject, selector, "surroundings", None, fadeDistance)
   if surfacing:
     sceneObject = bridgeMeshAccess.requireMeshObject(terrainObject)
-    layers = layerOrder(sceneObject)
+    layers = bridgeMeshAccess.surfaceLayers(sceneObject)
     if not layers:
       raise ValueError(f"'{terrainObject}' has no surfacing layers to erase from")
     mask = bridgeMeshAccess.evaluateSelector(selector, sceneObject, "faces")

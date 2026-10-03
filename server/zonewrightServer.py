@@ -181,10 +181,10 @@ def modelSummary(details):
   }
 
 
-async def placeEQModel(context, folder, name, location, rotationDegrees, scale, avatarHeight, snapToGround, collection, details):
+async def placeEQModel(context, folder, name, location, rotationDegrees, scale, avatarHeight, snapToGround, collection, details, clientContent):
   placed = await callBridge(context, "placeModel", {
     "modelFolder": str(folder), "name": name, "location": location, "rotationDegrees": rotationDegrees, "scale": scale,
-    "avatarHeight": avatarHeight, "snapToGround": snapToGround, "collection": collection,
+    "avatarHeight": avatarHeight, "snapToGround": snapToGround, "collection": collection, "clientContent": clientContent,
   })
   return placed | {"source": modelSummary(details)}
 
@@ -718,7 +718,7 @@ async def placeSpawn(
   }
   pose = {"animation": animation, "variant": animationVariant.upper() if animationVariant else None, "frame": animationFrame}
   spawn = await anyio.to_thread.run_sync(spawnModel, zone, model, height, await zoneIsNewEngine(context), source, appearance, pose)
-  placed = await placeEQModel(context, spawn["folder"], name, frameLocation, rotation, spawn["scale"], spawn["avatarHeight"], snapToGround, collection, spawn["details"])
+  placed = await placeEQModel(context, spawn["folder"], name, frameLocation, rotation, spawn["scale"], spawn["avatarHeight"], snapToGround, collection, spawn["details"], "spawn")
   return placed | {key: spawn[key] for key in ("height", "scale", "avatarHeight")}
 
 
@@ -736,7 +736,7 @@ async def placeDoor(
     raise ToolError(f"scaleFactor must be positive, got {scaleFactor}")
   frameLocation, rotation = placementFrame(location, headingDegrees, x, y, z, heading)
   folder, details = await anyio.to_thread.run_sync(eqModel, zone, model, source)
-  return await placeEQModel(context, folder, name, frameLocation, rotation, scaleFactor / 100, 0, False, collection, details)
+  return await placeEQModel(context, folder, name, frameLocation, rotation, scaleFactor / 100, 0, False, collection, details, "door")
 
 
 @guardedTool(description=(
@@ -753,7 +753,7 @@ async def placeObject(
     raise ToolError(f"scale must be positive, got {scale}")
   frameLocation, rotation = placementFrame(location, headingDegrees, x, y, z, heading)
   folder, details = await anyio.to_thread.run_sync(eqModel, zone, model, source)
-  return await placeEQModel(context, folder, name, frameLocation, rotation, scale, 0, False, collection, details)
+  return await placeEQModel(context, folder, name, frameLocation, rotation, scale, 0, False, collection, details, "object")
 
 
 def zoneModel(zone):
@@ -767,7 +767,7 @@ async def placeZone(context, zone, collection):
   folder, details = await anyio.to_thread.run_sync(zoneModel, zone)
   placed = await callBridge(context, "placeModel", {
     "modelFolder": str(folder), "name": zone, "location": [0, 0, 0], "rotationDegrees": 0, "scale": 1, "avatarHeight": 0,
-    "snapToGround": False, "collection": collection,
+    "snapToGround": False, "collection": collection, "clientContent": "zone",
   })
   stampKeys = ("zoneCacheFormat", "modelCacheFormat", "indexFormat", "archives", "listingFingerprint", "zone", "textureSources", "lit", "minimum", "maximum")
   return placed | {"source": {key: value for key, value in details.items() if key not in stampKeys}}
@@ -782,13 +782,13 @@ def bridgeEmitters(emitters):
   return [{key: list(value) if key == "position" else value for key, value in emitter.items()} | {"name": emitter["name"] or f"emitter{emitter['definition']}"} for emitter in emitters]
 
 
-async def placeZoneEnvironment(context, zone, lights, emitters):
+async def placeZoneEnvironment(context, zone, lights, emitters, clientContent):
   """A placed zone's lights and emitters, each set in its own collection named for the zone; None for what is not read."""
   placed = {"lights": None if lights is None else 0, "emitters": 0}
   if lights:
-    placed["lights"] = (await callBridge(context, "placeLights", {"lights": bridgeLights(lights), "collection": f"{zone} lights"}))["lights"]
+    placed["lights"] = (await callBridge(context, "placeLights", {"lights": bridgeLights(lights), "collection": f"{zone} lights", "clientContent": clientContent}))["lights"]
   if emitters:
-    placed["emitters"] = (await callBridge(context, "placeEmitters", {"emitters": bridgeEmitters(emitters), "collection": f"{zone} emitters"}))["emitters"]
+    placed["emitters"] = (await callBridge(context, "placeEmitters", {"emitters": bridgeEmitters(emitters), "collection": f"{zone} emitters", "clientContent": clientContent}))["emitters"]
   return placed
 
 
@@ -817,7 +817,7 @@ async def importZone(context: Context, zone: str, collection: str | None = None)
     emitters = readEmitterList(eqEmitters.emitterListPath(clientRoot, zone))
   except ValueError as error:
     raise ToolError(str(error)) from error
-  return placed | await placeZoneEnvironment(context, zone, lights, emitters)
+  return placed | await placeZoneEnvironment(context, zone, lights, emitters, "zone")
 
 
 zoneFileSourceKeys = ("zoneCacheFormat", "modelCacheFormat", "sha256", "textureSources", "lit", "minimum", "maximum")
@@ -837,15 +837,23 @@ async def importZoneFile(context: Context, path: str, collection: str | None = N
     raise ToolError(f"{type(error).__name__}: {error}") from error
   placed = await callBridge(context, "placeModel", {
     "modelFolder": str(folder), "name": archivePath.stem.lower(), "location": [0, 0, 0], "rotationDegrees": 0, "scale": 1, "avatarHeight": 0,
-    "snapToGround": False, "collection": collection,
+    "snapToGround": False, "collection": collection, "clientContent": "zoneFile",
   })
   try:
     lights = await anyio.to_thread.run_sync(eqZones.zoneFileLights, archivePath)
   except ValueError as error:
     raise ToolError(str(error)) from error
   emitters = readEmitterList(archivePath.parent / f"{archivePath.stem}_EnvironmentEmitters.txt")
-  environment = await placeZoneEnvironment(context, archivePath.stem.lower(), lights, emitters)
+  environment = await placeZoneEnvironment(context, archivePath.stem.lower(), lights, emitters, "zoneFile")
   return placed | {"source": {key: value for key, value in details.items() if key not in zoneFileSourceKeys}} | environment
+
+
+def groupedExclusions(excluded, shownPerReason=25):
+  """Left-out objects by reason, each reason with its count and up to shownPerReason of its objects."""
+  groups = {}
+  for entry in excluded:
+    groups.setdefault(entry["reason"], []).append(entry["object"])
+  return [{"reason": reason, "count": len(names), "objects": names[:shownPerReason]} for reason, names in sorted(groups.items())]
 
 
 @guardedTool()
@@ -861,8 +869,11 @@ async def exportZone(context: Context, path: str):
   (the client reads that list loose from its own folder). A zone with housing (setZoneHousing) also gets <zone>_housing.json beside the
   archive, its plots as Peridot's plot content gives them (address, border door, center and heading in the server's axes, size across
   and along, price, upkeep, item capacity, pets, features) with their border doors (OBP_LOTSQUARE or OBP_GUILDSQUARE, open type 160,
-  in the server's axes and EQ heading), and <zone>_assets.txt naming stonesquare.eqg, which holds the border models. Guides and plot
-  borders are not exported as geometry. No baked light is written yet."""
+  in the server's axes and EQ heading), and <zone>_assets.txt naming stonesquare.eqg, which holds the border models. What is not the
+  zone's own geometry is left out and listed by reason in `excluded`: guides, plot borders, regions, anything hidden from renders, and
+  placed client content (spawns and doors, which are the server's data; client objects, which do not export yet; imported zones,
+  which are reference). `toConfirm` lists shipped meshes with shaping passes off or surfacing layers muted, which leave the zone as if
+  never made. No baked light is written yet."""
   archivePath = Path(path)
   if not archivePath.is_absolute() or archivePath.suffix != ".eqg" or not archivePath.parent.is_dir():
     raise ToolError(f"'{path}' is not an absolute .eqg path in an existing folder")
@@ -893,7 +904,8 @@ async def exportZone(context: Context, path: str):
   except (OSError, ValueError) as error:
     raise ToolError(f"{type(error).__name__}: {error}") from error
   return summary | {
-    "path": str(archivePath), "emitterList": str(emitterListPath) if emitterList is not None else None,
+    "path": str(archivePath), "excluded": groupedExclusions(collected["excluded"]), "toConfirm": collected["toConfirm"],
+    "emitterList": str(emitterListPath) if emitterList is not None else None,
     "housing": None if housing is None else {"role": housing["housing"]["role"], "plots": len(housing["plots"]), "file": str(housingPath) if hasPlots else None, "assetList": str(assetListPath) if hasPlots else None},
   }
 
@@ -942,7 +954,7 @@ async def placeRecorded(context, recordingPath, liveDumpsPath, atMilliseconds, n
     try:
       spawn = await anyio.to_thread.run_sync(spawnModel, zone["zone"], look["actorDef"], npc["height"], newEngine, None, recordedAppearance(look), None)
       location, rotation = placementFrame(None, None, npc["x"], npc["y"], npc["z"], npc["heading"])
-      await placeEQModel(context, spawn["folder"], npc["name"], location, rotation, spawn["scale"], spawn["avatarHeight"], True, collection, spawn["details"])
+      await placeEQModel(context, spawn["folder"], npc["name"], location, rotation, spawn["scale"], spawn["avatarHeight"], True, collection, spawn["details"], "spawn")
       placed.append({"kind": "npc", "name": npc["name"], "model": look["actorDef"]})
     except ToolError as error:
       notPlaced.append({"kind": "npc", "name": npc["name"], "model": look["actorDef"], "reason": str(error)})
@@ -957,7 +969,7 @@ async def placeRecorded(context, recordingPath, liveDumpsPath, atMilliseconds, n
     try:
       folder, details = await anyio.to_thread.run_sync(eqModel, zone["zone"], prop["name"])
       location, rotation = placementFrame(None, None, prop["x"], prop["y"], prop["z"], prop["heading"])
-      await placeEQModel(context, folder, name, location, rotation, scale, 0, False, collection, details)
+      await placeEQModel(context, folder, name, location, rotation, scale, 0, False, collection, details, "door" if prop["kind"] == "door" else "object")
       placed.append({"kind": prop["kind"], "name": name, "model": prop["name"]})
     except ToolError as error:
       notPlaced.append({"kind": prop["kind"], "name": name, "model": prop["name"], "reason": str(error)})
@@ -1339,7 +1351,7 @@ async def placeLights(context: Context, lights: list[dict], collection: str | No
   """Place zone lights: point lights [{name, position [x,y,z], color [r,g,b] 0-1 as the client stores it, radius (reach in units)}] in
   `collection`. exportZone writes them into the zone's .zon; the preview does not draw lights yet. The asset catalog's light styles
   (findAssets kind light) give the colors and radii client zones use for torches, braziers, fill light, and the rest."""
-  return await callBridge(context, "placeLights", {"lights": lights, "collection": collection})
+  return await callBridge(context, "placeLights", {"lights": lights, "collection": collection, "clientContent": None})
 
 
 @guardedTool()
@@ -1348,7 +1360,7 @@ async def placeEmitters(context: Context, emitters: list[dict], collection: str 
   field; 4000000 on most of the client's emitters)}] as empties in `collection`. exportZone writes them to <zone>_EnvironmentEmitters.txt
   beside the archive; the preview does not draw them yet. The asset catalog (findAssets kind emitter) says what each definition shows
   and under which names client zones place it."""
-  return await callBridge(context, "placeEmitters", {"emitters": [emitter | {"alwaysVisible": None} for emitter in emitters], "collection": collection})
+  return await callBridge(context, "placeEmitters", {"emitters": [emitter | {"alwaysVisible": None} for emitter in emitters], "collection": collection, "clientContent": None})
 
 
 @guardedTool()
