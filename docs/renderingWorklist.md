@@ -44,6 +44,7 @@ Rules the renderer uses that are not yet confirmed against the RoF2 client itsel
 - **EQ terrain:** 32 texels per tile (the DLL's default distance table; `eqgame.exe` may set others); quad kind bit 2 drawn as ordinary; placement z above the ground; tilt order; the cover map's mip filtering.
 - **Objects without baked light** (most placed objects in classic zones): drawn with no baked light and the full share of scene light, an assumption (`0x1009d670` is the client's path). EQG objects whose baked light doesn't fit get colors the client computes (clientRendering.md, EQG zones).
 - **Tilt order** of EQG zone placements.
+- **Back faces.** The preview draws both sides of every face and lights each by its own normal, as the vertex shaders light a vertex whichever side is seen, so a face turned inside out draws darker, as it does once exported. Whether the client draws back faces at all is not traced: it needs the cull mode set for zone and object meshes (`D3DRS_CULLMODE` in `EQGraphicsDX9.dll`'s draw setup, or a `CullMode` state in the effects' passes), or an RoF2 screenshot of an exported zone with a box turned inside out, seen from outside. Until then the preview does not cull.
 
 ## Parked
 

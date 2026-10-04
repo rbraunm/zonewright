@@ -1153,13 +1153,15 @@ async def transformObjects(
 
 @guardedTool()
 async def duplicateObjects(context: Context, names: list[str], offset: list[float], linkData: bool = False):
-  """Copy objects, offset from the originals; linkData shares the mesh instead of copying it. Returns original to copy names."""
+  """Copy objects, with everything parented under them, offset from the originals; linkData shares the meshes instead of copying them
+  (a copied mesh takes its copy's name). Returns original to copy names, children included."""
   return await callBridge(context, "duplicateObjects", {"names": names, "offset": offset, "linkData": linkData})
 
 
 @guardedTool()
 async def joinObjects(context: Context, names: list[str], into: str):
-  """Merge meshes into one object, for example a trunk and canopy into one tree; `into` keeps its name, origin, and transform, and the others are removed."""
+  """Merge meshes into one object, for example a trunk and canopy into one tree; `into` keeps its name, origin, and transform, its mesh
+  takes its name (the model name zone export writes), and the others are removed."""
   return await callBridge(context, "joinObjects", {"names": names, "into": into})
 
 
@@ -1171,32 +1173,45 @@ async def deleteObjects(context: Context, names: list[str]):
 
 @guardedTool()
 async def organize(context: Context, renames: dict[str, str] | None = None, parents: dict[str, str | None] | None = None, collections: dict[str, str] | None = None):
-  """Rename objects (old to new, applied first), then set parents (child to parent, or null to clear; world transform kept) and move objects into collections (created if missing), using the new names."""
+  """Rename objects (old to new, applied first; a mesh only that object uses takes the new name too, as zone export names models by
+  their mesh), then set parents (child to parent, or null to clear; world transform kept) and move objects into collections (created
+  if missing), using the new names."""
   return await callBridge(context, "organize", {"renames": renames, "parents": parents, "collections": collections})
 
 
 @guardedTool()
 async def getObjectDetail(context: Context, name: str):
-  """One object in depth: transform, world bounds, parent, collections, modifiers; for meshes the vertex, face, and triangle counts, faces per material, UV layers, world units per texture repeat, vertex groups."""
+  """One object in depth: transform (rotation as XYZ Euler degrees whatever its rotation mode), size, world bounds (for a collection
+  instance, its instanced meshes'; null when it instances none), parent, collections, modifiers; for meshes the mesh's name, the
+  vertex, face, and triangle counts, faces per material, UV layers, world units per texture repeat, vertex groups."""
   return await callBridge(context, "getObjectDetail", {"name": name})
 
 
 @guardedTool()
 async def measure(context: Context, points: list[list[float]], snapToSurface: bool = False):
-  """Points and the distances, horizontal distances, height changes, and slopes between consecutive ones; snapToSurface drops each point onto the rendered surface below it first, passing through regions and other helpers (one point gives a surface height)."""
+  """Points and the distances, horizontal distances, height changes, and slopes between consecutive ones; snapToSurface drops each
+  point first onto the surface players stand on below it, as walkRoute does (rendered meshes and collection instances; not water,
+  guides, regions, spawns, or doors; undersides, and ground inside a solid such as a rock sunk into it, are passed through, while ground
+  under one-sided cover such as a roof plane or leaf cards is stood on). One point gives a surface height."""
   return await callBridge(context, "measure", {"points": points, "snapToSurface": snapToSurface})
 
 
 @guardedTool()
 async def walkRoute(context: Context, path: list[list[float]], sampleSpacing: float = 4.0):
   """Walk a route as a player would, over what players stand on (rendered meshes and collection instances; not water, which is waded
-  or swum, nor guides, regions, spawns, or doors, taken as open): from its first point,
-  following the footing underfoot past each point of `path` [[x, y, z], ...], whose heights only need to be near the footing (so a
-  route can run over an arch or under it). Judged for a player 6 units tall who walks slopes up to 60 degrees: the route's length
-  across the ground, its steepest slope, its narrowest footing (how far it runs to each side before a drop or a wall; null beyond 60),
-  its lowest headroom, its deepest water over the footing, every problem (too steep, too low, a drop, a rise too steep to climb), and a
-  profile along the way (each row with the water depth over its footing, or null). Use it on
-  decks, ramps, ledges, and the ways into an area."""
+  or swum, nor guides, regions, spawns, or doors, taken as open; ground inside a solid is no footing, ground under one-sided cover
+  such as a roof plane or leaf cards is): from its first point, following the footing underfoot past each point of `path`
+  [[x, y, z], ...], whose heights only need to be within a step of the footing (so a route can run over an arch or under it). Judged
+  for a player 6 units tall who walks slopes up to 60 degrees and steps up 2, in half-unit strides whatever `sampleSpacing`, which
+  sets only the profile's rows. Returns the length walked, the steepest face stood on, the narrowest footing (how far it runs to each
+  side before a drop of more than a player's height, a wall, a step too high, or a face too steep; null beyond 60), the lowest
+  headroom, the deepest water over the footing; `problems`, everything that stops a player, each once over the stretch it covers:
+  rise (a wall or step over 2 in the way, its height, how far up its face stays steeper than 60, a plane's as much as a block's; null
+  past 60), drop (no footing within 60 below), steep (a face over 60 climbed, its steepest), headroom (under 6, its lowest); after a
+  rise or a drop the walk takes up again where the route's own heights find footing (resumesAt, null if never); `oneWay`, ways down a
+  player cannot climb back: ledge (a drop over a step, its height) and steep (a face over 60 descended); walkable when there are no
+  problems; and a profile along the way (each row with the water depth over its footing, or null). Use it on decks, ramps, ledges,
+  and the ways into an area."""
   return await callBridge(context, "walkRoute", {"path": path, "sampleSpacing": sampleSpacing})
 
 
@@ -1271,7 +1286,8 @@ async def collapseShapingPasses(context: Context, objectName: str):
 @guardedTool(description=(
   "Roughen the selected vertices of a mesh with fractal noise: bumps about `featureSize` units across, moving vertices `amplitude` units"
   " as a typical (root mean square) move, the largest about three times that, along each vertex's normal (`direction` normal: sideways on a wall, so cliffs break up too) or straight up. `octaves` (1-8) add finer"
-  " noise, each twice as fine and `roughness` times as strong. The same `seed` gives the same noise. `fadeDistance` ramps the effect"
+  " noise, each twice as fine and `roughness` times as strong; the result warns when the finest octave is finer than the mesh's edges,"
+  " which cannot hold it (it reads as a grain along the triangles). The same `seed` gives the same noise. `fadeDistance` ramps the effect"
   " in from the selection's edge so a mask leaves no step. Use it in its own shaping pass, confined to a region at that region's own scale"
   " rather than over the whole zone, coarse first (large featureSize, few octaves), then finer, turning each pass up or down after looking."
   + selectorHelp))
@@ -1316,12 +1332,19 @@ async def deleteFaces(context: Context, objectName: str, selector: dict):
   return await callBridge(context, "deleteFaces", {"objectName": objectName, "selector": selector})
 
 
-@guardedTool(description="Extrude the selected faces of a mesh by `distance` units along their average normal, or along `direction`." + selectorHelp)
+@guardedTool(description=(
+  "Extrude the selected faces of a mesh by `distance` units along their average normal, or along `direction`. The new side faces take"
+  " the material of the faces beside them and are box-mapped at the density box projection gives that material on the mesh (mappedFaces),"
+  " so a box-projected mesh carries on its texture without a seam; faces left unmapped, where the mesh has no UV layer or the material"
+  " no UV area, are listed with why (unmappedFaces)." + selectorHelp))
 async def extrudeFaces(context: Context, objectName: str, selector: dict, distance: float, direction: list[float] | None = None):
   return await callBridge(context, "extrudeFaces", {"objectName": objectName, "selector": selector, "distance": distance, "direction": direction})
 
 
-@guardedTool(description="Inset the selected faces of a mesh as one region by `thickness`, pushed in or out by `depth`." + selectorHelp)
+@guardedTool(description=(
+  "Inset the selected faces of a mesh as one region by `thickness`, pushed in or out by `depth`. The inset faces keep their texture as"
+  " it lay; the new rim faces are box-mapped at the density box projection gives their material on the mesh (mappedFaces), or listed"
+  " with why they could not be (unmappedFaces)." + selectorHelp))
 async def insetFaces(context: Context, objectName: str, selector: dict, thickness: float, depth: float = 0.0):
   return await callBridge(context, "insetFaces", {"objectName": objectName, "selector": selector, "thickness": thickness, "depth": depth})
 
@@ -1338,7 +1361,12 @@ async def subdivide(context: Context, objectName: str, cuts: int, selector: dict
 
 @guardedTool()
 async def booleanCut(context: Context, objectName: str, cutterName: str, operation: str = "DIFFERENCE", keepCutter: bool = False):
-  """Apply a boolean (DIFFERENCE, UNION, INTERSECT) of a cutter mesh to a mesh, for cave mouths and openings; the cutter is deleted unless keepCutter."""
+  """Apply a boolean (DIFFERENCE, UNION, INTERSECT) of a cutter mesh to a mesh, for cave mouths and openings; the cutter is deleted
+  unless keepCutter. The faces the cut makes (madeFaces) take the material and surfacing of the nearest face the cutter crosses (a cave
+  cut into a cliff is lined with the cliff's material) and are box-mapped at that material's density on the mesh (mappedFaces, or
+  unmappedFaces with why); no material slot is added. A cutter that crosses none of the mesh's faces is refused. A DIFFERENCE that keeps
+  none of the cutter's faces left an opening with nothing lining it, through an open surface that encloses nothing (a terrain sheet, a
+  plane), and its result carries a warning saying so."""
   return await callBridge(context, "booleanCut", {"objectName": objectName, "cutterName": cutterName, "operation": operation, "keepCutter": keepCutter})
 
 
@@ -1793,13 +1821,17 @@ async def settleObjects(context: Context, names: list[str], depth: float = 0.0, 
   onto a named object, resting on it with no vertex below its surface (a crate on a table, or tilted on a ramp); then `depth` lower. tiltShare (0 to 1) turns each
   that share of the way toward the slope of the ground under it, keeping its heading (and replacing any tilt it had). Settling again after
   the ground changes puts everything back on it. Each result gives the ground's lowest and highest under the footprint and the object's own
-  bottom and top. For a spot under an overhang or in a cave, use placeOnSurface, which casts from just above the object."""
+  bottom and top. For a spot under an overhang or in a cave, use placeOnSurface, which casts from just above the object's top."""
   return await callBridge(context, "settleObjects", {"names": names, "depth": depth, "tiltShare": tiltShare, "onto": onto})
 
 
 @guardedTool()
 async def placeOnSurface(context: Context, objectNames: list[str], at: list[list[float]] | None = None, alignToNormal: bool = False, surfaceObjects: list[str] | None = None, offset: float = 0.0):
-  """Drop objects onto the surface below `at` points (or below their own origins, cast from just above), optionally tilted to the surface normal and restricted to surfaceObjects."""
+  """Drop objects, with what is parented to them, onto the surface below `at` points, or below their own origins cast from just above
+  their tops, so one sunk into the ground, under an overhang, or in a cave lands on the ground beneath it. They land on what players
+  stand on (not water, guides, regions, spawns, or doors), or only on surfaceObjects, never on themselves, what they carry, or each
+  other; optionally tilted to the surface normal keeping their heading, then lifted `offset`. To set props on open ground by their
+  footprint, settleObjects casts from above the whole scene."""
   return await callBridge(context, "placeOnSurface", {"objectNames": objectNames, "at": at, "alignToNormal": alignToNormal, "surfaceObjects": surfaceObjects, "offset": offset})
 
 
@@ -1810,7 +1842,11 @@ async def scatterInRegion(
   maximumSlopeDegrees: float = 90, surfaceObjects: list[str] | None = None, castFromHeight: float | None = None, seed: int = 0,
   avoidObjects: list[str] | None = None, avoidClearance: float = 0.0,
 ):
-  """Scatter linked copies of an object over a region ({"circle": {center, radius}} or {"polygon": [[x,y], ...]}): `density` per 10,000 square units, at least `minimumSpacing` apart, random yaw and scale within ranges, dropped onto surfaces from `castFromHeight` (default just above the scene), skipped where steeper than maximumSlopeDegrees or inside or within avoidClearance of any avoidObjects. Deterministic for a seed."""
+  """Scatter linked copies of an object over a region ({"circle": {center, radius}} or {"polygon": [[x,y], ...]}): `density` per 10,000
+  square units, at least `minimumSpacing` apart, random yaw within yawRangeDegrees, each copy's scale the source's times a factor from
+  scaleRange, dropped from `castFromHeight` (default just above the scene) onto what players stand on (not water, guides, regions,
+  spawns, or doors; never the source) or only onto surfaceObjects, skipped where steeper than maximumSlopeDegrees or inside or within
+  avoidClearance of any avoidObjects. Deterministic for a seed."""
   return await callBridge(context, "scatterInRegion", {
     "sourceObject": sourceObject, "region": region, "density": density, "minimumSpacing": minimumSpacing, "yawRangeDegrees": yawRangeDegrees,
     "scaleRange": scaleRange, "alignToNormal": alignToNormal, "maximumSlopeDegrees": maximumSlopeDegrees, "surfaceObjects": surfaceObjects,
@@ -1829,7 +1865,8 @@ async def linkKitAsset(
   context: Context, kitPath: str, assetName: str, instanceName: str, location: list[float],
   rotationDegrees: list[float] = [0, 0, 0], scale: list[float] = [1, 1, 1], collection: str | None = None,
 ):
-  """Link a collection marked as an asset in a kit .blend (absolute path) and place an instance of it."""
+  """Link a collection marked as an asset in a kit .blend (absolute path) and place an instance of it; the result gives its size. Its
+  materials draw in the preview lit as the open file's own are."""
   return await callBridge(context, "linkKitAsset", {"kitPath": kitPath, "assetName": assetName, "instanceName": instanceName, "location": location, "rotationDegrees": rotationDegrees, "scale": scale, "collection": collection})
 
 

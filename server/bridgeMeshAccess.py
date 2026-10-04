@@ -3,6 +3,7 @@ import contextlib
 import json
 import math
 import statistics
+import typing
 
 import bmesh
 import bpy
@@ -39,6 +40,13 @@ plotBorderProperty = "zonewrightPlotBorder"
 clientContentProperty = "zonewrightClientContent"
 clientContentKinds = ("spawn", "door", "object", "zone", "zoneFile")
 waterReach = 100000.0
+up = mathutils.Vector((0.0, 0.0, 1.0))
+down = mathutils.Vector((0.0, 0.0, -1.0))
+# Casts from a surface start this far off it, so they do not meet the face they start on.
+castNudge = 0.01
+# Ground inside a solid is told by level casts this far above it, clear of the ground's own rises, every sixteenth of a turn.
+enclosureProbeHeight = 1.0
+aroundDirections = [mathutils.Vector((math.cos(turn * math.pi / 8), math.sin(turn * math.pi / 8), 0.0)) for turn in range(16)]
 
 
 def requireObject(name):
@@ -129,22 +137,43 @@ def worldBoundsCorners(sceneObject, depsgraph):
   return [matrix @ mathutils.Vector(corner) for part, matrix in objectParts(sceneObject) for corner in part.evaluated_get(depsgraph).bound_box]
 
 
-def playerSolidParts(excluding=()):
-  """Each mesh players stand on and are blocked by, with its world matrix (objectParts), leaving out the objects named in excluding."""
+def playerSolidObjects(excluding=()):
+  """The objects players stand on and are blocked by, leaving out the objects named in excluding."""
   # An object moved or made since the last evaluation still holds its old world matrix until the scene is evaluated.
   bpy.context.view_layer.update()
-  parts = [part for sceneObject in bpy.context.scene.objects if isPlayerSolid(sceneObject) and sceneObject.name not in excluding for part in objectParts(sceneObject)]
+  return [sceneObject for sceneObject in bpy.context.scene.objects if isPlayerSolid(sceneObject) and sceneObject.name not in excluding]
+
+
+def playerSolidParts(excluding=()):
+  """Each mesh players stand on and are blocked by, with its world matrix (objectParts), leaving out the objects named in excluding."""
+  parts = [part for sceneObject in playerSolidObjects(excluding) for part in objectParts(sceneObject)]
   if not parts:
     raise ValueError("The scene has nothing players stand on: no rendered meshes or collection instances besides water, guides, regions, spawns, and doors")
   return parts
 
 
-class PlayerSurfaces:
-  """Ray casts against what players stand on and are blocked by (playerSolidParts)."""
+class Footing(typing.NamedTuple):
+  """Where a player stands: the point, its face's normal, its object, and the first face above it whichever way it faces (point, normal)."""
+  point: mathutils.Vector
+  normal: mathutils.Vector
+  objectName: str
+  overhead: tuple | None
 
-  def __init__(self):
+
+class PlayerSurfaces:
+  """Ray casts against what players stand on and are blocked by: playerSolidObjects but excluding, or only objects."""
+
+  def __init__(self, excluding=(), objects=None):
+    owners = playerSolidObjects(excluding) if objects is None else [sceneObject for sceneObject in objects if sceneObject.name not in excluding]
+    bpy.context.view_layer.update()
     depsgraph = bpy.context.evaluated_depsgraph_get()
-    self.members = [(matrix, matrix.inverted(), mathutils.bvhtree.BVHTree.FromObject(part, depsgraph)) for part, matrix in playerSolidParts()]
+    self.members = [
+      (owner.name, matrix, matrix.inverted(), mathutils.bvhtree.BVHTree.FromObject(part, depsgraph))
+      for owner in owners for part, matrix in objectParts(owner)
+    ]
+    if not self.members:
+      what = "the named objects have no meshes" if objects is not None else "the scene has nothing players stand on besides water, guides, regions, spawns, and doors"
+      raise ValueError(f"Nothing to cast against: {what}" + (f" once {sorted(excluding)} are left out" if excluding else ""))
 
   def cast(self, origin, direction, distance):
     """The nearest world hit point within distance, or None."""
@@ -152,29 +181,57 @@ class PlayerSurfaces:
     return hit[0] if hit else None
 
   def footingBelow(self, origin, distance):
-    """The first surface below origin within distance that faces up; an underside met first means origin lies inside rock, and the
-    search goes on through it."""
-    down = mathutils.Vector((0, 0, -1))
+    """The point of footingOn, or None."""
+    footing = self.footingOn(origin, distance)
+    return footing.point if footing else None
+
+  def footingOn(self, origin, distance):
+    """The first up-facing surface below origin within distance that is not ground inside a solid, as a Footing, or None."""
     while True:
-      hit = self.castWithNormal(origin, down, distance)
+      hit = self.castOn(origin, down, distance)
       if hit is None:
         return None
-      if hit[1].z > 0:
-        return hit[0]
-      distance -= origin.z - hit[0].z + 0.01
-      origin = hit[0] + down * 0.01
+      point, normal, name = hit
+      if normal.z > 0:
+        overhead = self.castWithNormal(point + up * castNudge, up, waterReach)
+        # A face above met from behind is the top of a solid around the point, or one-sided cover over open ground (a roof plane, a leaf
+        # card, a deck): only the ways round it tell which.
+        if overhead is None or overhead[1].z <= 0 or not self.enclosedAround(point + up * enclosureProbeHeight):
+          return Footing(point, normal, name, overhead)
+      distance -= origin.z - point.z + castNudge
+      origin = point + down * castNudge
+
+  def enclosedAround(self, point):
+    """Whether most level ways out of point meet a face from behind first, as from inside a solid."""
+    # Most, not every: client meshes are one-sided and seldom closed, so from under a terrace whose only faces are its floor and its
+    # outer walls a few ways out still meet something in front.
+    behind, elsewhere = 0, 0
+    for direction in aroundDirections:
+      hit = self.castWithNormal(point, direction, waterReach)
+      if hit is not None and hit[1].dot(direction) > 0:
+        behind += 1
+      else:
+        elsewhere += 1
+      if 2 * behind > len(aroundDirections) or 2 * elsewhere >= len(aroundDirections):
+        break
+    return 2 * behind > len(aroundDirections)
 
   def castWithNormal(self, origin, direction, distance):
     """The nearest world hit point within distance and the normal of the face hit there, or None."""
+    hit = self.castOn(origin, direction, distance)
+    return hit[:2] if hit else None
+
+  def castOn(self, origin, direction, distance):
+    """castWithNormal's hit with the name of the object it belongs to, or None."""
     nearest = None
-    for matrix, inverse, tree in self.members:
+    for name, matrix, inverse, tree in self.members:
       location, normal, _, _ = tree.ray_cast(inverse @ origin, (inverse.to_3x3() @ direction).normalized())
       if location is None:
         continue
       hit = matrix @ location
       along = (hit - origin).length
       if along <= distance and (nearest is None or along < nearest[0]):
-        nearest = (along, hit, (matrix.to_3x3().inverted().transposed() @ normal).normalized())
+        nearest = (along, hit, (matrix.to_3x3().inverted().transposed() @ normal).normalized(), name)
     return nearest[1:] if nearest else None
 
 
@@ -492,6 +549,50 @@ def readFaceArrays(sceneObject):
   return worldPositions(sceneObject, centers.reshape(-1, 3)), worldDirections(sceneObject, normals.reshape(-1, 3)), materialIndices
 
 
+class TextureAreas(typing.NamedTuple):
+  """Each triangle's world area, its area as box projection maps it at one unit a repeat, its UV area, and its material slot."""
+  world: numpy.ndarray
+  box: numpy.ndarray
+  uv: numpy.ndarray
+  materials: numpy.ndarray
+
+
+def textureAreas(sceneObject):
+  """The mesh's TextureAreas on its active UV layer, or None when it has no UV layer."""
+  mesh = sceneObject.data
+  if not mesh.uv_layers:
+    return None
+  mesh.calc_loop_triangles()
+  triangleLoops = numpy.empty(len(mesh.loop_triangles) * 3, dtype=numpy.int64)
+  mesh.loop_triangles.foreach_get("loops", triangleLoops)
+  triangleLoops = triangleLoops.reshape(-1, 3)
+  materialIndices = numpy.empty(len(mesh.loop_triangles), dtype=numpy.int64)
+  mesh.loop_triangles.foreach_get("material_index", materialIndices)
+  trianglePolygons = numpy.empty(len(mesh.loop_triangles), dtype=numpy.int64)
+  mesh.loop_triangles.foreach_get("polygon_index", trianglePolygons)
+  loopVertices = numpy.empty(len(mesh.loops), dtype=numpy.int64)
+  mesh.loops.foreach_get("vertex_index", loopVertices)
+  positions, _ = readVertexArrays(sceneObject)
+  _, faceNormals, _ = readFaceArrays(sceneObject)
+  uvs = numpy.empty(len(mesh.loops) * 2)
+  mesh.uv_layers.active.data.foreach_get("uv", uvs)
+  corners = positions[loopVertices[triangleLoops]]
+  crossProducts = numpy.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0])
+  # Box projection maps each face onto the plane across its normal's largest world axis, as projectUVs does.
+  boxAxes = numpy.abs(faceNormals).argmax(axis=1)[trianglePolygons]
+  uvCorners = uvs.reshape(-1, 2)[triangleLoops]
+  uvEdgeA, uvEdgeB = uvCorners[:, 1] - uvCorners[:, 0], uvCorners[:, 2] - uvCorners[:, 0]
+  return TextureAreas(
+    numpy.linalg.norm(crossProducts, axis=1) / 2, numpy.abs(crossProducts[numpy.arange(len(crossProducts)), boxAxes]) / 2,
+    numpy.abs(uvEdgeA[:, 0] * uvEdgeB[:, 1] - uvEdgeA[:, 1] * uvEdgeB[:, 0]) / 2, materialIndices,
+  )
+
+
+def worldUnitsPerRepeat(worldArea, uvArea):
+  """How many world units one texture repeat spans over faces of these areas; None when they have no UV area."""
+  return math.sqrt(worldArea / uvArea) if uvArea > 0 else None
+
+
 def vertexGroupMask(sceneObject, groupName):
   group = sceneObject.vertex_groups.get(groupName)
   if group is None:
@@ -797,41 +898,11 @@ def meshCounts(sceneObject):
   return {"vertices": len(mesh.vertices), "faces": len(mesh.polygons), "triangles": triangleCount(sceneObject)}
 
 
-def rayCast(origin, direction, distance, onlyObjects=None):
-  """Nearest hit along a ray in the open scene, or only on the named objects; None when nothing is hit within distance."""
+def rayCast(origin, direction, distance):
+  """Nearest hit along a ray in the open scene; None when nothing is hit within distance."""
   depsgraph = bpy.context.evaluated_depsgraph_get()
-  origin = mathutils.Vector(origin)
-  direction = mathutils.Vector(direction).normalized()
-  if onlyObjects is None:
-    hit, location, normal, faceIndex, hitObject, _ = bpy.context.scene.ray_cast(depsgraph, origin, direction, distance=distance)
-    return (location, normal, faceIndex, hitObject) if hit else None
-  nearest = None
-  for name in onlyObjects:
-    sceneObject = requireMeshObject(name)
-    inverse = sceneObject.matrix_world.inverted()
-    hit, location, normal, faceIndex = sceneObject.ray_cast(inverse @ origin, (inverse.to_3x3() @ direction).normalized(), depsgraph=depsgraph)
-    if not hit:
-      continue
-    worldLocation = sceneObject.matrix_world @ location
-    hitDistance = (worldLocation - origin).length
-    if hitDistance <= distance and (nearest is None or hitDistance < nearest[0]):
-      worldNormal = (sceneObject.matrix_world.to_3x3().inverted().transposed() @ normal).normalized()
-      nearest = (hitDistance, worldLocation, worldNormal, faceIndex, sceneObject)
-  return nearest[1:] if nearest else None
-
-
-@contextlib.contextmanager
-def hiddenObjects(names):
-  """Hide objects from ray casts for the duration, restoring their visibility after."""
-  hidden = [requireObject(name) for name in names]
-  previous = [sceneObject.hide_viewport for sceneObject in hidden]
-  for sceneObject in hidden:
-    sceneObject.hide_viewport = True
-  try:
-    yield
-  finally:
-    for sceneObject, wasHidden in zip(hidden, previous):
-      sceneObject.hide_viewport = wasHidden
+  hit, location, normal, faceIndex, hitObject, _ = bpy.context.scene.ray_cast(depsgraph, mathutils.Vector(origin), mathutils.Vector(direction).normalized(), distance=distance)
+  return (location, normal, faceIndex, hitObject) if hit else None
 
 
 def closestOnObject(container, worldPoint, depsgraph):

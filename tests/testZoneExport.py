@@ -93,6 +93,80 @@ def testExportedZoneComesBackAsItWasBuilt(stageBlenderServer, tmp_path):
   assert numpy.percentile(difference.max(axis=-1), 99) <= 2, numpy.percentile(difference.max(axis=-1), 99)
 
 
+flipCode = """
+import bmesh
+crate = bpy.data.objects['crate']
+editor = bmesh.new()
+editor.from_mesh(crate.data)
+flipped = [face for face in editor.faces if face.normal.y < -0.5 or face.normal.z > 0.5]
+bmesh.ops.reverse_faces(editor, faces=flipped)
+editor.to_mesh(crate.data)
+editor.free()
+crate.data.update()
+result = len(flipped)
+"""
+
+
+olderGroupCode = """
+tree = bpy.data.node_groups['eqClientLight']
+tree.interface.remove(next(item for item in tree.interface.items_tree if item.item_type == 'SOCKET' and item.name == 'Stored'))
+tree['eqVersion'] = 6
+result = sum(1 for material in bpy.data.materials if material.node_tree for node in material.node_tree.nodes if node.type == 'GROUP' and node.node_tree == tree)
+"""
+storedCode = """
+rows = set()
+for material in bpy.data.materials:
+  nodes = material.node_tree.nodes if material.node_tree else []
+  storedNormal = any(node.type == 'ATTRIBUTE' and node.attribute_name == 'eqNormal' for node in nodes)
+  for node in nodes:
+    if node.type == 'GROUP' and node.node_tree.name == 'eqClientLight':
+      rows.add((storedNormal, node.inputs['Stored'].default_value))
+result = sorted(rows)
+"""
+
+
+def testFacesTurnedInsideOutDrawAlikeBuiltAndExported(stageBlenderServer, tmp_path):
+  groundTexture = tmp_path / "ground.dds"
+  groundTexture.write_bytes(eqgWriter.ddsBytes(patternedRGBA(16, 1)))
+  crateTexture = tmp_path / "crate.png"
+  Image.fromarray(patternedRGBA(8, 2)).save(crateTexture)
+  archivePath = tmp_path / "testplot.eqg"
+
+  async def steps(session):
+    await buildPlot(session, groundTexture, crateTexture)
+    flipped = (await session.expectSuccess("runPython", {"code": flipCode}))["result"]
+    built, _ = await session.expectImage("renderView", {"view": crateView})
+    await session.expectSuccess("exportZone", {"path": str(archivePath)})
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    await session.expectSuccess("importZoneFile", {"path": str(archivePath)})
+    await session.expectSuccess("setZoneProperties", environment)
+    again, _ = await session.expectImage("renderView", {"view": crateView})
+    olderUses = (await session.expectSuccess("runPython", {"code": olderGroupCode}))["result"]
+    await session.expectSuccess("saveFile", {"path": str(tmp_path / "older.blend")})
+    await session.expectSuccess("openFile", {"path": str(tmp_path / "older.blend")})
+    reopened, _ = await session.expectImage("renderView", {"view": crateView})
+    stored = (await session.expectSuccess("runPython", {"code": storedCode}))["result"]
+    return flipped, built, again, olderUses, reopened, stored
+
+  def pixels(image):
+    return numpy.asarray(Image.open(io.BytesIO(image)).convert("RGB"), dtype=numpy.int64)
+
+  crateView = {"eye": [-20, -12, 12], "target": [-20, 10, 4]}
+  flipped, built, again, olderUses, reopened, stored = stageBlenderServer.session(steps)
+  # The crate's faces toward the camera and the sky, which fill most of the view, are turned inside out. Seen from behind, each is lit
+  # by its own normal, built as the zone file's stored normal lights it once exported, so the two draw alike.
+  assert flipped == 2
+  difference = numpy.abs(pixels(built) - pixels(again))
+  assert difference.mean() < 0.5, difference.mean()
+  assert numpy.percentile(difference.max(axis=-1), 99) <= 2, numpy.percentile(difference.max(axis=-1), 99)
+  # A file saved before the lighting group took Stored has the group's older build and no Stored on its materials. Opened again, the
+  # group is rebuilt and each material's Stored is read from its own nodes: the imported meshes light by their stored normals and the
+  # crate draws as it did before it was saved.
+  assert olderUses > 0
+  assert stored == [[True, 1.0]]
+  assert numpy.abs(pixels(reopened) - pixels(again)).max() == 0
+
+
 def testExportRefusesWhatAZoneFileCannotHold(stageBlenderServer, tmp_path):
   groundTexture = tmp_path / "ground.png"
   Image.fromarray(patternedRGBA(16, 3)).save(groundTexture)

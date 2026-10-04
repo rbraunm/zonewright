@@ -12,7 +12,7 @@ import numpy
 
 import bridgeExport
 import bridgeMeshAccess
-from playerScale import playerHeight, walkableNormalZ
+from playerScale import playerHeight, stepHeight, walkableNormalZ
 
 # How far a route looks to each side for a drop or a wall, and how finely; how far above for a ceiling; and how far below it still
 # finds footing.
@@ -21,6 +21,18 @@ routeSideStep = 2.0
 routeHeadroomReach = 60.0
 routeFootingReach = 60.0
 routeProfileRows = 60
+# A route is walked in strides no longer than this whatever its sampleSpacing, so a step, a wall, or a slope is judged alike at any
+# spacing; sampleSpacing sets only the profile's rows.
+routeStride = 0.5
+# Casts start this far short of each spot and this far above a footing, so geometry built on round numbers (a block's face exactly on
+# a spot) is not met edge on.
+castNudge = bridgeMeshAccess.castNudge
+# What blocks a step is climbed in rises this tall, then its top found within a thirty-second of one.
+obstacleClimb = 1.0
+obstacleRefinements = 5
+steepestWalkableDegrees = math.degrees(math.acos(walkableNormalZ))
+up = bridgeMeshAccess.up
+down = bridgeMeshAccess.down
 
 
 def triangulated(sceneObject, depsgraph, matrix):
@@ -88,14 +100,176 @@ def routeSamples(path, sampleSpacing):
   return points, directions
 
 
-def sideClearance(surfaces, footing, side, climb):
-  """How far to one side the footing runs before it drops more than a player's height or rises into a wall."""
+def slopeOf(normal):
+  return math.degrees(math.acos(min(1.0, normal.z)))
+
+
+def standingBelow(surfaces, origin, distance):
+  """The footing below origin (PlayerSurfaces.footingOn) with its face's normal and the ceiling over it within reach, or None."""
+  footing = surfaces.footingOn(origin, distance)
+  if footing is None:
+    return None
+  overhead = footing.overhead
+  return footing.point, footing.normal, overhead[0] if overhead is not None and overhead[0].z - footing.point.z <= routeHeadroomReach else None
+
+
+def passageBlocker(surfaces, footing, end):
+  """The first thing above a step's height in the way from footing to end, along the slope to a higher end; None when clear."""
+  start = footing + up * (stepHeight + castNudge)
+  span = mathutils.Vector((end.x, end.y, max(footing.z, end.z) + stepHeight + castNudge)) - start
+  return surfaces.cast(start, span.normalized(), span.length)
+
+
+def obstacleHeight(surfaces, footing, blocker, direction):
+  """How far above the footing what blocks a step stays steeper than walkable, or None when it goes on past routeHeadroomReach."""
+  # Level casts from over the footing climb the blocker's face for as long as each finds it no further back than a walkable slope
+  # would lean from the last; past its top, a plane's as much as a block's, they find nothing so near.
+  lean = 1 / math.tan(math.radians(steepestWalkableDegrees))
+
+  def faceDistance(height, low, nearest):
+    hit = surfaces.cast(mathutils.Vector((footing.x, footing.y, footing.z + height)), direction, nearest + lean * (height - low) + castNudge)
+    return None if hit is None else math.hypot(hit.x - footing.x, hit.y - footing.y)
+
+  low, nearest = blocker.z - footing.z, math.hypot(blocker.x - footing.x, blocker.y - footing.y)
+  while True:
+    high = low + obstacleClimb
+    if high > routeHeadroomReach:
+      return None
+    found = faceDistance(high, low, nearest)
+    if found is None:
+      break
+    low, nearest = high, found
+  for _ in range(obstacleRefinements):
+    middle = (low + high) / 2
+    found = faceDistance(middle, low, nearest)
+    if found is None:
+      high = middle
+    else:
+      low, nearest = middle, found
+  return (low + high) / 2
+
+
+def stepAcross(surfaces, footing, target, direction, reach):
+  """What stepping from footing to target's [x, y] comes to, searching reach below: step, ledge, steep, rise, or drop (walkRoute)."""
+  run = math.hypot(target.x - footing.x, target.y - footing.y)
+  climb = max(stepHeight, run * math.tan(math.radians(steepestWalkableDegrees)))
+  standing = standingBelow(surfaces, mathutils.Vector((target.x, target.y, footing.z + climb + castNudge)), reach + climb + castNudge)
+  blocker = passageBlocker(surfaces, footing, standing[0] if standing is not None else mathutils.Vector((target.x, target.y, footing.z)))
+  if blocker is not None:
+    return {"kind": "rise", "blocker": blocker}
+  if standing is None:
+    return {"kind": "drop"}
+  landing, normal, ceiling = standing
+  slope = slopeOf(normal)
+  outcome = {"landing": landing, "slope": slope, "ceiling": ceiling, "run": run}
+  if slope > steepestWalkableDegrees:
+    return outcome | {"kind": "steep", "climbing": normal.x * direction.x + normal.y * direction.y < 0}
+  allowance = stepHeight + run * math.tan(math.radians(slope))
+  rise = landing.z - footing.z
+  if rise > allowance:
+    return outcome | {"kind": "rise"}
+  if -rise > allowance:
+    return outcome | {"kind": "ledge", "height": -rise}
+  return outcome | {"kind": "step"}
+
+
+def riseHeight(surfaces, footing, outcome, direction):
+  """How high a rise stepAcross met stands over the footing: its landing's height, or the height of what blocked the way."""
+  if "landing" in outcome:
+    return outcome["landing"].z - footing.z
+  return obstacleHeight(surfaces, footing, outcome["blocker"], direction)
+
+
+def sideClearance(surfaces, footing, side):
+  """How far to one side footing runs, stepped across, before a drop over a player's height, a rise, or a steep face; None past reach."""
+  current = footing
   for offset in numpy.arange(routeSideStep, routeSideReach + routeSideStep / 2, routeSideStep):
-    probe = footing + side * float(offset)
-    hit = surfaces.footingBelow(probe + mathutils.Vector((0, 0, playerHeight + climb)), 2 * playerHeight + climb)
-    if hit is None or hit.z > footing.z + climb + routeSideStep:
+    outcome = stepAcross(surfaces, current, footing + side * (float(offset) - castNudge), side, playerHeight)
+    if outcome["kind"] not in ("step", "ledge"):
       return float(offset) - routeSideStep
+    current = outcome["landing"]
   return None
+
+
+class RouteWalk:
+  """A player's walk along a route stride by stride; a rise or a drop stops it until the route's own heights find footing again."""
+
+  def __init__(self, surfaces, water):
+    self.surfaces, self.water = surfaces, water
+    self.footing, self.slope, self.headroom = None, None, None
+    self.travelled = 0.0
+    self.problems, self.oneWay, self.rows = [], [], []
+    self.runs = {}
+    self.stopped = None
+    self.steepest, self.lowest = None, None
+
+  def footingAt(self, spot):
+    return standingBelow(self.surfaces, spot + up * (stepHeight + castNudge), routeFootingReach + stepHeight + castNudge)
+
+  def start(self, point, direction):
+    standing = self.footingAt(point + direction * castNudge)
+    if standing is None:
+      raise ValueError(f"No footing within {routeFootingReach:g} below the route's start {roundVector(point)}")
+    self.stand(standing[0], slopeOf(standing[1]), standing[2], None)
+
+  def advance(self, point, direction):
+    spot = point - direction * castNudge
+    if self.footing is None:
+      self.takeUp(spot)
+      return
+    outcome = stepAcross(self.surfaces, self.footing, spot, direction, routeFootingReach)
+    if outcome["kind"] in ("rise", "drop"):
+      self.stopped = {"kind": outcome["kind"], "at": roundVector(self.footing)}
+      if outcome["kind"] == "rise":
+        height = riseHeight(self.surfaces, self.footing, outcome, direction)
+        self.stopped["height"] = None if height is None else round(height, 1)
+      self.stopped["resumesAt"] = None
+      self.problems.append(self.stopped)
+      self.footing, self.runs = None, {}
+      return
+    if outcome["kind"] == "ledge":
+      self.oneWay.append({"kind": "ledge", "at": roundVector(self.footing), "height": round(outcome["height"], 1)})
+    self.travelled += outcome["run"]
+    self.stand(outcome["landing"], outcome["slope"], outcome["ceiling"], outcome["climbing"] if outcome["kind"] == "steep" else None)
+
+  def takeUp(self, spot):
+    standing = self.footingAt(spot)
+    if standing is not None:
+      self.stopped["resumesAt"] = roundVector(standing[0])
+      self.stand(standing[0], slopeOf(standing[1]), standing[2], None)
+
+  def stand(self, landing, slope, ceiling, climbingSteep):
+    self.footing, self.slope = landing, slope
+    self.headroom = None if ceiling is None else ceiling.z - landing.z
+    if self.steepest is None or slope > self.steepest[0]:
+      self.steepest = (slope, landing)
+    if self.headroom is not None and (self.lowest is None or self.headroom < self.lowest[0]):
+      self.lowest = (self.headroom, landing)
+    found = {}
+    if climbingSteep is not None:
+      found[("problems" if climbingSteep else "oneWay", "steep")] = ("steepestDegrees", slope, max)
+    if self.headroom is not None and self.headroom < playerHeight:
+      found[("problems", "headroom")] = ("lowest", self.headroom, min)
+    self.runs = {key: entry for key, entry in self.runs.items() if key in found}
+    for key, (field, value, keep) in found.items():
+      if key not in self.runs:
+        self.runs[key] = {"kind": key[1], "from": roundVector(landing), "to": None, field: round(value, 1)}
+        getattr(self, key[0]).append(self.runs[key])
+      entry = self.runs[key]
+      entry["to"] = roundVector(landing)
+      entry[field] = keep(entry[field], round(value, 1))
+
+  def record(self, direction):
+    if self.footing is None:
+      return
+    side = mathutils.Vector((-direction.y, direction.x, 0.0))
+    waterDepth = bridgeMeshAccess.waterDepthAt(self.water, self.footing)
+    self.rows.append({
+      "distance": round(self.travelled, 1), "at": roundVector(self.footing), "slopeDegrees": round(self.slope, 1),
+      "headroom": None if self.headroom is None else round(self.headroom, 1),
+      "left": sideClearance(self.surfaces, self.footing, side), "right": sideClearance(self.surfaces, self.footing, -side),
+      "waterDepth": None if waterDepth is None else round(waterDepth, 1),
+    })
 
 
 def walkRoute(path, sampleSpacing):
@@ -103,59 +277,26 @@ def walkRoute(path, sampleSpacing):
     raise ValueError(f"A route is at least two [x, y, z] points, got {path!r}")
   if sampleSpacing <= 0:
     raise ValueError(f"sampleSpacing must be positive, got {sampleSpacing}")
-  surfaces = bridgeMeshAccess.PlayerSurfaces()
-  water = bridgeMeshAccess.swimSurfaces()
-  steepestWalkable = math.degrees(math.acos(walkableNormalZ))
-  climb = sampleSpacing * math.tan(math.radians(steepestWalkable)) + 0.5
-  up = mathutils.Vector((0, 0, 1))
+  walk = RouteWalk(bridgeMeshAccess.PlayerSurfaces(), bridgeMeshAccess.swimSurfaces())
   points, directions = routeSamples(path, sampleSpacing)
-  footing = surfaces.footingBelow(points[0] + up * climb, routeFootingReach + climb)
-  if footing is None:
-    raise ValueError(f"No footing within {routeFootingReach:g} below the route's start {list(path[0])}")
-  rows, problems, travelled = [], [], 0.0
-  for index, (point, direction) in enumerate(zip(points, directions)):
-    if index:
-      probe = mathutils.Vector((point.x, point.y, footing.z + climb))
-      hit = surfaces.footingBelow(probe, routeFootingReach + climb)
-      if hit is None:
-        over = surfaces.castWithNormal(probe, up, routeHeadroomReach)
-        if over is not None and over[1].z > 0:
-          problems.append(f"rise: the ground climbs steeper than {steepestWalkable:.0f} degrees past {roundVector(footing)} toward [{point.x:.1f}, {point.y:.1f}]")
-        else:
-          problems.append(f"drop: no footing within {routeFootingReach:g} below {roundVector(footing)} going on to [{point.x:.1f}, {point.y:.1f}]")
-        break
-      run = math.hypot(hit.x - footing.x, hit.y - footing.y)
-      slope = math.degrees(math.atan2(abs(hit.z - footing.z), run))
-      travelled += run
-      footing = hit
-    else:
-      slope = 0.0
-    ceiling = surfaces.cast(footing + up * 0.05, up, routeHeadroomReach)
-    headroom = None if ceiling is None else ceiling.z - footing.z
-    side = mathutils.Vector((-direction.y, direction.x, 0.0))
-    left, right = sideClearance(surfaces, footing, side, climb), sideClearance(surfaces, footing, -side, climb)
-    waterDepth = bridgeMeshAccess.waterDepthAt(water, footing)
-    rows.append({
-      "distance": round(travelled, 1), "at": roundVector(footing), "slopeDegrees": round(slope, 1), "headroom": None if headroom is None else round(headroom, 1),
-      "left": left, "right": right, "waterDepth": None if waterDepth is None else round(waterDepth, 1),
-    })
-    if slope > steepestWalkable:
-      problems.append(f"slope {slope:.0f} degrees at {roundVector(footing)}, steeper than {steepestWalkable:.0f}")
-    if headroom is not None and headroom < playerHeight:
-      problems.append(f"headroom {headroom:.1f} at {roundVector(footing)}, under a player's {playerHeight:g}")
+  walk.start(points[0], directions[0])
+  walk.record(directions[0])
+  for start, end, direction in zip(points[:-1], points[1:], directions[:-1]):
+    strides = max(1, math.ceil(math.hypot(end.x - start.x, end.y - start.y) / routeStride))
+    for stride in range(1, strides + 1):
+      walk.advance(start.lerp(end, stride / strides), direction)
+    walk.record(direction)
+  rows = walk.rows
   widths = [(row["left"] if row["left"] is not None else routeSideReach) + (row["right"] if row["right"] is not None else routeSideReach) for row in rows]
   narrowest = int(numpy.argmin(widths))
-  steepest = max(range(len(rows)), key=lambda row: rows[row]["slopeDegrees"])
-  covered = [row for row in rows if row["headroom"] is not None]
   wet = [row for row in rows if row["waterDepth"] is not None]
-  stride = max(1, math.ceil(len(rows) / routeProfileRows))
   return {
-    "length": round(travelled, 1), "samples": len(rows), "walkable": not problems, "problems": problems,
-    "steepest": {"slopeDegrees": rows[steepest]["slopeDegrees"], "at": rows[steepest]["at"]},
+    "length": round(walk.travelled, 1), "samples": len(rows), "walkable": not walk.problems, "problems": walk.problems, "oneWay": walk.oneWay,
+    "steepest": {"slopeDegrees": round(walk.steepest[0], 1), "at": roundVector(walk.steepest[1])},
     "narrowest": {"width": round(widths[narrowest], 1), "at": rows[narrowest]["at"], "left": rows[narrowest]["left"], "right": rows[narrowest]["right"]},
-    "lowestHeadroom": min(({"headroom": row["headroom"], "at": row["at"]} for row in covered), key=lambda item: item["headroom"]) if covered else None,
+    "lowestHeadroom": None if walk.lowest is None else {"headroom": round(walk.lowest[0], 1), "at": roundVector(walk.lowest[1])},
     "deepestWater": max(({"depth": row["waterDepth"], "at": row["at"]} for row in wet), key=lambda item: item["depth"]) if wet else None,
-    "profile": rows[::stride],
+    "profile": rows[::max(1, math.ceil(len(rows) / routeProfileRows))],
   }
 
 

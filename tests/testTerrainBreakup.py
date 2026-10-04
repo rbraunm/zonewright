@@ -79,6 +79,24 @@ def testRoughenFollowsTheSurfaceStaysInItsMaskAndRepeatsBySeed(stageBlenderServe
   assert numpy.abs(wallMoves[:, 2]).max() < 1e-5 and numpy.abs(wallMoves[:, 0]).max() < 1e-5 and numpy.abs(wallMoves[:, 1]).max() > 0.5
 
 
+def testRoughenWarnsWhenItsFinestOctaveIsFinerThanTheMeshsEdges(stageBlenderServer):
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    for name in ("grainy", "fitting", "tiny"):
+      await newGrid(session, name)
+    grainy = await session.expectSuccess("roughen", {"objectName": "grainy", "featureSize": 16, "amplitude": 3, "octaves": 4})
+    fitting = await session.expectSuccess("roughen", {"objectName": "fitting", "featureSize": 64, "amplitude": 3, "octaves": 3})
+    tiny = await session.expectSuccess("roughen", {"objectName": "tiny", "featureSize": 4, "amplitude": 3, "octaves": 1})
+    return grainy, fitting, tiny
+
+  grainy, fitting, tiny = stageBlenderServer.session(steps)
+  # On 8-unit cells, octaves from 16 units across halve to 8, 4, and 2: two of them fit the mesh.
+  assert "The finest of 4 octaves is 2 units across, finer than the mesh's 8-unit edges" in grainy["warning"]
+  assert "Use at most 2 octaves at this featureSize" in grainy["warning"]
+  assert "warning" not in fitting
+  assert "featureSize itself is finer than the edges" in tiny["warning"]
+
+
 def testWarpBendsShapesSidewaysAndCanBeTakenBack(stageBlenderServer):
   async def steps(session):
     await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
