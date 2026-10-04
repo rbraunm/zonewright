@@ -70,11 +70,12 @@ def testPlotBorderOpensTowardItsStreetAndItsPriceFollowsTheRules(stageBlenderSer
     return placed, lowTier, guide, border, overridden, restored, smaller, smallerBorder, overlapping
 
   placed, lowTier, guide, border, overridden, restored, smaller, smallerBorder, overlapping = stageBlenderServer.session(steps)
-  # The guide stays inside the plot: its entrance mark is a chevron set 6 in from the entrance side (local +y), pointing out.
+  # The guide stays inside the plot: its entrance mark is a chevron with its tip on the middle of the entrance side (local +y),
+  # pointing out, and its arms within 9 of that side.
   guide = numpy.array(guide)
-  assert numpy.isclose(guide[:, 1].max(), 170.1 / 2) and numpy.isclose(numpy.abs(guide[:, 0]).max(), 169.1 / 2)
-  tips = guide[numpy.isclose(guide[:, 0], 0)]
-  assert numpy.isclose(tips[:, 1].max(), 170.1 / 2 - 6) and len(guide) == 14
+  assert numpy.isclose(guide[:, 1].max(), 170.1 / 2) and numpy.isclose(numpy.abs(guide[:, 0]).max(), 169.1 / 2) and len(guide) == 14
+  chevron = guide[8:]
+  assert numpy.isclose(chevron[numpy.isclose(chevron[:, 0], 0), 1].max(), 170.1 / 2) and 170.1 / 2 - 9 < chevron[:, 1].min() < 170.1 / 2 - 6
   # Facing east (+X), the border's open side (the model's -x wall) opens east, and the border's middle stands on the plot's center.
   assert numpy.allclose(border["openSide"], [1, 0, 0], atol=1e-6)
   assert numpy.allclose(border["middle"][:2], [0, 0], atol=1e-3) and border["name"] == "101 Test Street border"
@@ -87,6 +88,32 @@ def testPlotBorderOpensTowardItsStreetAndItsPriceFollowsTheRules(stageBlenderSer
   assert smaller["border"]["size"] == 71 and numpy.allclose(smallerBorder["scale"], 0.71)
   assert smaller["pricePlatinum"] == round((84 * 120 * 120 / (169.1 * 170.1) + 15 * 2.1 + 10.5) * 1.25)
   assert overlapping["overlaps"][0]["plot"] == "101 Test Street"
+
+
+def testTheEntranceMarkShowsFromTheStreetAndStaysOutOfTheViewFromTheEntrance(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await freshScene(session)
+    await flatGround(session, tmp_path)
+    await session.expectSuccess("setZoneProperties", environment)
+    await session.expectSuccess("setZoneHousing", decision)
+    await session.expectSuccess("placePlot", {"address": "101 Test Street", "center": [0, 0], "facingDegrees": 0})
+    entrance, _ = await session.expectImage("renderView", {"view": {"standAt": [0, 84.5], "headingDegrees": 180, "pitchDegrees": -6}})
+    street, _ = await session.expectImage("renderView", {"view": {"standAt": [0, 110], "headingDegrees": 180, "pitchDegrees": -8}})
+    return entrance, street
+
+  entrance, street = stageBlenderServer.session(steps)
+
+  def guideCyan(image):
+    pixels = numpy.asarray(Image.open(io.BytesIO(image)).convert("RGB"), dtype=numpy.int64)
+    return (pixels[..., 0] < 90) & (pixels[..., 1] > 170) & (pixels[..., 2] > 200)
+
+  # Standing on the middle of the entrance looking in, no part of the guide is in view.
+  assert not guideCyan(entrance).any()
+  # From the street 25 out, the entrance side runs across the view and the chevron rises from its middle toward the plot's back.
+  cyan = guideCyan(street)
+  bandRows = numpy.flatnonzero(cyan.mean(axis=1) > 0.9)
+  assert len(bandRows) and cyan[bandRows.min() - 40:bandRows.min() - 4, 360:600].sum() > 200
+  assert not cyan[bandRows.min() - 40:bandRows.min() - 4, :300].any() and not cyan[bandRows.min() - 40:bandRows.min() - 4, 660:].any()
 
 
 def testGradePlotLevelsItsGroundInItsOwnPassAndRegradesAfterAMove(stageBlenderServer, tmp_path):
@@ -267,6 +294,107 @@ def testARenamedGradedPlotKeepsItsGradingAndARefusedRemovalRemovesNothing(stageB
   assert kept["grading"]["gradedPlots"] == [] and keptPasses == ["base", "kept grade 3 Low Lane"] and numpy.allclose(keptGround, graded, atol=1e-3)
   # Its passes collapsed, a plot's grading cannot be taken back: the removal is refused and the plot stays.
   assert "to take back" in refused and [plot["address"] for plot in housing["plots"]] == ["4 Low Lane"]
+
+
+def testGradingFollowsItsGroundWhenRenamedAndADeletedGroundIsRefusedUntilGradedAgain(stageBlenderServer):
+  readTerrain = "objectName = 'terrain'" + readShapedMesh
+
+  async def steps(session):
+    await slopedPlots(session, lowLane[:1])
+    natural = await groundVertices(session)
+    await session.expectSuccess("gradePlot", {"address": "1 Low Lane", "objectName": "ground"})
+    await session.expectSuccess("runPython", {"code": "bpy.data.objects['ground'].name = 'terrain'"})
+    renamed = await session.expectSuccess("getHousing", {})
+    seated = await session.expectSuccess("placePlot", {"address": "5 Low Lane", "center": [40, -150], "facingDegrees": 0, "size": [30, 30]})
+    await session.expectSuccess("removePlot", {"address": "5 Low Lane"})
+    removed = await session.expectSuccess("removePlot", {"address": "1 Low Lane"})
+    restored = numpy.array((await session.expectSuccess("runPython", {"code": readTerrain}))["result"]["vertices"])
+    await slopedPlots(session, lowLane)
+    for address, _, _ in lowLane:
+      await session.expectSuccess("gradePlot", {"address": address, "objectName": "ground"})
+    await session.expectSuccess("deleteObjects", {"names": ["ground"]})
+    deleted = await session.expectSuccess("getHousing", {})
+    placeRefused = await session.expectError("placePlot", {"address": "3 Low Lane", "center": [300, 0], "facingDegrees": 0})
+    removeRefused = await session.expectError("removePlot", {"address": "1 Low Lane"})
+    removedAlone = await session.expectSuccess("removePlot", {"address": "2 Low Lane", "keepGrading": True})
+    await session.expectSuccess("createTerrainGrid", {"name": "spare", "size": [800, 800], "spacing": 8, "location": [0, 0, 0], "collection": "terrain"})
+    regraded = await session.expectSuccess("gradePlot", {"address": "1 Low Lane", "objectName": "spare"})
+    placed = await session.expectSuccess("placePlot", {"address": "3 Low Lane", "center": [300, 0], "facingDegrees": 0})
+    return natural, renamed, seated, removed, restored, deleted, placeRefused, removeRefused, removedAlone, regraded, placed
+
+  natural, renamed, seated, removed, restored, deleted, placeRefused, removeRefused, removedAlone, regraded, placed = stageBlenderServer.session(steps)
+  # Its ground renamed, the plot is still graded on it: a plot placed inside its pad sits on the slope as it lies under the pad
+  # (0.18 * -150), not on the pad at -18, and removing the graded plot takes its pass back off the renamed ground.
+  assert renamed["plots"][0]["grading"] == {"object": "terrain", "margin": 10.0, "batterDegrees": 35.0}
+  assert seated["center"][2] == -27.0
+  assert removed["grading"]["gradedPlots"] == [] and numpy.allclose(restored, natural, atol=1e-3)
+  # Its ground deleted, the plot's grading names no ground, and seating any plot or taking its grading back is refused until it is
+  # graded on ground again; keepGrading removes such a plot alone.
+  assert [plot["grading"]["object"] for plot in deleted["plots"]] == [None, None]
+  assert "Plot '1 Low Lane' was graded on ground that no longer exists" in placeRefused and "gradePlot" in placeRefused
+  assert "no grading to take back" in removeRefused and "keepGrading true" in removeRefused
+  assert removedAlone == {"removed": ["2 Low Lane", "2 Low Lane border"], "grading": None}
+  assert regraded["object"] == "spare" and regraded["height"] == -18.0 and "formerGround" not in regraded
+  assert placed["center"][2] == 0.0 and placed["grading"] is None
+
+
+def testAGradedPlotMovesOntoAnotherGroundMeshWhenToldWhich(stageBlenderServer):
+  tilePasses = "result = [None if (keys := bpy.data.objects[name].data.shape_keys) is None else [key.name for key in keys.key_blocks] for name in ('tileWest', 'tileEast')]"
+
+  async def steps(session):
+    await freshScene(session)
+    for name, x in (("tileWest", -200), ("tileEast", 200)):
+      await session.expectSuccess("createTerrainGrid", {"name": name, "size": [400, 400], "spacing": 8, "location": [x, 0, 0], "collection": "terrain"})
+      await session.expectSuccess("runPython", {"code": f"mesh = bpy.data.objects['{name}'].data\nfor vertex in mesh.vertices:\n  vertex.co.z = 0.12 * vertex.co.y\nmesh.update()"})
+    await session.expectSuccess("setZoneHousing", decision)
+    await session.expectSuccess("placePlot", {"address": "1 Tile Way", "center": [-200, 40], "facingDegrees": 180})
+    await session.expectSuccess("placePlot", {"address": "2 Tile Way", "center": [-200, -150], "facingDegrees": 0, "size": [100, 60]})
+    notGraded = await session.expectError("editPlot", {"address": "2 Tile Way", "objectName": "tileEast"})
+    await session.expectSuccess("gradePlot", {"address": "1 Tile Way", "objectName": "tileWest"})
+    offItsGround = await session.expectError("editPlot", {"address": "1 Tile Way", "center": [200, 40]})
+    moved = await session.expectSuccess("editPlot", {"address": "1 Tile Way", "center": [200, 40], "objectName": "tileEast"})
+    passes = (await session.expectSuccess("runPython", {"code": tilePasses}))["result"]
+    west = (await session.expectSuccess("runPython", {"code": "objectName = 'tileWest'" + readShapedMesh}))["result"]["vertices"]
+    assessed = await session.expectSuccess("assessPlot", {"address": "1 Tile Way"})
+    housing = await session.expectSuccess("getHousing", {})
+    return notGraded, offItsGround, moved, passes, west, assessed, housing
+
+  notGraded, offItsGround, moved, passes, west, assessed, housing = stageBlenderServer.session(steps)
+  assert "Plot '2 Tile Way' is not graded" in notGraded
+  # Moved off the mesh it is graded on, it is refused with the way on; told the other mesh, its grading moves there.
+  assert "No vertex of 'tileWest' lies under or near plot '1 Tile Way'" in offItsGround and "(objectName)" in offItsGround
+  assert moved["center"] == [200.0, 40.0, 4.8] and moved["grading"]["object"] == "tileEast" and moved["grading"]["height"] == 4.8
+  assert moved["grading"]["formerGround"]["object"] == "tileWest" and moved["grading"]["formerGround"]["gradedPlots"] == []
+  assert passes == [None, ["base", "grade 1 Tile Way"]] and assessed["under"]["unevenness"] == 0.0
+  west = numpy.array(west)
+  assert numpy.allclose(west[:, 2], 0.12 * west[:, 1], atol=1e-3)
+  assert housing["plots"][0]["grading"] == {"object": "tileEast", "margin": 10.0, "batterDegrees": 35.0}
+
+
+def testGradingKeepsShapingOutOfThePlotsPasses(stageBlenderServer):
+  readPassState = "keys = bpy.data.objects['ground'].data.shape_keys\nresult = [[key.name for key in keys.key_blocks], bpy.data.objects['ground'].active_shape_key.name]"
+  bump = {"objectName": "ground", "mode": "raise", "center": [204, 204, 36.72], "radius": 30, "strength": 10, "falloff": "smooth", "direction": [0, 0, 1]}
+  readBump = "import bridgeWater\nresult = bridgeWater.Ground().heightBelow(204, 204, 500)"
+
+  async def steps(session):
+    await slopedPlots(session, lowLane[:1])
+    await session.expectSuccess("gradePlot", {"address": "1 Low Lane", "objectName": "ground"})
+    noPass = await session.expectError("sculptAtPoint", bump)
+    await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "ridges"})
+    await session.expectSuccess("gradePlot", {"address": "1 Low Lane", "objectName": "ground", "margin": 12})
+    afterGrading = (await session.expectSuccess("runPython", {"code": readPassState}))["result"]
+    await session.expectSuccess("sculptAtPoint", bump)
+    raised = (await session.expectSuccess("runPython", {"code": readBump}))["result"]
+    await session.expectSuccess("gradePlot", {"address": "1 Low Lane", "objectName": "ground", "margin": 8})
+    regraded = (await session.expectSuccess("runPython", {"code": readBump}))["result"]
+    return noPass, afterGrading, raised, regraded
+
+  noPass, afterGrading, raised, regraded = stageBlenderServer.session(steps)
+  # On ground that had no passes, grading leaves none active, so shaping is refused until it has a pass of its own.
+  assert "none is active" in noPass and "addShapingPass" in noPass
+  # The pass active before grading stays active, so the bump goes into it and grading again keeps it (0.18 * 204 + 10 at the vertex).
+  assert afterGrading == [["base", "grade 1 Low Lane", "ridges"], "ridges"]
+  assert abs(raised - 46.72) < 0.01 and abs(regraded - raised) < 1e-3
 
 
 def testAMovedGradedPlotSitsOnTheUngradedGroundAndTakesItsGradingAlong(stageBlenderServer):

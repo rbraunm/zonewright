@@ -188,3 +188,28 @@ def testASectionDrawsAreaFloorsAndAStairAlongIt(stageBlenderServer):
   # 200 along and 80 up at 6.6 pixels a unit; the stair drawn in the sheet's red halfway up.
   column, row = round(60 + 6.6 * 87.5), round(669 - (10 + 20) * 6.6)
   assert (numpy.abs(pixels[row - 3:row + 4, column - 3:column + 4] - numpy.array([200, 40, 40])).max(axis=-1) <= 30).any()
+
+
+def testAPlanNamesOnlyTheAreasThatReachIntoIt(stageBlenderServer):
+  areas = [
+    {"name": "farNorth", "kind": "area", "rectangle": {"center": [-100, 600], "size": [100, 100], "headingDegrees": 0}},
+    {"name": "edge", "kind": "area", "rectangle": {"center": [80, 100], "size": [100, 80], "headingDegrees": 0}},
+  ]
+
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [1600, 1600], "spacing": 20, "location": [0, 0, 0]})
+    await session.expectSuccess("setZoneProperties", environment)
+    await session.expectSuccess("sketch", {"sheet": "camp", "shapes": areas})
+    return await session.expectImage("renderSketch", {"center": [0, 0], "width": 300, "layers": [], "spotHeights": False})
+
+  image, _ = stageBlenderServer.session(steps)
+  pixels = numpy.asarray(Image.open(io.BytesIO(image)).convert("RGB"), dtype=numpy.int64)
+
+  def red(rows, columns):
+    return (numpy.abs(pixels[rows, columns] - numpy.array([200, 40, 40])).max(axis=-1) <= 35).sum()
+
+  # 4.8 pixels a unit: the frame reaches y 84.4. The area crossing its top edge (x 30..130, columns 864..1344) is named just inside
+  # the top; the one wholly north of it (x -150..-50, columns 0..480) is not named at all.
+  assert red(slice(0, 60), slice(954, 1254)) > 20
+  assert red(slice(0, 60), slice(0, 480)) == 0

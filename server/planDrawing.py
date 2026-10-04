@@ -19,7 +19,6 @@ dashLength = 10
 gapLength = 6
 spotColor = (90, 30, 0)
 gridLabelColor = (40, 40, 40)
-# A plot's entrance mark in plan, in pixels: a triangle this long pointing out of the middle of its entrance side, this wide at its base.
 entranceMarkLength = 11
 entranceMarkWidth = 14
 
@@ -74,8 +73,7 @@ class LabelBoard:
     labelAt(self.draw, position, text, color, size, anchor)
 
   def place(self, position, text, color, size=15, anchor="mm"):
-    """Write a label at position, or moved the least distance clear of the labels already placed; where every spot tried is taken, at
-    position, as a label is never left out."""
+    """Write a label clear of those placed, moved the least it can; at position when nothing near is clear, never left out."""
     box = self.textBox(position, text, size, anchor)
     width, height = box[2] - box[0], box[3] - box[1]
     for ring in range(4):
@@ -256,6 +254,26 @@ def strokeShape(draw, frame, shape, color):
     facingArrow(draw, frame, center, shape["facingDegrees"], reach, (*color, 255))
 
 
+def clippedToFrame(points, size):
+  """The part of a polygon inside the drawing, 0 to size across and down."""
+  for axis, bound, keepBelow in ((0, 0, False), (0, size[0], True), (1, 0, False), (1, size[1], True)):
+    kept = []
+    for index, current in enumerate(points):
+      previous = points[index - 1]
+      currentIn, previousIn = (point[axis] <= bound if keepBelow else point[axis] >= bound for point in (current, previous))
+      if currentIn != previousIn:
+        share = (bound - previous[axis]) / (current[axis] - previous[axis])
+        kept.append(tuple(previous[other] + (current[other] - previous[other]) * share for other in range(2)))
+      if currentIn:
+        kept.append(current)
+    points = kept
+  return points
+
+
+def polygonArea(points):
+  return abs(sum(a[0] * b[1] - b[0] * a[1] for a, b in zip(points, points[1:] + points[:1]))) / 2
+
+
 def labelShape(board, frame, shape, color):
   points = [frame.pixel(point) for point in shape["plan"]]
   label = shape.get("label") or shape["name"]
@@ -271,10 +289,11 @@ def labelShape(board, frame, shape, color):
   elif kind == "note":
     board.place(points[0], label, color, 14)
   elif kind == "area":
-    # An area's name sits just inside the top of what the drawing shows of it, clear of the footprints and points usually drawn in its
-    # middle.
-    left, right = max(0, min(point[0] for point in points)), min(frame.size[0], max(point[0] for point in points))
-    board.place(((left + right) / 2, max(0, min(point[1] for point in points)) + 14), label, color, 15)
+    shown = clippedToFrame(points, frame.size)
+    if polygonArea(shown) > 0:
+      # Just inside the top of what the drawing shows of it, clear of the footprints and points usually drawn in its middle.
+      left, right = min(point[0] for point in shown), max(point[0] for point in shown)
+      board.place(((left + right) / 2, min(point[1] for point in shown) + 14), label, color, 15)
   else:
     board.place(centroidOf(points), label, color, 15)
 
@@ -343,15 +362,10 @@ sectionPadding = (60, 40)
 groundColor = (110, 70, 40)
 massingColor = (90, 90, 90)
 sectionBackground = (238, 236, 232)
-
-
-# A section's label stands this many pixels above the top of what it names.
 sectionLabelLift = 8
-# A plot's pad in section: its line's width, the ticks at its ends, and its entrance mark, in pixels.
 padWidth = 5
 padTick = 7
 entranceMarkSection = 10
-# A path without a width crossing a section shows as a diamond this many pixels across.
 crossingMark = 5
 
 

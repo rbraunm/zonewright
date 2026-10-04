@@ -1943,7 +1943,7 @@ def borderModelFolder(kind):
 
 
 plotHelp = (
-  " A plot is a guide on the ground (its outline, and a chevron pointing out of its entrance side) with the client's own border model (a player's"
+  " A plot is a guide on the ground (its outline, and a chevron on the middle of its entrance side pointing out) with the client's own border model (a player's"
   " OBP_LOTSQUARE, a guild's OBP_GUILDSQUARE, sized as a door's size scales it, in whole percents) at its center, as players will see"
   " it; guides draw in renderView (guides false hides them) and never export. `facingDegrees` is the way its entrance faces, toward its"
   " street (0 = +Y, clockwise). Sizes are [across, along] (along runs from the entrance to the back); the default is the stock plot:"
@@ -1975,8 +1975,8 @@ async def setZoneHousing(
 @guardedTool()
 async def getHousing(context: Context):
   """The zone's housing decision and every plot: address, kind, center, facing, size, allowances, features, price with each step that
-  led to it, upkeep, border size, and grading (the ground it is graded on, its margin and batter, or null); plot counts against its
-  budget; and overlapping plots, which export refuses."""
+  led to it, upkeep, border size, and grading (the ground it is graded on, its margin and batter, or null; the ground is null when it
+  was deleted); plot counts against its budget; and overlapping plots, which export refuses."""
   return await callBridge(context, "getHousing", {})
 
 
@@ -2002,12 +2002,13 @@ async def placePlot(
   " given), facingDegrees, size, height, items, pets, features (replacing its list), pricePlatinum (an override; 0 returns it to its"
   " derived price). A plot whose kind or size changes gets a new border. A graded plot keeps its grading: renamed, its pass is renamed;"
   " moved, turned, resized, or raised, its ground is graded again where it now lies, and the result's grading says as gradePlot does"
-  " what that changed. Nothing changes when the edit is refused." + plotHelp
+  " what that changed. It stays graded on the ground it is graded on; `objectName` grades it on another (moved onto another terrain"
+  " mesh, say), taking its grading back from the first, as formerGround reports. Nothing changes when the edit is refused." + plotHelp
 ))
 async def editPlot(
   context: Context, address: str, newAddress: str | None = None, kind: str | None = None, center: list[float] | None = None,
   facingDegrees: float | None = None, size: list[float] | None = None, height: float | None = None, items: int | None = None,
-  pets: int | None = None, features: list[str] | None = None, pricePlatinum: int | None = None,
+  pets: int | None = None, features: list[str] | None = None, pricePlatinum: int | None = None, objectName: str | None = None,
 ):
   folder = None
   if kind is not None or size is not None:
@@ -2021,7 +2022,8 @@ async def editPlot(
     folder = await anyio.to_thread.run_sync(borderModelFolder, newKind)
   return await callBridge(context, "editPlot", {
     "address": address, "newAddress": newAddress, "kind": kind, "center": center, "facingDegrees": facingDegrees, "size": size,
-    "height": height, "items": items, "pets": pets, "tags": features, "pricePlatinum": pricePlatinum, "borderFolder": folder,
+    "height": height, "items": items, "pets": pets, "tags": features, "pricePlatinum": pricePlatinum, "objectName": objectName,
+    "borderFolder": folder,
   })
 
 
@@ -2029,7 +2031,8 @@ async def editPlot(
 async def removePlot(context: Context, address: str, keepGrading: bool = False):
   """Remove a plot and its border. A graded plot's grading goes with it: its pass is removed and the other plots graded on that ground
   are graded again without it, their pads untouched. With keepGrading the ground stays as it is, the plot's pass kept as ordinary
-  shaping named "kept grade <address>". Nothing is removed when the removal is refused."""
+  shaping named "kept grade <address>"; a plot whose pass was collapsed, or whose ground was deleted, is removed only so. Nothing is
+  removed when the removal is refused."""
   return await callBridge(context, "removePlot", {"address": address, "keepGrading": keepGrading})
 
 
@@ -2042,8 +2045,12 @@ async def gradePlot(context: Context, address: str, objectName: str, margin: flo
   where two pads stand too close for their difference in height, the ground between them runs in one straight bank, steeper than the
   batter, listed in steepBanks (move a plot, change its height, or build a retaining wall there). touched names the other plots whose
   ground within 60 units of their edges changed: look at them too. Grading again (with another margin or batter) replaces what the pass
-  held; editPlot keeps a graded plot graded, and removePlot takes its grading back. A plot standing far off the ground around it is
-  refused: move it or change its height. Look at the cut and fill slopes in a render; paint them like the rest of the ground."""
+  held; grading on other ground takes its grading back from the ground it was on (formerGround reports that). editPlot keeps a graded
+  plot graded, and removePlot takes its grading back. The grading follows the ground when it is renamed; when that ground is deleted,
+  grade the plot again where it stands. A plot standing far off the ground around it is refused: move it or change its height.
+  Shaping never goes into a plot's pass, which grading rewrites whole: the pass active before grading stays active, and on ground that
+  had no passes none is, so add one (addShapingPass) before shaping it again. Look at the cut and fill slopes in a render; paint them
+  like the rest of the ground."""
   return await callBridge(context, "gradePlot", {"address": address, "objectName": objectName, "margin": margin, "batterDegrees": batterDegrees})
 
 
