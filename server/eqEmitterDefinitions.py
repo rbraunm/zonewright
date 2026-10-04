@@ -76,10 +76,20 @@ def environmentDefinitionsPath(clientRoot):
   return path
 
 
-def texturePath(clientRoot, textureName):
-  """Where the client finds a definition's texture, searching its effect folders in order, or None."""
+def textureFiles(clientRoot):
+  """The files a definition's texture can name, by lowercased name, as the client finds them: the first effect folder holding a name
+  gives it."""
+  found = {}
   for folder in textureFolders:
-    found = findFile(Path(clientRoot) / folder, textureName)
-    if found is not None:
-      return found
-  return None
+    path = Path(clientRoot) / folder
+    if not path.is_dir():
+      continue
+    names = {}
+    for entry in path.iterdir():
+      key = entry.name.lower()
+      if key in names:
+        raise ValueError(f"{path} holds {names[key].name} and {entry.name}, one name in different cases")
+      names[key] = entry
+    for key, entry in names.items():
+      found.setdefault(key, entry)
+  return found

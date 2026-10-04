@@ -179,7 +179,8 @@ def testTheEmitterDefinitionsTheClientsZonesPlaceFindTheirTextures():
   for path in everquestClient.iterdir():
     if path.name.lower().endswith(eqEmitters.listSuffix):
       used |= {emitter["definition"] for emitter in eqEmitters.parseEmitters(path.read_text(encoding="latin-1"), path.name)}
-  missing = {(index, definitions[index]["texture"]) for index in used if index < len(definitions) and eqEmitterDefinitions.texturePath(everquestClient, definitions[index]["texture"]) is None}
+  files = eqEmitterDefinitions.textureFiles(everquestClient)
+  missing = {(index, definitions[index]["texture"]) for index in used if index < len(definitions) and definitions[index]["texture"].lower() not in files}
   # Found ignoring case in SpellEffects, EnvEmitterEffects, or ActorEffects; these few name textures the client does not hold.
   assert missing == {(0, "nul"), (154, "wisp_grey01.dds"), (400, "fire01_gray.dds"), (401, "fire01_gray.dds"), (402, "fire01_gray.dds"), (495, "shadow04.dds")}
   assert sorted(index for index in used if index >= len(definitions)) == [966, 1003, 1015, 4442777]

@@ -14,7 +14,6 @@ maximumCapacity = 100000
 lodFloorParticles = 16
 millisecondsPerSecond = 1000.0
 billboardModes = {0: "screen", 1: "beam", 2: "flat"}
-shapes = {0: "point", 1: "evenRing", 2: "evenCylinder", 3: "cylinder", 4: "disc", 5: "sphere", 6: "box", 7: "cone", 8: "torus", 9: "ring"}
 
 
 def turnsToRadians(angle):

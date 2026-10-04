@@ -19,11 +19,12 @@ def prepareAssets(clientRoot, toolingRoot):
   definition naming it is reported as not drawn."""
   definitionsPath = eqEmitterDefinitions.environmentDefinitionsPath(clientRoot)
   definitions = eqEmitterDefinitions.parseDefinitions(definitionsPath.read_bytes(), definitionsPath.name)
+  files = eqEmitterDefinitions.textureFiles(clientRoot)
   sources = {}
   for definition in definitions:
     name = definition["texture"].lower()
     if name and name not in sources:
-      sources[name] = eqEmitterDefinitions.texturePath(clientRoot, definition["texture"])
+      sources[name] = files.get(name)
   stamp = {"format": assetsFormat, "definitions": fileStamp(definitionsPath), "textures": {name: fileStamp(path) for name, path in sources.items() if path is not None}}
   digest = hashlib.sha256(json.dumps(stamp, sort_keys=True).encode("utf-8")).hexdigest()[:16]
   folder = toolingRoot / "emitters"
