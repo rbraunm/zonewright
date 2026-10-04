@@ -106,6 +106,18 @@ def parseModel(modelBytes, sourceName):
   }
 
 
+def lightPosition(first, second, third):
+  """Where the client places a .zon light, in the zone's own axes (the axes its placements and terrain use): (field 2, -field 1, field 3)
+  (EQGraphicsDX9.dll 0x10065acb). Freeport West's torch lights land on its torch models only so."""
+  return (second, -first, third)
+
+
+def lightFields(position):
+  """The three .zon fields that place a light at a position in the zone's axes (lightPosition's inverse)."""
+  x, y, z = position
+  return (-y, x, z)
+
+
 def parseZone(zoneBytes, sourceName):
   """EQGZ .zon: model names, object placements, regions (name, center, three turns, half extents), and lights (name, position, RGB 0-1,
   radius). Version 2 appends per-vertex baked light to each object."""
@@ -145,8 +157,8 @@ def parseZone(zoneBytes, sourceName):
     position += zoneRegionBytes
   lights = []
   for _ in range(lightCount):
-    nameOffset, x, y, z, red, green, blue, radius = struct.unpack_from("<I7f", zoneBytes, position)
-    lights.append({"name": readString(stringTable, nameOffset), "position": (x, y, z), "color": (red, green, blue), "radius": radius})
+    nameOffset, first, second, third, red, green, blue, radius = struct.unpack_from("<I7f", zoneBytes, position)
+    lights.append({"name": readString(stringTable, nameOffset), "position": lightPosition(first, second, third), "color": (red, green, blue), "radius": radius})
     position += zoneLightBytes
   if position != len(zoneBytes):
     raise ValueError(f"{sourceName}: zone data ends at {position} of {len(zoneBytes)} bytes")

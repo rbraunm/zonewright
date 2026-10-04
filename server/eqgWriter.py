@@ -199,7 +199,7 @@ def zoneBytes(modelNames, placements, regions, lights):
   for light in lights:
     if light["radius"] <= 0 or not all(0 <= component <= 1 for component in light["color"]):
       raise ValueError(f"Light '{light['name']}' needs a positive radius and RGB in 0-1, got {light['radius']} and {list(light['color'])}")
-    lightRecords += struct.pack("<I7f", strings.offset(light["name"]), *light["position"], *light["color"], light["radius"])
+    lightRecords += struct.pack("<I7f", strings.offset(light["name"]), *eqgFiles.lightFields(light["position"]), *light["color"], light["radius"])
   header = b"EQGZ" + struct.pack("<6I", zoneVersion, len(strings.data), len(modelNames), len(placements), len(regions), len(lights))
   return header + bytes(strings.data) + struct.pack(f"<{len(modelOffsets)}I", *modelOffsets) + bytes(records) + bytes(regionRecords) + bytes(lightRecords)
 
