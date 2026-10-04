@@ -90,5 +90,4 @@ A zone light is a point light whose `eqRadius` property holds the EQ radius, col
 - **EQ terrain zones:** their lights, if they have any outside the .zon.
 - **Emitter definitions:** the client's `actoremittersnew.edd`, so an emitter is known by its index and the names zones give it.
 - **Classic objects' textures:** their use on placed objects (the zone's own meshes are measured).
-- **`Resources/Sky/sky.ini`:** its zone sky settings.
 - **The preview:** it draws neither lights nor emitters.

@@ -80,14 +80,15 @@ A zone decides its housing before any plot exists: whether it has any, how centr
 
 ### Arrangement
 
+Planned; today placeOnSurface, duplicateObjects, and scatterInRegion cover part of it.
+
 - **Explicit sets:** one call places many linked copies of a model or kit asset, each with its own position, heading, pitch, roll, and scale, which are exactly what an EQ placement holds.
 - **Generated sets:** rows (between two points, by count or spacing), grids, rings, along a route, and scatter over a region, each with ranges for heading, pitch, roll, scale, and position jitter, and a seed. The result is the same per-copy list, so a generated set can be edited copy by copy.
 - **Settling:** dropping copies onto whatever is below them from above the whole scene, by footprint rather than by origin: sunk to the lowest ground under the footprint (plus an optional depth), optionally tilted toward the ground's slope by a fraction, or seated on top of a named object. Settling again after the terrain changes puts everything back on the ground.
 
 ### Review
 
-- Framing a view on given objects, walk views at eye height along a route, and before-and-after comparisons of the same view across passes. Views come first.
-- Checks, which confirm what the views show: props floating above or buried in the ground, route segments steeper than walkable, texture stretch and uneven texture scale, triangle and object counts.
+Views come first: renderView at eye height, from above, and close; plans (renderSketch) and sections (renderSection). Checks confirm what the views show: walkRoute for slope, footing, and headroom along a route, compareWithClientZones for construction against the client's zones. Planned: views framed on given objects, walk views along a route, before-and-after comparisons of the same view, and checks for props floating above or buried in the ground, texture stretch, and uneven texture scale.
 
 ### Surfacing and lighting from the catalog
 

@@ -26,7 +26,7 @@ The survey caches what zonewright knows about every zone in the EverQuest client
 
 Each zone variant is keyed `zone:format` (`wld`, `eqgz`, `eqtzp`); some zones ship both a classic and an EQG version. A row with `error` is a variant whose files the parsers cannot read; report it, do not guess its values.
 
-**Interpretive lane** — Claude's own reading of a zone from renders and the technical data: zone type, character, areas, landmarks. It is token-heavy. Run it on your own judgment when a question needs it for a zone or a few zones. Before running it on a large sample, warn the user that it will take significant time and tokens through the MCP, and wait for them to agree. The interpretation procedure and its tools are added once zone rendering exists.
+**Interpretive lane** — Claude's own reading of a zone from renders and the technical data: zone type, character, areas, landmarks. It is token-heavy. Run it on your own judgment when a question needs it for a zone or a few zones. Before running it on a large sample, warn the user that it will take significant time and tokens through the MCP, and wait for them to agree. Its procedure is not written yet: zone rendering exists (importZone, renderView), and a pilot on three or four contrasting zones measuring tokens, time, and screenshots per zone comes before any larger run.
 
 ## Caching
 
