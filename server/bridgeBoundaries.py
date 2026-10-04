@@ -308,9 +308,13 @@ def boxBounds(box):
 
 
 def boxCorners(box):
-  """A zone line's lowest and highest corners."""
-  center, half = boxBounds(box)
-  return [middle - extent for middle, extent in zip(center, half)], [middle + extent for middle, extent in zip(center, half)]
+  """A box empty's eight world corners, x changing fastest, then y, then z: the first four its bottom."""
+  return [list(box.matrix_world @ mathutils.Vector((x, y, z))) for z in (-1, 1) for y in (-1, 1) for x in (-1, 1)]
+
+
+def boxHeading(box):
+  """How far a box is turned about Z, in radians."""
+  return box.matrix_world.to_euler().z
 
 
 def guideCorners():
@@ -350,12 +354,16 @@ def placeZoneLine(number, label, minimum, maximum, target):
 
 
 def describeZoneLine(box):
+  """A zone line's name, number, label, the bounds of its box, its turn about Z where it has one, and its target."""
   number, label = parsedName(box.name)
-  center, half = boxBounds(box)
+  corners = boxCorners(box)
+  heading = boxHeading(box)
   described = {
-    "name": box.name, "number": number, "label": label, "minimum": [round(c - h, 2) for c, h in zip(center, half)],
-    "maximum": [round(c + h, 2) for c, h in zip(center, half)], "target": readSpec(box, bridgeMeshAccess.zoneLineProperty),
+    "name": box.name, "number": number, "label": label, "minimum": [round(min(corner[axis] for corner in corners), 2) for axis in range(3)],
+    "maximum": [round(max(corner[axis] for corner in corners), 2) for axis in range(3)], "target": readSpec(box, bridgeMeshAccess.zoneLineProperty),
   }
+  if abs(heading) > turnTolerance:
+    described["headingDegrees"] = round(math.degrees(heading), 2)
   if not isAuthored(box):
     described["clientContent"] = box[bridgeMeshAccess.clientContentProperty]
   return described
@@ -468,36 +476,45 @@ def getZoneLines():
   return {"zoneLines": [describeZoneLine(line) for line in zoneLineObjects()], "errors": [error["message"] for error in zoneLineErrors()], "gaps": zoneLineGaps()}
 
 
-def placeImportedBoundaries(zone, walls, zoneLines):
-  """What an imported zone archive holds of its player boundaries, as reference: its terrain's material -1 triangles as one boundary,
-  and its ATP_ regions as zone lines whose targets the archive does not hold."""
-  collected = {"boundary": None, "zoneLines": []}
-  names = ([f"{zone} boundaries"] if walls is not None else []) + [line["name"] for line in zoneLines]
-  for name in names:
-    bridgeObjects.requireNewName(name)
-  if walls is not None:
-    mesh = bpy.data.meshes.new(f"{zone} boundaries")
-    mesh.from_pydata(walls["positions"], [], walls["triangles"])
-    mesh.update()
-    boundary = bpy.data.objects.new(f"{zone} boundaries", mesh)
-    boundary.hide_render = True
-    boundary[bridgeMeshAccess.boundaryProperty] = json.dumps({"kind": "imported"})
-    boundary[bridgeMeshAccess.clientContentProperty] = "zoneFile"
-    bridgeObjects.targetCollection(f"{zone} boundaries").objects.link(boundary)
-    bpy.context.view_layer.update()
-    collected["boundary"] = describeBoundary(boundary)
+def placeImportedBoundaries(zone, walls):
+  """An imported zone archive's terrain's material -1 triangles as one boundary, for reference."""
+  name = f"{zone} boundaries"
+  bridgeObjects.requireNewName(name)
+  mesh = bpy.data.meshes.new(name)
+  mesh.from_pydata(walls["positions"], [], walls["triangles"])
+  mesh.update()
+  boundary = bpy.data.objects.new(name, mesh)
+  boundary.hide_render = True
+  boundary[bridgeMeshAccess.boundaryProperty] = json.dumps({"kind": "imported"})
+  boundary[bridgeMeshAccess.clientContentProperty] = "zoneFile"
+  bridgeObjects.targetCollection(name).objects.link(boundary)
+  bpy.context.view_layer.update()
+  return {"boundary": describeBoundary(boundary)}
+
+
+def placeZoneLineGuides(zoneLines, collection, clientContent):
+  """An imported zone's zone lines, for reference: boxes as placeZoneLine makes them, [{name, center, halfExtents, headingDegrees}],
+  turned about Z as the zone file turns them, with no target, which a zone file never holds (the server's zone points do). A name
+  already taken is numbered, as Blender numbers a zone's lights."""
+  if clientContent not in bridgeMeshAccess.clientContentKinds:
+    raise ValueError(f"clientContent is one of {list(bridgeMeshAccess.clientContentKinds)}, got {clientContent!r}")
+  destination = bridgeObjects.targetCollection(collection)
+  boxes = []
   for line in zoneLines:
+    if min(line["halfExtents"]) <= 0:
+      raise ValueError(f"Zone line '{line['name']}' has a half extent of 0 or less: {list(line['halfExtents'])}")
     box = bpy.data.objects.new(line["name"], None)
     box.empty_display_type = "CUBE"
     box.empty_display_size = 1.0
     box.location = line["center"]
+    box.rotation_euler = (0.0, 0.0, math.radians(line["headingDegrees"]))
     box.scale = line["halfExtents"]
     box[bridgeMeshAccess.zoneLineProperty] = json.dumps(None)
-    box[bridgeMeshAccess.clientContentProperty] = "zoneFile"
-    bridgeObjects.targetCollection(f"{zone} zone lines").objects.link(box)
-    bpy.context.view_layer.update()
-    collected["zoneLines"].append(describeZoneLine(box))
-  return collected
+    box[bridgeMeshAccess.clientContentProperty] = clientContent
+    destination.objects.link(box)
+    boxes.append(box)
+  bpy.context.view_layer.update()
+  return {"zoneLines": [describeZoneLine(box) for box in boxes]}
 
 
 commands = {
@@ -508,4 +525,5 @@ commands = {
   "placeZoneLine": (placeZoneLine, True),
   "getZoneLines": (getZoneLines, False),
   "placeImportedBoundaries": (placeImportedBoundaries, True),
+  "placeZoneLineGuides": (placeZoneLineGuides, True),
 }

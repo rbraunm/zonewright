@@ -153,7 +153,8 @@ def testExportWritesWallsFlagsAndZoneLinesAndTheArchiveBringsThemBack(stageBlend
   assert imported["boundary"]["triangles"] == exported["boundaryTriangles"] and imported["boundary"]["kind"] == "imported" and imported["boundary"]["clientContent"] == "zoneFile"
   assert imported["boundary"]["minimum"][0] == -190.0 and imported["boundary"]["maximum"] == [150.0, 150.0, 70.0]
   assert lines["zoneLines"] == [{"name": "ATP_1_east", "number": 1, "label": "east", "minimum": [148.0, -20.0, -5.0], "maximum": [160.0, 20.0, 60.0], "target": None, "clientContent": "zoneFile"}]
-  assert lines["errors"] == [] and lines["gaps"] == [] and imported["zoneLinesTurned"] == [] and imported["passableTriangles"] == exported["passableTriangles"]
+  assert imported["zoneLines"] == lines["zoneLines"] and imported["zoneLinesTilted"] == []
+  assert lines["errors"] == [] and lines["gaps"] == [] and imported["passableTriangles"] == exported["passableTriangles"]
   assert blocked["problems"][0]["kind"] == "blocked" and blocked["problems"][0]["boundary"][:2] == [150.0, 80.0]
   assert through["walkable"] and wading["walkable"] and wading["deepestWater"] is None and min(row["at"][2] for row in wading["profile"]) <= -15
   reasons = {group["reason"]: group["objects"] for group in reference["excluded"]}
@@ -261,3 +262,35 @@ def testBoundariesAndZoneLinesDrawInEveryShadingPlanAndSection(stageBlenderServe
   assert numpy.abs(guidePixel(section, 1215, 389) - [215, 30, 25]).max() <= 2 and numpy.abs(guidePixel(section, 225, 355) - [215, 30, 25]).max() <= 2
   sectionRed, sectionGreen, _ = guidePixel(section, 406, 400)
   assert sectionGreen - sectionRed > 20
+
+
+def testTurnedZoneLinesDrawTurnedInViewsPlansAndSections(stageBlenderServer, tmp_path):
+  overhead = {"map": {"center": [0, 0], "width": 800}}
+
+  async def steps(session):
+    await groundedBasin(session, tmp_path)
+    await session.expectSuccess("setZoneProperties", environment)
+    await session.expectSuccess("placeZoneLine", {"number": 1, "label": "turned", "minimum": [-40, 40, -5], "maximum": [40, 60, 30], "target": target})
+    await session.expectSuccess("transformObjects", {"names": ["ATP_1_turned"], "rotationDegrees": [0, 0, 30]})
+    lines = await session.expectSuccess("getZoneLines", {})
+    view, _ = await session.expectImage("renderView", {"view": overhead, "shading": "layout"})
+    bareView, _ = await session.expectImage("renderView", {"view": overhead, "shading": "layout", "guides": False})
+    plan, _ = await session.expectImage("renderSketch", {"center": [0, 0], "width": 800})
+    barePlan, _ = await session.expectImage("renderSketch", {"center": [0, 0], "width": 800, "layers": ["regions", "plots", "water"]})
+    _, cuts = await session.expectImage("renderSection", {"start": [-200, 55], "end": [200, 55], "bottom": -30, "top": 60})
+    return lines, view, bareView, plan, barePlan, cuts
+
+  lines, view, bareView, plan, barePlan, cuts = stageBlenderServer.session(steps)
+  # The 80 by 20 box about (0, 50), turned 30 degrees counter-clockwise from above: its corners reach 39.64 along x and 28.66 along y.
+  assert lines["zoneLines"] == [{
+    "name": "ATP_1_turned", "number": 1, "label": "turned", "minimum": [-39.64, 21.34, -5.0], "maximum": [39.64, 78.66, 30.0], "target": target, "headingDegrees": 30.0,
+  }]
+  assert lines["errors"] == ["'ATP_1_turned' is turned; zone lines stay square to the axes"]
+  # (23.5, 69.3) lies in the turned box only, (-35, 58) in the unturned one only. Views 1.2 pixels a unit and plans 1.8, north (+X) up.
+  for image, bare, turnedOnly, squareOnly in ((view, bareView, (397, 242), (410, 312)), (plan, barePlan, (595, 363), (616, 468))):
+    red, green, _ = guidePixel(image, *turnedOnly) - guidePixel(bare, *turnedOnly)
+    assert green - red > 30, (guidePixel(image, *turnedOnly), guidePixel(bare, *turnedOnly))
+    assert numpy.array_equal(guidePixel(image, *squareOnly), guidePixel(bare, *squareOnly))
+  # The section along y = 55, 5 off the box's middle, runs through the turned box from x = -11.34 to 28.66 (s counts from x = -200);
+  # turned the other way it would run from -28.66 to 11.34.
+  assert cuts["zoneLines"] == [{"name": "ATP_1_turned", "s": [188.66, 228.66], "z": [-5.0, 30.0]}]

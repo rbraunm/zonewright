@@ -71,7 +71,7 @@ def testTechnicalLaneMeasuresEachZoneFormat(stageServer):
   assert rows["steamfontmts:eqtzp"]["dimensions"]["tileShape"] == {"quadsPerTile": 16, "unitsPerVertex": 12.0}
   assert rows["befallen:wld"]["verticality"]["enclosedShare"] > 0.95
   assert rows["gfaydark:wld"]["verticality"]["enclosedShare"] < 0.05
-  assert rows["gfaydark:wld"]["regions"] == {"regionCount": 9, "regionsByKind": {"zoneLine": 9}}
+  assert rows["gfaydark:wld"]["regions"] == {"regionCount": 9, "regionsByKind": {"zoneLine": 9}, "zoneLines": None}
   assert rows["gfaydark:wld"]["content"]["topModels"][0] == {"model": "nekpine1_actordef", "count": 1247}
   assert rows["steamfontmts:eqtzp"]["content"]["topModels"][0] == {"model": "obp_stmfnt_pine.mod", "count": 194}
   assert progressMessages[0] == "checking zone file hashes"
@@ -117,11 +117,29 @@ def testZoneSurveyReturnsEveryGroup(stageServer):
   assert survey["brewallLabelCount"] > 0
 
 
-def testSurveyRejectsUnknownZonesGroupsAndSorts(stageServer):
+def testRegionsListAnEQGZonesZoneLinesInZoneNameOrder(stageServer):
   server = stageSurveyServer(stageServer)
-  assert "zonewrightnowhere" in server.callToolExpectingError("surveyZones", {"zones": ["gfaydark", "zonewrightnowhere"]})
+  result, _ = server.callToolExpectingSuccess("surveyZones", {"zones": ["draniksscar", "Crescent", "zonewrightnowhere"], "groups": ["regions"]})
+  assert result["unknownZones"] == ["zonewrightnowhere"]
+  assert [row["variant"] for row in result["rows"]] == ["crescent:eqgz:loose", "draniksscar:eqgz"]
+  rows = rowsByVariant(result)
+  # The files write the turns in radians (-pi/2, pi/2, pi), which read as 512ths of a turn are a degree or two.
+  assert rows["crescent:eqgz:loose"]["regions"]["zoneLines"] == [
+    {"name": "ATP_1_", "number": 1, "center": [-842.0, -2765.0, 87.1], "size": [111.8, 340.8, 307.2], "headingDegrees": -1.1},
+  ]
+  assert rows["crescent:eqgz:loose"]["regions"]["regionsByKind"] == {"water": 57, "zoneLine": 1}
+  assert rows["draniksscar:eqgz"]["regions"]["zoneLines"] == [
+    {"name": "ATP_3_", "number": 3, "center": [1337.0, -2045.8, 430.1], "size": [120.0, 60.0, 130.0], "headingDegrees": 1.1},
+    {"name": "ATP_2_", "number": 2, "center": [2110.7, -729.4, -207.0], "size": [120.0, 60.0, 130.0], "headingDegrees": -2.21},
+    {"name": "ATP_1_", "number": 1, "center": [1383.7, 2058.3, 482.9], "size": [120.0, 60.0, 130.0], "headingDegrees": -1.1},
+  ]
+
+
+def testSurveyRefusesUnknownGroupsAndSortsByUnrequestedGroups(stageServer):
+  server = stageSurveyServer(stageServer)
   assert "Unknown measured groups ['mood']" in server.callToolExpectingError("surveyZones", {"zones": ["gfaydark"], "groups": ["mood"]})
-  assert "sortBy 'surfaces.totalArea' must start with one of the requested groups" in server.callToolExpectingError("surveyZones", {"zones": ["gfaydark"], "sortBy": "surfaces.totalArea"})
+  refusal = server.callToolExpectingError("surveyZones", {"zones": ["gfaydark"], "groups": ["regions"], "sortBy": "dimensions.footprint"})
+  assert "sortBy 'dimensions.footprint' sorts by the dimensions group, which this call does not request (groups ['regions'])" in refusal
 
 
 def testSurveyWithoutClientFails(stageServer):
@@ -130,15 +148,15 @@ def testSurveyWithoutClientFails(stageServer):
   assert "EVERQUEST_CLIENT is not set" in errorText
 
 
-def testZoneNotesListBrewallLabels(stageServer):
+def testZoneNotesListBrewallLabelsOnTheZoneByLayerAndTheRestByName(stageServer):
   server = stageSurveyServer(stageServer)
   notes, _ = server.callToolExpectingSuccess("getZoneNotes", {"zone": "gfaydark"})
-  labelTexts = [label["text"] for label in notes["labels"]]
-  assert "to Butcherblock Mountains" in labelTexts
-  butcherblock = notes["labels"][labelTexts.index("to Butcherblock Mountains")]
-  assert butcherblock["mapPosition"] == [-2657.4233, 1641.3786, 0.0008]
-  assert butcherblock["scenePosition"] == [-1641.3786, 2657.4233, 0.0008]
-  assert butcherblock["layer"] == "gfaydark_1"
+  assert notes["variant"] == "gfaydark:wld" and list(notes["labels"]) == ["gfaydark_1"] and len(notes["labels"]["gfaydark_1"]) == 144
+  # The map's file holds (-2657.4233, 1641.3786, 0.0008): x and y swap and turn negative in the scene.
+  assert {"text": "to Butcherblock Mountains", "at": [-1641, 2657, 0]} in notes["labels"]["gfaydark_1"]
+  assert notes["offZone"] == {"count": 4, "texts": [
+    "Original Map: EverQuest Default", "Revised Map: Brewall Rainsinger (Cazic-Thule)", "http://www.eqmaps.info", "Return of the Exiled (www.roteguild.org)",
+  ]}
 
 
 def testZoneNoteScenePositionsLieOnTheZone(stageServer):
@@ -146,14 +164,30 @@ def testZoneNoteScenePositionsLieOnTheZone(stageServer):
   notes, _ = server.callToolExpectingSuccess("getZoneNotes", {"zone": "highpasshold"})
   rows, _ = server.callToolExpectingSuccess("surveyZones", {"zones": ["highpasshold"], "groups": ["dimensions"]})
   minimum, maximum = rows["rows"][0]["dimensions"]["terrainMinimum"], rows["rows"][0]["dimensions"]["terrainMaximum"]
-  # The first layer names the places; the second holds the map's credits in a column off the zone. Highpass Hold runs about 3000 units
-  # along x and 1550 along y, so its places at map y past 840 fall off its ground unless the axes swap.
-  places = [label for label in notes["labels"] if label["layer"] == "highpasshold_1"]
-  offTheZone = [label["text"] for label in places if not all(minimum[axis] <= label["scenePosition"][axis] <= maximum[axis] for axis in (0, 1))]
-  assert len(places) == 81 and offTheZone == []
-  assert max(abs(label["mapPosition"][1]) for label in places) > maximum[1]
-  kithicor = next(label for label in notes["labels"] if label["text"] == "to Kithicor Forest")
-  assert kithicor["scenePosition"] == [-1361.0, 198.0, -114.5187]
+  assert notes["extent"] == {"minimum": minimum[:2], "maximum": maximum[:2]}
+  # The first layer names the places; the second holds the map's credits and its hunters in a column off the zone. Highpass Hold runs
+  # about 3000 units along x and 1550 along y, so its places past 840 along x fall off its ground unless the axes swap.
+  places = notes["labels"]["highpasshold_1"]
+  assert len(places) == 81 and max(abs(place["at"][0]) for place in places) > maximum[1]
+  assert {"text": "to Kithicor Forest", "at": [-1361, 198, -115]} in places
+  assert notes["offZone"] == {"count": 7, "texts": [
+    "http://www.eqmaps.info", "Return of the Exiled (www.roteguild.org)", "Grenix Mucktail", "Hagnis Shralok", "Recfek Shralok", "Vexven Mucktail", "Vopuk Shralok",
+  ]}
+
+
+def testZoneNotesKeepTheLabelsHoldingEveryWord(stageServer):
+  server = stageSurveyServer(stageServer)
+  exits, _ = server.callToolExpectingSuccess("getZoneNotes", {"zone": "crescent", "text": "to"})
+  causeway, _ = server.callToolExpectingSuccess("getZoneNotes", {"zone": "draniksscar", "text": "Nobles` CAUSEWAY"})
+  credits, _ = server.callToolExpectingSuccess("getZoneNotes", {"zone": "crescent", "text": "map brewall"})
+  # "To" is a word of "Bag-To-Token", but only part of "Skeleton", "Touch", and "Elevator", which stay out.
+  assert exits["labels"] == {"crescent_1": [
+    {"text": "to Bixie Warfront", "at": [-1326, -2559, -160]}, {"text": "to Blightfire Moors", "at": [-1022, -2783, -73]},
+    {"text": "Realnyna (Bag-To-Token)", "at": [-1340, -1350, -91]},
+  ]}
+  assert exits["offZone"] == {"count": 0, "texts": []}
+  assert causeway["labels"] == {"draniksscar_1": [{"text": "to Nobles` Causeway", "at": [2039, -711, -260]}]}
+  assert credits["labels"] == {} and credits["offZone"] == {"count": 1, "texts": ["Revised Map: Brewall Rainsinger (Cazic-Thule)"]}
 
 
 def testInterpretationIsKeptWithItsScreenshotsAndReadBackCurrent(stageServer, tmp_path):

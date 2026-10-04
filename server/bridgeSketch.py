@@ -505,7 +505,7 @@ def planOverlays(sheets, layers, spots):
   if "boundaries" in layers:
     overlays["boundaries"] = [boundaryPlan(boundary) for boundary in bridgeBoundaries.boundaryObjects() if boundary.type == "MESH"]
   if "zoneLines" in layers:
-    overlays["zoneLines"] = [{"name": line.name, "corners": [corner[:2] for corner in bridgeBoundaries.boxCorners(line)]} for line in bridgeBoundaries.zoneLineObjects()]
+    overlays["zoneLines"] = [{"name": line.name, "corners": [bridgeBoundaries.boxCorners(line)[corner][:2] for corner in (0, 1, 3, 2)]} for line in bridgeBoundaries.zoneLineObjects()]
   if "water" in layers:
     bodies = renderedWater()
     ground = bridgeWater.Ground() if bodies else None
@@ -692,6 +692,11 @@ def boxCrossing(low, high, start, along):
   return [round(enter, 2), round(leave, 2)] if leave > enter else None
 
 
+def planTurned(vector, angle):
+  """A plan vector turned counter-clockwise by angle radians."""
+  return numpy.array([vector[0] * math.cos(angle) - vector[1] * math.sin(angle), vector[0] * math.sin(angle) + vector[1] * math.cos(angle)])
+
+
 def sectionCuts(start, end, bottom, top, layers):
   """What the zone holds where the vertical plane through the line from start to end cuts it, in the plane's own terms (s along the line
   from start, z height): the ground players stand on, water surfaces, swim volumes, sketch massing, sketch area floors and paths, plot
@@ -751,10 +756,11 @@ def sectionCuts(start, end, bottom, top, layers):
     cuts["boundaries"] = [entry | {"kind": bridgeBoundaries.readSpec(bpy.data.objects[entry["name"]], bridgeMeshAccess.boundaryProperty)["kind"]} for entry in cutObjects(boundaries)]
   if "zoneLines" in layers:
     for line in bridgeBoundaries.zoneLineObjects():
-      low, high = bridgeBoundaries.boxCorners(line)
-      crossing = boxCrossing(low, high, start, along)
+      center, half = bridgeBoundaries.boxBounds(line)
+      heading = bridgeBoundaries.boxHeading(line)
+      crossing = boxCrossing([-extent for extent in half], half, planTurned(start - center[:2], -heading), planTurned(along, -heading))
       if crossing is not None:
-        cuts["zoneLines"].append({"name": line.name, "s": crossing, "z": [low[2], high[2]]})
+        cuts["zoneLines"].append({"name": line.name, "s": crossing, "z": [round(center[2] - half[2], 2), round(center[2] + half[2], 2)]})
   return cuts
 
 

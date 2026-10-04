@@ -78,6 +78,12 @@ def zoneSource(clientRoot, zoneName):
   return drawnVariant(clientRoot, zoneName)[1]
 
 
+def clientEQGZone(source, zoneName):
+  """A client EQG zone's .zon, the loose one when the client has it."""
+  zonBytes = source["zonPath"].read_bytes() if "zonPath" in source else eqArchive.EQArchive(source["archive"]).read(source["zon"])
+  return eqgFiles.parseZone(zonBytes, zoneName)
+
+
 def zoneLights(clientRoot, zoneName):
   """The lights a client zone places: lights.wld's point lights for a classic zone, the .zon's for an EQG zone (the loose one when the
   client has it); None for an EQ terrain zone, whose lights are not read."""
@@ -86,9 +92,25 @@ def zoneLights(clientRoot, zoneName):
     archive = eqArchive.EQArchive(source["archive"])
     return eqWorldFile.WorldFile(archive.read("lights.wld"), f"{source['archive'].name}:lights.wld").pointLights() if "lights.wld" in archive.entries else []
   if source["format"] == "eqgz":
-    zonBytes = source["zonPath"].read_bytes() if "zonPath" in source else eqArchive.EQArchive(source["archive"]).read(source["zon"])
-    return eqgFiles.parseZone(zonBytes, zoneName)["lights"]
+    return clientEQGZone(source, zoneName)["lights"]
   return None
+
+
+def zoneLineBoxes(regions):
+  """A .zon's ATP_ regions as zone-line guides, each its name and box (eqgFiles.regionBox), and the names of those with a tilt field set,
+  listed apart since how the client reads those is untraced."""
+  boxes = [region | eqgFiles.regionBox(region) for region in regions if eqgFiles.isZoneLine(region["name"])]
+  return {
+    "zoneLines": [{key: box[key] for key in ("name", "center", "halfExtents", "headingDegrees")} for box in boxes if "tiltFields" not in box],
+    "zoneLinesTilted": [box["name"] for box in boxes if "tiltFields" in box],
+  }
+
+
+def zoneLines(clientRoot, zoneName):
+  """The zone lines of the variant importZone draws: an EQG zone's (zoneLineBoxes); None for a classic or EQ terrain zone, whose zone-line
+  regions are not read."""
+  source = zoneSource(clientRoot, zoneName)
+  return zoneLineBoxes(clientEQGZone(source, zoneName)["regions"]) if source["format"] == "eqgz" else None
 
 
 def zoneFileLights(archivePath):
@@ -434,17 +456,15 @@ def buildClientEQGZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
   """A client EQG zone: its .zon (the loose one when the client has it) and the models its archive and asset archives hold."""
   archivePaths, missingArchives = zoneSources.assetArchivePaths(clientRoot, source)
   library = zoneSources.ModelLibrary(archivePaths, zoneName)
-  zonBytes = source["zonPath"].read_bytes() if "zonPath" in source else library.archives[0].read(source["zon"])
   label = f"Zone '{zoneName}'"
-  parts, details = eqgZoneParts(library, eqgFiles.parseZone(zonBytes, zoneName), library.archives[0], label)
+  parts, details = eqgZoneParts(library, clientEQGZone(source, zoneName), library.archives[0], label)
   written = eqModels.writePartsCache(zoneFolder, parts, library.archives, label)
   return details | {"looseZoneFile": "zonPath" in source, "missingAssetArchives": missingArchives} | written
 
 
 def zoneFileBoundaries(archivePath):
   """What an EQG zone archive holds of its player boundaries: its terrain's invisible walls (material -1 triangles that block, in world
-  positions, or None without any); its ATP_ regions as zone lines, those turned listed apart since the client's use of region turns
-  is not traced; and how many triangles each model lets players through."""
+  positions, or None without any); its zone lines (zoneLineBoxes); and how many triangles each model lets players through."""
   archive = eqArchive.EQArchive(archivePath)
   zoneFiles = [name for name in archive.entries if name.endswith(".zon")]
   if len(zoneFiles) != 1:
@@ -462,11 +482,8 @@ def zoneFileBoundaries(archivePath):
       positions.append(eqgFiles.placeVertices(model["vertices"][used], placement))
       triangles.append(remapped.reshape(-1, 3) + offset)
       offset += len(used)
-  atp = [region for region in zone["regions"] if region["name"].upper().startswith("ATP_")]
-  return {
+  return zoneLineBoxes(zone["regions"]) | {
     "walls": {"positions": numpy.concatenate(positions).tolist(), "triangles": numpy.concatenate(triangles).tolist()} if positions else None,
-    "zoneLines": [{"name": region["name"], "center": list(region["center"]), "halfExtents": list(region["halfExtents"])} for region in atp if not any(region["rotation"])],
-    "zoneLinesTurned": [region["name"] for region in atp if any(region["rotation"])],
     "passableTriangles": {name: int((model["triangleFlags"] & eqgFiles.passableFlag).astype(bool).sum()) for name, model in models.items() if (model["triangleFlags"] & eqgFiles.passableFlag).any()},
   }
 

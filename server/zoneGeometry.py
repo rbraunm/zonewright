@@ -146,7 +146,7 @@ def buildWLDGeometry(clientRoot, source):
       raise ValueError(f"{source['zone']}: mesh '{mesh['name']}' uses material {int(materialIndices.max())} of {len(mesh['materials'])}")
     triangleSurfaces = numpy.where(mesh["isPassable"] & (materialSurfaces[materialIndices] == surfaceCode["solid"]), surfaceCode["passable"], materialSurfaces[materialIndices]).astype(numpy.int8)
     builder.add(mesh["vertices"], mesh["triangles"], materialTextures[materialIndices], triangleSurfaces, mesh["uvs"], False, False)
-  geometry = builder.build(placementCounts=wldPlacementCounts(archive), regionNames=wldRegionNames(worldFile), missingModels=[], missingAssetArchives=[])
+  geometry = builder.build(placementCounts=wldPlacementCounts(archive), regionNames=wldRegionNames(worldFile), regionBoxes=None, missingModels=[], missingAssetArchives=[])
   return geometry | {"terrainBounds": (geometry["vertices"].min(0), geometry["vertices"].max(0))}
 
 
@@ -162,7 +162,7 @@ def buildEQGGeometry(clientRoot, source):
   placementCounts, missingModels = addPlacements(builder, library, [placement for placement in zone["placements"] if not placement["model"].endswith(".ter")], True)
   if not builder.vertexChunks:
     raise ValueError(f"{source['zone']}: none of the {len(zone['placements'])} placements has a model in {[archive.archivePath.name for archive in library.archives]}")
-  geometry = builder.build(placementCounts=placementCounts, regionNames=[region["name"] for region in zone["regions"]], missingModels=missingModels, missingAssetArchives=missingArchives)
+  geometry = builder.build(placementCounts=placementCounts, regionNames=[region["name"] for region in zone["regions"]], regionBoxes=zone["regions"], missingModels=missingModels, missingAssetArchives=missingArchives)
   terrainVertices = geometry["vertices"][:terrainVertexCount]
   return geometry | {"terrainBounds": (terrainVertices.min(0), terrainVertices.max(0)) if terrainVertexCount else None}
 
@@ -193,7 +193,7 @@ def buildTerrainGeometry(clientRoot, source):
     position = eqgTerrain.placedPosition(terrain, tilesByOrigin, placement)
     addEQGModel(builder, model, {"model": placement["model"], "transform": transform, "position": position}, True)
   minimum, maximum = eqgTerrain.terrainBounds(terrain)
-  return builder.build(placementCounts=placementCounts, regionNames=terrain["regionNames"], missingModels=sorted(missingModels), missingAssetArchives=missingArchives) | {
+  return builder.build(placementCounts=placementCounts, regionNames=terrain["regionNames"], regionBoxes=None, missingModels=sorted(missingModels), missingAssetArchives=missingArchives) | {
     "terrainBounds": (numpy.array(minimum), numpy.array(maximum)),
     "tileShape": {"quadsPerTile": quads, "unitsPerVertex": spacing},
   }

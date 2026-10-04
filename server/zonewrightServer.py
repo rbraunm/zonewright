@@ -290,23 +290,28 @@ async def removeExtension(extensionID: str, context: Context):
 
 
 @guardedTool()
-async def surveyZones(context: Context, zones: list[str] | None = None, groups: list[str] | None = None, sortBy: str = "dimensions.footprint", limit: int | None = None, verifyHashes: bool = False):
-  """Technical lane: measured field groups for the named zones (all when omitted), sorted descending by a dotted field path. Cached by file hash and group version; file hashes are reused while a file's size and modification time are unchanged unless verifyHashes."""
+async def surveyZones(context: Context, zones: list[str] | None = None, groups: list[str] | None = None, sortBy: str | None = None, limit: int | None = None, verifyHashes: bool = False):
+  """Technical lane: measured field groups (dimensions when omitted) for the named zones (all when omitted), in zone name order, or
+  sorted descending by sortBy, a dotted field path into one of the requested groups (rows without a number there last). Names that are
+  no zone in the client are listed in unknownZones, and the known ones answered. Cached by file hash and group version; file hashes are
+  reused while a file's size and modification time are unchanged unless verifyHashes."""
   groupNames = groups if groups is not None else ["dimensions"]
   zoneSurvey.validateMeasuredGroups(groupNames)
-  if sortBy.split(".")[0] not in groupNames:
-    raise ToolError(f"sortBy '{sortBy}' must start with one of the requested groups {groupNames}")
+  if sortBy is not None and sortBy.split(".")[0] not in groupNames:
+    raise ToolError(f"sortBy '{sortBy}' sorts by the {sortBy.split('.')[0]} group, which this call does not request (groups {groupNames}); request it too, or sort by a field of a requested group")
   clientRoot = zoneSources.resolveClientRoot()
-  surveys = await anyio.to_thread.run_sync(zoneSurvey.surveyMeasured, clientRoot, toolingRoot, zones, groupNames, progressReporter(context), verifyHashes)
+  zoneNames = [zone.lower() for zone in zones] if zones is not None else None
+  surveys, unknownZones = await anyio.to_thread.run_sync(zoneSurvey.surveyMeasured, clientRoot, toolingRoot, zoneNames, groupNames, progressReporter(context), verifyHashes)
   rows = [{"variant": key} | survey for key, survey in surveys.items()]
-  sortable = sorted((row for row in rows if isinstance(sortValue(row, sortBy), (int, float))), key=lambda row: sortValue(row, sortBy), reverse=True)
-  unsortable = [row for row in rows if not isinstance(sortValue(row, sortBy), (int, float))]
-  ordered = sortable + unsortable
+  if sortBy is not None:
+    sortable = sorted((row for row in rows if isinstance(sortValue(row, sortBy), (int, float))), key=lambda row: sortValue(row, sortBy), reverse=True)
+    rows = sortable + [row for row in rows if not isinstance(sortValue(row, sortBy), (int, float))]
   return {
     "units": "EQ units, Blender 1:1",
     "groups": {groupName: surveyFields.measuredGroups[groupName][0] for groupName in groupNames},
     "variantCount": len(rows),
-    "rows": ordered[:limit] if limit is not None else ordered,
+    "unknownZones": unknownZones,
+    "rows": rows[:limit] if limit is not None else rows,
   }
 
 
@@ -318,7 +323,9 @@ async def getZoneSurvey(context: Context, zone: str):
   recorded anew with recordZoneInterpretation); or "none"."""
   clientRoot = zoneSources.resolveClientRoot()
   zoneName = zone.lower()
-  surveys = await anyio.to_thread.run_sync(zoneSurvey.surveyMeasured, clientRoot, toolingRoot, [zoneName], list(surveyFields.measuredGroups), progressReporter(context))
+  surveys, unknownZones = await anyio.to_thread.run_sync(zoneSurvey.surveyMeasured, clientRoot, toolingRoot, [zoneName], list(surveyFields.measuredGroups), progressReporter(context))
+  if unknownZones:
+    raise ToolError(f"'{zoneName}' is not a zone in {clientRoot}")
   try:
     interpreted = await anyio.to_thread.run_sync(zoneInterpretation.interpretationState, clientRoot, toolingRoot, zoneSurveySkillPath, zoneName)
   except ValueError as error:
@@ -395,9 +402,11 @@ async def compareWithClientZones(context: Context, formats: list[str] = ["eqgz"]
   clientRoot = zoneSources.resolveClientRoot()
   zoneNames = [zone.lower() for zone in zones] if zones is not None else None
   try:
-    rows = await anyio.to_thread.run_sync(zoneSurvey.surveyMeasured, clientRoot, toolingRoot, zoneNames, ["dimensions", "content", "construction"], progressReporter(context))
+    rows, unknownZones = await anyio.to_thread.run_sync(zoneSurvey.surveyMeasured, clientRoot, toolingRoot, zoneNames, ["dimensions", "content", "construction"], progressReporter(context))
   except ValueError as error:
     raise ToolError(str(error)) from error
+  if unknownZones:
+    raise ToolError(f"Not zones in {clientRoot}: {unknownZones}")
   clientRows = [row for row in rows.values() if row["format"] in formats and "error" not in row]
   measures = {}
   for measure, meaning in comparedMeasures.items():
@@ -411,13 +420,28 @@ async def compareWithClientZones(context: Context, formats: list[str] = ["eqgz"]
 
 
 @guardedTool()
-def getZoneNotes(zone: str):
-  """Brewall map labels for a zone: place names for design notes, not geometry or scale. Each gives its map position and the scene
-  position it marks, roughly (scene x, y = map -y, -x)."""
+async def getZoneNotes(context: Context, zone: str, text: str | None = None):
+  """Brewall map labels for a zone: place names for design notes, never geometry or scale. Those on the zone (within the plan extent
+  of the variant importZone draws, as the survey's dimensions give it) come by map layer, each with the scene position it roughly marks
+  (scene x, y = map -y, -x) in whole units; those off it (a map's legend and credits, at made-up positions beside the zone) are counted
+  and named. text keeps only the labels holding each of its words as a word of their own, case aside: "to" finds the zone lines'
+  destinations ("to Blightfire Moors")."""
   clientRoot = zoneSources.resolveClientRoot()
-  if not zoneSurvey.brewallMapPaths(clientRoot, zone.lower()):
+  zoneName = zone.lower()
+  if not zoneSurvey.brewallMapPaths(clientRoot, zoneName):
     raise ToolError(f"No Brewall map files for zone '{zone}' in {clientRoot / 'maps' / 'Brewall'}")
-  return {"zone": zone, "labels": zoneSurvey.readBrewallLabels(clientRoot, zone.lower())}
+  try:
+    variant = eqZones.drawnVariant(clientRoot, zoneName)[0]
+  except ValueError as error:
+    raise ToolError(f"Zone '{zone}' has Brewall maps, but its labels cannot be placed against the zone: {error}") from error
+  surveys, _ = await anyio.to_thread.run_sync(zoneSurvey.surveyMeasured, clientRoot, toolingRoot, [zoneName], ["dimensions"], progressReporter(context))
+  if "error" in surveys[variant]:
+    raise ToolError(f"Zone '{zone}' ({variant}) cannot be measured, so its labels cannot be placed against it: {surveys[variant]['error']}")
+  dimensions = surveys[variant]["dimensions"]
+  if dimensions["terrainMinimum"] is None:
+    raise ToolError(f"Zone '{zone}' ({variant}) has no terrain whose extent its labels could be placed against")
+  minimum, maximum = dimensions["terrainMinimum"][:2], dimensions["terrainMaximum"][:2]
+  return {"zone": zoneName, "variant": variant, "extent": {"minimum": minimum, "maximum": maximum}} | zoneSurvey.zoneNotes(zoneSurvey.readBrewallLabels(clientRoot, zoneName), minimum, maximum, text)
 
 
 catalog = assetCatalog.AssetCatalog(toolingRoot, serverDirectory.parent / "catalog")
@@ -918,6 +942,14 @@ async def placeZoneEnvironment(context, zone, lights, emitters, clientContent):
   return placed
 
 
+async def placeZoneLineGuides(context, zone, found, clientContent):
+  """A placed zone's zone lines (eqZones.zoneLineBoxes) as guides in "<zone> zone lines", and the tilted ones listed apart."""
+  placed = await callBridge(context, "placeZoneLineGuides", {
+    "zoneLines": found["zoneLines"], "collection": f"{zone} zone lines", "clientContent": clientContent,
+  }) if found["zoneLines"] else {"zoneLines": []}
+  return placed | {"zoneLinesTilted": found["zoneLinesTilted"]}
+
+
 def readEmitterList(path):
   if path is None or not path.is_file():
     return []
@@ -935,15 +967,21 @@ async def importZone(context: Context, zone: str, collection: str | None = None)
   the ground, or an EQG (EQGZ) zone's terrain and placed models (the loose .zon beside the archive when the client has one, as it
   loads it), with baked light where its count fits each model. It keeps the zone file's coordinates, which the scene shares (Blender
   x, y are the server's y, x). The zone's lights (classic and EQG zones) come in as point lights in "<zone> lights" and its emitters as
-  empties in "<zone> emitters", as placeLights and placeEmitters make them."""
+  empties in "<zone> emitters", as placeLights and placeEmitters make them. An EQG zone's zone-line regions come in as zone-line guides in
+  "<zone> zone lines", as placeZoneLine makes them, named as the zone file names them (the number the client reads from the name) and
+  turned about Z as it turns them, with no target (the zone file never says where one leads; the server's zone points do); getZoneLines
+  lists them and plans and views draw them. Those with a tilt field set, whose reading is untraced, are listed in zoneLinesTilted, not
+  placed. A classic or EQ terrain zone's zone lines are not read (zoneLines None)."""
   placed = await placeZone(context, zone, collection)
   clientRoot = zoneSources.resolveClientRoot()
   try:
     lights = await anyio.to_thread.run_sync(eqZones.zoneLights, clientRoot, zone)
     emitters = readEmitterList(eqEmitters.emitterListPath(clientRoot, zone))
+    zoneLines = await anyio.to_thread.run_sync(eqZones.zoneLines, clientRoot, zone)
   except ValueError as error:
     raise ToolError(str(error)) from error
-  return placed | await placeZoneEnvironment(context, zone, lights, emitters, "zone")
+  environment = await placeZoneEnvironment(context, zone, lights, emitters, "zone")
+  return placed | environment | (await placeZoneLineGuides(context, zone, zoneLines, "zone") if zoneLines is not None else {"zoneLines": None, "zoneLinesTilted": None})
 
 
 zoneFileSourceKeys = ("zoneCacheFormat", "modelCacheFormat", "sha256", "textureSources", "lit", "minimum", "maximum")
@@ -955,8 +993,8 @@ async def importZoneFile(context: Context, path: str, collection: str | None = N
   (the file name), drawn as importZone draws the client's EQG zones: its terrain and placed models, with baked light where its count
   fits each model, and the triangles it lets players through marked so walkRoute passes them; its lights and the emitters of the
   <zone>_EnvironmentEmitters.txt beside it, as importZone brings them; and its player boundaries as reference: the terrain's invisible
-  walls as one boundary in "<zone> boundaries" and its ATP_ regions as zone lines in "<zone> zone lines" (the archive holds no
-  targets; regions it turns are listed, not placed). The result counts each model's passable triangles."""
+  walls as one boundary in "<zone> boundaries" and its ATP_ regions as zone-line guides in "<zone> zone lines", as importZone brings a
+  client zone's (no targets; tilted ones listed in zoneLinesTilted, not placed). The result counts each model's passable triangles."""
   archivePath = Path(path)
   if not archivePath.is_absolute() or archivePath.suffix.lower() != ".eqg" or not archivePath.is_file():
     raise ToolError(f"'{path}' is not an absolute path to an existing .eqg file")
@@ -978,10 +1016,11 @@ async def importZoneFile(context: Context, path: str, collection: str | None = N
     boundaries = await anyio.to_thread.run_sync(eqZones.zoneFileBoundaries, archivePath)
   except ValueError as error:
     raise ToolError(str(error)) from error
-  placedBoundaries = await callBridge(context, "placeImportedBoundaries", {"zone": archivePath.stem.lower(), "walls": boundaries["walls"], "zoneLines": boundaries["zoneLines"]})
-  return placed | {"source": {key: value for key, value in details.items() if key not in zoneFileSourceKeys}} | environment | placedBoundaries | {
-    "zoneLinesTurned": boundaries["zoneLinesTurned"], "passableTriangles": boundaries["passableTriangles"],
-  }
+  zone = archivePath.stem.lower()
+  walls = {"boundary": None} if boundaries["walls"] is None else await callBridge(context, "placeImportedBoundaries", {"zone": zone, "walls": boundaries["walls"]})
+  return placed | {"source": {key: value for key, value in details.items() if key not in zoneFileSourceKeys}} | environment | walls | await placeZoneLineGuides(
+    context, zone, boundaries, "zoneFile",
+  ) | {"passableTriangles": boundaries["passableTriangles"]}
 
 
 def groupedExclusions(excluded, shownPerReason=25):
