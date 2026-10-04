@@ -12,11 +12,12 @@ import mathutils.bvhtree
 import mathutils.kdtree
 import numpy
 
+import bridgeCaveData
 import bridgeNoise
 
 selectorKeys = (
   "all", "sphere", "box", "cylinder", "facing", "slope", "height", "nearPath", "material", "vertexGroup", "insideObject", "region", "noise",
-  "underWater", "nearWater", "and", "or", "not",
+  "underWater", "nearWater", "cave", "and", "or", "not",
 )
 selectorFields = {
   "sphere": ("center", "radius"), "box": ("minimum", "maximum"), "cylinder": ("center", "radius", "bottom", "top"),
@@ -655,8 +656,9 @@ def faceNormals(sceneObject, positions):
 
 
 def foldedFaceCount(sceneObject, before, after):
-  """Faces a move turned over: their normal now points against where it pointed."""
-  return int(((faceNormals(sceneObject, before) * faceNormals(sceneObject, after)).sum(1) < 0).sum())
+  """Faces a move turned over: their normal now points against where it pointed. A cave's own faces are left out: its lining holds still
+  while the ground around its mouth moves, so its first row stretches rather than folds."""
+  return int((((faceNormals(sceneObject, before) * faceNormals(sceneObject, after)).sum(1) < 0) & ~bridgeCaveData.caveFaceMask(sceneObject)).sum())
 
 
 def faceVertexIndices(sceneObject):
@@ -675,6 +677,8 @@ def evaluateSelector(selector, sceneObject, elementKind):
     return underWaterMask(requireWater(value), sceneObject, elementKind)
   if key == "nearWater":
     return nearWaterMask(requireWater(value["water"]), sceneObject, elementKind, value["distance"])
+  if key == "cave":
+    return bridgeCaveData.liningSelection(sceneObject, value, elementKind)
   if elementKind == "vertices":
     positions, normals = readVertexArrays(sceneObject)
   else:
@@ -889,9 +893,10 @@ def storeSplitBMesh(meshEditor, sceneObject):
 
 
 def storeBMesh(meshEditor, sceneObject):
-  if hasShapingPasses(sceneObject):
+  if hasShapingPasses(sceneObject) or bridgeCaveData.holdsCaves(sceneObject):
     meshEditor.free()
     requireNoShapingPasses(sceneObject, "change its faces")
+    bridgeCaveData.requireNoCaves(sceneObject, "change its faces")
   meshEditor.normal_update()
   meshEditor.to_mesh(sceneObject.data)
   meshEditor.free()

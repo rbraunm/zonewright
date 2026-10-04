@@ -12,7 +12,9 @@ import bpy
 import numpy
 
 import bridgeBoundaries
+import bridgeCaves
 import bridgeEnvironment
+import bridgeGrading
 import bridgeHousing
 import bridgeMeshAccess
 import bridgeSurfacing
@@ -101,7 +103,8 @@ def exportedObjects():
 
 
 def decisionsToConfirm(shipped):
-  """Shaping passes and surfacing layers that are off on shipped meshes: they leave the zone as if never made, which may be meant."""
+  """Shaping passes and surfacing layers that are off on shipped meshes, which leave the zone as if never made (which may be meant); and
+  the caves and defined passes whose ground moved since they were made (stale), which export as they stand and a game export refuses."""
   decisions = []
   for sceneObject, role in shipped:
     if sceneObject.type != "MESH":
@@ -109,8 +112,10 @@ def decisionsToConfirm(shipped):
     keys = sceneObject.data.shape_keys
     offPasses = [key.name for key in keys.key_blocks if key != keys.reference_key and (key.mute or key.value == 0)] if keys is not None else []
     mutedLayers = [layer["name"] for layer in bridgeMeshAccess.surfaceLayers(sceneObject) if layer["muted"]]
-    if offPasses or mutedLayers:
-      decisions.append({"object": sceneObject.name, "passesOff": offPasses, "layersMuted": mutedLayers})
+    staleCaves = bridgeCaves.staleCaves(sceneObject)
+    staleDefined = [name for entry in bridgeGrading.describeDefinedPasses(sceneObject) if entry["stale"] for name in entry["passes"]]
+    if offPasses or mutedLayers or staleCaves or staleDefined:
+      decisions.append({"object": sceneObject.name, "passesOff": offPasses, "layersMuted": mutedLayers, "staleCaves": staleCaves, "staleDefinedPasses": staleDefined})
   return decisions
 
 

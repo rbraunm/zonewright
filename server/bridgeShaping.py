@@ -8,6 +8,7 @@ import mathutils
 import mathutils.kdtree
 import numpy
 
+import bridgeCaveData
 import bridgeMeshAccess
 import bridgeNoise
 import bridgePasses
@@ -71,13 +72,17 @@ def falloffWeights(normalizedDistances, curve):
 
 
 def writeWorldPositions(sceneObject, worldPositions):
-  """Move the mesh as seen; with shaping passes, the move goes into the active pass."""
+  """Move the mesh as seen; with shaping passes, the move goes into the active pass. A cave's lining stays where it is and its ring on
+  its plug triangles (bridgeCaveData.guardedKey); returns what a result says of the lining vertices it left alone."""
   localPositions = bridgeMeshAccess.localPositions(sceneObject, worldPositions)
   if bridgeMeshAccess.hasShapingPasses(sceneObject):
-    bridgePasses.writeIntoActivePass(sceneObject, localPositions)
-    return
-  sceneObject.data.vertices.foreach_set("co", localPositions.ravel())
+    return bridgeCaveData.liningReport(bridgePasses.writeIntoActivePass(sceneObject, localPositions))
+  current = numpy.empty(len(sceneObject.data.vertices) * 3)
+  sceneObject.data.vertices.foreach_get("co", current)
+  guarded, left = bridgeCaveData.guardedKey(sceneObject, current.reshape(-1, 3), localPositions)
+  sceneObject.data.vertices.foreach_set("co", guarded.ravel())
   sceneObject.data.update()
+  return bridgeCaveData.liningReport(left)
 
 
 def moveVertices(objectName, selector, offset, falloff):
@@ -90,8 +95,8 @@ def moveVertices(objectName, selector, offset, falloff):
     distances = numpy.linalg.norm(positions - bridgeMeshAccess.toArray(falloff["center"]), axis=1) / falloff["radius"]
     weights *= falloffWeights(distances, falloff["curve"])
   displacement = weights[:, None] * bridgeMeshAccess.toArray(offset)
-  writeWorldPositions(sceneObject, positions + displacement)
-  return {"movedVertices": int((weights > 0).sum()), "largestMove": round(float(numpy.linalg.norm(displacement, axis=1).max()), 3)}
+  left = writeWorldPositions(sceneObject, positions + displacement)
+  return {"movedVertices": int((weights > 0).sum()), "largestMove": round(float(numpy.linalg.norm(displacement, axis=1).max()), 3)} | left
 
 
 def vertexNeighbourAverages(sceneObject, positions):
@@ -142,14 +147,14 @@ def sculpt(objectName, mode, strokeFractions, nearestPoints, strength, curve, di
     updated, unsnapped = profileStroke(sceneObject, positions, affected, strength)
     return finishProfileStroke(sceneObject, positions, updated, unsnapped)
   moved = numpy.linalg.norm(updated - positions, axis=1)
-  writeWorldPositions(sceneObject, updated)
-  return {"affectedVertices": int((moved > 1e-9).sum()), "largestMove": round(float(moved.max()), 3), "foldedFaces": bridgeMeshAccess.foldedFaceCount(sceneObject, positions, updated)}
+  left = writeWorldPositions(sceneObject, updated)
+  return {"affectedVertices": int((moved > 1e-9).sum()), "largestMove": round(float(moved.max()), 3), "foldedFaces": bridgeMeshAccess.foldedFaceCount(sceneObject, positions, updated)} | left
 
 
 def finishProfileStroke(sceneObject, positions, updated, unsnapped):
   """Write a carve or fill, triangulate what it shaped along the contours, and put back any snapped vertices that leave their cell no
   diagonal facing up."""
-  writeWorldPositions(sceneObject, updated)
+  left = writeWorldPositions(sceneObject, updated)
   shaped = numpy.linalg.norm(updated - positions, axis=1) > 1e-9
   triangulation = triangulateAlongContours(sceneObject, updated, shaped) | {"keptOffContours": 0}
   for _ in range(snapRepairs):
@@ -161,7 +166,7 @@ def finishProfileStroke(sceneObject, positions, updated, unsnapped):
     triangulation["turnedDiagonals"] += triangulateAlongContours(sceneObject, updated, shaped)["turnedDiagonals"]
     triangulation["keptOffContours"] += int(returning.sum())
   moved = numpy.linalg.norm(updated - positions, axis=1)
-  return {"affectedVertices": int((moved > 1e-9).sum()), "largestMove": round(float(moved.max()), 3), "foldedFaces": int(overturnedFaces(sceneObject, updated, shaped).sum())} | triangulation
+  return {"affectedVertices": int((moved > 1e-9).sum()), "largestMove": round(float(moved.max()), 3), "foldedFaces": int(overturnedFaces(sceneObject, updated, shaped).sum())} | triangulation | left
 
 
 def sculptAtPoint(objectName, mode, center, radius, strength, falloff, direction, iterations):
@@ -201,7 +206,8 @@ def overturnedFaces(sceneObject, worldPositions, vertexMask):
   loopTotals, loopVertices = bridgeMeshAccess.faceLoops(sceneObject)
   touching = numpy.add.reduceat(vertexMask[loopVertices].astype(numpy.int64), numpy.cumsum(loopTotals) - loopTotals) > 0
   edgeLength = medianEdgeLength(sceneObject, worldPositions, vertexMask)
-  return touching & (bridgeMeshAccess.faceNormals(sceneObject, worldPositions)[:, 2] <= degenerateAreaShare * edgeLength * edgeLength)
+  # A cave's vault faces down by design: its faces are no fold.
+  return touching & ~bridgeCaveData.caveFaceMask(sceneObject) & (bridgeMeshAccess.faceNormals(sceneObject, worldPositions)[:, 2] <= degenerateAreaShare * edgeLength * edgeLength)
 
 
 def overturnedVertexMask(sceneObject, worldPositions, vertexMask):
@@ -271,7 +277,7 @@ def profileAlongPath(sceneObject, positions, affected, strength, path, radii, pr
   fractions, floors, radiiHere, nearest = bridgeMeshAccess.strokeAlongPath(positions, path, radii, horizontal=True)
   lateral = unslidLateral = fractions * radiiHere
   unsnapped = movedToProfile(positions, affected, strength, floors + numpy.interp(numpy.clip(fractions, 0, 1), profileArray[:, 0], profileArray[:, 1]), mode)
-  border = bridgeMeshAccess.boundaryVertexMask(sceneObject)
+  border = bridgeMeshAccess.boundaryVertexMask(sceneObject) | bridgeCaveData.fixedInPlan(sceneObject)
   outwards = numpy.zeros((len(positions), 2))
   away = lateral > 0
   outwards[away] = (positions[away, :2] - nearest[away]) / lateral[away, None]
@@ -342,7 +348,7 @@ def sculptOutline(objectName, mode, outline, base, profile, strength, conformBre
   snapped = positions
   if conformBreaks:
     breaks = numpy.broadcast_to(profileArray[1:-1, 0][None, :], (len(positions), len(profileArray) - 2))
-    snapped, distance = snapOntoBreaks(sceneObject, positions, affected, distance, breaks, directions, bridgeMeshAccess.boundaryVertexMask(sceneObject))
+    snapped, distance = snapOntoBreaks(sceneObject, positions, affected, distance, breaks, directions, bridgeMeshAccess.boundaryVertexMask(sceneObject) | bridgeCaveData.fixedInPlan(sceneObject))
   updated, _ = unslidWhereUnshaped(positions, snapped, movedToProfile(snapped, affected, strength, base + numpy.interp(distance, profileArray[:, 0], profileArray[:, 1]), mode))
   return finishProfileStroke(sceneObject, positions, updated, unsnapped)
 
@@ -376,8 +382,8 @@ def facet(objectName, selector, cellSize, strength, seed, fadeDistance):
     facets += 1
   updated = positions.copy()
   updated[selected] += strength * weights[selected, None] * moves
-  writeWorldPositions(sceneObject, updated)
-  return moveSummary(sceneObject, positions, updated) | {"facets": facets}
+  left = writeWorldPositions(sceneObject, updated)
+  return moveSummary(sceneObject, positions, updated) | {"facets": facets} | left
 
 
 def sculptAlongPath(objectName, mode, path, radius, radii, strength, falloff, direction, iterations, profile, conformRim, conformBreaks):
@@ -604,6 +610,7 @@ def booleanCut(objectName, cutterName, operation, keepCutter):
   if cutter == sceneObject:
     raise ValueError(f"'{objectName}' cannot cut itself")
   bridgeMeshAccess.requireNoShapingPasses(sceneObject, "cut it")
+  bridgeCaveData.requireNoCaves(sceneObject, "cut it with a boolean")
   requireNoModifiers(sceneObject)
   before = bridgeMeshAccess.meshCounts(sceneObject)
   pairs = worldFaceTree(sceneObject, range(len(sceneObject.data.polygons))).overlap(worldFaceTree(cutter, range(len(cutter.data.polygons))))
@@ -672,6 +679,7 @@ def decimate(objectName, ratio):
     raise ValueError(f"ratio must be in (0, 1), got {ratio}")
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   bridgeMeshAccess.requireNoShapingPasses(sceneObject, "decimate it")
+  bridgeCaveData.requireNoCaves(sceneObject, "decimate it")
   requireNoModifiers(sceneObject)
   before = bridgeMeshAccess.meshCounts(sceneObject)
   modifier = sceneObject.modifiers.new("zonewrightDecimate", "DECIMATE")
@@ -740,16 +748,24 @@ def triangulateAlongContours(sceneObject, worldPositions, vertexMask):
   planar = worldPositions[:, :2].tolist()
   edgeLength = medianEdgeLength(sceneObject, worldPositions, vertexMask)
   margin, sliverArea = diagonalTurnMargin * edgeLength, diagonalSliverShare * edgeLength * edgeLength
+  # A cave puts its plug faces back on the vertices they were cut from: a cell turned or split beside them would overlap them then.
+  caveVertices = set(numpy.flatnonzero(bridgeCaveData.fixedInPlan(sceneObject)).tolist())
   meshEditor = bridgeMeshAccess.loadBMesh(sceneObject)
   layers = [layer for kind in ("bool", "float", "int", "string") for layer in getattr(meshEditor.faces.layers, kind).values()]
   maskedVertices = [meshEditor.verts[index] for index in numpy.flatnonzero(vertexMask)]
-  quads = sorted({face for vertex in maskedVertices for face in vertex.link_faces if len(face.verts) == 4}, key=lambda face: face.index)
+
+  def atCave(face):
+    return any(vertex.index in caveVertices for vertex in face.verts)
+
+  quads = sorted({face for vertex in maskedVertices for face in vertex.link_faces if len(face.verts) == 4 and not atCave(face)}, key=lambda face: face.index)
   bmesh.ops.triangulate(meshEditor, faces=quads, quad_method="FIXED")
   turned = 0
   for _ in range(diagonalSweeps):
     meshEditor.edges.index_update()
     gains = {}
     for edge in {edge for vertex in maskedVertices for face in vertex.link_faces for edge in face.edges}:
+      if caveVertices and any(atCave(face) for face in edge.link_faces):
+        continue
       gain = diagonalTurnGain(edge, heights, planar, margin, sliverArea, layers)
       if gain > 0:
         gains[edge] = gain
@@ -881,7 +897,7 @@ def bisectedFractions(measure, starts, ends, level, startValues):
   return (low + high) / 2
 
 
-def splitAtPeaks(meshEditor, cutting, values, points, measure, level):
+def splitAtPeaks(meshEditor, cutting, values, points, measure, level, refuseAtCaves):
   """Split edges a distance level crosses twice where they lie farthest past it, and triangulate around; returns how many it split."""
   splits = []
   for edge in sorted({edge for face in cutting for edge in face.edges}, key=lambda edge: edge.index):
@@ -900,6 +916,7 @@ def splitAtPeaks(meshEditor, cutting, values, points, measure, level):
     farthest = int(numpy.argmax(-numpy.sign(first) * past))
     if numpy.sign(past[farthest]) != numpy.sign(first):
       splits.append((edge, start, float(fractions[farthest]), float(past[farthest]) + level))
+  refuseAtCaves([face for edge, _, _, _ in splits for face in edge.link_faces])
   touched, inserted = set(), set()
   for edge, start, fraction, distance in splits:
     end = edge.other_vert(start)
@@ -930,12 +947,29 @@ def cutAlongLevels(sceneObject, positions, measure, levels, within):
   then each crossed edge where the level crosses it, then each face between two such splits."""
   values = list(measure.values)
   points = list(positions)
+  caveVertices = bridgeCaveData.CaveVertices(sceneObject) if bridgeCaveData.holdsCaves(sceneObject) else None
   meshEditor = bridgeMeshAccess.loadBMesh(sceneObject)
+
+  def refuseAtCaves(faces):
+    # A split edge's new vertex blends its ends' cave ids, which would leave an id twice or a made-up one; a split face beside a cave
+    # would overlap its plug when the cave is taken back.
+    if caveVertices is None:
+      return
+    touched = [vertex.index for face in faces for vertex in face.verts if vertex.index < len(caveVertices.tagged) and caveVertices.tagged[vertex.index]]
+    if touched:
+      meshEditor.free()
+      raise ValueError(
+        f"The cut would split faces of '{sceneObject.name}' at cave(s) {caveVertices.namesOf(numpy.array(touched))}, whose take-back needs the"
+        " faces around it as they were cut; cut clear of the cave (a selector away from its mouth and the ground over it), or take the cave"
+        " back (removeCave, which returns its definition), cut, and cut the cave again (cutCave with that definition). Nothing was changed"
+      )
+
   cutting = {meshEditor.faces[index] for index in numpy.flatnonzero(within)}
   crossed = [
     face for face in cutting if len(face.verts) > 3
     and any(min(values[vertex.index] for vertex in face.verts) < level < max(values[vertex.index] for vertex in face.verts) for level in levels)
   ]
+  refuseAtCaves(crossed)
   if crossed:
     # A face that is not flat is drawn as triangles split from its first corner (Blender's own); cut as those triangles, the ground
     # keeps its shape, so cutting again finds the same lines.
@@ -947,7 +981,7 @@ def cutAlongLevels(sceneObject, positions, measure, levels, within):
   for level in sorted(levels):
     if measure.crossesTwice(level):
       for _ in range(contourPeakRounds + 1):
-        split = splitAtPeaks(meshEditor, cutting, values, points, measure, level)
+        split = splitAtPeaks(meshEditor, cutting, values, points, measure, level, refuseAtCaves)
         meshEditor.edges.index_update()
         meshEditor.faces.index_update()
         doubleCrossings += split
@@ -963,6 +997,7 @@ def cutAlongLevels(sceneObject, positions, measure, levels, within):
       below, above = values[start.index] - level, values[end.index] - level
       if below * above < 0 and min(abs(below), abs(above)) > measure.tolerance:
         crossing.append((edge, start, end))
+    refuseAtCaves([face for edge, _, _ in crossing for face in edge.link_faces])
     if crossing:
       starts = numpy.array([points[start.index] for _, start, _ in crossing])
       ends = numpy.array([points[end.index] for _, _, end in crossing])
@@ -980,6 +1015,7 @@ def cutAlongLevels(sceneObject, positions, measure, levels, within):
     for face in list(cutting):
       corners = [vertex for vertex in face.verts if vertex in onLevel or abs(values[vertex.index] - level) <= measure.tolerance]
       if len(corners) == 2 and not any(edge in face.edges for edge in corners[0].link_edges if corners[1] in edge.verts):
+        refuseAtCaves([face])
         newFace, _ = bmesh.utils.face_split(face, corners[0], corners[1])
         cutting.add(newFace)
         splitFaces += 1
@@ -1054,8 +1090,8 @@ def roughen(objectName, featureSize, amplitude, octaves, roughness, seed, direct
   values = bridgeNoise.fractalNoise(bridgeNoise.noiseSamplePoints(positions, featureSize, seed), octaves, roughness)
   pushDirections = normals if direction == "normal" else numpy.broadcast_to((0.0, 0.0, 1.0), normals.shape)
   updated = positions + (amplitude * values * weights)[:, None] * pushDirections
-  writeWorldPositions(sceneObject, updated)
-  summary = moveSummary(sceneObject, positions, updated)
+  left = writeWorldPositions(sceneObject, updated)
+  summary = moveSummary(sceneObject, positions, updated) | left
   edgeLength = medianEdgeLength(sceneObject, positions, weights > 0)
   finest = featureSize / 2 ** (octaves - 1)
   if finest < edgeLength:
@@ -1085,8 +1121,8 @@ def warp(objectName, featureSize, amplitude, seed, plane, selector, fadeDistance
     vectors -= (vectors * normals).sum(1)[:, None] * normals
   vectors /= bridgeNoise.noiseSpread * math.sqrt(3 if plane == "full" else 2)
   updated = positions + amplitude * weights[:, None] * vectors
-  writeWorldPositions(sceneObject, updated)
-  return moveSummary(sceneObject, positions, updated)
+  left = writeWorldPositions(sceneObject, updated)
+  return moveSummary(sceneObject, positions, updated) | left
 
 
 commands = {

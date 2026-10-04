@@ -2,7 +2,8 @@
 its pass, "route <name>"; the plots graded on a mesh keep theirs on the plots and are graded together (bridgeHousing), as one feature
 placed at the first of their passes. Each is graded on the ground under it as it stands without its own pass and without any defined
 pass made after it, so where two meet the later one wins: grading one again replays every later one whose ground that changed, and
-regradeTerrain replays them all in the order they were made. Runs under Blender's Python."""
+regradeTerrain replays them all in the order they were made, then cuts again every cave whose ground moved. Runs under Blender's
+Python."""
 import math
 
 import bpy
@@ -10,6 +11,8 @@ import mathutils
 import mathutils.bvhtree
 import numpy
 
+import bridgeCaveData
+import bridgeCaves
 import bridgeExport
 import bridgeHousing
 import bridgeMeshAccess
@@ -312,7 +315,7 @@ def planRoute(sceneObject, name, definition, ground, faces, edgeLength):
   edges[rows, 0] = centerline.widthAt(alongs[picked]) / 2
   away = distances[picked] > 1e-9
   outward[rows[away]] = (plan[rows[away]] - nearest[picked][away]) / distances[picked][away, None]
-  snapped, _ = bridgeShaping.snapOntoBreaks(sceneObject, ground, affected, lateral, edges, outward, bridgeMeshAccess.boundaryVertexMask(sceneObject))
+  snapped, _ = bridgeShaping.snapOntoBreaks(sceneObject, ground, affected, lateral, edges, outward, bridgeMeshAccess.boundaryVertexMask(sceneObject) | bridgeCaveData.fixedInPlan(sceneObject))
   positions = ground.copy()
   positions[rows, :2] = snapped[rows, :2]
   loopTotals, loopVertices = bridgeMeshAccess.faceLoops(sceneObject)
@@ -347,7 +350,10 @@ def planRoute(sceneObject, name, definition, ground, faces, edgeLength):
     positions[returning, :2] = ground[returning, :2]
     widened |= returning
     positions[relaxing, :2] = bridgeShaping.vertexNeighbourAverages(sceneObject, result)[relaxing, :2]
-  benchRows = rows[onBench]
+  offsets, left = bridgeCaveData.guardedOffsets(sceneObject, result - ground)
+  result = ground + offsets
+  # A cave's lining under the bench in plan is no part of it: it holds still inside the rock.
+  benchRows = rows[onBench & ~bridgeCaveData.liningVertices(sceneObject)[rows]]
   requireNoClash(name, result[benchRows], tanCut, definition["cutBatterDegrees"])
   if tanFill is None:
     requireFooting(name, centerline, result[benchRows, 2] - ground[benchRows, 2], benchAlongs, edgeLength)
@@ -360,7 +366,7 @@ def planRoute(sceneObject, name, definition, ground, faces, edgeLength):
       "deepestCut": round(-float(change.min(initial=0.0)), 2), "highestFill": round(float(change.max(initial=0.0)), 2),
       "batterReach": round(reach, 1), "movedVertices": int((numpy.abs(result - ground).max(axis=1) > 1e-9).sum()),
       "centerline": [[round(float(value), 2) for value in sample] for sample in centerline.samples()],
-    },
+    } | bridgeCaveData.liningReport(left),
   }
 
 
@@ -548,7 +554,7 @@ def gradeFeature(sceneObject, feature, ground, faces, edgeLength):
   plotPlan = bridgeHousing.planGrading(sceneObject, feature["overrides"], feature["subjects"], feature["kept"], ground)
   offsets = numpy.zeros_like(ground)
   offsets[:, 2] = plotPlan["graded"] - ground[:, 2]
-  return {"offsets": offsets, "plotPlan": plotPlan}
+  return {"offsets": bridgeCaveData.guardedOffsets(sceneObject, offsets)[0], "plotPlan": plotPlan}
 
 
 def planReplay(sceneObject, features, first, everything):
@@ -634,7 +640,12 @@ def applyReplay(plan):
   if shaped.any():
     bridgeShaping.triangulateAlongContours(sceneObject, after, shaped)
     folded = int(bridgeShaping.overturnedFaces(sceneObject, after, shaped).sum())
-  return {"summaries": summaries, "plots": plotOutcome, "foldedFaces": folded}
+  return {"summaries": summaries, "plots": plotOutcome, "foldedFaces": folded} | staleCaveReport(sceneObject)
+
+
+def staleCaveReport(sceneObject):
+  """The caves whose ground a grading moved, to cut again (editCave, or regradeTerrain for all): nothing for a mesh without caves."""
+  return {"staleCaves": bridgeCaves.staleCaves(sceneObject)} if bridgeCaveData.holdsCaves(sceneObject) else {}
 
 
 def planPlots(sceneObject, overrides, subjects, kept=None):
@@ -653,7 +664,7 @@ def plotPlanOf(plan):
 def applyPlots(plan):
   """Write planned plot grading and its replay: bridgeHousing.applyGrading's outcome, with the later defined passes replayed."""
   applied = applyReplay(plan)
-  return applied["plots"] | {"foldedFaces": applied["foldedFaces"], "replayed": applied["summaries"][1:]}
+  return applied["plots"] | {"foldedFaces": applied["foldedFaces"], "replayed": applied["summaries"][1:]} | staleCaveReport(plan["object"])
 
 
 def gradeRoute(objectName, name, points, width, widths, maximumGradeDegrees, cutBatterDegrees, fillBatterDegrees, landingLength):
@@ -677,16 +688,34 @@ def gradeRoute(objectName, name, points, width, widths, maximumGradeDegrees, cut
   report = plan["entries"][0]["graded"]["report"]
   applied = applyReplay(plan)
   walk = bridgeReview.walkRoute(report["centerline"], walkSampleSpacing)
-  return {"object": objectName, "route": name, "pass": passName} | report | {"foldedFaces": applied["foldedFaces"], "replayed": applied["summaries"][1:], "walk": walk}
+  return {"object": objectName, "route": name, "pass": passName} | report | {"foldedFaces": applied["foldedFaces"], "replayed": applied["summaries"][1:], "walk": walk} | staleCaveReport(sceneObject)
 
 
 def regradeTerrain(objectName):
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   features = definedFeatures(sceneObject)
+  if not features and not bridgeCaveData.holdsCaves(sceneObject):
+    raise ValueError(f"'{objectName}' has no defined passes and no caves: no route graded on it (gradeRoute), no plot (gradePlot), and no cave (cutCave)")
+  applied = applyReplay(planReplay(sceneObject, features, 0, True)) if features else {"summaries": [], "foldedFaces": 0}
+  return {"object": objectName, "replayed": applied["summaries"], "foldedFaces": applied["foldedFaces"], "refittedCaves": bridgeCaves.refitStaleCaves(sceneObject)}
+
+
+def describeDefinedPasses(sceneObject):
+  """Each defined feature on a mesh in the order it was made, with whether grading it again would move it (its ground moved since)."""
+  features = definedFeatures(sceneObject)
   if not features:
-    raise ValueError(f"'{objectName}' has no defined passes: no route graded on it (gradeRoute) and no plot (gradePlot)")
-  applied = applyReplay(planReplay(sceneObject, features, 0, True))
-  return {"object": objectName, "replayed": applied["summaries"], "foldedFaces": applied["foldedFaces"]}
+    return []
+  try:
+    plan = planReplay(sceneObject, features, 0, True)
+  except ValueError as error:
+    return [{"passes": feature["passes"], "stale": True, "regradeRefused": str(error)} for feature in features]
+  described = []
+  for entry in plan["entries"]:
+    feature = entry["feature"]
+    moved = numpy.abs(entry["graded"]["offsets"] - entry["held"]).max(axis=1)
+    named = {"route": feature["name"]} if feature["kind"] == routeKind else {"plots": sorted(bridgeHousing.gradedOn(sceneObject))}
+    described.append(named | {"passes": feature["passes"], "stale": bool((moved > bridgeHousing.heldTolerance).any()), "largestChange": round(float(moved.max(initial=0.0)), 3)})
+  return described
 
 
 commands = {

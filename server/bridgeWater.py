@@ -761,10 +761,10 @@ def carveWaterBed(name, objectName, depth, shoreWidth):
   targets = positions[under, 2] - rise[under] - depth * smoothStep(numpy.clip(fromShore / shoreWidth, 0, 1))
   updated = positions.copy()
   updated[under, 2] = numpy.where(targets < positions[under, 2] - bridgeMeshAccess.waterlineTolerance, targets, positions[under, 2])
-  bridgeShaping.writeWorldPositions(sceneObject, updated)
+  left = bridgeShaping.writeWorldPositions(sceneObject, updated)
   return bridgeShaping.moveSummary(sceneObject, positions, updated) | {
     "underWater": int(under.sum()), "deepestBed": round(float(updated[under, 2].min()), 2), "waterlineCut": waterlineCut,
-  }
+  } | left
 
 
 # Names

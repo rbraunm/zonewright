@@ -9,7 +9,10 @@ import mathutils.bvhtree
 import mathutils.geometry
 import numpy
 
+import bridgeCaveData
+import bridgeCaves
 import bridgeExport
+import bridgeGrading
 import bridgeMeshAccess
 import bridgePasses
 import bridgeShaping
@@ -365,6 +368,7 @@ def joinObjects(names, into):
     raise ValueError("Apply or remove modifiers before joining; join merges the base meshes")
   for sceneObject in sceneObjects:
     bridgeMeshAccess.requireNoShapingPasses(sceneObject, "join it")
+    bridgeCaveData.requireNoCaves(sceneObject, "join it")
   for sceneObject in sceneObjects:
     if sceneObject.data.users > 1:
       sceneObject.data = sceneObject.data.copy()
@@ -453,7 +457,8 @@ def getObjectDetail(name):
       "vertexGroups": [group.name for group in sceneObject.vertex_groups],
       "sharedMeshUsers": mesh.users,
       "shapingPasses": bridgePasses.passList(sceneObject),
-    "surfaceLayers": json.loads(sceneObject[bridgeMeshAccess.surfaceLayersProperty]) if bridgeMeshAccess.surfaceLayersProperty in sceneObject else [],
+      "surfaceLayers": json.loads(sceneObject[bridgeMeshAccess.surfaceLayersProperty]) if bridgeMeshAccess.surfaceLayersProperty in sceneObject else [],
+      "definedPasses": bridgeGrading.describeDefinedPasses(sceneObject), "caves": bridgeCaves.describeCaves(sceneObject),
     }
   if sceneObject.instance_type == "COLLECTION" and sceneObject.instance_collection is not None:
     detail["instanceCollection"] = sceneObject.instance_collection.name

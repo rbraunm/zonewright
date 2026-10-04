@@ -6,6 +6,7 @@ import os
 import bpy
 import numpy
 
+import bridgeCaveData
 import bridgeClientLight
 import bridgeMeshAccess
 
@@ -246,8 +247,11 @@ def assignMaterial(objectName, materialName, selector):
   material = bpy.data.materials.get(materialName)
   if material is None:
     raise ValueError(f"No material named '{materialName}'")
+  bridgeCaveData.refuseLiningMapping(sceneObject, selector, "assignMaterial")
   mask = bridgeMeshAccess.evaluateSelector(selector, sceneObject, "faces")
-  count = bridgeMeshAccess.requireSelection(mask, selector, sceneObject, "faces")
+  bridgeMeshAccess.requireSelection(mask, selector, sceneObject, "faces")
+  mask = bridgeCaveData.requireSurfaceSelection(sceneObject, selector, mask)
+  count = int(mask.sum())
   slotIndex = next((index for index, slot in enumerate(sceneObject.material_slots) if slot.material == material), None)
   if slotIndex is None:
     sceneObject.data.materials.append(material)

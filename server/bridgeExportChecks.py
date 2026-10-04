@@ -12,6 +12,7 @@ import numpy
 
 import bridgeAuthoring
 import bridgeBoundaries
+import bridgeCaves
 import bridgeCommands
 import bridgeExport
 import bridgeHousing
@@ -535,6 +536,10 @@ def checkZoneExport(purpose):
     failures.append({"failure": "unsaved changes", "message": "Save the file (saveFile): an export writes the zone as saved"})
   shipped, excluded, classified = bridgeExport.classifyObjects()
   failures += classified + placementFailures(shipped)
+  failures += [
+    {"failure": "caves broken", "object": sceneObject.name, "message": problem}
+    for sceneObject, role in shipped if sceneObject.type == "MESH" for problem in bridgeCaves.integrityProblems(sceneObject)
+  ]
   _, faceFailures, faceFindings, blockouts, coverage = surveyFaces(shipped)
   failures += faceFailures
   findings += faceFindings
@@ -548,13 +553,21 @@ def checkZoneExport(purpose):
   gapKey = "failure" if purpose == "game" else "finding"
   gaps = blockouts.listed(gapKey) + [{gapKey: f"swim {swimState}", "body": body.name, "at": bodyCenter(body)} for swimState, bodies in decisions.items() for body in bodies]
   gaps += [{gapKey: gap["gap"]} | {key: value for key, value in gap.items() if key != "gap"} for gap in zoneRowGaps() + bridgeBoundaries.zoneLineGaps()]
+  toConfirm = bridgeExport.decisionsToConfirm(shipped)
   if purpose == "game":
+    failures += [
+      {
+        "failure": "stale", "object": decision["object"], "staleCaves": decision["staleCaves"], "staleDefinedPasses": decision["staleDefinedPasses"],
+        "message": f"The ground under caves {decision['staleCaves']} and defined passes {decision['staleDefinedPasses']} of '{decision['object']}' moved since they were made; regradeTerrain (or editCave) fits them to it",
+      }
+      for decision in toConfirm if decision["staleCaves"] or decision["staleDefinedPasses"]
+    ]
     failures += gaps + [{"failure": "containment not checked", "message": "A game export must prove players cannot leave the play area except through zone lines; that needs reach mapping, which is not built yet, so no game export can be made"}]
   else:
     findings += gaps
   return {
     "purpose": purpose, "failures": failures, "findings": findings, "coverage": coverage, "excluded": excluded,
-    "toConfirm": bridgeExport.decisionsToConfirm(shipped), "swim": {swimState: [body.name for body in bodies] for swimState, bodies in decisions.items()},
+    "toConfirm": toConfirm, "swim": {swimState: [body.name for body in bodies] for swimState, bodies in decisions.items()},
     "boundaries": sorted(sceneObject.name for sceneObject, role in shipped if role == "boundary"), "zoneLines": [region["name"] for region in bridgeBoundaries.zoneLineRegions()],
   }
 

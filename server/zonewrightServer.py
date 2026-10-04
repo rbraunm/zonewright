@@ -962,7 +962,8 @@ exportChecksHelp = (
   " the faces' connected pieces (center and face count, largest first); renderView shading \"coverage\" draws the same statuses."
   " `coverage` counts the exported faces by status; `excluded` lists what is not the zone's own geometry by reason (guides, plot borders,"
   " regions, anything hidden from renders, placed client content); `toConfirm` lists shipped meshes with shaping passes off or surfacing"
-  " layers muted, which leave the zone as if never made; `swim` the undecided and changed pools and rivers; `boundaries` and `zoneLines`"
+  " layers muted, which leave the zone as if never made, and caves and defined passes whose ground moved since they were made"
+  " (stale; a game export refuses them, and caves broken by a change outside their guards refuse both); `swim` the undecided and changed pools and rivers; `boundaries` and `zoneLines`"
   " what goes into the terrain as invisible walls and into the .zon as zone lines."
 )
 
@@ -1262,11 +1263,24 @@ selectorHelp = (
   " {\"noise\": {\"featureSize\": f, \"share\": s, \"seed\": n}} (patches about f across covering about the fraction s of the surface, for breaking up one material with another),"
   " {\"underWater\": waterBodyName} (under a pool or river's surface or on it: its bed; a face only when all its corners are), {\"nearWater\": {\"water\": name, \"distance\": d}} (out of the water within d in plan of its waterline, where the mesh meets the surface: wet banks; a face the waterline crosses or meets, so bed and banks leave no gap, or all of whose corners lie within d),"
   " both following whole faces: for a bed and a bank band that end exactly on the waterline and d out from it, cut the mesh along those lines first (cutContours with waterline and levels [0, d]; carveWaterBed cuts the waterline itself),"
+  " {\"cave\": caveName} or {\"cave\": true} (the lining of a cave cutCave made, or of every cave: surface tools leave linings out unless their selector names the cave),"
   " {\"and\": [selectors]}, {\"or\": [selectors]}, {\"not\": selector}. Shapes test vertex positions, or face centers for face operations."
   " A selector that matches nothing is an error. Masks such as slope and height pick within an area you chose (a region, a stroke);"
   " a recipe belongs to a region, not to the whole zone."
 )
 allSelector = {"all": True}
+caveSurfaceHelp = (
+  " A cave's lining (cutCave) is left out unless the selector names the cave ({\"cave\": name}); a stroke that reaches a lining is kept"
+  " with its cave and painted again each time the cave is cut."
+)
+caveShapingHelp = (
+  " Around a cave (cutCave) its lining stays where it is (caveLiningLeft counts the lining vertices left alone) and the vertices where it"
+  " meets the ground follow that ground, so its mouth stays sealed."
+)
+caveFacesHelp = (
+  " Refused on a mesh holding caves (cutCave), whose take-back needs the faces around them as they were cut: take each back (removeCave,"
+  " which returns its definition), make the change, and cut it again."
+)
 
 
 @guardedTool()
@@ -1346,7 +1360,10 @@ async def organize(context: Context, renames: dict[str, str] | None = None, pare
 async def getObjectDetail(context: Context, name: str):
   """One object in depth: transform (rotation as XYZ Euler degrees whatever its rotation mode), size, world bounds (for a collection
   instance, its instanced meshes'; null when it instances none), parent, collections, modifiers; for meshes the mesh's name, the
-  vertex, face, and triangle counts, faces per material, UV layers, world units per texture repeat, vertex groups."""
+  vertex, face, and triangle counts, faces per material, UV layers, world units per texture repeat, vertex groups, shaping passes,
+  surfacing layers, its defined passes (graded routes, the plots graded on it, in the order made) and its caves (cutCave), each with
+  whether its ground moved since it was made (stale: grading it again would move it, or the ground within the cave's reach moved, and
+  how far), which regradeTerrain or editCave puts right."""
   return await callBridge(context, "getObjectDetail", {"name": name})
 
 
@@ -1380,7 +1397,7 @@ async def walkRoute(context: Context, path: list[list[float]], sampleSpacing: fl
   return await callBridge(context, "walkRoute", {"path": path, "sampleSpacing": sampleSpacing})
 
 
-@guardedTool(description="Move the selected vertices of a mesh by `offset` [x, y, z] world units. With `falloff` {center, radius, curve: constant|linear|smooth|sharp} the move fades with distance from the center; this is the precise, fine-detail edit. With shaping passes, the move goes into the active pass." + selectorHelp)
+@guardedTool(description="Move the selected vertices of a mesh by `offset` [x, y, z] world units. With `falloff` {center, radius, curve: constant|linear|smooth|sharp} the move fades with distance from the center; this is the precise, fine-detail edit. With shaping passes, the move goes into the active pass." + caveShapingHelp + selectorHelp)
 async def moveVertices(context: Context, objectName: str, selector: dict, offset: list[float], falloff: dict | None = None):
   return await callBridge(context, "moveVertices", {"objectName": objectName, "selector": selector, "offset": offset, "falloff": falloff})
 
@@ -1390,7 +1407,7 @@ async def sculptAtPoint(
   context: Context, objectName: str, mode: str, center: list[float], radius: float, strength: float,
   falloff: str = "smooth", direction: list[float] | None = None, iterations: int = 1,
 ):
-  """Sculpt a mesh within `radius` of `center`: raise, lower, or crease (strength in units, along the region's average normal or `direction`); smooth or flatten (strength a fraction 0 to 1; smooth repeats `iterations` times). Falloff curve: constant, linear, smooth, sharp. With shaping passes, the change goes into the active pass."""
+  """Sculpt a mesh within `radius` of `center`: raise, lower, or crease (strength in units, along the region's average normal or `direction`); smooth or flatten (strength a fraction 0 to 1; smooth repeats `iterations` times). Falloff curve: constant, linear, smooth, sharp. With shaping passes, the change goes into the active pass. Around a cave (cutCave) its lining stays where it is (caveLiningLeft counts the lining vertices left alone) and the vertices where it meets the ground follow that ground."""
   return await callBridge(context, "sculptAtPoint", {"objectName": objectName, "mode": mode, "center": center, "radius": radius, "strength": strength, "falloff": falloff, "direction": direction, "iterations": iterations})
 
 
@@ -1399,7 +1416,7 @@ async def sculptAlongPath(
   context: Context, objectName: str, mode: str, path: list[list[float]], strength: float, radius: float | None = None, radii: list[float] | None = None,
   falloff: str = "smooth", direction: list[float] | None = None, iterations: int = 1, profile: list[list[float]] | None = None, conformRim: bool | None = None, conformBreaks: bool = False,
 ):
-  """Sculpt along a polyline path [[x,y,z], ...] within `radius`, or within `radii` (one per path point, the stroke widening or narrowing evenly between them, so one stroke carves a canyon that pinches to a gorge): raise, lower, crease, smooth, flatten as in sculptAtPoint; carve, which cuts vertically down to the path's own heights shaped by `profile` [[lateralFraction, heightAboveFloor], ...] from 0 (center) to 1 (edge); or fill, which raises ground up to such a profile (a mesa: a flat cap, a cliff, a slope at the base). carve and fill strength is a fraction, and their path can be a single point (a pit or a butte). With conformRim (carve only, on by default; needs rising profile heights), vertices just outside the cut slide onto the rim contour so the edge follows the profile rather than the grid; the mesh's open edge stays put. With conformBreaks (carve and fill), the vertices nearest each break of the profile slide onto its contour first wherever the stroke shapes them, so stepped profiles (strata, ledges, terraces) make clean lines along the path instead of zigzags across the grid. carve and fill then triangulate the cells they shaped along the contours, as followContours does (splitCells, turnedDiagonals), and put back where the plain cut leaves them any snapped vertices that leave their cell no diagonal facing up (keptOffContours). Results count foldedFaces: faces the move turned over, a sign it was too strong for the mesh's spacing. With shaping passes, the change goes into the active pass."""
+  """Sculpt along a polyline path [[x,y,z], ...] within `radius`, or within `radii` (one per path point, the stroke widening or narrowing evenly between them, so one stroke carves a canyon that pinches to a gorge): raise, lower, crease, smooth, flatten as in sculptAtPoint; carve, which cuts vertically down to the path's own heights shaped by `profile` [[lateralFraction, heightAboveFloor], ...] from 0 (center) to 1 (edge); or fill, which raises ground up to such a profile (a mesa: a flat cap, a cliff, a slope at the base). carve and fill strength is a fraction, and their path can be a single point (a pit or a butte). With conformRim (carve only, on by default; needs rising profile heights), vertices just outside the cut slide onto the rim contour so the edge follows the profile rather than the grid; the mesh's open edge stays put. With conformBreaks (carve and fill), the vertices nearest each break of the profile slide onto its contour first wherever the stroke shapes them, so stepped profiles (strata, ledges, terraces) make clean lines along the path instead of zigzags across the grid. carve and fill then triangulate the cells they shaped along the contours, as followContours does (splitCells, turnedDiagonals), and put back where the plain cut leaves them any snapped vertices that leave their cell no diagonal facing up (keptOffContours). Results count foldedFaces: faces the move turned over, a sign it was too strong for the mesh's spacing. With shaping passes, the change goes into the active pass. Around a cave (cutCave) its lining stays where it is (caveLiningLeft counts the lining vertices left alone), the vertices where it meets the ground follow that ground, and none of its vertices slides sideways onto a break or rim."""
   return await callBridge(context, "sculptAlongPath", {"objectName": objectName, "mode": mode, "path": path, "radius": radius, "radii": radii, "strength": strength, "falloff": falloff, "direction": direction, "iterations": iterations, "profile": profile, "conformRim": conformRim, "conformBreaks": conformBreaks})
 
 
@@ -1416,7 +1433,8 @@ async def sculptOutline(
   the outline: its corners stay angular inside it (within half an edge) and round outside it. With conformBreaks (on by default), the vertices nearest each break
   of the profile slide onto it first wherever the stroke shapes them, so its ledges and cliff edges are clean lines; then the shaped cells are triangulated along the
   contours as followContours does, and snapped vertices that would leave a cell no diagonal facing up are put back (keptOffContours).
-  With shaping passes, the change goes into the active pass."""
+  With shaping passes, the change goes into the active pass. Around a cave (cutCave) its lining stays where it is (caveLiningLeft), the
+  vertices where it meets the ground follow that ground, and none of its vertices slides sideways onto a break."""
   return await callBridge(context, "sculptOutline", {"objectName": objectName, "mode": mode, "outline": outline, "base": base, "profile": profile, "strength": strength, "conformBreaks": conformBreaks})
 
 
@@ -1426,7 +1444,7 @@ async def addShapingPass(context: Context, objectName: str, name: str):
   turned up or down, muted, removed, or collapsed, so a shaping step is revised without redoing the others. Tools that add or remove
   vertices otherwise (delete, extrude, inset, bevel, subdivide, booleanCut, decimate, join) refuse while a mesh has passes; collapse
   them first. Cuts along a line (cutContours, carveWaterBed's cut along the waterline) and turned diagonals keep them, each new vertex
-  placed alike in every pass."""
+  placed alike in every pass. A cave (cutCave) keeps them too; while a mesh holds caves, the tools that change faces refuse it."""
   return await callBridge(context, "addShapingPass", {"objectName": objectName, "name": name})
 
 
@@ -1486,8 +1504,69 @@ async def regradeTerrain(context: Context, objectName: str):
   """Put every defined pass on a mesh back on target after other shaping changed the ground under them (a roughen, a sculpt, a pass
   turned up, down, or off): each graded route (gradeRoute) and the plots graded on it (gradePlot, all together) are taken back and
   graded again in the order they were first made, each on the ground as it then stands, so where two meet the later one still wins. A
-  muted or turned defined pass comes back unmuted at full strength (restoredFrom says which). Reports what each one moved, in order."""
+  muted or turned defined pass comes back unmuted at full strength (restoredFrom says which). Then every cave (cutCave) whose ground
+  moved since it was cut is cut again to fit it (refittedCaves, with how far its ground had moved). Reports what each one moved, in
+  order."""
   return await callBridge(context, "regradeTerrain", {"objectName": objectName})
+
+
+@guardedTool()
+async def cutCave(
+  context: Context, objectName: str, name: str, path: list[list[float]], widths: list[float], heights: list[float], wallMaterial: str,
+  floorMaterial: str, worldUnitsPerRepeat: float, edgeLength: float = 16.0, wallShare: float = 0.35, breakup: dict | None = None,
+  mouthFade: float | None = None, maximumFloorDegrees: float = 30.0,
+):
+  """Cut a cave into a terrain mesh (objectName) as the client's own caves are built, one terrain holding the hill and the room under
+  it: a closed tube swept along the floor `path` [[x, y, z], ...] with one width and height per point, its floor flat across, its walls
+  straight up to `wallShare` of the height and a vault above. Widths and heights ease from point to point and the floor grades evenly
+  between their heights; a room is a wide stretch of the path. A bend turns on an arc the width in radius (less where the points are
+  close). `breakup` {featureSize, amplitude, seed} moves the walls and vault along their outward directions by noise, the floor kept
+  flat, fading out within `mouthFade` (default twice edgeLength) of wherever the tube lies in the open, so the lip stays a clean arch.
+  Each end is open (its section in the open but for a sill a step deep: a mouth; two make a through tunnel) or blind (wholly inside the
+  rock, then closing as a dome on its floor over half its width beyond its last point).
+  The ground within reach of the tube (half its width, three breakup amplitudes, and two edges) is closed into a solid, the tube taken
+  out of it with the exact boolean, and the result spliced into the same mesh keeping every shaping pass: the ground faces the cut
+  changed (the plug) are recorded and deleted as faces only, their vertices staying in every pass, so removeCave puts the ground back
+  exactly; the new vertices where the tube meets the ground (the ring) follow the plug's triangles in every pass, so the mouth stays
+  sealed however the ground is shaped; the tube's own surface (the lining) holds no offset in any pass. Short edges at the mouth are
+  welded down to a third of `edgeLength`. Lining faces facing up get `floorMaterial`, the rest `wallMaterial`, with every surfacing
+  layer uncovered on them, box-mapped at `worldUnitsPerRepeat` and smooth shaded; ground faces the cut split keep their materials,
+  paint, and mapping.
+  Refused, changing nothing: a stretch of floor steeper than `maximumFloorDegrees` (naming it and the run it needs), a bend tighter than
+  half the width, an end part in the rock and part in the open, both ends inside the rock, the tube reaching the terrain's border or
+  another cave's reach, a mesh with modifiers or shared with another object, and caves that fail their integrity checks.
+  Returns the faces and vertices it made, the shortest edges of the lining, the pieces of ground at the mouth, and the seam, each end's
+  kind, and the floor's level stretches (start, end, length, height, narrowest width: a stretch about 220 wide and long holds a stock
+  player plot). The cave is kept with its definition: the ground within its reach is fingerprinted, getObjectDetail and exports flag it
+  stale once that ground moves, and editCave or regradeTerrain cuts it again to fit. Around a cave, shaping leaves its lining where it
+  is (results count caveLiningLeft) and keeps its ring on the ground; strokes never slide its vertices sideways; contour cuts, turned
+  diagonals, and face edits refuse or keep clear of it (removeCave, change, cutCave with the definition it returned); surface tools
+  leave its lining out unless their selector names it ({"cave": name}), and paint that reaches its lining is kept with it and painted
+  again on every cut. Look at it from outside the mouth, close on the throat, from inside looking out, in the room with the figure,
+  from the hill above, and in sections across and along."""
+  return await callBridge(context, "cutCave", {
+    "objectName": objectName, "name": name, "path": path, "widths": widths, "heights": heights, "wallMaterial": wallMaterial,
+    "floorMaterial": floorMaterial, "worldUnitsPerRepeat": worldUnitsPerRepeat, "edgeLength": edgeLength, "wallShare": wallShare,
+    "breakup": breakup, "mouthFade": mouthFade, "maximumFloorDegrees": maximumFloorDegrees,
+  })
+
+
+@guardedTool()
+async def editCave(context: Context, objectName: str, name: str, changes: dict | None = None):
+  """Change a cave cut into a terrain (cutCave) and cut it again in one step: `changes` holds any of its definition's path, widths,
+  heights, wallMaterial, floorMaterial, worldUnitsPerRepeat, edgeLength, wallShare, breakup, mouthFade, maximumFloorDegrees; the cave is
+  taken back and cut again from its definition with them merged in, against the ground as it now stands, and the strokes kept with its
+  lining are painted again. With no changes it refits the cave to the ground (after a sculpt at its mouth or a pass turned up). If the
+  new cut is refused, the cave stays exactly as it was. Returns what taking it back restored and what the new cut made."""
+  return await callBridge(context, "editCave", {"objectName": objectName, "name": name, "changes": changes})
+
+
+@guardedTool()
+async def removeCave(context: Context, objectName: str, name: str):
+  """Take a cave (cutCave) back out of a terrain exactly: its lining and the pieces of ground at its mouth go, and the ground's own faces
+  return on their vertices with every shaping pass made since, each carrying the surfacing and mapping its largest piece of ground held
+  (painted or mapped since the cut). Returns the cave's definition, to cut it again with cutCave, and the strokes kept with its lining."""
+  return await callBridge(context, "removeCave", {"objectName": objectName, "name": name})
 
 
 @guardedTool(description=(
@@ -1497,7 +1576,7 @@ async def regradeTerrain(context: Context, objectName: str):
   " which cannot hold it (it reads as a grain along the triangles). The same `seed` gives the same noise. `fadeDistance` ramps the effect"
   " in from the selection's edge so a mask leaves no step. Use it in its own shaping pass, confined to a region at that region's own scale"
   " rather than over the whole zone, coarse first (large featureSize, few octaves), then finer, turning each pass up or down after looking."
-  + selectorHelp))
+  + caveShapingHelp + selectorHelp))
 async def roughen(
   context: Context, objectName: str, featureSize: float, amplitude: float, octaves: int = 4, roughness: float = 0.5, seed: int = 0,
   direction: str = "normal", selector: dict = allSelector, fadeDistance: float = 0.0,
@@ -1513,7 +1592,7 @@ async def roughen(
   " mean square) move and the largest about three times that, so round"
   " and straight shapes (a sculpted cone hill, a carved channel) stop being regular. `plane` horizontal keeps heights and bends the shape"
   " sideways, moving every height at a spot alike so walls bend without shearing; surface moves along the surface; full moves in every direction. The same `seed` gives the same warp; `fadeDistance` ramps"
-  " it in from the selection's edge. Use it in its own shaping pass, confined to a region." + selectorHelp))
+  " it in from the selection's edge. Use it in its own shaping pass, confined to a region." + caveShapingHelp + selectorHelp))
 async def warp(
   context: Context, objectName: str, featureSize: float, amplitude: float, seed: int = 0, plane: str = "horizontal",
   selector: dict = allSelector, fadeDistance: float = 0.0,
@@ -1529,12 +1608,12 @@ async def warp(
   " that best fits it (by `strength`, 1 fully flat), so rock reads as broad faces meeting at sharp edges, as the client's natural"
   " terrain is built, and the texture carries the fine detail, where warp and roughen would leave smooth or bumpy noise. The same"
   " `seed` gives the same facets; `fadeDistance` ramps it in from the selection's edge. Use it in its own shaping pass, confined to the"
-  " rock it should shape." + selectorHelp))
+  " rock it should shape." + caveShapingHelp + selectorHelp))
 async def facet(context: Context, objectName: str, cellSize: float, strength: float = 1.0, seed: int = 0, selector: dict = allSelector, fadeDistance: float = 0.0):
   return await callBridge(context, "facet", {"objectName": objectName, "selector": selector, "cellSize": cellSize, "strength": strength, "seed": seed, "fadeDistance": fadeDistance})
 
 
-@guardedTool(description="Delete the selected faces of a mesh, with edges and vertices left unused; for example the terrain inside a rock that should form its own cave floor ({\"insideObject\": \"rockName\"})." + selectorHelp)
+@guardedTool(description="Delete the selected faces of a mesh, with edges and vertices left unused; for example the terrain inside a rock that should form its own cave floor ({\"insideObject\": \"rockName\"})." + caveFacesHelp + selectorHelp)
 async def deleteFaces(context: Context, objectName: str, selector: dict):
   return await callBridge(context, "deleteFaces", {"objectName": objectName, "selector": selector})
 
@@ -1544,7 +1623,7 @@ async def deleteFaces(context: Context, objectName: str, selector: dict):
   " the material of the faces beside them and are box-mapped at the density box projection gives that material on the mesh (mappedFaces;"
   " on a surfaced mesh, as the mapping beneath its layers' transitions, so it stays as the layers compose again), so a box-projected mesh"
   " carries on its texture without a seam; faces left unmapped, where the mesh has no UV layer or the material no UV area, are listed"
-  " with why (unmappedFaces)." + selectorHelp))
+  " with why (unmappedFaces)." + caveFacesHelp + selectorHelp))
 async def extrudeFaces(context: Context, objectName: str, selector: dict, distance: float, direction: list[float] | None = None):
   return await callBridge(context, "extrudeFaces", {"objectName": objectName, "selector": selector, "distance": distance, "direction": direction})
 
@@ -1552,17 +1631,17 @@ async def extrudeFaces(context: Context, objectName: str, selector: dict, distan
 @guardedTool(description=(
   "Inset the selected faces of a mesh as one region by `thickness`, pushed in or out by `depth`. The inset faces keep their texture as"
   " it lay; the new rim faces are box-mapped at the density box projection gives their material on the mesh (mappedFaces; on a surfaced"
-  " mesh, as the mapping beneath its layers' transitions), or listed with why they could not be (unmappedFaces)." + selectorHelp))
+  " mesh, as the mapping beneath its layers' transitions), or listed with why they could not be (unmappedFaces)." + caveFacesHelp + selectorHelp))
 async def insetFaces(context: Context, objectName: str, selector: dict, thickness: float, depth: float = 0.0):
   return await callBridge(context, "insetFaces", {"objectName": objectName, "selector": selector, "thickness": thickness, "depth": depth})
 
 
-@guardedTool(description="Bevel the edges whose two vertices are both selected, by `width` units in `segments` steps; `minimumAngleDegrees` limits it to edges at least that sharp." + selectorHelp)
+@guardedTool(description="Bevel the edges whose two vertices are both selected, by `width` units in `segments` steps; `minimumAngleDegrees` limits it to edges at least that sharp." + caveFacesHelp + selectorHelp)
 async def bevelEdges(context: Context, objectName: str, selector: dict, width: float, segments: int = 1, minimumAngleDegrees: float | None = None):
   return await callBridge(context, "bevelEdges", {"objectName": objectName, "selector": selector, "width": width, "segments": segments, "minimumAngleDegrees": minimumAngleDegrees})
 
 
-@guardedTool(description="Subdivide the selected faces of a mesh with `cuts` cuts per edge, adding detail where it is needed." + selectorHelp)
+@guardedTool(description="Subdivide the selected faces of a mesh with `cuts` cuts per edge, adding detail where it is needed." + caveFacesHelp + selectorHelp)
 async def subdivide(context: Context, objectName: str, cuts: int, selector: dict = allSelector):
   return await callBridge(context, "subdivide", {"objectName": objectName, "selector": selector, "cuts": cuts})
 
@@ -1574,19 +1653,22 @@ async def booleanCut(context: Context, objectName: str, cutterName: str, operati
   cut into a cliff is lined with the cliff's material) and are box-mapped at that material's density on the mesh (mappedFaces, or
   unmappedFaces with why; on a surfaced mesh, as the mapping beneath its layers' transitions); no material slot is added. A cutter that crosses none of the mesh's faces is refused. A DIFFERENCE that keeps
   none of the cutter's faces left an opening with nothing lining it, through an open surface that encloses nothing (a terrain sheet, a
-  plane), and its result carries a warning saying so."""
+  plane), and its result carries a warning saying so. Refused on a mesh holding caves (cutCave): take each back (removeCave), cut, and
+  cut it again."""
   return await callBridge(context, "booleanCut", {"objectName": objectName, "cutterName": cutterName, "operation": operation, "keepCutter": keepCutter})
 
 
 @guardedTool()
 async def decimate(context: Context, objectName: str, ratio: float):
-  """Reduce a mesh to roughly `ratio` (0 to 1) of its triangles."""
+  """Reduce a mesh to roughly `ratio` (0 to 1) of its triangles; refused on a mesh holding caves (cutCave): take each back (removeCave),
+  decimate, and cut it again."""
   return await callBridge(context, "decimate", {"objectName": objectName, "ratio": ratio})
 
 
 @guardedTool()
 async def cleanupMesh(context: Context, objectName: str, mergeDistance: float = 0.01, recalculateNormals: bool = True):
-  """Merge vertices closer than mergeDistance, dissolve degenerate geometry, and make face normals consistent."""
+  """Merge vertices closer than mergeDistance, dissolve degenerate geometry, and make face normals consistent; refused on a mesh holding
+  caves (cutCave): take each back (removeCave), clean up, and cut it again."""
   return await callBridge(context, "cleanupMesh", {"objectName": objectName, "mergeDistance": mergeDistance, "recalculateNormals": recalculateNormals})
 
 
@@ -1595,7 +1677,7 @@ async def cleanupMesh(context: Context, objectName: str, mergeDistance: float = 
   " one with the smaller height step, never leaving a sliver, so ledges and cliff edges that cross the grid run as clean lines instead"
   " of notching where they step to the next row. carve and fill do this where they shape; use it after warp, roughen, or changing"
   " passes. Vertices never move, so shaping passes keep what they hold; cells whose two triangles differ in material or surfacing keep"
-  " their diagonal." + selectorHelp))
+  " their diagonal, and cells at a cave (cutCave) stay as its cut left them." + selectorHelp))
 async def followContours(context: Context, objectName: str, selector: dict = allSelector):
   return await callBridge(context, "followContours", {"objectName": objectName, "selector": selector})
 
@@ -1908,12 +1990,12 @@ async def removeSurfaceLayer(context: Context, objectName: str, name: str):
   " circle, a line, or the grid. It never breaks a selected piece apart: where the noise would pinch a narrow stroke through, the faces"
   " it took there go back, and faces it would leave touching the piece only at a corner are left out. The noise is laid out in plan:"
   " the same edgeNoise on the same selector picks the same faces again on ground left as it was (eraseSurface, clearRegion); reshaped"
-  " since, its edge can land a face to either side." + selectorHelp))
+  " since, its edge can land a face to either side." + caveSurfaceHelp + selectorHelp))
 async def paintSurface(context: Context, objectName: str, layer: str, material: str, selector: dict, edgeNoise: dict | None = None):
   return await callBridge(context, "paintSurface", {"objectName": objectName, "layer": layer, "material": material, "selector": selector, "edgeNoise": edgeNoise})
 
 
-@guardedTool(description="Erase a surfacing layer where the selector says, with edgeNoise as paintSurface takes it, so the layers beneath show again, each with its own mapping (a transition erased leaves the mapping beneath it as it was)." + selectorHelp)
+@guardedTool(description="Erase a surfacing layer where the selector says, with edgeNoise as paintSurface takes it, so the layers beneath show again, each with its own mapping (a transition erased leaves the mapping beneath it as it was)." + caveSurfaceHelp + selectorHelp)
 async def eraseSurface(context: Context, objectName: str, layer: str, selector: dict, edgeNoise: dict | None = None):
   return await callBridge(context, "eraseSurface", {"objectName": objectName, "layer": layer, "selector": selector, "edgeNoise": edgeNoise})
 
@@ -1926,7 +2008,7 @@ async def eraseSurface(context: Context, objectName: str, layer: str, selector: 
   " every hole in one smaller than `minimumArea` square units, as the surface shows it with every layer, is taken over by the material it"
   " borders most. Clean only lifts this layer's own paint off (where what lies beneath shows that material, or the speck is this"
   " layer's) or fills a hole in it with its own paint; it never copies another layer's material into it, so a speck that a lower layer"
-  " paints amid another lower layer's paint is left for cleaning that layer." + selectorHelp))
+  " paints amid another lower layer's paint is left for cleaning that layer." + caveSurfaceHelp + selectorHelp))
 async def editSurface(
   context: Context, objectName: str, layer: str, operation: str, steps: int = 1, selector: dict = allSelector, minimumArea: float | None = None,
 ):
@@ -1945,7 +2027,8 @@ async def editSurface(
   " smoothing evens them further; painting, erasing, or editing beside one makes it new to even. Borders on creases (a cliff's foot or"
   " lip) already run on modeled edges and stay; a closed piece whose outline is shorter than about three times `smoothing` is left as"
   " it is (editSurface clean takes specks off). Within the selector only; crossings no vertex could slide onto without turning a face"
-  " over are left (keptInPlace)." + selectorHelp))
+  " over are left (keptInPlace). A cave's lining (cutCave) is left out unless the selector names the cave, and the vertices of a cave"
+  " never slide (caveVerticesLeft)." + selectorHelp))
 async def conformSurfaceEdges(context: Context, objectName: str, layer: str, smoothing: float, selector: dict = allSelector):
   return await callBridge(context, "conformSurfaceEdges", {"objectName": objectName, "layer": layer, "smoothing": smoothing, "selector": selector})
 
@@ -1961,7 +2044,8 @@ async def conformSurfaceEdges(context: Context, objectName: str, layer: str, smo
   " crosses it, the new vertex placed alike in every shaping pass with UVs and surfacing paint carried over, and each crossed face"
   " splits along the line, so a height band, a stratum, or a transition strip ends on a modeled edge instead of zigzagging across the"
   " triangles. An edge a distance line crosses twice (up a wall one cell wide, both ends on the border; past a bend in a bank) is"
-  " first split where it lies farthest past the level, so both crossings are cut (doubleCrossings)." + selectorHelp))
+  " first split where it lies farthest past the level, so both crossings are cut (doubleCrossings). Refused, changing nothing, where it"
+  " would cut faces at a cave (cutCave), naming it: keep the selector clear of the cave." + selectorHelp))
 async def cutContours(
   context: Context, objectName: str, levels: list[float], distanceFrom: dict | None = None, waterline: str | None = None, selector: dict = allSelector,
   onlyAbove: bool = False,
@@ -1984,7 +2068,7 @@ async def cutContours(
   " (straddlingFaces): cut a contour at `width` first (cutContours with distanceFrom the toward faces and the same onlyAbove) so the strip"
   " ends on a modeled edge. With onlyAbove, the strip runs only from the stretches of border where the selector's faces mostly rise"
   " above the toward faces, and up from them: the foot of a wall, where rock rises from the ground, notches and all, and not the lip"
-  " of a ledge, where ground ends above rock falling away." + selectorHelp))
+  " of a ledge, where ground ends above rock falling away." + caveSurfaceHelp + selectorHelp))
 async def paintTransition(
   context: Context, objectName: str, layer: str, material: str, selector: dict, toward: dict, width: float, worldUnitsPerRepeat: float,
   onlyAbove: bool = False,
@@ -2027,7 +2111,8 @@ async def clearRegion(
   region was painted with also takes back the paint that spilled past its edge, and any paint lying wholly within the noise's reach
   of the region, cut off from paint beyond it, so the spill goes even where the ground was reshaped since (without edgeNoise, the
   spill stays); its shaping kept, reset (passes taken back), or rebuilt (spanned from the ground around it), faded over
-  fadeDistance; and the objects placed in it (models, lights, emitters) deleted."""
+  fadeDistance; and the objects placed in it (models, lights, emitters) deleted. A cave's lining keeps its surfacing (its definition and
+  the strokes kept with it paint it)."""
   return await callBridge(context, "clearRegion", {
     "region": region, "terrainObject": terrainObject, "shaping": shaping, "surfacing": surfacing, "objects": objects, "fadeDistance": fadeDistance,
     "edgeNoise": edgeNoise,

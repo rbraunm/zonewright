@@ -5,6 +5,7 @@ import json
 
 import numpy
 
+import bridgeCaveData
 import bridgeMeshAccess
 
 baseKeyName = "base"
@@ -70,14 +71,17 @@ def keyCoordinates(key):
 
 
 def writeIntoActivePass(sceneObject, localPositions):
-  """Move the mesh as seen to localPositions by adding the change, divided by the pass's strength, into the active pass."""
+  """Move the mesh as seen to localPositions by adding the change, divided by the pass's strength, into the active pass, a cave's lining
+  left where it is and its ring on its plug triangles (bridgeCaveData.guardedKey); returns how many lining vertices it left alone."""
   key = activePass(sceneObject)
   with bridgeMeshAccess.shapedMesh(sceneObject) as mesh:
     shown = numpy.empty(len(mesh.vertices) * 3)
     mesh.vertices.foreach_get("co", shown)
-  updated = keyCoordinates(key) + (localPositions - shown.reshape(-1, 3)) / key.value
+  current = keyCoordinates(key)
+  updated, left = bridgeCaveData.guardedKey(sceneObject, current, current + (localPositions - shown.reshape(-1, 3)) / key.value)
   key.data.foreach_set("co", updated.ravel())
   sceneObject.data.update()
+  return left
 
 
 def addShapingPass(objectName, name):

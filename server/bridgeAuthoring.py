@@ -9,6 +9,7 @@ import mathutils
 import mathutils.kdtree
 import numpy
 
+import bridgeCaveData
 import bridgeEnvironment
 import bridgeExport
 import bridgeMeshAccess
@@ -161,13 +162,14 @@ def shownSurface(sceneObject, belowPosition=None):
 
 
 def readCornerVectors(mesh, attributeName):
-  vectors = numpy.empty(len(mesh.loops) * 3)
+  # Read and written in the attribute's own single precision, which Blender copies without converting each value.
+  vectors = numpy.empty(len(mesh.loops) * 3, dtype=numpy.float32)
   mesh.attributes[attributeName].data.foreach_get("vector", vectors)
-  return vectors.reshape(-1, 3)
+  return vectors.reshape(-1, 3).astype(numpy.float64)
 
 
 def writeCornerVectors(mesh, attributeName, vectors):
-  mesh.attributes[attributeName].data.foreach_set("vector", numpy.asarray(vectors, dtype=numpy.float64).ravel())
+  mesh.attributes[attributeName].data.foreach_set("vector", numpy.asarray(vectors, dtype=numpy.float32).ravel())
 
 
 def mappingAttributes(mesh):
@@ -176,6 +178,12 @@ def mappingAttributes(mesh):
 
 
 def compose(sceneObject):
+  """Show the layers (showLayers) and describe them."""
+  showLayers(sceneObject)
+  return describeLayers(sceneObject)
+
+
+def showLayers(sceneObject):
   """Show each face's material, and once a layer maps a transition its own way, each face's mapping, as the layers decide them."""
   mesh = sceneObject.data
   shown, deciders = shownSurface(sceneObject)
@@ -190,9 +198,8 @@ def compose(sceneObject):
         own = readCornerVectors(mesh, name)
         showing = (loopDeciders == position) & ~numpy.isnan(own[:, 0])
         mapping[showing] = own[showing]
-    mesh.uv_layers[bridgeSurfacing.uvLayerName].data.foreach_set("uv", mapping[:, :2].ravel())
+    mesh.uv_layers[bridgeSurfacing.uvLayerName].data.foreach_set("uv", mapping[:, :2].astype(numpy.float32).ravel())
   mesh.update()
-  return describeLayers(sceneObject)
 
 
 def readEdgeFloats(mesh, attributeName):
@@ -409,29 +416,38 @@ def wholePieces(sceneObject, mask, roughened):
   return result
 
 
-def paintSurface(objectName, layer, material, selector, edgeNoise):
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
-  requireLayer(sceneObject, layer)
+def strokeFaces(sceneObject, selector, edgeNoise):
+  """The faces a surface stroke takes: its selector's (a cave's lining only where the selector names the cave), its edge moved by
+  edgeNoise (roughenedSelection)."""
   mask = bridgeMeshAccess.evaluateSelector(selector, sceneObject, "faces")
   bridgeMeshAccess.requireSelection(mask, selector, sceneObject, "faces")
-  mask = roughenedSelection(sceneObject, mask, edgeNoise)
+  mask = bridgeCaveData.requireSurfaceSelection(sceneObject, selector, mask)
+  return bridgeCaveData.surfaceMask(sceneObject, selector, roughenedSelection(sceneObject, mask, edgeNoise))
+
+
+def paintSurface(objectName, layer, material, selector, edgeNoise, keepCaveStroke=True):
+  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  requireLayer(sceneObject, layer)
+  mask = strokeFaces(sceneObject, selector, edgeNoise)
   slot = materialSlot(sceneObject, material)
   values = readFaceInts(sceneObject.data, layerAttributePrefix + layer)
   values[mask] = slot
   writeLayerValues(sceneObject, layer, values, mask)
+  if keepCaveStroke:
+    bridgeCaveData.keepStroke(sceneObject, selector, mask, "paintSurface", {"layer": layer, "material": material, "selector": selector, "edgeNoise": edgeNoise})
   return {"painted": int(mask.sum())} | compose(sceneObject)
 
 
-def eraseSurface(objectName, layer, selector, edgeNoise):
+def eraseSurface(objectName, layer, selector, edgeNoise, keepCaveStroke=True):
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   requireLayer(sceneObject, layer)
-  mask = bridgeMeshAccess.evaluateSelector(selector, sceneObject, "faces")
-  bridgeMeshAccess.requireSelection(mask, selector, sceneObject, "faces")
-  mask = roughenedSelection(sceneObject, mask, edgeNoise)
+  mask = strokeFaces(sceneObject, selector, edgeNoise)
   values = readFaceInts(sceneObject.data, layerAttributePrefix + layer)
   erased = int((mask & (values != uncovered)).sum())
   values[mask] = uncovered
   writeLayerValues(sceneObject, layer, values, mask)
+  if keepCaveStroke:
+    bridgeCaveData.keepStroke(sceneObject, selector, mask, "eraseSurface", {"layer": layer, "selector": selector, "edgeNoise": edgeNoise})
   return {"erased": erased} | compose(sceneObject)
 
 
@@ -484,7 +500,7 @@ def cleanedLayer(sceneObject, layer, within, minimumArea):
   return numpy.where(lifted, uncovered, numpy.where(filled, cleaned, values)), values
 
 
-def editSurface(objectName, layer, operation, steps, selector, minimumArea):
+def editSurface(objectName, layer, operation, steps, selector, minimumArea, keepCaveStroke=True):
   """Grow, shrink, or smooth a layer's painted area within the selector, or clean it (cleanedLayer)."""
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   requireLayer(sceneObject, layer)
@@ -498,6 +514,9 @@ def editSurface(objectName, layer, operation, steps, selector, minimumArea):
     raise ValueError(f"minimumArea must be positive, got {minimumArea}")
   within = bridgeMeshAccess.evaluateSelector(selector, sceneObject, "faces")
   bridgeMeshAccess.requireSelection(within, selector, sceneObject, "faces")
+  within = bridgeCaveData.requireSurfaceSelection(sceneObject, selector, within)
+  if keepCaveStroke:
+    bridgeCaveData.keepStroke(sceneObject, selector, within, "editSurface", {"layer": layer, "operation": operation, "steps": steps, "selector": selector, "minimumArea": minimumArea})
   mesh = sceneObject.data
   if operation == "clean":
     shownBefore, _ = shownSurface(sceneObject)
@@ -885,6 +904,7 @@ def conformSurfaceEdges(objectName, layer, smoothing, selector):
     raise ValueError(f"smoothing must be positive, got {smoothing}")
   within = bridgeMeshAccess.evaluateSelector(selector, sceneObject, "faces")
   bridgeMeshAccess.requireSelection(within, selector, sceneObject, "faces")
+  within = bridgeCaveData.requireSurfaceSelection(sceneObject, selector, within)
   mesh = sceneObject.data
   values = readFaceInts(mesh, layerAttributePrefix + layer)
   if len(numpy.unique(values[within])) < 2:
@@ -896,6 +916,10 @@ def conformSurfaceEdges(objectName, layer, smoothing, selector):
   edgeLength = float(numpy.median(numpy.linalg.norm(positions[edges[:, 0]] - positions[edges[:, 1]], axis=1)))
   onLine = conformOnLineShare * edgeLength
   movable = movableVertices(sceneObject, within, positions)
+  # A cave's plug, ring, and lining stay where its cut put them, in every pass.
+  caveVertices = bridgeCaveData.fixedInPlan(sceneObject)
+  caveVerticesLeft = int((movable & caveVertices).sum())
+  movable &= ~caveVertices
   edgeIndices, firstFaces, secondFaces = bridgeMeshAccess.sharedEdges(mesh)
   inside = within[firstFaces] & within[secondFaces]
   alreadyEvened = int(settled[edgeIndices[(values[firstFaces] != values[secondFaces]) & inside]].sum())
@@ -923,7 +947,7 @@ def conformSurfaceEdges(objectName, layer, smoothing, selector):
   mesh.attributes[markName].data.foreach_set("value", marks)
   return {
     "movedVertices": int(len(movers)), "keptInPlace": dropped, "changedFaces": int((updatedValues != values).sum()), "alreadyEvened": alreadyEvened,
-  } | compose(sceneObject)
+  } | ({"caveVerticesLeft": caveVerticesLeft} if bridgeCaveData.holdsCaves(sceneObject) else {}) | compose(sceneObject)
 
 
 def decidedFaces(sceneObject, curves, values, within, movable, moved, movers, reach):
@@ -1000,7 +1024,7 @@ def cleanedValues(mesh, values, within, areas, minimumArea):
   return values
 
 
-def paintTransition(objectName, layer, material, selector, toward, width, worldUnitsPerRepeat, onlyAbove):
+def paintTransition(objectName, layer, material, selector, toward, width, worldUnitsPerRepeat, onlyAbove, keepCaveStroke=True):
   """Paint the faces wholly within `width` of where selector's faces meet toward's, mapped up from that border and along it (stripAlong);
   the material is marked as a transition, so export checks count the borders it lies along as bridged."""
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
@@ -1008,8 +1032,8 @@ def paintTransition(objectName, layer, material, selector, toward, width, worldU
   if width <= 0 or worldUnitsPerRepeat <= 0:
     raise ValueError(f"width and worldUnitsPerRepeat must be positive, got {width} and {worldUnitsPerRepeat}")
   mesh = sceneObject.data
-  side = bridgeMeshAccess.evaluateSelector(selector, sceneObject, "faces")
-  other = bridgeMeshAccess.evaluateSelector(toward, sceneObject, "faces") & ~side
+  side = bridgeCaveData.surfaceMask(sceneObject, selector, bridgeMeshAccess.evaluateSelector(selector, sceneObject, "faces"))
+  other = bridgeCaveData.surfaceMask(sceneObject, toward, bridgeMeshAccess.evaluateSelector(toward, sceneObject, "faces")) & ~side
   borderEdges, _, _ = (bridgeMeshAccess.footBorders if onlyAbove else bridgeMeshAccess.faceBorders)(sceneObject, side, other)
   if not len(borderEdges):
     raise ValueError(f"The faces {selector!r} picks never {'rise above' if onlyAbove else 'meet'} the faces {toward!r} picks on '{objectName}'")
@@ -1088,6 +1112,10 @@ def paintTransition(objectName, layer, material, selector, toward, width, worldU
   mapping = readCornerVectors(mesh, mappingName)
   mapping[stripLoops] = numpy.column_stack([along, numpy.minimum(distances[stripVertices] / width, 1.0), numpy.zeros(len(stripLoops))])
   writeCornerVectors(mesh, mappingName, mapping)
+  if keepCaveStroke:
+    bridgeCaveData.keepStroke(sceneObject, selector, strip, "paintTransition", {
+      "layer": layer, "material": material, "selector": selector, "toward": toward, "width": width, "worldUnitsPerRepeat": worldUnitsPerRepeat, "onlyAbove": onlyAbove,
+    })
   return {"painted": int(strip.sum()), "straddlingFaces": int((wanted & ~strip).sum()), "borderLength": round(float(lengths.sum()), 1)} | compose(sceneObject)
 
 
@@ -1137,7 +1165,10 @@ def squareOffEnds(positions, chainVertices, nearestAlong):
 def projectUVs(objectName, method, worldUnitsPerRepeat, selector, direction):
   """Project UVs onto the selector's faces; on a mesh whose layers map transitions, into its base mapping (compose)."""
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  bridgeCaveData.refuseLiningMapping(sceneObject, selector, "projectUVs")
   faceMask, selectedLoops, projected = bridgeSurfacing.projectedUVs(sceneObject, method, worldUnitsPerRepeat, selector, direction)
+  faceMask = bridgeCaveData.requireSurfaceSelection(sceneObject, selector, faceMask)
+  selectedLoops = faceMask[numpy.repeat(numpy.arange(len(faceMask)), bridgeMeshAccess.faceLoops(sceneObject)[0])]
   mesh = sceneObject.data
   if bridgeSurfacing.baseMappingName in mesh.attributes:
     mapping = readCornerVectors(mesh, bridgeSurfacing.baseMappingName)
@@ -1177,7 +1208,8 @@ def resetRegion(objectName, selector, passes, fadeDistance):
   for name in names:
     key = keys.key_blocks[name]
     coordinates = bridgePasses.keyCoordinates(key)
-    key.data.foreach_set("co", (base + (coordinates - base) * (1 - weights)[:, None]).ravel())
+    guarded, _ = bridgeCaveData.guardedKey(sceneObject, coordinates, base + (coordinates - base) * (1 - weights)[:, None])
+    key.data.foreach_set("co", guarded.ravel())
   sceneObject.data.update()
   inside = weights > 0
   # Passes hold moves, not shapes: a kept pass that also moved the area keeps its moves, so a level it raised the ground to (a fill's
@@ -1281,13 +1313,13 @@ def rebuildRegion(objectName, selector, mode, height, fadeDistance):
   else:
     targets = numpy.full(len(positions), float(height))
   updated[:, 2] += weights * (targets - positions[:, 2])
-  bridgeShaping.writeWorldPositions(sceneObject, updated)
+  left = bridgeShaping.writeWorldPositions(sceneObject, updated)
   # Diagonals turned for the old shape would crease the new one.
   turned = bridgeShaping.triangulateAlongContours(sceneObject, updated, free)["turnedDiagonals"]
   return {
     "object": objectName, "mode": mode, "affectedVertices": int(free.sum()), "largestMove": round(float(numpy.linalg.norm(updated - positions, axis=1).max()), 3),
     "turnedDiagonals": turned,
-  }
+  } | left
 
 
 def objectsInRegion(regionName, terrainNames):
@@ -1322,10 +1354,11 @@ def clearRegion(region, terrainObject, shaping, surfacing, objects, fadeDistance
       raise ValueError(f"'{terrainObject}' has no surfacing layers to erase from")
     regionFaces = bridgeMeshAccess.evaluateSelector(selector, sceneObject, "faces")
     bridgeMeshAccess.requireSelection(regionFaces, selector, sceneObject, "faces")
-    mask = roughenedSelection(sceneObject, regionFaces, edgeNoise)
+    regionFaces = bridgeCaveData.requireSurfaceSelection(sceneObject, selector, regionFaces)
+    mask = bridgeCaveData.surfaceMask(sceneObject, selector, roughenedSelection(sceneObject, regionFaces, edgeNoise))
     # The same edgeNoise picks the same faces only on ground as it was painted; reshaped since, a face of the spill can fall outside.
     # Paint lying wholly within the noise's reach of the region, cut off from paint beyond it, is spill however the ground moved.
-    within = (mask | regionFaces | noiseReach(sceneObject, regionFaces, edgeNoise["amplitude"])) if edgeNoise is not None else mask
+    within =bridgeCaveData.surfaceMask(sceneObject, selector, (mask | regionFaces | noiseReach(sceneObject, regionFaces, edgeNoise["amplitude"])) if edgeNoise is not None else mask)
     first, second = faceNeighbourPairs(sceneObject.data)
     erased = 0
     for layer in layers:

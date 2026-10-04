@@ -11,6 +11,7 @@ import bpy
 import mathutils
 import numpy
 
+import bridgeCaveData
 import bridgeGrading
 import bridgeMeshAccess
 import bridgeModels
@@ -741,12 +742,14 @@ def applyGrading(plan):
     for index, pad in enumerate(plan["pads"]):
       key = gradeKey(sceneObject, pad["plot"])
       rows = numpy.flatnonzero(plan["owner"] == index)
+      padLocal = numpy.zeros_like(local)
+      padLocal[rows] = local[rows]
+      padLocal, _ = bridgeCaveData.guardedOffsets(sceneObject, padLocal)
+      rows = numpy.union1d(rows, numpy.flatnonzero(numpy.abs(padLocal).max(axis=1) > 0))
       previous = plan["held"].get(pad["plot"])
-      if previous is not None and key.value == 1.0 and numpy.array_equal(previous[0], rows) and numpy.allclose(previous[1], local[rows], rtol=0, atol=heldTolerance):
+      if previous is not None and key.value == 1.0 and numpy.array_equal(previous[0], rows) and numpy.allclose(previous[1], padLocal[rows], rtol=0, atol=heldTolerance):
         continue
-      coordinates = reference.copy()
-      coordinates[rows] += local[rows]
-      key.data.foreach_set("co", coordinates.astype(numpy.float32).ravel())
+      key.data.foreach_set("co", (reference + padLocal).astype(numpy.float32).ravel())
       key.mute, key.value = False, 1.0
   keys = sceneObject.data.shape_keys
   if keys is not None:
