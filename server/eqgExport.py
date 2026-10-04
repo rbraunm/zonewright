@@ -1,7 +1,8 @@
-"""An EQG zone archive from what bridgeExport collects from a scene: the terrain (.ter) placed at the origin as TER_<zone>, each model
-(.mod) at its placements, a version 1 .zon with the water bodies' swim volumes and the scene's point lights, and every material's
-textures as DDS. No baked light yet: placements carry no .lit. The scene's emitters go beside the archive in the client's emitter
-list, which the client reads loose."""
+"""An EQG zone archive from what bridgeExport collects from a scene: the terrain (.ter) placed at the origin as TER_<zone>, its
+boundaries merged in as triangles without a material, each model (.mod) at its placements, triangles players pass through flagged 0x1,
+a version 1 .zon with the swim volumes and zone lines as regions and the scene's point lights, and every material's textures as DDS.
+No baked light yet: placements carry no .lit. The scene's emitters go beside the archive in the client's emitter list, which the
+client reads loose."""
 import os
 import re
 from pathlib import Path
@@ -9,6 +10,7 @@ from pathlib import Path
 import numpy
 from PIL import Image
 
+import eqgFiles
 import eqgWriter
 
 zoneNamePattern = re.compile(r"^[a-z0-9]+$")
@@ -45,7 +47,7 @@ def zoneArchive(collected):
     return textureNames[path]
 
   def model(kind, entry):
-    names = list(dict.fromkeys(entry["materials"]))
+    names = [name for name in dict.fromkeys(entry["materials"]) if name is not None]
     writerMaterials = []
     for name in names:
       material = materials[name]
@@ -59,10 +61,10 @@ def zoneArchive(collected):
           "secondDiffuseTexture": texture(liquid["secondDiffusePath"]) if liquid["secondDiffusePath"] else None,
         },
       })
-    index = {name: position for position, name in enumerate(names)}
+    index = {name: position for position, name in enumerate(names)} | {None: eqgFiles.noMaterial}
     prefix = entry["arrays"]
     return eqgWriter.modelBytes(kind, writerMaterials, arrays[f"{prefix}_positions"], arrays[f"{prefix}_normals"], arrays[f"{prefix}_uvs"],
-      arrays[f"{prefix}_triangles"], [index[name] for name in entry["materials"]])
+      arrays[f"{prefix}_triangles"], [index[name] for name in entry["materials"]], numpy.where(arrays[f"{prefix}_passable"], eqgFiles.passableFlag, 0))
 
   terrainFile = collected["terrain"]["file"]
   files[terrainFile] = model("ter", collected["terrain"])
@@ -74,7 +76,9 @@ def zoneArchive(collected):
   data = eqgWriter.archiveBytes(files)
   return data, {
     "zone": zone, "bytes": len(data), "terrainTriangles": len(collected["terrain"]["materials"]),
+    "boundaryTriangles": sum(name is None for name in collected["terrain"]["materials"]),
     "modelTriangles": {entry["file"]: len(entry["materials"]) for entry in collected["models"]},
+    "passableTriangles": {entry["file"]: int(arrays[f"{entry['arrays']}_passable"].sum()) for entry in [collected["terrain"]] + collected["models"] if arrays[f"{entry['arrays']}_passable"].any()},
     "placements": len(collected["placements"]), "lights": len(collected["lights"]), "emitters": len(collected["emitters"]),
     "regions": [region["name"] for region in collected["regions"]],
     "textures": sorted(textureSources), "materials": sorted(materials),

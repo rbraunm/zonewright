@@ -97,8 +97,12 @@ def addEQGModel(builder, model, placement, isObject):
   # Material -1 (no material) indexes the trailing entry.
   triangleMaterials = model["triangleMaterials"][keptTriangles]
   materialIndices = numpy.where(triangleMaterials < 0, len(model["materials"]), triangleMaterials)
+  surfaces = materialSurfaces[materialIndices]
+  # A solid or invisible triangle flagged passable is passable, as a classic zone's passable solid triangles are.
+  flagged = (model["triangleFlags"][keptTriangles] & eqgFiles.passableFlag).astype(bool) & numpy.isin(surfaces, (surfaceCode["solid"], surfaceCode["invisible"]))
+  surfaces = numpy.where(flagged, surfaceCode["passable"], surfaces).astype(numpy.int8)
   placed = vertices @ placement["transform"].T + placement["position"] if "transform" in placement else eqgFiles.placeVertices(vertices, placement)
-  builder.add(placed, triangles, materialTextures[materialIndices], materialSurfaces[materialIndices], uvs, isObject, materialPainted[materialIndices])
+  builder.add(placed, triangles, materialTextures[materialIndices], surfaces, uvs, isObject, materialPainted[materialIndices])
 
 
 def addPlacements(builder, library, placements, isObject):

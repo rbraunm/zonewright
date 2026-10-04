@@ -467,7 +467,7 @@ def testMaterialsAndWorldScaledUVs(stageBlenderServer, tmp_path):
     return rock, leaf, missing, topOnly, crate, floor, summary
 
   rock, leaf, missing, topOnly, crate, floor, summary = stageBlenderServer.session(steps)
-  assert rock == {"material": "rockMaterial", "diffuseTexture": "rock.png", "normalTexture": None, "cutout": False}
+  assert rock == {"material": "rockMaterial", "diffuseTexture": "rock.png", "normalTexture": None, "cutout": False, "blockout": False}
   assert leaf["cutout"] is True
   assert "absent.png' is not an existing absolute path" in missing
   assert "ghostMaterial" not in [material["name"] for material in summary["materials"]]

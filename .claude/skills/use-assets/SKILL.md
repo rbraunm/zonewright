@@ -21,6 +21,7 @@ Work from the catalog (`docs/assetCatalog.md`), not from guesses about file name
 - Scale with `projectUVs`: the description's `worldUnitsPerRepeat`, else the measured `unitsPerRepeat` of its main use. Use `box` projection on cliffs so steep faces do not stretch.
 - Where two ground materials meet, use a transition texture (Phase 1 has no shader blending): look for `category: transition` or textures that tile one way (`seamRatios` low across, high down). Lay it as a strip: cut a contour at the strip's width from the border (`cutContours` with `distanceFrom`, and `onlyAbove` on both at a wall's foot), then `paintTransition`, which maps the texture's bottom edge onto the border and repeats it along the border; `projectUVs` would tile it down as well as across.
 - Judge in the client's light: `renderView` with the default client shading at eye height, not only in layout shading.
+- Block out with `createMaterial` greys made with `blockout: true`, so a game export refuses any left on exported faces. Before handing work off, read `checkExport` (purpose `test`) beside `renderView` with `shading: "coverage"`: they show where the base material shows, borders lack a transition strip, textures stretch or collapse, and blockout remains.
 
 ## Lights and emitters
 
@@ -30,4 +31,4 @@ Work from the catalog (`docs/assetCatalog.md`), not from guesses about file name
 
 ## Closing the loop
 
-`exportZone` writes the textures (DDS unchanged), the point lights into the .zon, and the emitters to `<zone>_EnvironmentEmitters.txt`. `surveyAssets` with the exported `path` measures the result like any client zone: compare its textures' `unitsPerRepeat` and slope use with what was intended.
+`exportZone` (from the saved file, with a purpose) writes the textures (DDS unchanged), the point lights into the .zon, and the emitters to `<zone>_EnvironmentEmitters.txt`. `surveyAssets` with the exported `path` measures the result like any client zone: compare its textures' `unitsPerRepeat` and slope use with what was intended.

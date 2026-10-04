@@ -1001,7 +1001,8 @@ def cleanedValues(mesh, values, within, areas, minimumArea):
 
 
 def paintTransition(objectName, layer, material, selector, toward, width, worldUnitsPerRepeat, onlyAbove):
-  """Paint the faces wholly within `width` of where selector's faces meet toward's, mapped up from that border and along it (stripAlong)."""
+  """Paint the faces wholly within `width` of where selector's faces meet toward's, mapped up from that border and along it (stripAlong);
+  the material is marked as a transition, so export checks count the borders it lies along as bridged."""
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   requireLayer(sceneObject, layer)
   if width <= 0 or worldUnitsPerRepeat <= 0:
@@ -1079,6 +1080,7 @@ def paintTransition(objectName, layer, material, selector, toward, width, worldU
   values = readFaceInts(mesh, layerAttributePrefix + layer)
   values[strip] = materialSlot(sceneObject, material)
   writeLayerValues(sceneObject, layer, values, strip)
+  bpy.data.materials[material][bridgeSurfacing.transitionPropertyName] = True
   mappingName = bridgeSurfacing.transitionMappingPrefix + layer
   if mappingName not in mesh.attributes:
     mesh.attributes.new(mappingName, "FLOAT_VECTOR", "CORNER")
@@ -1112,11 +1114,24 @@ def stripAlong(sceneObject, positions, faces, chainVertices, nearestAlong, loopL
   free = inStrip & reached & ~onBorder & (degrees > 0)
   failure = "The transition's mapping along its border did not settle"
   if loopLength is None:
-    return harmonicValues(first, second, weights, nearestAlong, free, failure)
+    # Nothing holds the vertices square off an open border's end along it, so spanned harmonically they drift back toward the border
+    # and squeeze the strip's last faces; kept at their nearest points, a straight strip maps evenly to its end.
+    return harmonicValues(first, second, weights, nearestAlong, free & ~squareOffEnds(positions, chainVertices, nearestAlong), failure)
   turns = 2 * math.pi * nearestAlong / loopLength
   across = harmonicValues(first, second, weights, numpy.cos(turns), free, failure)
   upward = harmonicValues(first, second, weights, numpy.sin(turns), free, failure)
   return numpy.mod(numpy.arctan2(upward, across), 2 * math.pi) * loopLength / (2 * math.pi)
+
+
+def squareOffEnds(positions, chainVertices, nearestAlong):
+  """The vertices whose nearest point of an open border is one of its ends, lying straight out from it across its end segment."""
+  square = numpy.zeros(len(positions), dtype=bool)
+  for end, before in ((chainVertices[0], chainVertices[1]), (chainVertices[-1], chainVertices[-2])):
+    direction = positions[end] - positions[before]
+    offsets = positions - positions[end]
+    atEnd = numpy.abs(nearestAlong - nearestAlong[end]) <= transitionTolerance * numpy.linalg.norm(direction)
+    square |= atEnd & (numpy.abs(offsets @ direction) <= transitionTolerance * numpy.linalg.norm(offsets, axis=1) * numpy.linalg.norm(direction))
+  return square
 
 
 def projectUVs(objectName, method, worldUnitsPerRepeat, selector, direction):

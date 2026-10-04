@@ -271,8 +271,8 @@ def measureConstruction(geometry, frames):
 # Bump a group's version when its method or output changes; only that group is recomputed.
 measuredGroups = {
   "dimensions": (1, measureDimensions),
-  "surfaces": (1, measureSurfaces),
-  "verticality": (1, measureVerticality),
+  "surfaces": (2, measureSurfaces),
+  "verticality": (2, measureVerticality),
   "content": (2, measureContent),
   "regions": (1, measureRegions),
   "construction": (1, measureConstruction),

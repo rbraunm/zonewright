@@ -20,7 +20,7 @@ import eqTextures
 import eqWorldFile
 import zoneSources
 
-zoneCacheFormat = 5
+zoneCacheFormat = 6
 readFormats = ("wld", "eqtzp", "eqgz")
 # A model's vertex light where its file gives none: no baked light and the full share of scene light, an assumption until the client's
 # lighting of EQG objects is traced.
@@ -199,12 +199,12 @@ def litColors(litBytes, vertexCount, sourceName):
 
 def placedEQGPart(model, transform, position, colors):
   """A static EQG model placed by a transform (rotation and scale) and a position, its normals turned with it, lit by colors (RGBA per
-  vertex)."""
+  vertex), with the triangles its file lets players through."""
   textures, alphaModes = eqModels.eqgMaterialTextures(model["materials"], model["triangleMaterials"], {})
   normals = model["normals"] @ numpy.linalg.inv(transform)
   normals /= numpy.maximum(numpy.linalg.norm(normals, axis=1, keepdims=True), 1e-12)
   return eqModels.meshPart(model["vertices"] @ transform.T + position, model["triangles"], eqModels.staticEQGUVs(model["uvs"]), textures, alphaModes,
-    {"normals": normals, "colors": colors}, eqModels.eqgLiquids(model["materials"], model["triangleMaterials"]))
+    {"normals": normals, "colors": colors}, eqModels.eqgLiquids(model["materials"], model["triangleMaterials"]), model["triangleFlags"] & eqgFiles.passableFlag)
 
 
 class TerrainObjects:
@@ -429,6 +429,36 @@ def buildClientEQGZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
   parts, details = eqgZoneParts(library, eqgFiles.parseZone(zonBytes, zoneName), library.archives[0], label)
   written = eqModels.writePartsCache(zoneFolder, parts, library.archives, label)
   return details | {"looseZoneFile": "zonPath" in source, "missingAssetArchives": missingArchives} | written
+
+
+def zoneFileBoundaries(archivePath):
+  """What an EQG zone archive holds of its player boundaries: its terrain's invisible walls (material -1 triangles that block, in world
+  positions, or None without any); its ATP_ regions as zone lines, those turned listed apart since the client's use of region turns
+  is not traced; and how many triangles each model lets players through."""
+  archive = eqArchive.EQArchive(archivePath)
+  zoneFiles = [name for name in archive.entries if name.endswith(".zon")]
+  if len(zoneFiles) != 1:
+    raise ValueError(f"{archivePath.name} holds {len(zoneFiles)} .zon files; a zone archive holds one")
+  zone = eqgFiles.parseZone(archive.read(zoneFiles[0]), zoneFiles[0])
+  models = {name: eqgFiles.parseModel(archive.read(name), f"{archivePath.name}:{name}") for name in zone["modelNames"] if name in archive.entries}
+  positions, triangles, offset = [], [], 0
+  for placement in zone["placements"]:
+    model = models.get(placement["model"])
+    if model is None or not placement["model"].endswith(".ter"):
+      continue
+    walls = (model["triangleMaterials"] == eqgFiles.noMaterial) & ((model["triangleFlags"] & eqgFiles.passableFlag) == 0)
+    if walls.any():
+      used, remapped = numpy.unique(model["triangles"][walls], return_inverse=True)
+      positions.append(eqgFiles.placeVertices(model["vertices"][used], placement))
+      triangles.append(remapped.reshape(-1, 3) + offset)
+      offset += len(used)
+  atp = [region for region in zone["regions"] if region["name"].upper().startswith("ATP_")]
+  return {
+    "walls": {"positions": numpy.concatenate(positions).tolist(), "triangles": numpy.concatenate(triangles).tolist()} if positions else None,
+    "zoneLines": [{"name": region["name"], "center": list(region["center"]), "halfExtents": list(region["halfExtents"])} for region in atp if not any(region["rotation"])],
+    "zoneLinesTurned": [region["name"] for region in atp if any(region["rotation"])],
+    "passableTriangles": {name: int((model["triangleFlags"] & eqgFiles.passableFlag).astype(bool).sum()) for name, model in models.items() if (model["triangleFlags"] & eqgFiles.passableFlag).any()},
+  }
 
 
 def buildZoneFile(cacheRoot, archivePath):
