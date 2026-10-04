@@ -618,7 +618,9 @@ def followContours(objectName, selector):
 def splitAtPeaks(meshEditor, cutting, values, points, tree, level):
   """Split each edge of the cut faces whose ends lie on one side of a distance level that the distance between them passes (an edge
   up a wall one cell wide, both ends on the border, passes a level below half the wall's height) where it lies farthest past the
-  level, and triangulate the faces around the new vertex, so the level crosses each edge at most once. Returns how many it split."""
+  level, and triangulate the faces around the new vertices, so the level crosses each edge at most once. A face that gained two new
+  vertices is first split between them: both lie past the level, and a diagonal from one end of the wall to the other would pass it
+  twice again. Returns how many edges it split."""
   splits = []
   for edge in sorted({edge for face in cutting for edge in face.edges}, key=lambda edge: edge.index):
     start, end = edge.verts
@@ -635,7 +637,7 @@ def splitAtPeaks(meshEditor, cutting, values, points, tree, level):
     farthest = int(numpy.argmax(-numpy.sign(first) * past))
     if numpy.sign(past[farthest]) != numpy.sign(first):
       splits.append((edge, start, float(fractions[farthest]), float(past[farthest]) + level))
-  touched = set()
+  touched, inserted = set(), set()
   for edge, start, fraction, distance in splits:
     end = edge.other_vert(start)
     _, vertex = bmesh.utils.edge_split(edge, start, fraction)
@@ -643,6 +645,13 @@ def splitAtPeaks(meshEditor, cutting, values, points, tree, level):
     values.append(distance)
     points.append(points[start.index] + fraction * (points[end.index] - points[start.index]))
     touched.update(vertex.link_faces)
+    inserted.add(vertex)
+  for face in sorted(touched, key=lambda face: face.index):
+    peaks = [vertex for vertex in face.verts if vertex in inserted]
+    if len(peaks) >= 2 and not any(peaks[1] in edge.verts for edge in peaks[0].link_edges if edge in face.edges):
+      newFace, _ = bmesh.utils.face_split(face, peaks[0], peaks[1])
+      touched.add(newFace)
+  meshEditor.faces.index_update()
   if touched:
     triangulated = bmesh.ops.triangulate(meshEditor, faces=sorted(touched, key=lambda face: face.index), quad_method="BEAUTY", ngon_method="BEAUTY")
     cutting.update(triangulated["faces"])
