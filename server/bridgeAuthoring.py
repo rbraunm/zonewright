@@ -22,11 +22,6 @@ regionCollectionName = "regions"
 layerOrderProperty = bridgeMeshAccess.surfaceLayersProperty
 baseAttributeName = "zonewrightSurfaceBase"
 layerAttributePrefix = "zonewrightSurface:"
-# Once a layer maps a transition its own way, the mesh's own UVs are kept here per face corner and the UV map is composed from them
-# and the transition mappings, as materials are from the layers; each layer's transition mapping is kept under the prefix, not a
-# number where the layer maps nothing of its own. Three-component vectors, so Blender does not take them for UV maps.
-baseMappingName = "zonewrightSurfaceBaseUV"
-transitionMappingPrefix = "zonewrightTransitionUV:"
 # Each border edge a conform run put on its evened line keeps the smoothing it was evened at, so a later run at that smoothing or
 # less leaves it as it is: evening a line that is already even still moves it (a narrow stroke's ends round off further each time).
 # Paint changed beside an edge clears its record.
@@ -177,7 +172,7 @@ def writeCornerVectors(mesh, attributeName, vectors):
 
 def mappingAttributes(mesh):
   """The names of the corner mappings a layered mesh keeps besides its UV maps: its base mapping and its layers' transition mappings."""
-  return [attribute.name for attribute in mesh.attributes if attribute.name == baseMappingName or attribute.name.startswith(transitionMappingPrefix)]
+  return [attribute.name for attribute in mesh.attributes if attribute.name == bridgeSurfacing.baseMappingName or attribute.name.startswith(bridgeSurfacing.transitionMappingPrefix)]
 
 
 def compose(sceneObject):
@@ -185,12 +180,12 @@ def compose(sceneObject):
   mesh = sceneObject.data
   shown, deciders = shownSurface(sceneObject)
   mesh.polygons.foreach_set("material_index", shown)
-  if baseMappingName in mesh.attributes:
+  if bridgeSurfacing.baseMappingName in mesh.attributes:
     loopTotals, _ = bridgeMeshAccess.faceLoops(sceneObject)
     loopDeciders = numpy.repeat(deciders, loopTotals)
-    mapping = readCornerVectors(mesh, baseMappingName)
+    mapping = readCornerVectors(mesh, bridgeSurfacing.baseMappingName)
     for position, layer in enumerate(bridgeMeshAccess.surfaceLayers(sceneObject)):
-      name = transitionMappingPrefix + layer["name"]
+      name = bridgeSurfacing.transitionMappingPrefix + layer["name"]
       if name in mesh.attributes:
         own = readCornerVectors(mesh, name)
         showing = (loopDeciders == position) & ~numpy.isnan(own[:, 0])
@@ -214,7 +209,7 @@ def writeLayerValues(sceneObject, layer, values, replaced):
     return
   loopTotals, _ = bridgeMeshAccess.faceLoops(sceneObject)
   replacedLoops = numpy.repeat(replaced, loopTotals)
-  name = transitionMappingPrefix + layer
+  name = bridgeSurfacing.transitionMappingPrefix + layer
   if name in mesh.attributes:
     mapping = readCornerVectors(mesh, name)
     mapping[replacedLoops] = numpy.nan
@@ -281,13 +276,13 @@ def removeSurfaceLayer(objectName, name):
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   layers = [layer for layer in requireLayer(sceneObject, name) if layer["name"] != name]
   mesh = sceneObject.data
-  for attributeName in (layerAttributePrefix + name, transitionMappingPrefix + name, conformedPrefix + name):
+  for attributeName in (layerAttributePrefix + name, bridgeSurfacing.transitionMappingPrefix + name, conformedPrefix + name):
     if attributeName in mesh.attributes:
       mesh.attributes.remove(mesh.attributes[attributeName])
   sceneObject[layerOrderProperty] = json.dumps(layers)
   described = compose(sceneObject)
   if not layers:
-    for attributeName in (baseAttributeName, baseMappingName):
+    for attributeName in (baseAttributeName, bridgeSurfacing.baseMappingName):
       if attributeName in mesh.attributes:
         mesh.attributes.remove(mesh.attributes[attributeName])
     del sceneObject[layerOrderProperty]
@@ -1076,15 +1071,15 @@ def paintTransition(objectName, layer, material, selector, toward, width, worldU
   along = alongLoops[stripLoops] / repeats[loopChains[stripLoops]]
   if bridgeSurfacing.uvLayerName not in mesh.uv_layers:
     mesh.uv_layers.new(name=bridgeSurfacing.uvLayerName)
-  if baseMappingName not in mesh.attributes:
+  if bridgeSurfacing.baseMappingName not in mesh.attributes:
     uvs = numpy.empty(len(mesh.loops) * 2)
     mesh.uv_layers[bridgeSurfacing.uvLayerName].data.foreach_get("uv", uvs)
-    mesh.attributes.new(baseMappingName, "FLOAT_VECTOR", "CORNER")
-    writeCornerVectors(mesh, baseMappingName, numpy.column_stack([uvs.reshape(-1, 2), numpy.zeros(len(mesh.loops))]))
+    mesh.attributes.new(bridgeSurfacing.baseMappingName, "FLOAT_VECTOR", "CORNER")
+    writeCornerVectors(mesh, bridgeSurfacing.baseMappingName, numpy.column_stack([uvs.reshape(-1, 2), numpy.zeros(len(mesh.loops))]))
   values = readFaceInts(mesh, layerAttributePrefix + layer)
   values[strip] = materialSlot(sceneObject, material)
   writeLayerValues(sceneObject, layer, values, strip)
-  mappingName = transitionMappingPrefix + layer
+  mappingName = bridgeSurfacing.transitionMappingPrefix + layer
   if mappingName not in mesh.attributes:
     mesh.attributes.new(mappingName, "FLOAT_VECTOR", "CORNER")
     writeCornerVectors(mesh, mappingName, numpy.full((len(mesh.loops), 3), numpy.nan))
@@ -1129,10 +1124,10 @@ def projectUVs(objectName, method, worldUnitsPerRepeat, selector, direction):
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   faceMask, selectedLoops, projected = bridgeSurfacing.projectedUVs(sceneObject, method, worldUnitsPerRepeat, selector, direction)
   mesh = sceneObject.data
-  if baseMappingName in mesh.attributes:
-    mapping = readCornerVectors(mesh, baseMappingName)
+  if bridgeSurfacing.baseMappingName in mesh.attributes:
+    mapping = readCornerVectors(mesh, bridgeSurfacing.baseMappingName)
     mapping[selectedLoops, :2] = projected[selectedLoops]
-    writeCornerVectors(mesh, baseMappingName, mapping)
+    writeCornerVectors(mesh, bridgeSurfacing.baseMappingName, mapping)
     compose(sceneObject)
   else:
     if bridgeSurfacing.uvLayerName not in mesh.uv_layers:

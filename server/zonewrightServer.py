@@ -1334,17 +1334,18 @@ async def deleteFaces(context: Context, objectName: str, selector: dict):
 
 @guardedTool(description=(
   "Extrude the selected faces of a mesh by `distance` units along their average normal, or along `direction`. The new side faces take"
-  " the material of the faces beside them and are box-mapped at the density box projection gives that material on the mesh (mappedFaces),"
-  " so a box-projected mesh carries on its texture without a seam; faces left unmapped, where the mesh has no UV layer or the material"
-  " no UV area, are listed with why (unmappedFaces)." + selectorHelp))
+  " the material of the faces beside them and are box-mapped at the density box projection gives that material on the mesh (mappedFaces;"
+  " on a surfaced mesh, as the mapping beneath its layers' transitions, so it stays as the layers compose again), so a box-projected mesh"
+  " carries on its texture without a seam; faces left unmapped, where the mesh has no UV layer or the material no UV area, are listed"
+  " with why (unmappedFaces)." + selectorHelp))
 async def extrudeFaces(context: Context, objectName: str, selector: dict, distance: float, direction: list[float] | None = None):
   return await callBridge(context, "extrudeFaces", {"objectName": objectName, "selector": selector, "distance": distance, "direction": direction})
 
 
 @guardedTool(description=(
   "Inset the selected faces of a mesh as one region by `thickness`, pushed in or out by `depth`. The inset faces keep their texture as"
-  " it lay; the new rim faces are box-mapped at the density box projection gives their material on the mesh (mappedFaces), or listed"
-  " with why they could not be (unmappedFaces)." + selectorHelp))
+  " it lay; the new rim faces are box-mapped at the density box projection gives their material on the mesh (mappedFaces; on a surfaced"
+  " mesh, as the mapping beneath its layers' transitions), or listed with why they could not be (unmappedFaces)." + selectorHelp))
 async def insetFaces(context: Context, objectName: str, selector: dict, thickness: float, depth: float = 0.0):
   return await callBridge(context, "insetFaces", {"objectName": objectName, "selector": selector, "thickness": thickness, "depth": depth})
 
@@ -1364,7 +1365,7 @@ async def booleanCut(context: Context, objectName: str, cutterName: str, operati
   """Apply a boolean (DIFFERENCE, UNION, INTERSECT) of a cutter mesh to a mesh, for cave mouths and openings; the cutter is deleted
   unless keepCutter. The faces the cut makes (madeFaces) take the material and surfacing of the nearest face the cutter crosses (a cave
   cut into a cliff is lined with the cliff's material) and are box-mapped at that material's density on the mesh (mappedFaces, or
-  unmappedFaces with why); no material slot is added. A cutter that crosses none of the mesh's faces is refused. A DIFFERENCE that keeps
+  unmappedFaces with why; on a surfaced mesh, as the mapping beneath its layers' transitions); no material slot is added. A cutter that crosses none of the mesh's faces is refused. A DIFFERENCE that keeps
   none of the cutter's faces left an opening with nothing lining it, through an open surface that encloses nothing (a terrain sheet, a
   plane), and its result carries a warning saying so."""
   return await callBridge(context, "booleanCut", {"objectName": objectName, "cutterName": cutterName, "operation": operation, "keepCutter": keepCutter})

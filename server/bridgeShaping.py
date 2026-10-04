@@ -440,8 +440,26 @@ def materialDensities(sceneObject):
   return {int(slot): bridgeMeshAccess.worldUnitsPerRepeat(areas.box[areas.materials == slot].sum(), areas.uv[areas.materials == slot].sum()) for slot in numpy.unique(areas.materials)}
 
 
+def keepLayeredMapping(meshEditor, faces):
+  """On a mesh whose surfacing layers compose its UV map (bridgeSurfacing.baseMappingName), keep the faces' mapping as they show it now
+  in its base mapping and out of every transition's, so the layers show it again each time they compose."""
+  vectorLayers = meshEditor.loops.layers.float_vector
+  base = vectorLayers.get(bridgeSurfacing.baseMappingName)
+  if base is None:
+    return
+  uvLayer = meshEditor.loops.layers.uv.active
+  transitions = [layer for name, layer in vectorLayers.items() if name.startswith(bridgeSurfacing.transitionMappingPrefix)]
+  for face in faces:
+    for loop in face.loops:
+      u, v = loop[uvLayer].uv
+      loop[base] = (u, v, 0.0)
+      for layer in transitions:
+        loop[layer] = (math.nan, math.nan, math.nan)
+
+
 def mapNewFaces(meshEditor, sceneObject, faces, densities):
-  """Box-map the faces an edit made at their material's density before it (materialDensities): (mapped, unmapped and why) by material."""
+  """Box-map the faces an edit made at their material's density before it (materialDensities), kept so through surfacing layers
+  (keepLayeredMapping): (mapped, unmapped and why) by material."""
   slots = sceneObject.material_slots
 
   def materialName(slot):
@@ -466,6 +484,7 @@ def mapNewFaces(meshEditor, sceneObject, faces, densities):
       point = numpy.array(matrix @ loop.vert.co)
       loop[uvLayer].uv = (float(point @ across) / density, float(point @ along) / density)
     mapped[face.material_index] += 1
+  keepLayeredMapping(meshEditor, faces)
   return (
     [{"material": materialName(slot), "faces": count, "worldUnitsPerRepeat": round(densities[slot], 3)} for slot, count in sorted(mapped.items())],
     [{"material": materialName(slot), "faces": count, "reason": "the material's faces on the mesh had no UV area to take a density from"} for slot, count in sorted(unmapped.items())],

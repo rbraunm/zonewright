@@ -285,6 +285,58 @@ def testExtrudedFacesOfARoundMeshContinueItsBoxMapping(stageBlenderServer, tmp_p
   assert len(seam) == 32 and all(len(uvs) == 2 and uvs[0] == uvs[1] for uvs in seam.values())
 
 
+wallMappingCode = """
+mesh = bpy.data.objects['ground'].data
+uvs = mesh.uv_layers.active.data
+result = [
+  [mesh.materials[polygon.material_index].name, [list(uvs[index].uv) for index in polygon.loop_indices]] for polygon in mesh.polygons
+  if abs(polygon.normal.z) < 0.1
+]
+"""
+
+
+def testExtrudedFacesKeepTheirMappingWhenSurfacingLayersComposeAgain(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await freshScene(session)
+    for name, color in (("sand", (200, 180, 120, 255)), ("stone", (120, 80, 60, 255)), ("blend", (230, 120, 40, 255))):
+      await session.expectSuccess("createMaterial", {"name": name, "diffuseTexture": str(writePNG(tmp_path / f"{name}.png", 4, 4, color))})
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [96, 96], "spacing": 8, "location": [0, 0, 0]})
+    await session.expectSuccess("projectUVs", {"objectName": "ground", "method": "box", "worldUnitsPerRepeat": 16})
+    await session.expectSuccess("addSurfaceLayer", {"objectName": "ground", "name": "ground"})
+    await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "ground", "material": "sand", "selector": {"all": True}})
+    block = {"box": {"minimum": [-17, -17, -1], "maximum": [17, 17, 1]}}
+    await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "ground", "material": "stone", "selector": block})
+    await session.expectSuccess("addSurfaceLayer", {"objectName": "ground", "name": "blend"})
+    strip = await session.expectSuccess("paintTransition", {
+      "objectName": "ground", "layer": "blend", "material": "blend", "selector": {"material": "stone"}, "toward": {"material": "sand"},
+      "width": 8, "worldUnitsPerRepeat": 16,
+    })
+    extruded = await session.expectSuccess("extrudeFaces", {"objectName": "ground", "selector": block, "distance": 12, "direction": [0, 0, 1]})
+    walls = (await session.expectSuccess("runPython", {"code": wallMappingCode}))["result"]
+    await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "ground", "material": "sand", "selector": {"box": {"minimum": [40, 40, -1], "maximum": [48, 48, 1]}}})
+    recomposed = (await session.expectSuccess("runPython", {"code": wallMappingCode}))["result"]
+    return strip, extruded, walls, recomposed
+
+  strip, extruded, walls, recomposed = stageBlenderServer.session(steps)
+
+  def uvArea(corners):
+    return abs(sum(u0 * v1 - u1 * v0 for (u0, v0), (u1, v1) in zip(corners, corners[1:] + corners[:1]))) / 2
+
+  # The block's outer ring of stone carries a transition with its own mapping; the 16 walls the extrusion grows from it, 8 wide and 12
+  # tall, are box-mapped at the density of the material each takes.
+  densities = {entry["material"]: entry["worldUnitsPerRepeat"] for entry in extruded["mappedFaces"]}
+  assert strip["painted"] > 0 and "blend" in densities and sum(entry["faces"] for entry in extruded["mappedFaces"]) == 16
+  assert extruded["unmappedFaces"] == [] and len(walls) == 16
+  assert all(abs(uvArea(corners) - 8 * 12 / densities[material] ** 2) < 1e-3 * uvArea(corners) for material, corners in walls)
+  # Painting elsewhere composes every face's mapping from the layers again: the walls keep theirs, neither the corners' copies from the
+  # faces they grew from nor the transition's.
+  assert [material for material, _ in recomposed] == [material for material, _ in walls]
+  assert all(
+    abs(a - b) < 1e-6 for (_, before), (_, after) in zip(walls, recomposed) for cornerBefore, cornerAfter in zip(before, after)
+    for a, b in zip(cornerBefore, cornerAfter)
+  )
+
+
 blankLayerCode = """
 layer = bpy.data.objects['blank'].data.uv_layers.new(name='blank')
 layer.data.foreach_set('uv', [0.0] * (2 * len(layer.data)))

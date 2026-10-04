@@ -11,6 +11,11 @@ import bridgeMeshAccess
 
 projectionMethods = ("planar", "box")
 uvLayerName = "UVMap"
+# Once a layer maps a transition its own way, the mesh's own UVs are kept here per face corner and the UV map is composed from them
+# and the transition mappings, as materials are from the layers; each layer's transition mapping is kept under the prefix, not a
+# number where the layer maps nothing of its own. Three-component vectors, so Blender does not take them for UV maps.
+baseMappingName = "zonewrightSurfaceBaseUV"
+transitionMappingPrefix = "zonewrightTransitionUV:"
 # What zone export reads a createMaterial material by.
 diffuseNodeName = "zonewrightDiffuse"
 normalNodeName = "zonewrightNormal"
