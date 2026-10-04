@@ -12,6 +12,7 @@ import bridgeClientLight
 import bridgeMeshAccess
 import bridgeModels
 import skyDrawing
+from playerScale import swimEyeAboveSurface
 
 requiredZoneKeys = (
   "ambientColor", "specialAmbientColor", "bounceColor", "sunColor", "sunAzimuthDegrees", "sunElevationDegrees", "fogColor", "fogStart", "fogEnd",
@@ -195,23 +196,30 @@ def placeCamera(preview, view, figureModel):
     return placeMapCamera(preview, view["map"])
   if viewKeys == {"standAt", "headingDegrees", "pitchDegrees"}:
     standAt = view["standAt"]
+    surfaces = bridgeMeshAccess.PlayerSurfaces()
     if len(standAt) == 2:
       bottom, top = sceneHeightRange(preview)
-      groundHit = preview.rayCast(mathutils.Vector((*standAt, top + mapClearance)), mathutils.Vector((0, 0, -1)), top - bottom + 2 * mapClearance)
-      if groundHit is None:
+      ground = surfaces.footingBelow(mathutils.Vector((*standAt, top + mapClearance)), top - bottom + 2 * mapClearance)
+      if ground is None:
         raise ValueError(f"No ground below {list(standAt)}")
     elif len(standAt) == 3:
-      groundHit = preview.rayCast(mathutils.Vector(standAt) + mathutils.Vector((0, 0, 1)), mathutils.Vector((0, 0, -1)), groundSearchDistance)
-      if groundHit is None:
+      ground = surfaces.footingBelow(mathutils.Vector(standAt) + mathutils.Vector((0, 0, 1)), groundSearchDistance)
+      if ground is None:
         raise ValueError(f"No ground within {groundSearchDistance} units below {list(standAt)}")
     else:
       raise ValueError(f"standAt is [x, y] or [x, y, z], got {standAt!r}")
-    eye = groundHit[0] + mathutils.Vector((0, 0, eyeHeight))
+    # Where the water stands over the eye, the player swims, eye at the surface.
+    waterDepth = bridgeMeshAccess.waterDepthAt(bridgeMeshAccess.swimSurfaces(), ground)
+    swimming = waterDepth is not None and waterDepth > eyeHeight - swimEyeAboveSurface
+    eye = ground + mathutils.Vector((0, 0, waterDepth + swimEyeAboveSurface if swimming else eyeHeight))
     forward = headingPitchForward(view["headingDegrees"], view["pitchDegrees"])
     camera.location, camera.rotation_quaternion = eye, lookRotation(forward)
-    description = {"eye": list(eye), "forward": list(forward), "ground": list(groundHit[0]), "figure": None}
+    description = {
+      "eye": list(eye), "forward": list(forward), "ground": list(ground), "waterDepth": None if waterDepth is None else round(waterDepth, 2),
+      "swimming": swimming, "figure": None,
+    }
     if figureModel is not None:
-      description["figure"] = list(placeScaleFigure(preview, groundHit[0], view["headingDegrees"], figureModel))
+      description["figure"] = list(placeScaleFigure(preview, surfaces, ground, view["headingDegrees"], figureModel))
     return description
   raise ValueError(f"A view is {{camera}}, {{eye, target}}, {{map}}, or {{standAt, headingDegrees, pitchDegrees}}; got keys {sorted(viewKeys)}")
 
@@ -304,24 +312,26 @@ def placeMapCamera(preview, mapView):
   return {"mapCenter": list(mapView["center"]), "mapWidth": mapView["width"], "mapHeight": mapView["width"] * renderHeight / renderWidth, "unitsPerPixel": mapView["width"] / renderWidth, "figure": None}
 
 
-def placeScaleFigure(preview, ground, headingDegrees, figureModel):
-  """Walk ahead along the ground, as a player would, until figureDistance or a wall, drop, or climb stops the walk; then stand the figure there."""
+def placeScaleFigure(preview, surfaces, ground, headingDegrees, figureModel):
+  """Walk ahead along what players stand on (surfaces, bridgeMeshAccess.PlayerSurfaces), as a player would, until figureDistance or a
+  wall, drop, or climb stops the walk; then stand the figure there."""
   heading = math.radians(headingDegrees)
   ahead = mathutils.Vector((math.sin(heading), math.cos(heading), 0))
   side = mathutils.Vector((math.cos(heading), -math.sin(heading), 0))
+  down = mathutils.Vector((0, 0, -1))
   position = ground.copy()
-  sideHit = preview.rayCast(position + side * figureSideOffset + mathutils.Vector((0, 0, figureStepClimb)), mathutils.Vector((0, 0, -1)), figureStepClimb + figureStepDrop)
+  sideHit = surfaces.cast(position + side * figureSideOffset + mathutils.Vector((0, 0, figureStepClimb)), down, figureStepClimb + figureStepDrop)
   if sideHit is not None:
-    position = sideHit[0]
+    position = sideHit
   walked = 0.0
   while walked < figureDistance:
     chest = position + mathutils.Vector((0, 0, figureModel["avatarHeight"]))
-    if preview.rayCast(chest, ahead, figureStep + figureClearance) is not None:
+    if surfaces.cast(chest, ahead, figureStep + figureClearance) is not None:
       break
-    nextGround = preview.rayCast(position + ahead * figureStep + mathutils.Vector((0, 0, figureStepClimb)), mathutils.Vector((0, 0, -1)), figureStepClimb + figureStepDrop)
+    nextGround = surfaces.cast(position + ahead * figureStep + mathutils.Vector((0, 0, figureStepClimb)), down, figureStepClimb + figureStepDrop)
     if nextGround is None:
       break
-    position = nextGround[0]
+    position = nextGround
     walked += figureStep
   if walked < figureMinimumDistance:
     raise ValueError(f"No room for the scale figure: the ground ahead stops after {walked:.0f} units")

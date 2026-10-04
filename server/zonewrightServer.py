@@ -636,7 +636,7 @@ async def setZoneProperties(
 
 @guardedTool()
 async def renderView(context: Context, view: dict, shading: str = "client", bandHeight: float = 50.0, guides: bool = True):
-  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground at [x,y], or with z on the ground within 50 units below it, for caves and under overhangs; heading 0 = +Y, clockwise; eye 5.5 above the ground; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog. shading "client" draws the zone as the client does; "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout. Guides (plot outlines) draw unless guides is false."""
+  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], or with z on the ground within 50 units below it, for caves and under overhangs; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog. shading "client" draws the zone as the client does; "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout. Guides (plot outlines) draw unless guides is false."""
   outputPath = newRenderPath()
   figureModel = None
   zone = await callBridge(context, "getZoneProperties", {})
@@ -1175,11 +1175,13 @@ async def measure(context: Context, points: list[list[float]], snapToSurface: bo
 
 @guardedTool()
 async def walkRoute(context: Context, path: list[list[float]], sampleSpacing: float = 4.0):
-  """Walk a route as a player would, over the zone's rendered surfaces (terrain and placed objects): from its first point,
+  """Walk a route as a player would, over what players stand on (rendered meshes and collection instances; not water, which is waded
+  or swum, nor guides, regions, spawns, or doors, taken as open): from its first point,
   following the footing underfoot past each point of `path` [[x, y, z], ...], whose heights only need to be near the footing (so a
   route can run over an arch or under it). Judged for a player 6 units tall who walks slopes up to 60 degrees: the route's length
   across the ground, its steepest slope, its narrowest footing (how far it runs to each side before a drop or a wall; null beyond 60),
-  its lowest headroom, every problem (too steep, too low, a drop, a rise too steep to climb), and a profile along the way. Use it on
+  its lowest headroom, its deepest water over the footing, every problem (too steep, too low, a drop, a rise too steep to climb), and a
+  profile along the way (each row with the water depth over its footing, or null). Use it on
   decks, ramps, ledges, and the ways into an area."""
   return await callBridge(context, "walkRoute", {"path": path, "sampleSpacing": sampleSpacing})
 

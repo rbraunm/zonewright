@@ -11,6 +11,7 @@ import mathutils.bvhtree
 import numpy
 
 import bridgeExport
+import bridgeMeshAccess
 from playerScale import playerHeight, walkableNormalZ
 
 # How far a route looks to each side for a drop or a wall, and how finely; how far above for a ceiling; and how far below it still
@@ -70,50 +71,6 @@ def collectConstruction(outputPath):
   return {"arrays": outputPath, "textureNames": list(textureNames), "placements": placements}
 
 
-class SolidSurfaces:
-  """Ray casts against every rendered mesh in the scene (terrain and placed objects), not regions or other helpers."""
-
-  def __init__(self):
-    depsgraph = bpy.context.evaluated_depsgraph_get()
-    self.members = [
-      (sceneObject.matrix_world.copy(), sceneObject.matrix_world.inverted(), mathutils.bvhtree.BVHTree.FromObject(sceneObject, depsgraph))
-      for sceneObject in bpy.context.scene.objects if sceneObject.type == "MESH" and not sceneObject.hide_render
-    ]
-    if not self.members:
-      raise ValueError("The scene has no rendered meshes to walk on")
-
-  def cast(self, origin, direction, distance):
-    """The nearest world hit point within distance, or None."""
-    hit = self.castWithNormal(origin, direction, distance)
-    return hit[0] if hit else None
-
-  def footingBelow(self, origin, distance):
-    """The first surface below origin within distance that faces up; an underside met first means origin lies inside rock, and the
-    search goes on through it."""
-    down = mathutils.Vector((0, 0, -1))
-    while True:
-      hit = self.castWithNormal(origin, down, distance)
-      if hit is None:
-        return None
-      if hit[1].z > 0:
-        return hit[0]
-      distance -= origin.z - hit[0].z + 0.01
-      origin = hit[0] + down * 0.01
-
-  def castWithNormal(self, origin, direction, distance):
-    """The nearest world hit point within distance and the normal of the face hit there, or None."""
-    nearest = None
-    for matrix, inverse, tree in self.members:
-      location, normal, _, _ = tree.ray_cast(inverse @ origin, (inverse.to_3x3() @ direction).normalized())
-      if location is None:
-        continue
-      hit = matrix @ location
-      along = (hit - origin).length
-      if along <= distance and (nearest is None or along < nearest[0]):
-        nearest = (along, hit, (matrix.to_3x3().inverted().transposed() @ normal).normalized())
-    return nearest[1:] if nearest else None
-
-
 def routeSamples(path, sampleSpacing):
   """Points every sampleSpacing units along the route, measured across the ground, with the route's horizontal direction at each."""
   points, directions = [], []
@@ -146,7 +103,8 @@ def walkRoute(path, sampleSpacing):
     raise ValueError(f"A route is at least two [x, y, z] points, got {path!r}")
   if sampleSpacing <= 0:
     raise ValueError(f"sampleSpacing must be positive, got {sampleSpacing}")
-  surfaces = SolidSurfaces()
+  surfaces = bridgeMeshAccess.PlayerSurfaces()
+  water = bridgeMeshAccess.swimSurfaces()
   steepestWalkable = math.degrees(math.acos(walkableNormalZ))
   climb = sampleSpacing * math.tan(math.radians(steepestWalkable)) + 0.5
   up = mathutils.Vector((0, 0, 1))
@@ -176,7 +134,11 @@ def walkRoute(path, sampleSpacing):
     headroom = None if ceiling is None else ceiling.z - footing.z
     side = mathutils.Vector((-direction.y, direction.x, 0.0))
     left, right = sideClearance(surfaces, footing, side, climb), sideClearance(surfaces, footing, -side, climb)
-    rows.append({"distance": round(travelled, 1), "at": roundVector(footing), "slopeDegrees": round(slope, 1), "headroom": None if headroom is None else round(headroom, 1), "left": left, "right": right})
+    waterDepth = bridgeMeshAccess.waterDepthAt(water, footing)
+    rows.append({
+      "distance": round(travelled, 1), "at": roundVector(footing), "slopeDegrees": round(slope, 1), "headroom": None if headroom is None else round(headroom, 1),
+      "left": left, "right": right, "waterDepth": None if waterDepth is None else round(waterDepth, 1),
+    })
     if slope > steepestWalkable:
       problems.append(f"slope {slope:.0f} degrees at {roundVector(footing)}, steeper than {steepestWalkable:.0f}")
     if headroom is not None and headroom < playerHeight:
@@ -185,12 +147,14 @@ def walkRoute(path, sampleSpacing):
   narrowest = int(numpy.argmin(widths))
   steepest = max(range(len(rows)), key=lambda row: rows[row]["slopeDegrees"])
   covered = [row for row in rows if row["headroom"] is not None]
+  wet = [row for row in rows if row["waterDepth"] is not None]
   stride = max(1, math.ceil(len(rows) / routeProfileRows))
   return {
     "length": round(travelled, 1), "samples": len(rows), "walkable": not problems, "problems": problems,
     "steepest": {"slopeDegrees": rows[steepest]["slopeDegrees"], "at": rows[steepest]["at"]},
     "narrowest": {"width": round(widths[narrowest], 1), "at": rows[narrowest]["at"], "left": rows[narrowest]["left"], "right": rows[narrowest]["right"]},
     "lowestHeadroom": min(({"headroom": row["headroom"], "at": row["at"]} for row in covered), key=lambda item: item["headroom"]) if covered else None,
+    "deepestWater": max(({"depth": row["waterDepth"], "at": row["at"]} for row in wet), key=lambda item: item["depth"]) if wet else None,
     "profile": rows[::stride],
   }
 

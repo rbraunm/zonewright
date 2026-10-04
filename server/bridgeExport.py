@@ -43,13 +43,9 @@ def exclusionReason(sceneObject):
     return "a region: the plan"
   if sceneObject.hide_render:
     return "hidden from renders"
-  if sceneObject.type == "EMPTY" and not bridgeEnvironment.isEmitter(sceneObject) and not isCollectionInstance(sceneObject):
+  if sceneObject.type == "EMPTY" and not bridgeEnvironment.isEmitter(sceneObject) and not bridgeMeshAccess.isCollectionInstance(sceneObject):
     return "an empty with nothing to export"
   return None
-
-
-def isCollectionInstance(sceneObject):
-  return sceneObject.type == "EMPTY" and sceneObject.instance_type == "COLLECTION" and sceneObject.instance_collection is not None
 
 
 def exportedObjects():
@@ -74,7 +70,7 @@ def exportedObjects():
       shipped.append((sceneObject, "emitter"))
     elif sceneObject.type == "MESH":
       shipped.append((sceneObject, "mesh"))
-    elif isCollectionInstance(sceneObject):
+    elif bridgeMeshAccess.isCollectionInstance(sceneObject):
       shipped.append((sceneObject, "instance"))
     else:
       raise ValueError(f"'{sceneObject.name}' is a {sceneObject.type}; zone export takes meshes and collection instances")

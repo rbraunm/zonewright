@@ -97,11 +97,98 @@ def isDesignAid(sceneObject):
   return guideProperty in sceneObject or plotBorderProperty in sceneObject
 
 
-def worldTriangles(sceneObjects):
-  """The evaluated meshes of objects as world positions and triangles, all in one."""
+def isCollectionInstance(sceneObject):
+  return sceneObject.type == "EMPTY" and sceneObject.instance_type == "COLLECTION" and sceneObject.instance_collection is not None
+
+
+def isPlayerSolid(sceneObject):
+  """Whether players stand on and are blocked by an object: rendered meshes and collection instances, but not guides, plot borders,
+  regions, water bodies (swum, not stood on), spawns (players pass through them), or doors (taken as open)."""
+  if sceneObject.hide_render or isDesignAid(sceneObject) or regionIntentProperty in sceneObject or waterProperty in sceneObject:
+    return False
+  if sceneObject.get(clientContentProperty) in ("spawn", "door"):
+    return False
+  return sceneObject.type == "MESH" or isCollectionInstance(sceneObject)
+
+
+def playerSolidParts():
+  """Each mesh players stand on and are blocked by, with its world matrix; a collection instance gives each of its meshes."""
+  parts = []
+  for sceneObject in bpy.context.scene.objects:
+    if not isPlayerSolid(sceneObject):
+      continue
+    if sceneObject.type == "MESH":
+      parts.append((sceneObject, sceneObject.matrix_world.copy()))
+      continue
+    collection = sceneObject.instance_collection
+    placement = sceneObject.matrix_world @ mathutils.Matrix.Translation(-collection.instance_offset)
+    parts.extend((member, placement @ member.matrix_world) for member in collection.all_objects if member.type == "MESH" and not member.hide_render)
+  if not parts:
+    raise ValueError("The scene has nothing players stand on: no rendered meshes or collection instances besides water, guides, regions, spawns, and doors")
+  return parts
+
+
+class PlayerSurfaces:
+  """Ray casts against what players stand on and are blocked by (playerSolidParts)."""
+
+  def __init__(self):
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    self.members = [(matrix, matrix.inverted(), mathutils.bvhtree.BVHTree.FromObject(part, depsgraph)) for part, matrix in playerSolidParts()]
+
+  def cast(self, origin, direction, distance):
+    """The nearest world hit point within distance, or None."""
+    hit = self.castWithNormal(origin, direction, distance)
+    return hit[0] if hit else None
+
+  def footingBelow(self, origin, distance):
+    """The first surface below origin within distance that faces up; an underside met first means origin lies inside rock, and the
+    search goes on through it."""
+    down = mathutils.Vector((0, 0, -1))
+    while True:
+      hit = self.castWithNormal(origin, down, distance)
+      if hit is None:
+        return None
+      if hit[1].z > 0:
+        return hit[0]
+      distance -= origin.z - hit[0].z + 0.01
+      origin = hit[0] + down * 0.01
+
+  def castWithNormal(self, origin, direction, distance):
+    """The nearest world hit point within distance and the normal of the face hit there, or None."""
+    nearest = None
+    for matrix, inverse, tree in self.members:
+      location, normal, _, _ = tree.ray_cast(inverse @ origin, (inverse.to_3x3() @ direction).normalized())
+      if location is None:
+        continue
+      hit = matrix @ location
+      along = (hit - origin).length
+      if along <= distance and (nearest is None or along < nearest[0]):
+        nearest = (along, hit, (matrix.to_3x3().inverted().transposed() @ normal).normalized())
+    return nearest[1:] if nearest else None
+
+
+def swimSurfaces():
+  """A BVH over the surfaces of rendered pools and rivers (falls are not swum), or None when the scene has none."""
+  bodies = [
+    sceneObject for sceneObject in bpy.context.scene.objects
+    if waterProperty in sceneObject and not sceneObject.hide_render and json.loads(sceneObject[waterProperty])["kind"] != "fall"
+  ]
+  return worldTree(bodies) if bodies else None
+
+
+def waterDepthAt(surfaces, point):
+  """How far a pool or river's surface stands above a point (surfaces from swimSurfaces), or None where no water lies above it."""
+  if surfaces is None:
+    return None
+  location, _, _, _ = surfaces.ray_cast(mathutils.Vector(point), mathutils.Vector((0.0, 0.0, 1.0)), waterReach)
+  return None if location is None else location.z - point[2]
+
+
+def partTriangles(parts):
+  """The evaluated meshes of (object, world matrix) parts as world positions and triangles, all in one."""
   depsgraph = bpy.context.evaluated_depsgraph_get()
   positions, triangles, offset = [], [], 0
-  for sceneObject in sceneObjects:
+  for sceneObject, worldMatrix in parts:
     evaluated = sceneObject.evaluated_get(depsgraph)
     mesh = evaluated.to_mesh()
     try:
@@ -112,12 +199,18 @@ def worldTriangles(sceneObjects):
       mesh.loop_triangles.foreach_get("vertices", corners)
     finally:
       evaluated.to_mesh_clear()
-    positions.append(worldPositions(sceneObject, coordinates.reshape(-1, 3)))
+    matrix = matrixArray(worldMatrix)
+    positions.append(coordinates.reshape(-1, 3) @ matrix[:3, :3].T + matrix[:3, 3])
     triangles.append(corners.reshape(-1, 3) + offset)
     offset += len(positions[-1])
   if not positions:
     return numpy.zeros((0, 3)), numpy.zeros((0, 3), dtype=numpy.int64)
   return numpy.concatenate(positions), numpy.concatenate(triangles)
+
+
+def worldTriangles(sceneObjects):
+  """The evaluated meshes of objects as world positions and triangles, all in one."""
+  return partTriangles([(sceneObject, sceneObject.matrix_world) for sceneObject in sceneObjects])
 
 
 def worldTree(sceneObjects):

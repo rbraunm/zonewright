@@ -10,6 +10,7 @@ import re
 import bmesh
 import bpy
 import mathutils
+import mathutils.bvhtree
 import mathutils.kdtree
 import numpy
 
@@ -46,15 +47,6 @@ neighbourSteps = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
 # The ground water lies on
 
-def groundObjects():
-  """What water lies on and against: every rendered mesh that is not water, a guide, or a plot's border."""
-  return [
-    sceneObject for sceneObject in bpy.context.scene.objects
-    if sceneObject.type == "MESH" and not sceneObject.hide_render and bridgeMeshAccess.waterProperty not in sceneObject
-    and not bridgeMeshAccess.isDesignAid(sceneObject)
-  ]
-
-
 def groundTop(x, y):
   """The height of the highest ground at [x, y], or None."""
   ground = Ground()
@@ -62,11 +54,13 @@ def groundTop(x, y):
 
 
 class Ground:
+  """What water lies on and against: what players stand on (bridgeMeshAccess.playerSolidParts)."""
+
   def __init__(self):
-    objects = groundObjects()
-    if not objects:
+    positions, triangles = bridgeMeshAccess.partTriangles(bridgeMeshAccess.playerSolidParts())
+    if len(triangles) == 0:
       raise ValueError("The scene has no rendered ground for water to lie on")
-    self.tree = bridgeMeshAccess.worldTree(objects)
+    self.tree = mathutils.bvhtree.BVHTree.FromPolygons(positions.tolist(), triangles.tolist())
 
   def depth(self, x, y, level):
     """How deep water at `level` stands over [x, y]: the drop to the ground below, 0 where the point lies under the ground (the first

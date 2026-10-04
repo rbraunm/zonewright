@@ -2,3 +2,5 @@
 playerHeight = 6.0
 # EQEmu's navmesh agent climbs slopes up to 60 degrees; the client's own limit is unconfirmed.
 walkableNormalZ = 0.5
+# Unmeasured: how far above the surface a swimming player's eye sits; the RoF2 client is to measure it.
+swimEyeAboveSurface = 1.0
