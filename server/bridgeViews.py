@@ -35,13 +35,15 @@ figureStepDrop = 4.0
 figureMinimumDistance = 3.0
 figureSideOffset = 1.5
 mapClearance = 100.0
-viewShadings = ("client", "layout")
+viewShadings = ("client", "layout", "relief")
 # The sky is soft everywhere, so an equirectangular image at about a fifth of a degree a pixel draws it.
 skyImageHeight = 1024
 # Layout shading lights from the northwest, as relief maps do, so slopes read the same whatever the zone's sun.
 layoutLightDirection = (-0.5, 0.5, 0.7071)
 layoutAmbient = 0.3
 layoutHeightColors = ((0.0, (0.22, 0.36, 0.26)), (0.35, (0.58, 0.56, 0.36)), (0.7, (0.62, 0.45, 0.32)), (1.0, (0.92, 0.9, 0.87)))
+# Relief shading is the layout drawing in quiet greys, for a plan's lines and labels to stand out over.
+reliefHeightColors = ((0.0, (0.5, 0.5, 0.48)), (1.0, (0.93, 0.93, 0.91)))
 
 
 
@@ -238,9 +240,10 @@ def sceneHeightRange(preview):
   return min(heights), max(heights)
 
 
-def applyLayoutShading(preview, bandHeight):
-  """Draw every surface unlit in a color for its height across the scene's height range, banded every bandHeight units so the band
-  edges read as contours, and darker facing away from the layout light so slopes read; returns that height range."""
+def applyLayoutShading(preview, bandHeight, heightColors):
+  """Draw every surface unlit in a color for its height across the scene's height range (heightColors: (fraction, RGB) stops),
+  banded every bandHeight units so the band edges read as contours, and darker facing away from the layout light so slopes read;
+  returns that height range."""
   if bandHeight <= 0:
     raise ValueError(f"bandHeight must be positive, got {bandHeight}")
   bottom, top = sceneHeightRange(preview)
@@ -267,9 +270,9 @@ def applyLayoutShading(preview, bandHeight):
   fraction.inputs["From Max"].default_value = max(top, bottom + bandHeight)
   ramp = nodes.new("ShaderNodeValToRGB")
   elements = ramp.color_ramp.elements
-  while len(elements) < len(layoutHeightColors):
+  while len(elements) < len(heightColors):
     elements.new(0.5)
-  for element, (position, color) in zip(elements, layoutHeightColors):
+  for element, (position, color) in zip(elements, heightColors):
     element.position, element.color = position, (*color, 1.0)
   links.new(fraction.outputs["Result"], ramp.inputs["Fac"])
   facing = nodes.new("ShaderNodeVectorMath")
@@ -346,14 +349,14 @@ def roundVector(vector, digits=3):
 def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, bandHeight, guides):
   if shading not in viewShadings:
     raise ValueError(f"shading must be one of {list(viewShadings)}, got '{shading}'")
-  # A map or a layout drawing is for reading the shape, so neither is fogged nor has a sky.
-  shapeOnly = "map" in view or shading == "layout"
+  # A map or a layout or relief drawing is for reading the shape, so none is fogged nor has a sky.
+  shapeOnly = "map" in view or shading != "client"
   preview = PreviewScene(sourceScene, zone | {"fogDensity": 0.0} if shapeOnly else zone, guides, None if shapeOnly else sky)
   try:
     description = placeCamera(preview, view, figureModel)
     preview.drawSky()
-    if shading == "layout":
-      description["heightRange"] = list(applyLayoutShading(preview, bandHeight))
+    if shading != "client":
+      description["heightRange"] = list(applyLayoutShading(preview, bandHeight, layoutHeightColors if shading == "layout" else reliefHeightColors))
       description["bandHeight"] = bandHeight
       if preview.camera.data.type != "ORTHO":
         preview.camera.data.clip_end = max((corner - preview.camera.location).length for corner in sceneCorners(preview)) + mapClearance

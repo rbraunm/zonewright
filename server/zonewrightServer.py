@@ -29,6 +29,7 @@ import eqSky
 import eqZones
 import extensionCatalog
 import machineProfile
+import planDrawing
 import toolingLog
 import toolingManifest
 import toolingStatus
@@ -636,7 +637,7 @@ async def setZoneProperties(
 
 @guardedTool()
 async def renderView(context: Context, view: dict, shading: str = "client", bandHeight: float = 50.0, guides: bool = True):
-  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], or with z on the ground within 50 units below it, for caves and under overhangs; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog. shading "client" draws the zone as the client does; "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout. Guides (plot outlines) draw unless guides is false."""
+  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], or with z on the ground within 50 units below it, for caves and under overhangs; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog. shading "client" draws the zone as the client does; "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout. Guides (plot outlines) draw unless guides is false."""
   outputPath = newRenderPath()
   figureModel = None
   zone = await callBridge(context, "getZoneProperties", {})
@@ -1378,6 +1379,69 @@ async def createRegion(context: Context, name: str, outline: list[list[float]], 
 async def editRegion(context: Context, name: str, outline: list[list[float]] | None = None, bottom: float | None = None, top: float | None = None, intent: str | None = None):
   """Change a region's outline, bottom, top, or intent as the plan changes."""
   return await callBridge(context, "editRegion", {"name": name, "outline": outline, "bottom": bottom, "top": top, "intent": intent})
+
+
+sketchShapeHelp = (
+  " A shape is {name, kind, ...}: an area or a footprint takes an outline [[x, y], ...] or a rectangle {center: [x, y], size: [across,"
+  " along], headingDegrees} (its facing; along runs that way), and may take floor (the height it is graded to) and facingDegrees;"
+  " a footprint may take height, and then stands in views (with guides on) as a plain block on its floor or the lowest ground under"
+  " it; a path takes points [[x, y] or [x, y, z], ...] and may take width; a point takes at [x, y] and may take facingDegrees; a note"
+  " takes at and a label, its text. Any shape may take a label and a note."
+)
+
+
+@guardedTool(description=(
+  "Sketch on a named sheet to think a layout through before or while building it: where buildings stand and face, the yards and"
+  " plazas between them, streets and stairs, landmarks, the arrival point, rooms of a dungeon, a village's lanes. Shapes are added,"
+  " or redrawn when a name is reused; each comes back measured against the ground under it: an area or footprint's size, the ground's"
+  " lowest, mean, and highest height and steepest slope under it, cut and fill to its floor, how much of it lies under water, which"
+  " shapes on the sheet it overlaps, and the nearest one and the gap to it; a path's length, its ground heights, and its steepest"
+  " grade, and the shapes it meets; a point's ground height. Sketches stay in the file on their sheets and can be revised, but they are"
+  " aids, not a plan: nothing holds the zone to them, export leaves them out, and players do not stand on them. Look at them with"
+  " renderSketch." + sketchShapeHelp
+))
+async def sketch(context: Context, sheet: str, shapes: list[dict]):
+  return await callBridge(context, "sketchShapes", {"sheet": sheet, "shapes": shapes})
+
+
+@guardedTool()
+async def eraseSketch(context: Context, sheet: str, names: list[str] | None = None, wholeSheet: bool = False):
+  """Erase sketch shapes by name from a sheet, or the whole sheet with wholeSheet true."""
+  return await callBridge(context, "eraseSketch", {"sheet": sheet, "names": names, "wholeSheet": wholeSheet})
+
+
+@guardedTool()
+async def getSketch(context: Context, sheet: str | None = None):
+  """A sketch sheet's shapes (or every sheet's) as drawn, each measured against the ground under it now, as sketch reports them."""
+  return await callBridge(context, "getSketch", {"sheet": sheet})
+
+
+@guardedTool()
+async def renderSketch(
+  context: Context, center: list[float], width: float, sheets: list[str] | None = None, layers: list[str] = ["regions", "plots", "water"],
+  bandHeight: float = 25.0,
+):
+  """Draw a plan: the zone from straight above in quiet grey relief (lighter higher, a step every bandHeight units, slopes shaded
+  from the northwest), `width` units across about `center`, north up, with a coordinate grid, a scale bar, the sketch sheets (all, or
+  those named) in their own colors (areas dashed, footprints filled with their facing arrows and heights, paths at their widths,
+  points, notes), and the plan's own layers: regions (dashed, named), plots (outlined, by address), and water (blue)."""
+  if len(center) != 2 or width <= 0:
+    raise ToolError(f"center is [x, y] and width positive, got {center} and {width}")
+  zone = await callBridge(context, "getZoneProperties", {})
+  basePath = newRenderPath()
+  base = await callBridge(context, "renderView", {
+    "view": {"map": {"center": center, "width": width}}, "outputPath": str(basePath), "figureModel": None, "shading": "relief",
+    "bandHeight": bandHeight, "guides": False, "sky": await zoneSky(zone),
+  })
+  overlays = await callBridge(context, "planOverlays", {"sheets": sheets, "layers": layers})
+  outputPath = newRenderPath()
+  drawn = await anyio.to_thread.run_sync(planDrawing.drawPlan, basePath, outputPath, center, width, overlays)
+  basePath.unlink()
+  return [Image(data=outputPath.read_bytes(), format="png"), {
+    "outputPath": str(outputPath), "center": center, "width": width, "unitsPerPixel": round(width / drawn["size"][0], 4), "heightRange": base["heightRange"],
+    "bandHeight": bandHeight, "gridStep": drawn["gridStep"], "sheetColors": drawn["sheetColors"],
+    "shapes": {sheet["sheet"]: len(sheet["shapes"]) for sheet in overlays["sheets"]},
+  }]
 
 
 @guardedTool()
