@@ -235,6 +235,18 @@ def testRaisingTheProcedureVersionMakesTheInterpretationStale(stageServer, tmp_p
   assert recordedAgain["interpreted"]["state"] == "current" and "staleBecause" not in recordedAgain["interpreted"]
 
 
+def testSkillWithoutAProcedureVersionIsRefused(stageServer, tmp_path):
+  server = stageSurveyServer(stageServer)
+  skillPath = stagedSkillPath(server)
+  skillPath.write_text(procedureVersionPattern.sub("", skillPath.read_text(encoding="utf-8")), encoding="utf-8")
+  readRefusal = server.callToolExpectingError("getZoneSurvey", {"zone": "befallen"})
+  recordRefusal = server.callToolExpectingError("recordZoneInterpretation", {"zone": "befallen", "interpretation": befallenInterpretation(tmp_path / "views")})
+
+  for refusal in (readRefusal, recordRefusal):
+    assert "must state the interpretive procedure's version once, as 'Interpretive procedure version: <n>' (found 0)" in refusal
+  assert not (server.toolingRoot / "survey" / "interpretations").exists()
+
+
 def testChangedZoneFileMakesTheInterpretationStale(stageServer, tmp_path):
   server = stageSurveyServer(stageServer)
   server.callToolExpectingSuccess("recordZoneInterpretation", {"zone": "befallen", "interpretation": befallenInterpretation(tmp_path / "views")})

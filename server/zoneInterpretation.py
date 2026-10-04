@@ -33,11 +33,12 @@ def readProcedure(skillPath):
   text = skillPath.read_text(encoding="utf-8")
   versions = versionPattern.findall(text)
   section = zoneTypesSectionPattern.search(text)
-  zoneTypes = dict(zoneTypeRowPattern.findall(section.group(1))) if section else {}
-  if len(versions) != 1 or not zoneTypes:
+  rows = zoneTypeRowPattern.findall(section.group(1)) if section else []
+  zoneTypes = dict(rows)
+  if len(versions) != 1 or not zoneTypes or len(zoneTypes) != len(rows):
     raise ValueError(
       f"{skillPath} must state the interpretive procedure's version once, as 'Interpretive procedure version: <n>' (found {len(versions)}),"
-      f" and its zone types as a table under '### Zone types' (found {len(zoneTypes)})"
+      f" and its zone types as a table under '### Zone types', each once (found {len(rows)} rows naming {len(zoneTypes)} types)"
     )
   return {"version": int(versions[0]), "zoneTypes": zoneTypes}
 
