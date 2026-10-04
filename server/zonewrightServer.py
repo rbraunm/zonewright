@@ -4,6 +4,7 @@ import functools
 import inspect
 import io
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -584,23 +585,23 @@ async def openFile(context: Context, path: str, discardUnsavedChanges: bool = Fa
 
 
 @guardedTool()
-async def saveFile(context: Context, path: str | None = None):
-  """Save the open file, or save it as an absolute path. Textures and libraries become relative paths; packed or generated images are refused."""
-  return await callBridge(context, "saveFile", {"path": path})
+async def saveFile(context: Context, path: str | None = None, replaceExisting: bool = False):
+  """Save the open file, or save it as an absolute path; a path holding another file is written over only with replaceExisting. Textures and libraries become relative paths; packed or generated images are refused."""
+  return await callBridge(context, "saveFile", {"path": path, "replaceExisting": replaceExisting})
 
 
 async def openWorkFilePath(context, toolName):
   """The open work file's path; a scene never saved has no work file to keep checkpoints of."""
   status = await callBridge(context, "getStatus", {})
   if status["filePath"] is None:
-    raise ToolError(f"{toolName} works on the open work file, and the open scene has never been saved: save it with saveFile and a path first")
+    raise ToolError(f"{toolName} works on the open work file, and no work file is open: open it (openFile), or save this scene as a new work file (saveFile with a path)")
   return status["filePath"]
 
 
 async def checkpointOpenFile(context, label):
   callReportingFailures(checkpoints.validateLabel, label)
   workFile = await openWorkFilePath(context, "saveCheckpoint")
-  await callBridge(context, "saveFile", {"path": None})
+  await callBridge(context, "saveFile", {"path": None, "replaceExisting": False})
   return await anyio.to_thread.run_sync(callReportingFailures, checkpoints.saveCheckpoint, toolingRoot, workFile, label)
 
 
@@ -614,24 +615,30 @@ async def saveCheckpoint(context: Context, label: str):
 async def listCheckpoints(context: Context, path: str | None = None):
   """The checkpoints of the open work file, or of the work file at `path` (absolute; it need not exist now): name, label, UTC time, and size, and their total size."""
   workFile = path if path is not None else await openWorkFilePath(context, "listCheckpoints")
-  return callReportingFailures(checkpoints.listCheckpoints, toolingRoot, workFile)
+  return await anyio.to_thread.run_sync(callReportingFailures, checkpoints.listCheckpoints, toolingRoot, workFile)
 
 
 @guardedTool()
-async def restoreCheckpoint(context: Context, name: str):
-  """Put a checkpoint back as the open work file: first keeps the current state as a checkpoint labelled "before restore <time of the checkpoint restored>" (restore that to take the restore back), then copies the checkpoint over the work file and reopens it. Refuses a checkpoint of another work file, since a work file's textures are on paths relative to it."""
+async def restoreCheckpoint(context: Context, name: str, discardUnsavedChanges: bool = False):
+  """Put a checkpoint back over the work file it was saved from, then open that file. The open file must be that work file, or nothing (as after a reconnect or a crash). Its unsaved changes are saved first unless discardUnsavedChanges; then the work file as it stands on disk is kept as a checkpoint labelled "before restore <time of the checkpoint restored>" (restore that to take the restore back). The copy goes in under a temporary name, so a failed restore leaves the work file as it was."""
   checkpointPath, workFile = callReportingFailures(checkpoints.findCheckpoint, toolingRoot, name)
-  openPath = await openWorkFilePath(context, "restoreCheckpoint")
-  if not checkpoints.samePath(openPath, workFile):
-    raise ToolError(f"Checkpoint '{name}' was saved from '{workFile}', but the open work file is '{openPath}'; a checkpoint is restored only over its own work file, whose textures are on paths relative to it: open '{workFile}' first")
+  status = await callBridge(context, "getStatus", {})
+  if status["filePath"] is not None and not checkpoints.samePath(status["filePath"], workFile):
+    raise ToolError(f"Checkpoint '{name}' was saved from '{workFile}', but the open file is '{status['filePath']}'; a checkpoint is restored only over its own work file, whose textures are on paths relative to it: open '{workFile}' first")
+  if status["unsavedChanges"] and not discardUnsavedChanges:
+    if status["filePath"] is None:
+      raise ToolError("The open scene was never saved and has changes the restore would drop: save it as a new work file (saveFile with a path), or pass discardUnsavedChanges true")
+    try:
+      await callBridge(context, "saveFile", {"path": None, "replaceExisting": False})
+    except ToolError as error:
+      raise ToolError(f"restoreCheckpoint saves the open work file's changes before keeping it, and saving failed; pass discardUnsavedChanges true to give those changes up.\n\n{error}") from error
   stamp = callReportingFailures(checkpoints.checkpointNameParts, checkpointPath)[0]
-  try:
-    beforeRestore = await checkpointOpenFile(context, f"before restore {stamp}")
-  except ToolError as error:
-    raise ToolError(f"restoreCheckpoint first keeps the current state as a checkpoint, and that failed; to give the current state up, reopen the work file (openFile with discardUnsavedChanges) and restore again.\n\n{error}") from error
+  beforeRestore = None
+  if os.path.isfile(workFile):
+    beforeRestore = await anyio.to_thread.run_sync(callReportingFailures, checkpoints.saveCheckpoint, toolingRoot, workFile, f"before restore {stamp}")
   await anyio.to_thread.run_sync(callReportingFailures, checkpoints.restoreOver, checkpointPath, workFile)
-  reopened = await callBridge(context, "openFile", {"path": workFile, "discardUnsavedChanges": False})
-  return reopened | {"restored": name, "beforeRestore": beforeRestore["name"]}
+  reopened = await callBridge(context, "openFile", {"path": workFile, "discardUnsavedChanges": True})
+  return reopened | {"restored": name, "beforeRestore": beforeRestore["name"] if beforeRestore is not None else None}
 
 
 @guardedTool()

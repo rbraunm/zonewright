@@ -41,8 +41,21 @@ def validateLabel(label):
 
 
 def workFileKey(workFile):
-  """The work file's name and a short hash of its full path, so work files of one name in different folders never share checkpoints."""
-  return f"{Path(workFile).stem}-{hashlib.sha256(comparablePath(workFile).encode('utf-8')).hexdigest()[:8]}"
+  """The work file's name and a short hash of its full path, both as Windows compares paths, so work files of one name in different
+  folders never share checkpoints and one file spelled in another case always does."""
+  comparable = comparablePath(workFile)
+  return f"{Path(comparable).stem}-{hashlib.sha256(comparable.encode('utf-8')).hexdigest()[:8]}"
+
+
+def copyIntoPlace(source, target):
+  """Copy to a temporary name beside the target (Blender's own `@` suffix), then rename it over the target: a copy that fails leaves the
+  target as it was."""
+  partial = Path(f"{target}@")
+  try:
+    shutil.copyfile(source, partial)
+    os.replace(partial, target)
+  finally:
+    partial.unlink(missing_ok=True)
 
 
 def recordedWorkFile(folder):
@@ -85,12 +98,14 @@ def saveCheckpoint(toolingRoot, workFile, label):
   if any(folder.glob(f"{stamp}_*.blend")):
     raise ValueError(f"A checkpoint of '{workFile}' already has the time {stamp}; save the checkpoint again")
   checkpointPath = folder / f"{stamp}_{label}.blend"
-  shutil.copyfile(workFile, checkpointPath)
+  copyIntoPlace(workFile, checkpointPath)
   return describe(checkpointPath) | {"workFile": workFile, "path": str(checkpointPath)}
 
 
 def listCheckpoints(toolingRoot, workFile):
   folder = workFileFolder(toolingRoot, workFile)
+  if not folder.is_dir() and not os.path.isfile(workFile):
+    raise ValueError(f"No work file is at '{workFile}' and it has no checkpoints")
   checkpoints = [describe(path) for path in sorted(folder.glob("*.blend"))]
   return {"workFile": workFile, "folder": str(folder), "checkpoints": checkpoints, "totalSizeBytes": sum(checkpoint["sizeBytes"] for checkpoint in checkpoints)}
 
@@ -104,7 +119,7 @@ def findCheckpoint(toolingRoot, name):
 
 
 def restoreOver(checkpointPath, workFile):
-  shutil.copyfile(checkpointPath, workFile)
+  copyIntoPlace(checkpointPath, workFile)
 
 
 def deleteCheckpoints(toolingRoot, names):
@@ -115,8 +130,13 @@ def deleteCheckpoints(toolingRoot, names):
   checkpointPaths = [findCheckpoint(toolingRoot, name)[0] for name in names]
   for checkpointPath in checkpointPaths:
     checkpointPath.unlink()
-  for folder in {checkpointPath.parent for checkpointPath in checkpointPaths}:
-    if not any(folder.glob("*.blend")):
-      (folder / recordName).unlink()
-      folder.rmdir()
-  return {"deleted": names}
+  keptFolders = {}
+  for folder in sorted({checkpointPath.parent for checkpointPath in checkpointPaths}):
+    others = sorted(entry.name for entry in folder.iterdir() if entry.name != recordName)
+    if others:
+      if not any(folder.glob("*.blend")):
+        keptFolders[str(folder)] = others
+      continue
+    (folder / recordName).unlink()
+    folder.rmdir()
+  return {"deleted": names} | ({"keptFolders": keptFolders} if keptFolders else {})

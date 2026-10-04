@@ -1,4 +1,5 @@
 import datetime
+import msvcrt
 from pathlib import Path
 
 from conftest import writePNG
@@ -123,7 +124,7 @@ def testRestoreRefusesACheckpointOfAnotherWorkFile(stageBlenderServer, tmp_path)
     return saved, otherBefore, refusal, otherListed, plotListed, crate
 
   saved, otherBefore, refusal, otherListed, plotListed, crate = stageBlenderServer.session(steps)
-  assert f"Checkpoint '{saved['name']}' was saved from '{plotFile}', but the open work file is '{otherFile}'" in refusal
+  assert f"Checkpoint '{saved['name']}' was saved from '{plotFile}', but the open file is '{otherFile}'" in refusal
   assert otherFile.read_bytes() == otherBefore
   assert otherListed["checkpoints"] == []
   assert [checkpoint["name"] for checkpoint in plotListed["checkpoints"]] == [saved["name"]]
@@ -233,16 +234,87 @@ bpy.data.materials['rock'].node_tree.nodes.new('ShaderNodeTexImage').image = ima
     unsaveable = await session.expectError("saveCheckpoint", {"label": "packed"})
     restoreRefusal = await session.expectError("restoreCheckpoint", {"name": saved["name"]})
     listed = await session.expectSuccess("listCheckpoints")
-    await session.expectSuccess("openFile", {"path": str(workFile), "discardUnsavedChanges": True})
-    restored = await session.expectSuccess("restoreCheckpoint", {"name": saved["name"]})
+    restored = await session.expectSuccess("restoreCheckpoint", {"name": saved["name"], "discardUnsavedChanges": True})
     return neverSaved, neverSavedList, badLabel, saved, unsaveable, restoreRefusal, listed, restored
 
   neverSaved, neverSavedList, badLabel, saved, unsaveable, restoreRefusal, listed, restored = stageBlenderServer.session(steps)
-  assert "saveCheckpoint works on the open work file, and the open scene has never been saved" in neverSaved
-  assert "listCheckpoints works on the open work file, and the open scene has never been saved" in neverSavedList
+  assert "saveCheckpoint works on the open work file, and no work file is open" in neverSaved
+  assert "listCheckpoints works on the open work file, and no work file is open" in neverSavedList
   assert "A checkpoint label is part of a file name" in badLabel and "['/']" in badLabel
   assert "Cannot save: image 'baked' is packed into the .blend" in unsaveable
-  assert "restoreCheckpoint first keeps the current state as a checkpoint, and that failed" in restoreRefusal
+  assert "saving failed; pass discardUnsavedChanges true to give those changes up" in restoreRefusal
   assert "Cannot save: image 'baked' is packed into the .blend" in restoreRefusal
   assert [checkpoint["name"] for checkpoint in listed["checkpoints"]] == [saved["name"]]
   assert restored["restored"] == saved["name"]
+
+
+def testRestoreWithNothingOpenPutsTheWorkFileBackAndNeverSavesTheEmptyScene(stageBlenderServer, tmp_path):
+  workFile = tmp_path / "work" / "plot.blend"
+
+  async def steps(session):
+    await buildPlot(session, workFile)
+    earlier = await sceneState(session)
+    saved = await session.expectSuccess("saveCheckpoint", {"label": "built"})
+    await wreckPlot(session, workFile)
+    await session.expectSuccess("saveFile", {})
+    wreckedBytes = workFile.read_bytes()
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    refusedSave = await session.expectError("saveFile", {"path": str(workFile)})
+    restored = await session.expectSuccess("restoreCheckpoint", {"name": saved["name"]})
+    return earlier, wreckedBytes, refusedSave, restored, await sceneState(session)
+
+  earlier, wreckedBytes, refusedSave, restored, afterRestore = stageBlenderServer.session(steps)
+  # As after a reconnect or a crash, nothing is open: the empty scene is never saved over the work file, and the restore puts the
+  # checkpoint back after keeping the wrecked file as it stood on disk.
+  assert "already holds a file other than the open one; pass replaceExisting true to write over it" in refusedSave
+  assert afterRestore == earlier and restored["filePath"] == str(workFile) and restored["unsavedChanges"] is False
+  assert checkpointFile(stageBlenderServer.toolingRoot, restored["beforeRestore"]).read_bytes() == wreckedBytes
+
+
+def testAFailedRestoreLeavesTheWorkFileAsItWas(stageBlenderServer, tmp_path):
+  workFile = tmp_path / "work" / "plot.blend"
+
+  async def steps(session):
+    await buildPlot(session, workFile)
+    saved = await session.expectSuccess("saveCheckpoint", {"label": "built"})
+    await wreckPlot(session, workFile)
+    await session.expectSuccess("saveFile", {})
+    wreckedBytes = workFile.read_bytes()
+    checkpointPath = checkpointFile(stageBlenderServer.toolingRoot, saved["name"])
+    # Another program holding part of the checkpoint stops the copy halfway.
+    with checkpointPath.open("rb") as held:
+      held.seek(checkpointPath.stat().st_size // 2)
+      msvcrt.locking(held.fileno(), msvcrt.LK_NBLCK, 1)
+      try:
+        failure = await session.expectError("restoreCheckpoint", {"name": saved["name"]})
+      finally:
+        held.seek(checkpointPath.stat().st_size // 2)
+        msvcrt.locking(held.fileno(), msvcrt.LK_UNLCK, 1)
+    return wreckedBytes, failure, workFile.read_bytes(), sorted(path.name for path in workFile.parent.iterdir())
+
+  wreckedBytes, failure, bytesAfter, workFolder = stageBlenderServer.session(steps)
+  assert "Permission" in failure or "lock" in failure
+  assert bytesAfter == wreckedBytes
+  assert not any(name.endswith("@") for name in workFolder)
+
+
+def testSaveFileWritesOverAnotherFileOnlyWhenTold(stageBlenderServer, tmp_path):
+  first, second = tmp_path / "first.blend", tmp_path / "second.blend"
+
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "one", "size": [2, 2, 2], "location": [0, 0, 0]})
+    await session.expectSuccess("saveFile", {"path": str(first)})
+    await session.expectSuccess("saveFile", {"path": str(first)})
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "two", "size": [2, 2, 2], "location": [0, 0, 0]})
+    await session.expectSuccess("saveFile", {"path": str(second)})
+    refused = await session.expectError("saveFile", {"path": str(first)})
+    keptBytes = first.read_bytes()
+    replaced = await session.expectSuccess("saveFile", {"path": str(first), "replaceExisting": True})
+    return refused, keptBytes, replaced
+
+  refused, keptBytes, replaced = stageBlenderServer.session(steps)
+  # Saving the open file again, or as a new path, needs nothing; writing over a different file needs replaceExisting.
+  assert f"'{first}' already holds a file other than the open one" in refused
+  assert keptBytes != first.read_bytes() and replaced["filePath"] == str(first)
