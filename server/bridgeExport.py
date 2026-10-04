@@ -135,7 +135,7 @@ def materialRecord(material):
   liquid = bridgeSurfacing.liquidOf(material)
   record = {"name": material.name, "diffusePath": nodeImagePath(material, bridgeSurfacing.diffuseNodeName), "normalPath": nodeImagePath(material, bridgeSurfacing.normalNodeName), "liquid": None, "cutout": False}
   if liquid is None:
-    return record | {"cutout": bool(material[bridgeSurfacing.cutoutPropertyName])}
+    return record | {"cutout": bool(material[bridgeMeshAccess.cutoutProperty])}
   return record | {"liquid": liquid | {
     "environmentPath": nodeImagePath(material, bridgeSurfacing.environmentNodeName), "secondDiffusePath": nodeImagePath(material, bridgeSurfacing.secondDiffuseNodeName),
   }}
@@ -177,7 +177,7 @@ def meshArrays(sceneObject, depsgraph, matrix, materialNames, marked):
     "positions": positions[loopVertices[firstLoop]], "normals": normals[firstLoop], "uvs": uvs[firstLoop],
     "triangles": loopToVertex[triangleLoops].reshape(-1, 3),
     "materials": [materialNames(slotMaterials[slot]) for slot in triangleSlots],
-    "passable": marked | numpy.array([bridgeBoundaries.isPassableMaterial(slotMaterials[slot]) for slot in triangleSlots], dtype=bool),
+    "passable": marked | numpy.array([bridgeMeshAccess.isPassableMaterial(slotMaterials[slot]) for slot in triangleSlots], dtype=bool),
   }
 
 

@@ -51,12 +51,10 @@ def groundTop(x, y):
 
 
 class Ground:
-  """What water lies on and against: what players stand on (bridgeMeshAccess.playerSolidParts)."""
+  """What water lies on and against: what players stand on (bridgeMeshAccess.playerSolidTriangles)."""
 
   def __init__(self):
-    positions, triangles = bridgeMeshAccess.partTriangles(bridgeMeshAccess.playerSolidParts())
-    if len(triangles) == 0:
-      raise ValueError("The scene has no rendered ground for water to lie on")
+    positions, triangles = bridgeMeshAccess.playerSolidTriangles()
     self.tree = mathutils.bvhtree.BVHTree.FromPolygons(positions.tolist(), triangles.tolist())
 
   def depth(self, x, y, level):

@@ -66,12 +66,14 @@ def modelMaterial(folder, textureName, alphaMode, tint, lit):
 
 
 def liquidModelMaterial(folder, textureName, liquid, lit):
-  """A client liquid material, drawn as the preview draws liquids (bridgeSurfacing.liquidNodes), reused across objects from one cache."""
+  """A client liquid material, drawn as the preview draws liquids (bridgeSurfacing.liquidNodes), reused across objects from one cache;
+  it keeps its liquid, so where its file lets players through it they swim (bridgeMeshAccess.swumFaces)."""
   materialName = f"eq_{os.path.basename(folder)}_{textureName}_{liquid['liquid']}{'_lit' if lit else ''}"
   material = bpy.data.materials.get(materialName)
   if material is not None and material.node_tree.nodes[bridgeSurfacing.diffuseNodeName].image.filepath == os.path.join(folder, textureName):
     return material
   material = bpy.data.materials.new(materialName)
+  material[bridgeMeshAccess.clientLiquidProperty] = liquid["liquid"]
   material.use_nodes = True
   paths = {key: os.path.join(folder, name) for key, name in liquid["textures"].items()}
   bridgeSurfacing.liquidNodes(material, liquid["liquid"], liquid["values"], os.path.join(folder, textureName), paths, lit)

@@ -723,7 +723,7 @@ def sectionCuts(start, end, bottom, top, layers):
     return found
 
   if "ground" in layers:
-    positions, triangles = bridgeMeshAccess.partTriangles(bridgeMeshAccess.playerSolidParts())
+    positions, triangles = bridgeMeshAccess.playerSolidTriangles()
     cuts["ground"] = keptSegments(planeSegments(positions, triangles, start, along, normal), length, bottom, top)
   if "water" in layers:
     bodies = renderedWater()

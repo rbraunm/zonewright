@@ -15,7 +15,6 @@ import numpy
 
 import bridgeMeshAccess
 import bridgeObjects
-import bridgeSurfacing
 import bridgeSwim
 
 boundaryCollectionName = "boundaries"
@@ -34,11 +33,6 @@ keep = "keep"
 turnTolerance = 1e-9
 
 
-def isPassableMaterial(material):
-  """Players pass through liquid surfaces (water, waterfall, lava) and cutout cards, as the client's own zones flag them (0x1)."""
-  return material is not None and (bridgeSurfacing.liquidPropertyName in material or bool(material.get(bridgeSurfacing.cutoutPropertyName)))
-
-
 def isAuthored(sceneObject):
   return bridgeMeshAccess.clientContentProperty not in sceneObject
 
@@ -55,55 +49,11 @@ def readSpec(sceneObject, propertyName):
   return json.loads(sceneObject[propertyName])
 
 
-def evaluatedTriangles(sceneObject, depsgraph):
-  """An evaluated mesh's vertex positions in its own space, its triangles, each triangle's polygon, and its material slots."""
-  evaluated = sceneObject.evaluated_get(depsgraph)
-  mesh = evaluated.to_mesh()
-  try:
-    mesh.calc_loop_triangles()
-    positions = numpy.empty(len(mesh.vertices) * 3)
-    mesh.vertices.foreach_get("co", positions)
-    triangles = numpy.empty(len(mesh.loop_triangles) * 3, dtype=numpy.int64)
-    mesh.loop_triangles.foreach_get("vertices", triangles)
-    polygons = numpy.empty(len(mesh.loop_triangles), dtype=numpy.int64)
-    mesh.loop_triangles.foreach_get("polygon_index", polygons)
-    slots = numpy.empty(len(mesh.polygons), dtype=numpy.int64)
-    mesh.polygons.foreach_get("material_index", slots)
-    flagged = numpy.zeros(len(mesh.polygons), dtype=bool)
-    attribute = mesh.attributes.get(bridgeMeshAccess.passableAttribute)
-    if attribute is not None:
-      attribute.data.foreach_get("value", flagged)
-    materials = [slot.material for slot in evaluated.material_slots]
-  finally:
-    evaluated.to_mesh_clear()
-  return positions.reshape(-1, 3), triangles.reshape(-1, 3), polygons, slots, flagged, materials
-
-
-def passableFaces(slots, flagged, materials):
-  """Which faces players pass through: a liquid or cutout material, or flagged so by the zone file it came from."""
-  slotPassable = numpy.array([isPassableMaterial(material) for material in materials] + [False], dtype=bool)
-  return slotPassable[numpy.minimum(slots, len(materials))] | flagged
-
-
 def collisionSurfaces(boundaries=True):
-  """Ray casts against what the client collides with: what players stand on, without faces they pass through (liquids, cutout cards,
-  objects marked passable, faces an imported zone file flags), and the boundaries unless boundaries is false."""
-  owners = bridgeMeshAccess.playerSolidObjects(collision=True)
-  depsgraph = bpy.context.evaluated_depsgraph_get()
-  trees = []
-  for owner in owners:
-    if not boundaries and bridgeMeshAccess.boundaryProperty in owner:
-      continue
-    for part, matrix in bridgeMeshAccess.objectParts(owner):
-      if bridgeMeshAccess.passableProperty in part:
-        continue
-      positions, triangles, polygons, slots, flagged, materials = evaluatedTriangles(part, depsgraph)
-      kept = ~passableFaces(slots, flagged, materials)[polygons]
-      if kept.all():
-        trees.append((owner.name, matrix, mathutils.bvhtree.BVHTree.FromObject(part, depsgraph)))
-      elif kept.any():
-        trees.append((owner.name, matrix, mathutils.bvhtree.BVHTree.FromPolygons(positions.tolist(), triangles[kept].tolist())))
-  return bridgeMeshAccess.PlayerSurfaces(trees=trees)
+  """Ray casts against what the client collides with: what players stand on (bridgeMeshAccess.PlayerSurfaces, never the faces they
+  pass through), and the boundaries unless boundaries is false."""
+  owners = [owner for owner in bridgeMeshAccess.playerSolidObjects(collision=True) if boundaries or bridgeMeshAccess.boundaryProperty not in owner]
+  return bridgeMeshAccess.PlayerSurfaces(trees=bridgeMeshAccess.solidTrees(owners))
 
 
 def boundarySurfaces():
@@ -431,7 +381,7 @@ def boundaryErrors():
 def boundaryArrays(boundary, depsgraph):
   """A boundary's evaluated triangles in world space as the terrain takes them: no material, no texture coordinates, not passable; a
   wall's twice, facing each way."""
-  positions, triangles, _, _, _, _ = evaluatedTriangles(boundary, depsgraph)
+  positions, triangles = bridgeMeshAccess.meshFaces(boundary, depsgraph)[:2]
   if readSpec(boundary, bridgeMeshAccess.boundaryProperty)["kind"] == "wall":
     # The client's own walls are single triangles facing the play area (Highpass Hold's, and over 99% of the vertical ones in its EQG
     # zones), and whether its collision lets a player through a wall met from behind is untraced. A wall here faces left of its path,

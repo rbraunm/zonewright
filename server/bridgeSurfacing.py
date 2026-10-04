@@ -20,13 +20,10 @@ transitionMappingPrefix = "zonewrightTransitionUV:"
 # What zone export reads a createMaterial material by.
 diffuseNodeName = "zonewrightDiffuse"
 normalNodeName = "zonewrightNormal"
-cutoutPropertyName = "zonewrightCutout"
 blockoutPropertyName = "zonewrightBlockout"
 transitionPropertyName = "zonewrightTransition"
 environmentNodeName = "zonewrightEnvironment"
 secondDiffuseNodeName = "zonewrightDiffuse1"
-# A liquid material keeps its liquid and shader values in this property; zone export writes them as the client's shader properties.
-liquidPropertyName = "zonewrightLiquid"
 # Each liquid's textures (beyond its diffuse) and shader values, as the client's water (Opaque_MaxWater.fx), waterfall
 # (Opaque_MaxWaterFall.fx), and lava (Opaque_MaxLava.fx) materials carry them.
 liquidTextures = {"water": ("normal", "environment"), "waterfall": (), "lava": ("normal", "secondDiffuse")}
@@ -63,7 +60,7 @@ def createMaterial(name, diffuseTexture, normalTexture, cutout, alphaThreshold, 
   diffuse.name = diffuseNodeName
   diffuse.image = diffuseImage
   diffuse.interpolation = "Linear"
-  material[cutoutPropertyName] = bool(cutout)
+  material[bridgeMeshAccess.cutoutProperty] = bool(cutout)
   material[blockoutPropertyName] = bool(blockout)
   normal = None
   if normalImage is not None:
@@ -115,7 +112,7 @@ def createLiquidMaterial(name, liquid, diffuseTexture, normalTexture, environmen
   material = bpy.data.materials.new(name)
   material.use_fake_user = True
   material.use_nodes = True
-  material[liquidPropertyName] = json.dumps({"liquid": liquid, "values": values})
+  material[bridgeMeshAccess.liquidProperty] = json.dumps({"liquid": liquid, "values": values})
   liquidNodes(material, liquid, values, diffuseTexture, {key: path for key, path in textures.items() if path is not None}, False)
   return {"material": name, "liquid": liquid, "values": values}
 
@@ -235,9 +232,9 @@ def clientWater(material, values, texturePaths):
 
 def liquidOf(material):
   """A liquid material's liquid and shader values, or None for any other material."""
-  if material is None or liquidPropertyName not in material:
+  if material is None or bridgeMeshAccess.liquidProperty not in material:
     return None
-  return json.loads(material[liquidPropertyName])
+  return json.loads(material[bridgeMeshAccess.liquidProperty])
 
 
 def assignMaterial(objectName, materialName, selector):

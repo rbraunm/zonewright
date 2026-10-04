@@ -65,7 +65,7 @@ def isPowerOfTwo(value):
 
 
 def isZonewrightMaterial(material):
-  return material is not None and (bridgeSurfacing.cutoutPropertyName in material or bridgeSurfacing.liquidPropertyName in material)
+  return material is not None and (bridgeMeshAccess.cutoutProperty in material or bridgeMeshAccess.liquidProperty in material)
 
 
 def isBlockout(material):
@@ -75,7 +75,7 @@ def isBlockout(material):
 def isGround(material):
   """A material ground borders run between: made by createMaterial, opaque, and neither blockout nor a transition."""
   return (
-    material is not None and bridgeSurfacing.cutoutPropertyName in material and not material[bridgeSurfacing.cutoutPropertyName]
+    material is not None and bridgeMeshAccess.cutoutProperty in material and not material[bridgeMeshAccess.cutoutProperty]
     and not material.get(bridgeSurfacing.blockoutPropertyName) and not material.get(bridgeSurfacing.transitionPropertyName)
   )
 
@@ -145,7 +145,7 @@ def materialProblems(material, images, clashing):
       problems.append((record["problem"], fields))
     elif record["ddsName"] in clashing:
       problems.append(("images share a DDS name", fields | {"ddsName": record["ddsName"], "images": clashing[record["ddsName"]]}))
-  if material.get(bridgeSurfacing.cutoutPropertyName) and nodes.get(bridgeSurfacing.normalNodeName) is not None:
+  if material.get(bridgeMeshAccess.cutoutProperty) and nodes.get(bridgeSurfacing.normalNodeName) is not None:
     problems.append(("cutout with a normal map", {}))
   return problems
 

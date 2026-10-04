@@ -43,8 +43,16 @@ clientContentProperty = "zonewrightClientContent"
 clientContentKinds = ("spawn", "door", "object", "zone", "zoneFile")
 boundaryProperty = "zonewrightBoundary"
 zoneLineProperty = "zonewrightZoneLine"
+# What players pass through: an object marked passable (markPassable), a face an imported client file flags passable (this face
+# attribute), and a face of a cutout or liquid material (createMaterial, createLiquidMaterial; export flags them). A liquid material
+# keeps its liquid and shader values, which export writes as the client's shader properties; a client liquid material keeps only its
+# liquid, as whether players pass through it is its file's flags.
 passableProperty = "zonewrightPassable"
 passableAttribute = "zonewrightPassable"
+cutoutProperty = "zonewrightCutout"
+liquidProperty = "zonewrightLiquid"
+clientLiquidProperty = "zonewrightClientLiquid"
+swumLiquids = ("water", "lava")
 waterReach = 100000.0
 up = mathutils.Vector((0.0, 0.0, 1.0))
 down = mathutils.Vector((0.0, 0.0, -1.0))
@@ -118,14 +126,13 @@ def isCollectionInstance(sceneObject):
 
 
 def isPlayerSolid(sceneObject, collision=False):
-  """Whether players stand on and are blocked by an object: rendered meshes and collection instances, but not guides, plot borders,
-  regions, water bodies (swum, not stood on), spawns (players pass through them), or doors (taken as open). With collision, as the
-  client collides: boundaries, never drawn, block too, and objects marked passable do not."""
+  """Whether players stand on and are blocked by an object: rendered meshes and collection instances, but not objects marked passable,
+  guides, plot borders, regions, water bodies (swum, not stood on), spawns (players pass through them), or doors (taken as open); of
+  its faces, only those players do not pass through (meshFaces). With collision, as the client collides: boundaries, never drawn,
+  block too."""
   if collision and boundaryProperty in sceneObject:
     return sceneObject.type == "MESH"
-  if collision and passableProperty in sceneObject:
-    return False
-  if sceneObject.hide_render or isDesignAid(sceneObject) or regionIntentProperty in sceneObject or waterProperty in sceneObject:
+  if passableProperty in sceneObject or sceneObject.hide_render or isDesignAid(sceneObject) or regionIntentProperty in sceneObject or waterProperty in sceneObject:
     return False
   if sceneObject.get(clientContentProperty) in ("spawn", "door"):
     return False
@@ -155,12 +162,105 @@ def playerSolidObjects(excluding=(), collision=False):
   return [sceneObject for sceneObject in bpy.context.scene.objects if isPlayerSolid(sceneObject, collision) and sceneObject.name not in excluding]
 
 
-def playerSolidParts(excluding=()):
-  """Each mesh players stand on and are blocked by, with its world matrix (objectParts), leaving out the objects named in excluding."""
-  parts = [part for sceneObject in playerSolidObjects(excluding) for part in objectParts(sceneObject)]
-  if not parts:
-    raise ValueError("The scene has nothing players stand on: no rendered meshes or collection instances besides water, guides, regions, spawns, and doors")
-  return parts
+def isPassableMaterial(material):
+  """Players pass through liquid surfaces (water, waterfall, lava) and cutout cards, as the client's own zones flag them (0x1)."""
+  return material is not None and (liquidProperty in material or bool(material.get(cutoutProperty)))
+
+
+class MeshFaces(typing.NamedTuple):
+  """An evaluated mesh's vertex positions in its own space, its triangles, each triangle's material (an index into materials, where
+  len(materials) is none), and which triangles players pass through."""
+  positions: numpy.ndarray
+  triangles: numpy.ndarray
+  slots: numpy.ndarray
+  materials: list
+  passable: numpy.ndarray
+
+
+def meshFaces(sceneObject, depsgraph):
+  """A mesh's MeshFaces: players pass through all of a mesh marked passable, and otherwise the faces of a liquid or cutout material
+  and those the client file it came from flags passable."""
+  evaluated = sceneObject.evaluated_get(depsgraph)
+  mesh = evaluated.to_mesh()
+  try:
+    mesh.calc_loop_triangles()
+    positions = numpy.empty(len(mesh.vertices) * 3)
+    mesh.vertices.foreach_get("co", positions)
+    triangles = numpy.empty(len(mesh.loop_triangles) * 3, dtype=numpy.int64)
+    mesh.loop_triangles.foreach_get("vertices", triangles)
+    polygons = numpy.empty(len(mesh.loop_triangles), dtype=numpy.int64)
+    mesh.loop_triangles.foreach_get("polygon_index", polygons)
+    faceSlots = numpy.empty(len(mesh.polygons), dtype=numpy.int64)
+    mesh.polygons.foreach_get("material_index", faceSlots)
+    flagged = numpy.zeros(len(mesh.polygons), dtype=bool)
+    attribute = mesh.attributes.get(passableAttribute)
+    if attribute is not None:
+      attribute.data.foreach_get("value", flagged)
+    materials = [slot.material for slot in evaluated.material_slots]
+  finally:
+    evaluated.to_mesh_clear()
+  slots = numpy.minimum(faceSlots[polygons], len(materials))
+  passableSlots = numpy.array([isPassableMaterial(material) for material in materials] + [False], dtype=bool)
+  passable = passableSlots[slots] | flagged[polygons] | (passableProperty in sceneObject)
+  return MeshFaces(positions.reshape(-1, 3), triangles.reshape(-1, 3), slots, materials, passable)
+
+
+def solidFaces(faces):
+  """Which of a mesh's triangles (MeshFaces) players do not pass through."""
+  return ~faces.passable
+
+
+def isSwumMaterial(material):
+  """A client liquid players swim under where its file lets them through: water or lava, not a waterfall."""
+  return material is not None and material.get(clientLiquidProperty) in swumLiquids
+
+
+def swumFaces(faces):
+  """Which of a mesh's triangles (MeshFaces) are a client liquid's surface players swim under (isSwumMaterial, passable)."""
+  return numpy.array([isSwumMaterial(material) for material in faces.materials] + [False], dtype=bool)[faces.slots] & faces.passable
+
+
+def solidTrees(owners):
+  """(owner name, world matrix, BVH tree in the mesh's own space) for each of the objects' meshes (objectParts) over the faces players
+  do not pass through (meshFaces), leaving out meshes players pass through whole."""
+  bpy.context.view_layer.update()
+  depsgraph = bpy.context.evaluated_depsgraph_get()
+  trees = []
+  for owner in owners:
+    for part, matrix in objectParts(owner):
+      faces = meshFaces(part, depsgraph)
+      solid = solidFaces(faces)
+      if solid.all():
+        trees.append((owner.name, matrix, mathutils.bvhtree.BVHTree.FromObject(part, depsgraph)))
+      elif solid.any():
+        trees.append((owner.name, matrix, mathutils.bvhtree.BVHTree.FromPolygons(faces.positions.tolist(), faces.triangles[solid].tolist())))
+  return trees
+
+
+def selectedTriangles(owners, select):
+  """The world positions of the objects' meshes (objectParts) and the triangles select(MeshFaces) picks of them, all in one."""
+  bpy.context.view_layer.update()
+  depsgraph = bpy.context.evaluated_depsgraph_get()
+  positions, triangles, offset = [], [], 0
+  for owner in owners:
+    for part, worldMatrix in objectParts(owner):
+      faces = meshFaces(part, depsgraph)
+      matrix = matrixArray(worldMatrix)
+      positions.append(faces.positions @ matrix[:3, :3].T + matrix[:3, 3])
+      triangles.append(faces.triangles[select(faces)] + offset)
+      offset += len(positions[-1])
+  if not positions:
+    return numpy.zeros((0, 3)), numpy.zeros((0, 3), dtype=numpy.int64)
+  return numpy.concatenate(positions), numpy.concatenate(triangles)
+
+
+def playerSolidTriangles(excluding=()):
+  """The world positions and triangles players stand on and are blocked by (playerSolidObjects, solidFaces), leaving out the objects
+  named in excluding."""
+  positions, triangles = selectedTriangles(playerSolidObjects(excluding), solidFaces)
+  if not len(triangles):
+    raise ValueError("The scene has nothing players stand on besides water, guides, regions, spawns, doors, and what they pass through")
+  return positions, triangles
 
 
 class Footing(typing.NamedTuple):
@@ -172,18 +272,15 @@ class Footing(typing.NamedTuple):
 
 
 class PlayerSurfaces:
-  """Ray casts against what players stand on and are blocked by: playerSolidObjects but excluding, or only objects, or given (object
-  name, world matrix, BVH tree) trees."""
+  """Ray casts against what players stand on and are blocked by, never the faces they pass through (solidTrees): playerSolidObjects
+  but excluding, or only objects, or given (object name, world matrix, BVH tree) trees."""
 
   def __init__(self, excluding=(), objects=None, trees=None):
     if trees is None:
-      owners = playerSolidObjects(excluding) if objects is None else [sceneObject for sceneObject in objects if sceneObject.name not in excluding]
-      bpy.context.view_layer.update()
-      depsgraph = bpy.context.evaluated_depsgraph_get()
-      trees = [(owner.name, matrix, mathutils.bvhtree.BVHTree.FromObject(part, depsgraph)) for owner in owners for part, matrix in objectParts(owner)]
+      trees = solidTrees(playerSolidObjects(excluding) if objects is None else [sceneObject for sceneObject in objects if sceneObject.name not in excluding])
     self.members = [(name, matrix, matrix.inverted(), tree) for name, matrix, tree in trees]
     if not self.members:
-      what = "the named objects have no meshes" if objects is not None else "the scene has nothing players stand on besides water, guides, regions, spawns, and doors"
+      what = "the named objects have no faces players do not pass through" if objects is not None else "the scene has nothing players stand on besides water, guides, regions, spawns, doors, and what they pass through"
       raise ValueError(f"Nothing to cast against: {what}" + (f" once {sorted(excluding)} are left out" if excluding else ""))
 
   def cast(self, origin, direction, distance):
@@ -283,12 +380,18 @@ def describeRockOverGround(where, levels):
 
 
 def swimSurfaces():
-  """A BVH over the surfaces of rendered pools and rivers (falls are not swum), or None when the scene has none."""
+  """A BVH over the surfaces players swim under: rendered pools and rivers (falls are not swum) and imported client liquids
+  (swumFaces); None when the scene has none."""
   bodies = [
     sceneObject for sceneObject in bpy.context.scene.objects
     if waterProperty in sceneObject and not sceneObject.hide_render and json.loads(sceneObject[waterProperty])["kind"] != "fall"
   ]
-  return worldTree(bodies) if bodies else None
+  liquidOwners = [owner for owner in playerSolidObjects() if any(isSwumMaterial(slot.material) for part, _ in objectParts(owner) for slot in part.material_slots)]
+  positions, triangles = selectedTriangles(liquidOwners, swumFaces)
+  bodyPositions, bodyTriangles = worldTriangles(bodies)
+  triangles = numpy.concatenate([triangles, bodyTriangles + len(positions)])
+  positions = numpy.concatenate([positions, bodyPositions])
+  return mathutils.bvhtree.BVHTree.FromPolygons(positions.tolist(), triangles.tolist()) if len(triangles) else None
 
 
 def waterDepthAt(surfaces, point):

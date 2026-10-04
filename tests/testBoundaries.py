@@ -123,10 +123,11 @@ def testExportWritesWallsFlagsAndZoneLinesAndTheArchiveBringsThemBack(stageBlend
     blocked = await session.expectSuccess("walkRoute", {"path": [[100, 80, 0], [190, 80, 0]]})
     through = await session.expectSuccess("walkRoute", {"path": [[100, 0, 0], [190, 0, 0]]})
     wading = await session.expectSuccess("walkRoute", {"path": [[-160, 0, 0], [0, 0, 0]]})
+    _, swimming = await session.expectImage("renderView", {"view": {"standAt": [0, 0], "headingDegrees": 90, "pitchDegrees": 0}, "guides": False})
     reference = await session.expectSuccess("checkExport", {"path": str(tmp_path / "again.eqg"), "purpose": "test"})
-    return checked, exported, builtBoundaries, imported, lines, blocked, through, wading, reference
+    return checked, exported, builtBoundaries, imported, lines, blocked, through, wading, swimming, reference
 
-  checked, exported, builtBoundaries, imported, lines, blocked, through, wading, reference = stageBlenderServer.session(steps)
+  checked, exported, builtBoundaries, imported, lines, blocked, through, wading, swimming, reference = stageBlenderServer.session(steps)
   assert checked["failures"] == [] and checked["boundaries"] == ["eastNorth", "eastSouth", "westLid"] and checked["zoneLines"] == ["ATP_1_east"]
   assert [(finding["finding"], finding["missing"]) for finding in checked["findings"] if "missing" in finding] == [("view values missing", ["minClip", "sky"]), ("safe point or underworld missing", ["safePoint", "underworld"])]
   assert sum(entry["triangles"] for entry in builtBoundaries["boundaries"]) == 2 * 33 + 2 * 33 + 2
@@ -155,7 +156,11 @@ def testExportWritesWallsFlagsAndZoneLinesAndTheArchiveBringsThemBack(stageBlend
   assert lines["zoneLines"] == [{"name": "ATP_1_east", "number": 1, "label": "east", "minimum": [148.0, -20.0, -5.0], "maximum": [160.0, 20.0, 60.0], "target": None, "clientContent": "zoneFile"}]
   assert lines["errors"] == [] and lines["gaps"] == [] and imported["zoneLinesTurned"] == [] and imported["passableTriangles"] == exported["passableTriangles"]
   assert blocked["problems"][0]["kind"] == "blocked" and blocked["problems"][0]["boundary"][:2] == [150.0, 80.0]
-  assert through["walkable"] and wading["walkable"] and wading["deepestWater"] is None and min(row["at"][2] for row in wading["profile"]) <= -15
+  assert through["walkable"] and wading["walkable"] and min(row["at"][2] for row in wading["profile"]) <= -15
+  # The imported pool's surface, which the archive lets players through, is swum as the pool was: the walk wades its bed under it, and
+  # a view in its middle stands on the bed and swims, eye a unit over the surface.
+  assert wading["deepestWater"]["depth"] >= 14
+  assert swimming["swimming"] is True and swimming["ground"][2] <= -19.5 and abs(swimming["eye"][2] - (swimming["ground"][2] + swimming["waterDepth"] + 1)) < 1e-3
   reasons = {group["reason"]: group["objects"] for group in reference["excluded"]}
   assert reasons["part of an imported zone archive: reference"][:3] == ["ATP_1_east", "boundplot", "boundplot boundaries"]
 

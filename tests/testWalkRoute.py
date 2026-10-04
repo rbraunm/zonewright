@@ -1,3 +1,4 @@
+from conftest import writePNG
 from testModelsAndDressing import freshScene
 from testWater import basin, liquidMaterials
 
@@ -175,3 +176,43 @@ def testPlayersStandOnTheBedUnderWaterAndOnInstancesButNotOnGuides(stageBlenderS
   # In the middle a player swims, eye a unit over the surface; at 70 out the water is 1 deep and the player stands on the bed.
   assert deep["swimming"] is True and deep["waterDepth"] == 15.0 and abs(deep["eye"][2] - (-4.0)) < 1e-3
   assert shallow["swimming"] is False and abs(shallow["waterDepth"] - 1.0) < 0.1 and abs(shallow["eye"][2] - (shallow["ground"][2] + 5.5)) < 1e-3
+
+
+def testEveryLookupForGroundPassesThroughACanopyAndWhatIsMarkedPassable(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [200, 200], "spacing": 8, "location": [0, 0, 0], "collection": "terrain"})
+    await session.expectSuccess("createMaterial", {"name": "leaves", "diffuseTexture": str(writePNG(tmp_path / "leaves.png", 4, 4, (40, 110, 40, 200))), "cutout": True})
+    await session.expectSuccess("createPrimitive", {"kind": "plane", "name": "canopy", "size": [60, 60, 0], "location": [0, 0, 20]})
+    await session.expectSuccess("assignMaterial", {"objectName": "canopy", "materialName": "leaves"})
+    await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "moss", "size": [20, 20, 8], "location": [60, 60, 0]})
+    await session.expectSuccess("markPassable", {"objects": ["moss"]})
+    for name, location in (("stone", [5, 5, 40]), ("pebble", [-5, -5, 40])):
+      await session.expectSuccess("createPrimitive", {"kind": "cube", "name": name, "size": [2, 2, 2], "location": location})
+    await session.expectSuccess("setZoneProperties", {
+      "ambientColor": [0.3, 0.3, 0.3], "specialAmbientColor": [0, 0, 0], "bounceColor": [0, 0, 0], "sunColor": [0.6, 0.6, 0.6],
+      "sunAzimuthDegrees": 0, "sunElevationDegrees": 45, "fogColor": [0.5, 0.5, 0.5], "fogStart": 50, "fogEnd": 3000, "fogDensity": 0.1, "fogOn": True, "maxClip": 6000, "newEngineZone": False,
+    })
+    _, under = await session.expectImage("renderView", {"view": {"standAt": [0, 0], "headingDegrees": 90, "pitchDegrees": 0, "figureAt": [10, 0]}, "guides": False})
+    _, mossy = await session.expectImage("renderView", {"view": {"standAt": [60, 60], "headingDegrees": 0, "pitchDegrees": 0}, "guides": False})
+    measured = await session.expectSuccess("measure", {"points": [[0, 0, 50], [60, 60, 50]], "snapToSurface": True})
+    sketched = await session.expectSuccess("sketch", {"sheet": "plot", "shapes": [{"name": "under", "kind": "point", "at": [0, 0]}, {"name": "onMoss", "kind": "point", "at": [60, 60]}]})
+    placed = await session.expectSuccess("placeOnSurface", {"objectNames": ["stone"]})
+    settled = await session.expectSuccess("settleObjects", {"names": ["pebble"]})
+    walked = await session.expectSuccess("walkRoute", {"path": [[-50, 0, 0], [50, 0, 0]]})
+    _, section = await session.expectImage("renderSection", {"start": [-50, 0], "end": [50, 0], "bottom": -10, "top": 40})
+    await session.expectSuccess("deleteObjects", {"names": ["canopy"]})
+    _, bareSection = await session.expectImage("renderSection", {"start": [-50, 0], "end": [50, 0], "bottom": -10, "top": 40})
+    return under, mossy, measured, sketched, placed, settled, walked, section, bareSection
+
+  under, mossy, measured, sketched, placed, settled, walked, section, bareSection = stageBlenderServer.session(steps)
+  # The cutout canopy 20 up and the crate marked passable are passed through by every lookup for the ground, as walkRoute passes them:
+  # the views stand on the ground under them, and the stones land and settle on it.
+  assert under["ground"] == [0.0, 0.0, 0.0] and under["eye"] == [0.0, 0.0, 5.5] and under["figure"] == [10.0, 0.0, 0.0]
+  assert mossy["ground"] == [60.0, 60.0, 0.0]
+  assert measured["points"] == [[0.0, 0.0, 0.0], [60.0, 60.0, 0.0]]
+  assert [shape["ground"] for shape in sketched["shapes"]] == [0.0, 0.0]
+  assert placed["placements"][0]["location"] == [5.0, 5.0, 0.0] and placed["placements"][0]["surface"] == "ground"
+  assert settled["settled"][0]["under"] == [0.0, 0.0] and settled["settled"][0]["spans"] == [0.0, 2.0]
+  assert walked["walkable"] and walked["lowestHeadroom"] is None and all(row["at"][2] == 0.0 for row in walked["profile"])
+  assert section["groundSegments"] == bareSection["groundSegments"]
