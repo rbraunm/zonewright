@@ -47,9 +47,14 @@ skyImageHeight = 1024
 # Layout shading lights from the northwest, as relief maps do, so slopes read the same whatever the zone's sun.
 layoutLightDirection = (-0.5, 0.5, 0.7071)
 layoutAmbient = 0.3
-# Swim volumes drawn in a view: see-through blocks, cyan for water and orange for lava.
-swimColors = {"water": (0.1, 0.85, 1.0), "lava": (1.0, 0.45, 0.05)}
+# Swim volumes drawn in a view: see-through blocks, cyan for water and magenta for lava, which shows over lava's oranges.
+swimColors = {"water": (0.1, 0.85, 1.0), "lava": (1.0, 0.15, 0.85)}
 swimAlpha = 0.3
+# A box's top shares its height with the surface it was built under, and drawn there the two fight for depth in a mottle; it is drawn
+# lifted by what the depth buffer can tell apart there (in perspective, distance squared over the near clip, orthographic, the clip
+# range, each over this many steps), and at least the minimum.
+swimLiftDepthSteps = 2.0 ** 20
+swimLiftMinimum = 0.02
 layoutHeightColors = ((0.0, (0.22, 0.36, 0.26)), (0.35, (0.58, 0.56, 0.36)), (0.7, (0.62, 0.45, 0.32)), (1.0, (0.92, 0.9, 0.87)))
 # Relief shading is the layout drawing in quiet greys, for a plan's lines and labels to stand out over.
 reliefHeightColors = ((0.0, (0.5, 0.5, 0.48)), (1.0, (0.93, 0.93, 0.91)))
@@ -158,12 +163,22 @@ class PreviewScene:
     figure = bridgeModels.modelObject(figureModel["folder"], previewName + "Figure", figureModel["scale"], origin, 90 - facingHeadingDegrees)
     return self.addObject(figure)
 
+  def swimTopLift(self, top):
+    """How far a box's top (its corners) is drawn above where it is, so it never fights the surface at its height for depth."""
+    camera = self.camera.data
+    if camera.type == "ORTHO":
+      return max(swimLiftMinimum, (camera.clip_end - camera.clip_start) / swimLiftDepthSteps)
+    distance = max((mathutils.Vector(corner) - self.camera.location).length for corner in top)
+    return max(swimLiftMinimum, distance * distance / (camera.clip_start * swimLiftDepthSteps))
+
   def drawSwimVolumes(self):
-    """Each swim volume as a see-through block in its liquid's color, to look at against the water and the bed."""
+    """Each swim volume as a see-through block in its liquid's color, to look at against the water and the bed; its top is drawn a hair
+    above the surface it meets."""
     for box in bridgeSwim.swimBoxes():
       liquid = bridgeSwim.readBox(box)["liquid"]
       (low, high) = bridgeSwim.boxCorners(box)
-      corners = [(x, y, z) for z in (low[2], high[2]) for y in (low[1], high[1]) for x in (low[0], high[0])]
+      top = high[2] + self.swimTopLift([(x, y, high[2]) for y in (low[1], high[1]) for x in (low[0], high[0])])
+      corners = [(x, y, z) for z in (low[2], top) for y in (low[1], high[1]) for x in (low[0], high[0])]
       faces = [(0, 2, 3, 1), (4, 5, 7, 6), (0, 1, 5, 4), (2, 6, 7, 3), (0, 4, 6, 2), (1, 3, 7, 5)]
       mesh = bpy.data.meshes.new(previewName + "Swim")
       mesh.from_pydata(corners, [], faces)

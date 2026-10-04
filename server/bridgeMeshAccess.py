@@ -28,6 +28,8 @@ regionIntentProperty = "zonewrightRegionIntent"
 surfaceLayersProperty = "zonewrightSurfaceLayers"
 # A water body (bridgeWater) keeps what it was made from in this property, so every edit rebuilds it from that against the ground.
 waterProperty = "zonewrightWater"
+# A swim volume (bridgeSwim) keeps its liquid, its body, and what it was built from in this property.
+swimProperty = "zonewrightSwimVolume"
 # A guide is drawn to design with (a plot's outline) and never exported; a plot's border is a server-placed door, exported in the
 # zone's housing file rather than its geometry.
 guideProperty = "zonewrightGuide"
@@ -230,21 +232,126 @@ def worldTree(sceneObjects):
   return mathutils.bvhtree.BVHTree.FromPolygons(positions.tolist(), triangles.tolist())
 
 
-def underWaterMask(waterObject, positions):
-  """Which points lie under a water body's surface."""
-  tree = worldTree([waterObject])
-  up = mathutils.Vector((0.0, 0.0, 1.0))
-  return numpy.array([tree.ray_cast(mathutils.Vector(point), up, waterReach)[0] is not None for point in positions], dtype=bool)
+# A point this close to a water surface lies on it: a vertex cut onto the waterline is at the level, not above it.
+waterlineTolerance = 1e-3
 
 
-def nearWaterMask(waterObject, positions, distance):
-  """Which points lie out of a water body but within distance of its surface, which reaches a little under its banks."""
+class WaterSurface:
+  """A pool or river's surface seen in plan: whether points lie over it, its height over them, and its waterline on a mesh, where the
+  mesh crosses that height. The surface runs on a little under its banks, so the waterline, not the surface's edge, is where players
+  see the water end."""
+
+  def __init__(self, waterObject):
+    if json.loads(waterObject[waterProperty])["kind"] == "fall":
+      raise ValueError(f"'{waterObject.name}' is a fall; it has no waterline, bed, or banks")
+    self.name = waterObject.name
+    self.positions, self.triangles = worldTriangles([waterObject])
+    flat = self.positions.copy()
+    flat[:, 2] = 0.0
+    self.plan = mathutils.bvhtree.BVHTree.FromPolygons(flat.tolist(), self.triangles.tolist())
+    self.low, self.high = self.positions[:, :2].min(0), self.positions[:, :2].max(0)
+
+  def heights(self, points):
+    """For [x, y] points: the height of the surface's plane nearest each in plan (its own height where it lies over the point), and
+    how far off the surface each lies in plan."""
+    heights, apart = numpy.empty(len(points)), numpy.empty(len(points))
+    for index, (x, y) in enumerate(points):
+      _, _, face, distance = self.plan.find_nearest(mathutils.Vector((x, y, 0.0)))
+      a, b, c = self.positions[self.triangles[face]]
+      normal = numpy.cross(b - a, c - a)
+      heights[index] = a[2] - (normal[0] * (x - a[0]) + normal[1] * (y - a[1])) / normal[2]
+      apart[index] = distance
+    return heights, apart
+
+  def nearby(self, points, margin):
+    return ((points[:, :2] >= self.low - margin) & (points[:, :2] <= self.high + margin)).all(axis=1)
+
+  def underMask(self, positions):
+    """Which points lie under the surface or on it."""
+    under = numpy.zeros(len(positions), dtype=bool)
+    candidates = numpy.flatnonzero(self.nearby(positions, waterlineTolerance))
+    heights, apart = self.heights(positions[candidates, :2])
+    under[candidates] = (apart <= waterlineTolerance) & (positions[candidates, 2] <= heights + waterlineTolerance)
+    return under
+
+  def waterline(self, positions, triangles):
+    """Where triangles of a mesh cross the surface over them, as plan segments (k x 2 x 2): the shore players see."""
+    nearTriangles = triangles[self.nearby(positions, waterlineTolerance)[triangles].any(axis=1)]
+    used = numpy.unique(nearTriangles)
+    values = numpy.full(len(positions), numpy.nan)
+    heights, _ = self.heights(positions[used, :2])
+    values[used] = positions[used, 2] - heights
+    segments = []
+    for triangle in nearTriangles:
+      below = values[triangle] < 0
+      if below.all() or not below.any():
+        continue
+      ends = []
+      for first, second in ((0, 1), (1, 2), (2, 0)):
+        if below[first] != below[second]:
+          a, b = values[triangle[first]], values[triangle[second]]
+          ends.append(positions[triangle[first], :2] + a / (a - b) * (positions[triangle[second], :2] - positions[triangle[first], :2]))
+      segments.append(ends)
+    segments = numpy.array(segments).reshape(-1, 2, 2)
+    segments = segments[numpy.linalg.norm(segments[:, 1] - segments[:, 0], axis=1) > waterlineTolerance]
+    if len(segments):
+      _, apart = self.heights(segments.mean(axis=1))
+      segments = segments[apart <= waterlineTolerance]
+    return segments
+
+
+def meshTriangles(sceneObject):
+  """The mesh's faces split into triangles, as vertex indices."""
+  mesh = sceneObject.data
+  mesh.calc_loop_triangles()
+  corners = numpy.empty(len(mesh.loop_triangles) * 3, dtype=numpy.int64)
+  mesh.loop_triangles.foreach_get("vertices", corners)
+  return corners.reshape(-1, 3)
+
+
+def waterlineDistances(segments, points):
+  """Each point's distance in plan from a waterline (WaterSurface.waterline), infinite where there is none."""
+  if not len(segments):
+    return numpy.full(len(points), numpy.inf)
+  flat = numpy.zeros((len(segments), 2, 3))
+  flat[:, :, :2] = segments
+  border = BorderDistance(flat[:, 0], flat[:, 1])
+  return numpy.array([border.nearest((x, y, 0.0))[0] for x, y in points[:, :2]])
+
+
+def underWaterMask(waterObject, sceneObject, elementKind):
+  """The vertices under a pool or river's surface or on it, or the faces every corner of which lies there: its bed. Faces are whole, so
+  where faces cross the waterline the bed stops short of it; cut the mesh along the waterline (carveWaterBed does, or cutContours at a
+  pool's level) for a bed that meets it."""
+  positions, _ = readVertexArrays(sceneObject)
+  under = WaterSurface(waterObject).underMask(positions)
+  if elementKind == "vertices":
+    return under
+  return numpy.array([under[corners].all() for corners in faceVertexIndices(sceneObject)], dtype=bool)
+
+
+def nearWaterMask(waterObject, sceneObject, elementKind, distance):
+  """The vertices out of a pool or river within distance in plan of its waterline on the mesh, or the faces not under it that the
+  waterline crosses or whose middles lie within distance of it: its wet banks, as wide as the faces allow."""
   if distance <= 0:
     raise ValueError(f"The nearWater selector's distance must be positive, got {distance}")
-  tree = worldTree([waterObject])
-  under = underWaterMask(waterObject, positions)
-  near = numpy.array([tree.find_nearest(mathutils.Vector(point), distance)[0] is not None for point in positions], dtype=bool)
-  return near & ~under
+  surface = WaterSurface(waterObject)
+  positions, _ = readVertexArrays(sceneObject)
+  under = surface.underMask(positions)
+  segments = surface.waterline(positions, meshTriangles(sceneObject))
+  if elementKind == "vertices":
+    points, outside, crossing = positions, ~under, numpy.zeros(len(positions), dtype=bool)
+  else:
+    points = readFaceArrays(sceneObject)[0]
+    cornersUnder = [under[corners] for corners in faceVertexIndices(sceneObject)]
+    outside = numpy.array([not corners.all() for corners in cornersUnder], dtype=bool)
+    crossing = numpy.array([corners.any() for corners in cornersUnder], dtype=bool)
+  near = numpy.zeros(len(points), dtype=bool)
+  if len(segments):
+    low, high = segments.reshape(-1, 2).min(0) - distance, segments.reshape(-1, 2).max(0) + distance
+    candidates = numpy.flatnonzero(outside & ~crossing & ((points[:, :2] >= low) & (points[:, :2] <= high)).all(axis=1))
+    near[candidates] = waterlineDistances(segments, points[candidates]) <= distance
+  return outside & (near | crossing)
 
 
 def requireMeshObject(name):
@@ -431,6 +538,10 @@ def evaluateSelector(selector, sceneObject, elementKind):
   key, value = next(iter(selector.items()))
   if key in selectorFields and (not isinstance(value, dict) or set(value) != set(selectorFields[key])):
     raise ValueError(f"The {key} selector is {{\"{key}\": {{{', '.join(selectorFields[key])}}}}}, got {selector!r}")
+  if key == "underWater":
+    return underWaterMask(requireWater(value), sceneObject, elementKind)
+  if key == "nearWater":
+    return nearWaterMask(requireWater(value["water"]), sceneObject, elementKind, value["distance"])
   if elementKind == "vertices":
     positions, normals = readVertexArrays(sceneObject)
   else:
@@ -471,10 +582,6 @@ def evaluateSelector(selector, sceneObject, elementKind):
     return insideMask(requireMeshObject(value), positions)
   if key == "region":
     return insideRegion(requireRegion(value), positions)
-  if key == "underWater":
-    return underWaterMask(requireWater(value), positions)
-  if key == "nearWater":
-    return nearWaterMask(requireWater(value["water"]), positions, value["distance"])
   if key == "noise":
     if not 0 < value["share"] < 1:
       raise ValueError(f"The noise selector's share is a fraction between 0 and 1, got {value['share']}")

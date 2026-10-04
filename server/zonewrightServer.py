@@ -644,7 +644,7 @@ async def setZoneProperties(
 
 @guardedTool()
 async def renderView(context: Context, view: dict, shading: str = "client", bandHeight: float = 50.0, guides: bool = True, swimVolumes: bool = False):
-  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], or with z on the ground within 50 units below it, for caves and under overhangs; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog. {"frame": {"objects": [names], "headingDegrees": h, "pitchDegrees": p}} looks at the named meshes or collection instances from that heading and pitch, standing back so they fit (its result's eye and target reproduce that camera). shading "client" draws the zone as the client does; "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout. Guides (plot outlines, sketch massing) draw unless guides is false; with swimVolumes, each swim volume draws as a see-through block (cyan water, orange lava)."""
+  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], or with z on the ground within 50 units below it, for caves and under overhangs; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog. {"frame": {"objects": [names], "headingDegrees": h, "pitchDegrees": p}} looks at the named meshes or collection instances from that heading and pitch, standing back so they fit (its result's eye and target reproduce that camera). shading "client" draws the zone as the client does; "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout. Guides (plot outlines, sketch massing) draw unless guides is false; with swimVolumes, each swim volume draws as a see-through block (cyan water, magenta lava), its top a hair above the surface it meets so the two do not mottle."""
   outputPath = newRenderPath()
   figureModel = None
   zone = await callBridge(context, "getZoneProperties", {})
@@ -873,7 +873,7 @@ async def exportZone(context: Context, path: str):
   as Opaque_MaxCB1.fx, diffuse only as Opaque_MaxC1.fx, a cutout (diffuse only) as Chroma_MPLBasicAT.fx. DDS textures are stored
   unchanged, others as uncompressed DDS with power-of-two sides; createLiquidMaterial materials export as the client's water, waterfall,
   and lava shaders with their values. The swim volumes go into the .zon as AWT_ (water) and ALV_ (lava) regions, as they stand (export
-  derives none and refuses boxes a zone file cannot hold); `swim` lists the pools and rivers whose swimming is undecided (no boxes and not
+  derives none and refuses boxes a zone file cannot hold, as getSwimVolumes lists them); `swim` lists the pools and rivers whose swimming is undecided (no boxes and not
   marked not swimmable) or changed since their boxes were accepted. Point lights
   placed with placeLight go into the .zon; emitters placed with placeEmitter go into <zone>_EnvironmentEmitters.txt beside the archive
   (the client reads that list loose from its own folder). A zone with housing (setZoneHousing) also gets <zone>_housing.json beside the
@@ -1097,7 +1097,8 @@ selectorHelp = (
   " {\"box\": {\"minimum\": [x,y,z], \"maximum\": [x,y,z]}}, {\"cylinder\": {\"center\": [x,y], \"radius\": r, \"bottom\": z, \"top\": z}},"
   " {\"facing\": {\"direction\": [x,y,z], \"withinDegrees\": d}}, {\"slope\": {\"minimumDegrees\": a, \"maximumDegrees\": b}} (0 flat, 90 vertical, over 90 overhanging), {\"height\": {\"minimum\": z, \"maximum\": z}}, {\"nearPath\": {\"path\": [[x,y,z], ...], \"radius\": r}} (horizontal distance), {\"material\": name}, {\"vertexGroup\": name}, {\"insideObject\": closedMeshName}, {\"region\": regionName} (inside a region createRegion made),"
   " {\"noise\": {\"featureSize\": f, \"share\": s, \"seed\": n}} (patches about f across covering about the fraction s of the surface, for breaking up one material with another),"
-  " {\"underWater\": waterBodyName} (under a pool or river's surface: its bed), {\"nearWater\": {\"water\": name, \"distance\": d}} (out of the water but within d of its surface: wet banks),"
+  " {\"underWater\": waterBodyName} (under a pool or river's surface or on it: its bed; a face only when all its corners are), {\"nearWater\": {\"water\": name, \"distance\": d}} (out of the water within d in plan of its waterline, where the mesh meets the surface: wet banks; a face the waterline crosses or whose middle lies within d),"
+  " both following whole faces: for a bed that meets the waterline exactly, cut the mesh along it first (carveWaterBed does, as does cutContours at a pool's level), and for a bank band with a clean outer edge, cut along that too (cutContours with distanceFrom the bed),"
   " {\"and\": [selectors]}, {\"or\": [selectors]}, {\"not\": selector}. Shapes test vertex positions, or face centers for face operations."
   " A selector that matches nothing is an error. Masks such as slope and height pick within an area you chose (a region, a stroke);"
   " a recipe belongs to a region, not to the whole zone."
@@ -1437,8 +1438,10 @@ async def renderSketch(
   from the northwest), `width` units across about `center`, north up, with a coordinate grid (the ground's height written at each
   crossing unless spotHeights is false), a scale bar, the sketch sheets (all, or
   those named) in their own colors (areas dashed, footprints filled with their facing arrows and heights, paths at their widths,
-  points, notes), and the plan's own layers: regions (dashed, named), plots (outlined, by address), water (blue), and swim (the swim
-  volumes, dashed)."""
+  points, notes), and the plan's own layers: regions (dashed, named), plots (outlined, by address), water (as players see it, not
+  where a surface runs on tucked under its banks: blue, lava orange), and swim (the swim volumes, dashed, cyan water and magenta lava,
+  each named inside itself where its name fits clear of the others, else by its number; `unnamedSwimVolumes` lists those in the
+  drawing left unnamed, to see closer)."""
   if len(center) != 2 or width <= 0:
     raise ToolError(f"center is [x, y] and width positive, got {center} and {width}")
   zone = await callBridge(context, "getZoneProperties", {})
@@ -1455,7 +1458,7 @@ async def renderSketch(
   return [Image(data=outputPath.read_bytes(), format="png"), {
     "outputPath": str(outputPath), "center": center, "width": width, "unitsPerPixel": round(width / drawn["size"][0], 4), "heightRange": base["heightRange"],
     "bandHeight": bandHeight, "gridStep": drawn["gridStep"], "sheetColors": drawn["sheetColors"],
-    "shapes": {sheet["sheet"]: len(sheet["shapes"]) for sheet in overlays["sheets"]},
+    "shapes": {sheet["sheet"]: len(sheet["shapes"]) for sheet in overlays["sheets"]}, "unnamedSwimVolumes": drawn["unnamedSwimVolumes"],
   }]
 
 
@@ -1505,7 +1508,8 @@ async def renderSection(
 ):
   """Draw a section: where the vertical plane through the line from start [x, y] to end [x, y] cuts the zone, seen from the line's right
   so start is on the left, from bottom to top at one scale across and up: the ground players stand on (brown; caves, overhangs, and
-  arches show as the shapes they are), water surfaces (blue), swim volumes (dashed boxes, cyan water and orange lava), sketch massing
+  arches show as the shapes they are), water surfaces where players see them (blue; not where they run on tucked under the banks),
+  swim volumes (dashed boxes, cyan water and magenta lava), sketch massing
   (grey), and plot pads (orange), with a height grid and the distance along the line. For judging what plans cannot show: swim
   volumes against the surface and the bed, a cave's headroom, a plot's pad against the slope, stacked floors, an arch's span. The
   result also gives the cuts as numbers (s along the line, z height)."""
@@ -1533,14 +1537,16 @@ async def buildSwimVolumes(context: Context, body: str, area: dict | None = None
   boxes to look at and adjust by hand (transformObjects, duplicateObjects, deleteObjects; placeSwimVolume adds one). area ({"circle":
   ...} or {"polygon": ...}) builds only inside it. A rebuild replaces the body's generated boxes there and refuses over boxes edited or
   placed by hand unless replaceEdited. The result gives the body's state and findings (surface left uncovered, a top away from the
-  surface, ground rising to the top inside a box): things to look at, never errors, since a box need not match a surface."""
+  surface, ground rising to the top inside a box, a box mostly without the body's water over it): things to look at, never errors,
+  since a box need not match a surface."""
   return await callBridge(context, "buildSwimVolumes", {"body": body, "area": area, "replaceEdited": replaceEdited})
 
 
 @guardedTool()
 async def placeSwimVolume(context: Context, name: str, liquid: str, minimum: list[float], maximum: list[float], body: str | None = None):
   """Place a swim volume by hand from its corners [x, y, z], square to the axes: water or lava, named <prefix><name> (AWT_ or ALV_
-  added), tied to a pool or river (body) or standing alone: a floating pool, a cove, a pool without a surface. Adjust it like any box."""
+  added), tied to a pool or river (body; not one marked not swimmable) or standing alone: a floating pool, a cove, a pool without a
+  surface. Adjust it like any box."""
   return await callBridge(context, "placeSwimVolume", {"name": name, "liquid": liquid, "minimum": minimum, "maximum": maximum, "body": body})
 
 
@@ -1555,8 +1561,9 @@ async def acceptSwimVolumes(context: Context, body: str):
 async def getSwimVolumes(context: Context, name: str | None = None):
   """The swim volumes (or one by name), each with its liquid, body, corners, and whether it was edited or placed by hand; every pool and
   river's swim state (boxed; changed since its boxes were accepted; notSwimmable, as editWater's swimmable false marks a fountain or a
-  trickle; undecided) with its findings; and any errors a zone file cannot hold (a box turned or without size, names that clash once
-  lowercased, a prefix against its liquid, a body gone), which export refuses."""
+  trickle; undecided) with its findings (as buildSwimVolumes gives them: a box left over a drained or moved basin is mostly without
+  water over it); and any errors a zone file cannot hold (a box turned or without size, names that clash once lowercased, a prefix
+  against its liquid, a body gone, a box of a body marked not swimmable), which export refuses."""
   return await callBridge(context, "getSwimVolumes", {"name": name})
 
 
@@ -1825,7 +1832,8 @@ async def createLiquidMaterial(
 waterBodyHelp = (
   " A water body is one named object in the water collection, rebuilt from what it was made from whenever editWater or"
   " shapeWaterExtent changes it, against the ground as it then is; look at it after every change (renderView close at the shore and"
-  " from above), then adjust. Its surface reaches a little under its banks so no seam shows. Where players swim is designed"
+  " from above), then adjust. Its surface reaches a little under its banks so no seam shows, and where its bounds cross open water"
+  " (a river's reach, a within outline, a stroke) it is cut cleanly along them rather than stepping cell by cell. Where players swim is designed"
   " apart from the surface, as swim volumes (buildSwimVolumes starts them, placeSwimVolume adds one), once the water and bed settle;"
   " editWater's swimmable false marks a body no one swims in. The ground is what players stand on: rendered meshes and collection"
   " instances that are not water, guides, regions, spawns, or doors. The result's `built` reports what the build found: a pool or river's deepest point and where it"
@@ -1889,7 +1897,8 @@ async def pourWaterfall(
   "Change what a water body is made from and build it again against the ground as it is now: a pool's level, seed, within (an empty"
   " list removes it), spacing, worldUnitsPerRepeat, or strokes (an empty list clears them); a river's path, reach, spacing,"
   " worldUnitsPerRepeat, or strokes; a pool or river's swimmable (false: no one swims in it, a fountain or a trickle; true: it is"
-  " swum, its swim volumes to be built); a fall's lip, bottom, throw, spread, spacing, or worldUnitsPerRepeat; any body's material."
+  " swum, its swim volumes to be built; marking false is refused while the body has swim volumes, which go first, with deleteObjects);"
+  " a fall's lip, bottom, throw, spread, spacing, or worldUnitsPerRepeat; any body's material."
   " With nothing to change it only rebuilds, for after the ground under it has changed." + waterBodyHelp
 ))
 async def editWater(
@@ -1909,7 +1918,10 @@ async def editWater(
   "Stroke where a pool or river may spread, as an artist paints a mask: mode \"add\" lets it flood an `area` its bounds left out (a"
   " cove past its within outline, a backwater beyond a river's reach), \"remove\" stops it where it leaks (a stroke across a gap in"
   " the bank); `area` is {\"circle\": {\"center\": [x, y], \"radius\": r}} or {\"polygon\": [[x, y], ...]}. Strokes apply in order"
-  " and are kept, so later edits keep them; editWater with strokes [] clears them." + waterBodyHelp
+  " and are kept, so later edits keep them; editWater with strokes [] clears them. A stroke that would leave the body as it is is"
+  " refused, saying why: no water inside a removed area, or for an added one, ground there at or above the level, low ground the water"
+  " already covers, or low ground that higher ground or the body's own bounds part from the water (open a way, stroke the gap in too,"
+  " or flood it as its own body)." + waterBodyHelp
 ))
 async def shapeWaterExtent(context: Context, name: str, mode: str, area: dict):
   return await callBridge(context, "shapeWaterExtent", {"name": name, "mode": mode, "area": area})
@@ -1917,15 +1929,19 @@ async def shapeWaterExtent(context: Context, name: str, mode: str, area: dict):
 
 @guardedTool()
 async def carveWaterBed(context: Context, name: str, objectName: str, depth: float, shoreWidth: float):
-  """Lower the ground (objectName) under a pool or river: `depth` under its surface from `shoreWidth` out from the shore, rising
-  smoothly to the surface at the shore, so the waterline stays where it is; ground already deeper stays. With shaping passes it goes
-  into the active pass. Paint the bed and wet banks with paintSurface's underWater and nearWater selectors."""
+  """Lower the ground (objectName) under a pool or river: `depth` under its surface from `shoreWidth` out from its waterline (where
+  the ground meets the surface), rising smoothly to the surface at the waterline. It first cuts the ground along the waterline (an edge
+  loop, as cutContours makes; `waterlineCut` counts the splits), so the waterline stays exactly where it is: nothing at or above the
+  surface moves, and ground already deeper stays. With shaping passes it goes into the active pass. Paint the bed and wet banks with
+  paintSurface's underWater and nearWater selectors; along the cut, the bed meets the waterline exactly."""
   return await callBridge(context, "carveWaterBed", {"name": name, "objectName": objectName, "depth": depth, "shoreWidth": shoreWidth})
 
 
 @guardedTool()
 async def getWater(context: Context):
-  """Every water body: its kind, what it is made from, its material, its levels and plan bounds, and its mesh counts."""
+  """Every water body: its kind, what it is made from, its material, its levels, its visibleExtent (the plan bounds of the water
+  players see: a pool or river's surface where it is not tucked under its banks, a fall's sheet outside the rock; null when none
+  shows), and its mesh counts."""
   return await callBridge(context, "getWater", {})
 
 
