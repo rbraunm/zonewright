@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy
 from PIL import Image
+import pytest
 
 from conftest import pinnedBlender
 
@@ -13,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
 import eqArchive
 import eqgFiles
 
+pytestmark = pytest.mark.clientData("survey")
 classicZone = "nektulos"
 eqgZone = "nektulosa"
 

@@ -27,6 +27,7 @@ zonewright is a standalone MCP server; it is not tied to any particular work rep
 
 ## Tests
 Tests exercise the real pinned Blender through the real bridge. No mocking the code path under test.
+- While working, run the test files for the code you changed; run the whole suite once, before merging. It takes the slow client data and install tiers only when their code changed (README).
 
 ## Phase 1 limits
 Phase 1 makes zones look right in Blender; EQ export is Phase 2. Build nothing Phase 2 can't carry:

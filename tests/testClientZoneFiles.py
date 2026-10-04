@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 
 import numpy
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
 import eqArchive
@@ -33,6 +34,7 @@ def groundUnder(vertices, triangles, point):
   return best
 
 
+@pytest.mark.clientData("clientFiles")
 def testClientTerrainStandsWhereItsVerticesAre():
   # Broodlands places its terrain turned a quarter and lowered 52.64; the client draws it where its vertices are, which is where the
   # trees, crates, and barrels placed on it stand.

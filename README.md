@@ -17,6 +17,8 @@ claude
 
 Tests run against the real pinned Blender through the real bridge. That Blender is installed once by `syncTooling` under `%LOCALAPPDATA%\zonewrightTests\<pin>` and shared by every test session in every worktree; each session has its own tooling root whose `blender` folder links to it. One server and Blender stay running for a session, each test starting from an empty file; a test that needs a process of its own (a crash, a code change, the machine profile) takes `freshBlenderServer`. Sessions running at the same time each need their own short `--basetemp`: pytest prunes its shared temp folder, and long paths break Blender.
 
+The suite runs in three tiers. Everyday tests (the tools on small built scenes, and the server and bridge lifecycle) always run. The client data tier checks the client's own data in three groups: surveys of client zones, reading client models and zones, and calibration against screenshots. The install tier installs Blender and extensions for real, over the network. A run of the whole suite takes a heavy group only when the code it checks changed since the branch left the last pushed `claude` (`heavyGroups` in `tests/conftest.py`), and says at the end which groups ran and why. `-m clientData` or `-m install` runs a whole tier, `--everyTier` runs everything, and naming a test file runs all of it.
+
 Run Claude Code from the repository root, since `.mcp.json` launches the server with paths relative to it. On first launch, accept the workspace trust prompt and approve the `zonewright` server. `claude mcp list` then shows `zonewright` as connected.
 
 ## Tooling
