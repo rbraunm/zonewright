@@ -353,14 +353,7 @@ def subjectCorners(preview, names):
     sceneObject = bpy.data.objects.get(name)
     if sceneObject is None:
       raise ValueError(f"No object named '{name}'")
-    if sceneObject.type == "MESH":
-      corners += [sceneObject.matrix_world @ mathutils.Vector(corner) for corner in sceneObject.evaluated_get(depsgraph).bound_box]
-    elif bridgeMeshAccess.isCollectionInstance(sceneObject):
-      collection = sceneObject.instance_collection
-      placement = sceneObject.matrix_world @ mathutils.Matrix.Translation(-collection.instance_offset)
-      corners += [placement @ member.matrix_world @ mathutils.Vector(corner) for member in collection.all_objects if member.type == "MESH" for corner in member.bound_box]
-    else:
-      raise ValueError(f"'{name}' is a {sceneObject.type}; a frame view frames meshes and collection instances")
+    corners += bridgeMeshAccess.worldBoundsCorners(sceneObject, depsgraph)
   if not corners:
     raise ValueError(f"{names} have nothing to frame")
   return corners

@@ -6,6 +6,7 @@ import os
 
 import bpy
 
+import bridgeArrangement
 import bridgeAuthoring
 import bridgeDressing
 import bridgeEnvironment
@@ -284,7 +285,7 @@ commands = {
   "pick": (pick, False),
   "renderPasses": (renderPasses, False),
   "renderModelThumbnails": (bridgeViews.renderModelThumbnails, False),
-} | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands | bridgeModels.commands | bridgeExport.commands | bridgePasses.commands | bridgeEnvironment.commands | bridgeReview.commands | bridgeAuthoring.commands | bridgeWater.commands | bridgeHousing.commands | bridgeSketch.commands | bridgeSwim.commands
+} | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands | bridgeModels.commands | bridgeExport.commands | bridgePasses.commands | bridgeEnvironment.commands | bridgeReview.commands | bridgeAuthoring.commands | bridgeWater.commands | bridgeHousing.commands | bridgeSketch.commands | bridgeSwim.commands | bridgeArrangement.commands
 
 
 def dispatch(command, arguments):

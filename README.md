@@ -95,7 +95,10 @@ Edits address parts of a mesh with selectors instead of an interactive selection
 | | `createLiquidMaterial` | The one exception to diffuse and normal only: water, waterfall, or lava with the textures and values the client's own liquid shaders take, drawn as the client's DX9 effects draw them (still) |
 | | `assignMaterial` | Material on selected faces |
 | | `projectUVs` | Planar or box projection at a set number of world units per texture repeat |
-| Dressing | `placeOnSurface` | Drops objects onto the surface below, optionally aligned to its normal |
+| Dressing | `placeCopies` | Many linked copies of a model or kit asset in one call, each with its own location, rotation, and uniform scale (what an EQ placement holds); optionally settled |
+| | `generateCopies` | A set laid out along a row, grid, ring, or route, facing along it or out of or into the ring, with seeded jitter for heading, tilt, scale, and position; returned copy by copy |
+| | `settleObjects` | Drops objects by footprint from above the whole scene: sunk to the lowest ground under them, or resting on a named object; optionally leaned toward the slope, keeping heading; again after the ground changes |
+| | `placeOnSurface` | Drops objects onto the surface below, optionally aligned to its normal |
 | | `scatterInRegion` | Spaced, linked copies over a circle or polygon by density, with yaw and scale ranges, a slope limit, and objects to keep clear of; deterministic per seed |
 | | `placeSpawn` | An EverQuest character drawn at the client's scale for its height in the zone with the client's appearance rules, posed at any frame of the animations the client gives it, its origin `avatarHeight` above the ground; see the `render-spawn` skill |
 | | `placeDoor` | An EverQuest door (any server-placed model: doors, lifts, teleport pads, books, furniture) at its position and scale; see the `render-door` skill |

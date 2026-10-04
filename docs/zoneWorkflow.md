@@ -80,11 +80,11 @@ A zone decides its housing before any plot exists: whether it has any, how centr
 
 ### Arrangement
 
-Planned; today placeOnSurface, duplicateObjects, and scatterInRegion cover part of it.
+Props are set as an artist sets them, and every set stays a list of copies to edit one by one.
 
-- **Explicit sets:** one call places many linked copies of a model or kit asset, each with its own position, heading, pitch, roll, and scale, which are exactly what an EQ placement holds.
-- **Generated sets:** rows (between two points, by count or spacing), grids, rings, along a route, and scatter over a region, each with ranges for heading, pitch, roll, scale, and position jitter, and a seed. The result is the same per-copy list, so a generated set can be edited copy by copy.
-- **Settling:** dropping copies onto whatever is below them from above the whole scene, by footprint rather than by origin: sunk to the lowest ground under the footprint (plus an optional depth), optionally tilted toward the ground's slope by a fraction, or seated on top of a named object. Settling again after the terrain changes puts everything back on the ground.
+- **Explicit sets** (`placeCopies`): one call places many linked copies of a model or kit asset, each with its own position, rotation, and uniform scale, which are exactly what an EQ placement holds.
+- **Generated sets** (`generateCopies`): rows (between two points, by count or spacing), grids, rings, and routes, with seeded jitter for heading, tilt, scale, and position; copies can face along the row or route, or out of or into the ring (EQ models face +X). The result is the same per-copy list. Scatter over a region stays with `scatterInRegion`.
+- **Settling** (`settleObjects`): copies drop onto whatever is below them from above the whole scene, by footprint rather than by origin: sunk to the lowest ground under the footprint so no edge floats, or rested on a named object with no vertex below its surface (crates on a table, or on a ramp); then optionally deeper. A tilt share leans each copy that far toward the slope under it, keeping its heading exactly, and replaces random tilt. Settling again after the ground changes puts everything back on it.
 
 ### Review
 

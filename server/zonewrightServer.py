@@ -1704,6 +1704,45 @@ async def projectUVs(context: Context, objectName: str, method: str, worldUnitsP
 
 
 @guardedTool()
+async def placeCopies(
+  context: Context, source: str, copies: list[dict], collection: str | None = None, settle: bool = False, depth: float = 0.0, tiltShare: float = 0.0,
+):
+  """Place many linked copies of an object (sharing its mesh, or its collection for a kit instance) in one call, each with its own
+  location [x, y, z], rotationDegrees [x, y, z] (Blender's XYZ order, z turning counterclockwise seen from above, x and y tilting; EQ
+  models face +X), uniform scale, and optional name: exactly what an EQ placement holds. With settle, each copy is then settled onto the
+  ground by its footprint as settleObjects does (its z is ignored; [x, y] will do). Returns each copy as placed (with settleObjects' report when settled), to edit copy by copy."""
+  return await callBridge(context, "placeCopies", {"source": source, "copies": copies, "collection": collection, "settle": settle, "depth": depth, "tiltShare": tiltShare})
+
+
+@guardedTool()
+async def generateCopies(
+  context: Context, source: str, pattern: dict, jitter: dict | None = None, seed: int = 0, collection: str | None = None,
+  settle: bool = True, depth: float = 0.0, tiltShare: float = 0.0,
+):
+  """A set of linked copies laid out by a pattern, as a starting point to edit copy by copy: {"row": {from: [x, y], to: [x, y], count
+  or spacing, facing: "along"}}, {"grid": {center, size [across, along], spacing [across, along], turnDegrees}}, {"ring": {center,
+  radius, count, startDegrees, facing: "out", "in", or "along"}}, or {"route": {path: [[x, y], ...], spacing, offset (to the right),
+  facing: "along"}}; facing turns each copy's +X (the way EQ models face) out, in, or along. jitter varies each copy, seeded:
+  turnDegrees [low, high], tiltDegrees [low, high] (each horizontal axis, either way), scale [low, high], position (a random nudge up to
+  that far). Copies settle onto the ground by footprint unless settle is false; tiltShare leans them
+  toward the slope instead of tilting them at random. Returns the copies as placeCopies does."""
+  return await callBridge(context, "generateCopies", {
+    "source": source, "pattern": pattern, "jitter": jitter, "seed": seed, "collection": collection, "settle": settle, "depth": depth, "tiltShare": tiltShare,
+  })
+
+
+@guardedTool()
+async def settleObjects(context: Context, names: list[str], depth: float = 0.0, tiltShare: float = 0.0, onto: str | None = None):
+  """Drop objects onto what lies below them, from above the whole scene, by their footprint rather than their origin: onto the ground
+  (what players stand on, apart from the objects being settled), sunk to the lowest ground under the footprint so no edge floats; or
+  onto a named object, resting on it with no vertex below its surface (a crate on a table, or tilted on a ramp); then `depth` lower. tiltShare (0 to 1) turns each
+  that share of the way toward the slope of the ground under it, keeping its heading (and replacing any tilt it had). Settling again after
+  the ground changes puts everything back on it. Each result gives the ground's lowest and highest under the footprint and the object's own
+  bottom and top. For a spot under an overhang or in a cave, use placeOnSurface, which casts from just above the object."""
+  return await callBridge(context, "settleObjects", {"names": names, "depth": depth, "tiltShare": tiltShare, "onto": onto})
+
+
+@guardedTool()
 async def placeOnSurface(context: Context, objectNames: list[str], at: list[list[float]] | None = None, alignToNormal: bool = False, surfaceObjects: list[str] | None = None, offset: float = 0.0):
   """Drop objects onto the surface below `at` points (or below their own origins, cast from just above), optionally tilted to the surface normal and restricted to surfaceObjects."""
   return await callBridge(context, "placeOnSurface", {"objectNames": objectNames, "at": at, "alignToNormal": alignToNormal, "surfaceObjects": surfaceObjects, "offset": offset})

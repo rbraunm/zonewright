@@ -111,20 +111,27 @@ def isPlayerSolid(sceneObject):
   return sceneObject.type == "MESH" or isCollectionInstance(sceneObject)
 
 
-def playerSolidParts():
-  """Each mesh players stand on and are blocked by, with its world matrix; a collection instance gives each of its meshes."""
-  # An object moved or made since the last evaluation still holds its old world matrix until the scene is evaluated.
-  bpy.context.view_layer.update()
-  parts = []
-  for sceneObject in bpy.context.scene.objects:
-    if not isPlayerSolid(sceneObject):
-      continue
-    if sceneObject.type == "MESH":
-      parts.append((sceneObject, sceneObject.matrix_world.copy()))
-      continue
+def objectParts(sceneObject):
+  """A mesh with its world matrix, or each rendered mesh of a collection instance as placed."""
+  if sceneObject.type == "MESH":
+    return [(sceneObject, sceneObject.matrix_world.copy())]
+  if isCollectionInstance(sceneObject):
     collection = sceneObject.instance_collection
     placement = sceneObject.matrix_world @ mathutils.Matrix.Translation(-collection.instance_offset)
-    parts.extend((member, placement @ member.matrix_world) for member in collection.all_objects if member.type == "MESH" and not member.hide_render)
+    return [(member, placement @ member.matrix_world) for member in collection.all_objects if member.type == "MESH" and not member.hide_render]
+  raise ValueError(f"'{sceneObject.name}' is a {sceneObject.type}; it has no mesh")
+
+
+def worldBoundsCorners(sceneObject, depsgraph):
+  """The world corners of the evaluated bounding boxes of an object's meshes (objectParts)."""
+  return [matrix @ mathutils.Vector(corner) for part, matrix in objectParts(sceneObject) for corner in part.evaluated_get(depsgraph).bound_box]
+
+
+def playerSolidParts(excluding=()):
+  """Each mesh players stand on and are blocked by, with its world matrix (objectParts), leaving out the objects named in excluding."""
+  # An object moved or made since the last evaluation still holds its old world matrix until the scene is evaluated.
+  bpy.context.view_layer.update()
+  parts = [part for sceneObject in bpy.context.scene.objects if isPlayerSolid(sceneObject) and sceneObject.name not in excluding for part in objectParts(sceneObject)]
   if not parts:
     raise ValueError("The scene has nothing players stand on: no rendered meshes or collection instances besides water, guides, regions, spawns, and doors")
   return parts
