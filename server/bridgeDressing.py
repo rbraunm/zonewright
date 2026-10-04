@@ -187,7 +187,7 @@ def scatterInRegion(sourceObject, region, density, minimumSpacing, yawRangeDegre
 
 def linkKitAsset(kitPath, assetName, instanceName, location, rotationDegrees, scale, collection):
   if not os.path.isabs(kitPath) or not os.path.isfile(kitPath):
-    raise FileNotFoundError(f"Kit '{kitPath}' is not an existing absolute path to a .blend")
+    raise ValueError(f"Kit '{kitPath}' is not an existing absolute path to a .blend")
   bridgeObjects.requireNewName(instanceName)
   with bpy.data.libraries.load(kitPath, link=True, assets_only=True) as (dataFrom, dataTo):
     if assetName not in dataFrom.collections:

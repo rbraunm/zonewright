@@ -123,7 +123,7 @@ class BlenderBridge:
   def exchangeOrRaise(self, command, arguments):
     response = self.exchange(command, arguments)
     if not response["ok"]:
-      raise ToolError(f"{response['error']}\n\n{response['traceback']}")
+      raise ToolError(response["error"])
     return response["result"]
 
   def shutdownProcess(self):

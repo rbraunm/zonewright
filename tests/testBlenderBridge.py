@@ -51,6 +51,31 @@ def testRunPythonErrorCarriesTraceback(stageBlenderServer):
   assert 'File "<runPython>", line 2, in explode' in errorText
 
 
+def testRefusalsComeBackAsTheirMessageAloneAndOtherErrorsWithTheirTraceback(stageBlenderServer, tmp_path):
+  notBlend = tmp_path / "notBlend.blend"
+  notBlend.write_text("not a blend file", encoding="ascii")
+
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    refused = await session.expectError("renderView", {"view": {"eye": [0, 0, 10], "target": [0, 10, 10]}})
+    missing = await session.expectError("openFile", {"path": str(tmp_path / "absent.blend")})
+    unreadable = await session.expectError("openFile", {"path": str(notBlend)})
+    scripted = await session.expectError("runPython", {"code": "lookup = {}\nlookup['absent']"})
+    return refused, missing, unreadable, scripted
+
+  refused, missing, unreadable, scripted = stageBlenderServer.session(steps)
+  assert refused == (
+    "Error executing tool renderView: Zone properties missing: ['ambientColor', 'specialAmbientColor', 'bounceColor', 'sunColor',"
+    " 'sunAzimuthDegrees', 'sunElevationDegrees', 'fogColor', 'fogStart', 'fogEnd', 'fogDensity', 'fogOn', 'maxClip', 'newEngineZone'];"
+    " set them with setZoneProperties (a sky supplies the light and the fog color)"
+  )
+  assert missing == f"Error executing tool openFile: '{tmp_path / 'absent.blend'}' does not exist"
+  # Blender's own failure to read a file is no refusal the bridge made: it keeps the traceback down to the call that failed.
+  assert unreadable.startswith("Error executing tool openFile: RuntimeError: ") and "Traceback (most recent call last)" in unreadable
+  assert 'bridgeCommands.py", line' in unreadable and "in openFile" in unreadable
+  assert scripted.startswith("Error executing tool runPython: KeyError: 'absent'") and 'File "<runPython>", line 2, in <module>' in scripted
+
+
 def testCrashIsReportedAndNextCallStartsFresh(freshBlenderServer):
   async def steps(session):
     await session.expectSuccess("runPython", {"code": "survivor = 1"})

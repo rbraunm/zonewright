@@ -67,7 +67,7 @@ def openFile(path, discardUnsavedChanges):
   if not os.path.isabs(path) or not path.lower().endswith(".blend"):
     raise ValueError(f"'{path}' is not an absolute path to a .blend file")
   if not os.path.isfile(path):
-    raise FileNotFoundError(f"'{path}' does not exist")
+    raise ValueError(f"'{path}' does not exist")
   requireNoUnsavedChanges(discardUnsavedChanges, f"open {path}")
   bpy.ops.wm.open_mainfile(filepath=path, load_ui=False)
   state.unsavedChanges = False
@@ -119,7 +119,7 @@ def saveFile(path, replaceExisting):
   if os.path.exists(targetPath) and not (openPath and os.path.normcase(os.path.abspath(openPath)) == os.path.normcase(os.path.abspath(targetPath))) and not replaceExisting:
     raise ValueError(f"'{targetPath}' already holds a file other than the open one; pass replaceExisting true to write over it")
   if not os.path.isdir(os.path.dirname(targetPath)):
-    raise FileNotFoundError(f"folder '{os.path.dirname(targetPath)}' does not exist")
+    raise ValueError(f"folder '{os.path.dirname(targetPath)}' does not exist")
   problems = externalFileProblems(targetPath)
   if problems:
     raise ValueError("Cannot save: " + "; ".join(problems))

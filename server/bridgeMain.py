@@ -27,6 +27,14 @@ def enableExtensions():
       raise RuntimeError(f"extension {extensionID} did not enable")
 
 
+def failureText(command, error):
+  """What a failed command reports: a refusal's message alone, as bridge code raises ValueError to refuse; any other exception, and
+  anything runPython's code raises (the caller's own code, not the bridge's), with the traceback a bug needs."""
+  if isinstance(error, ValueError) and command != "runPython":
+    return str(error)
+  return f"{type(error).__name__}: {error}\n\n{traceback.format_exc()}"
+
+
 def serve(connection, token):
   while True:
     try:
@@ -42,7 +50,7 @@ def serve(connection, token):
       result = bridgeCommands.dispatch(request["command"], request["arguments"])
       response = {"ok": True, "result": result}
     except Exception as error:
-      response = {"ok": False, "error": f"{type(error).__name__}: {error}", "traceback": traceback.format_exc()}
+      response = {"ok": False, "error": failureText(request["command"], error)}
     bridgeProtocol.sendFrame(connection, response)
 
 

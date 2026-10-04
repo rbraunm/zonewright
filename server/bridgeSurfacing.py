@@ -36,7 +36,7 @@ colorValues = ("reflectionColor", "waterColor1", "waterColor2")
 
 def loadImage(path, colorSpace):
   if not os.path.isabs(path) or not os.path.isfile(path):
-    raise FileNotFoundError(f"Texture '{path}' is not an existing absolute path")
+    raise ValueError(f"Texture '{path}' is not an existing absolute path")
   image = bpy.data.images.load(path, check_existing=True)
   image.colorspace_settings.name = colorSpace
   return image

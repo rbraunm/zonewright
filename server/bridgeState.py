@@ -20,4 +20,4 @@ state = BridgeState()
 
 def requireNoUnsavedChanges(discardUnsavedChanges, action):
   if state.unsavedChanges and not discardUnsavedChanges:
-    raise RuntimeError(f"Refusing to {action}: the open file has unsaved changes; save it or pass discardUnsavedChanges")
+    raise ValueError(f"Refusing to {action}: the open file has unsaved changes; save it or pass discardUnsavedChanges")
