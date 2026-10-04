@@ -13,7 +13,7 @@ def extensionAction(action, extensionID, version):
   return {"tool": "extension", "action": action, "id": extensionID, "version": version}
 
 
-def testSyncInstallsUpgradesAndRemoves(stageServer, blenderArchivePin, buildExtensionPin):
+def testSyncInstallsUpgradesRemovesAndPinsCatalogReleases(stageServer, blenderArchivePin, buildExtensionPin):
   version = blenderArchivePin["version"]
   probeV1 = buildExtensionPin("zonewrightProbe", "1.0.0")
   server = stageServer({"blender": blenderArchivePin, "extensions": {"zonewrightProbe": probeV1}})
@@ -70,25 +70,25 @@ def testSyncInstallsUpgradesAndRemoves(stageServer, blenderArchivePin, buildExte
   assert "Blender is running from the tooling root" in errorText
   assert str(executablePath) in errorText
 
-
-def testAddExtensionPinsCatalogRelease(stageServer, blenderArchivePin):
+  # addExtension pins the catalog's own release of an extension and installs it beside the ones already pinned.
   request = urllib.request.Request(
-    f"https://extensions.blender.org/api/v1/extensions/?blender_version={blenderArchivePin['version']}&platform=windows-x64",
+    f"https://extensions.blender.org/api/v1/extensions/?blender_version={version}&platform=windows-x64",
     headers={"User-Agent": "zonewright"},
   )
   with urllib.request.urlopen(request) as response:
     catalog = json.loads(response.read())["data"]
   smallestAddon = min((entry for entry in catalog if entry["type"] == "add-on"), key=lambda entry: entry["archive_size"])
   extensionID = smallestAddon["id"]
-  server = stageServer({"blender": blenderArchivePin, "extensions": {}})
-
   result, _ = server.callToolExpectingSuccess("addExtension", {"extensionID": extensionID})
   assert server.readManifest()["extensions"] == {
+    "zonewrightProbe": probeV2,
     extensionID: {"version": smallestAddon["version"], "url": smallestAddon["archive_url"], "sha256": smallestAddon["archive_hash"].removeprefix("sha256:")},
   }
   assert extensionAction("installed", extensionID, smallestAddon["version"]) in result["actions"]
-  assert result["status"]["extensions"]["pinned"] == {extensionID: {"pinnedVersion": smallestAddon["version"], "state": "installed"}}
-
+  assert result["status"]["extensions"]["pinned"] == {
+    "zonewrightProbe": {"pinnedVersion": "1.1.0", "state": "installed"},
+    extensionID: {"pinnedVersion": smallestAddon["version"], "state": "installed"},
+  }
   errorText = server.callToolExpectingError("addExtension", {"extensionID": extensionID, "version": "0.0.0"})
   assert f"offers only {extensionID} {smallestAddon['version']}" in errorText
 
