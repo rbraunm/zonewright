@@ -1,6 +1,12 @@
+import http.server
+import io
 import json
+import socket
+import struct
 import subprocess
+import threading
 import urllib.request
+import zipfile
 
 from conftest import pinnedBlender
 
@@ -130,3 +136,44 @@ def testBrokenInstallFailsWithoutTouchingIt(stageServer):
   errorText = server.callToolExpectingError("syncTooling")
   assert "is broken" in errorText
   assert list(brokenPath.iterdir()) == []
+
+
+def testDownloadsRetryAResetConnectionAndNameTheReasonWhenItKeepsFailing(stageServer):
+  archive = io.BytesIO()
+  with zipfile.ZipFile(archive, "w") as contents:
+    contents.writestr("blender/readme.txt", "not Blender")
+  counts = {"requests": 0, "resets": 1}
+
+  class FlakyServer(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+      counts["requests"] += 1
+      if counts["resets"] > 0:
+        counts["resets"] -= 1
+        # A zero linger makes close send a reset, as a server dropping the connection does.
+        self.connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+        self.connection.close()
+        return
+      self.send_response(200)
+      self.send_header("Content-Length", str(len(archive.getvalue())))
+      self.end_headers()
+      self.wfile.write(archive.getvalue())
+
+    def log_message(self, *arguments):
+      pass
+
+  server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), FlakyServer)
+  threading.Thread(target=server.serve_forever, daemon=True).start()
+  try:
+    pin = {"version": pinnedBlender["version"], "url": f"http://127.0.0.1:{server.server_port}/blender.zip", "sha256": "0" * 64}
+    staged = stageServer({"blender": pin, "extensions": {}})
+    afterOneReset = staged.callToolExpectingError("syncTooling")
+    requestsAfterOneReset = counts["requests"]
+    counts.update(requests=0, resets=99)
+    keptFailing = staged.callToolExpectingError("syncTooling")
+    requestsKeptFailing = counts["requests"]
+  finally:
+    server.shutdown()
+    server.server_close()
+  # The first attempt is reset and the second downloads the archive whole, which then fails only on its pinned hash.
+  assert requestsAfterOneReset == 2 and "does not match pinned" in afterOneReset
+  assert requestsKeptFailing == 3 and "download failed after 3 attempts: ConnectionResetError" in keptFailing
