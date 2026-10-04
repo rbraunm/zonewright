@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy
 from PIL import Image
 
+from conftest import writePNG
 from testModelsAndDressing import freshScene
 from testReviewViews import crateScene, environment
 
@@ -162,3 +163,63 @@ def testLabelsNameOnlyWhatTheViewShowsAndTheObjectsShadingColorsEachObject(stage
   x, y = next(place["at"] for place in places["shown"] if place["object"] == "crate")
   expected = numpy.array([int(crate["rgb"][index:index + 2], 16) for index in (1, 3, 5)]) * 0.6
   assert numpy.abs(pixelsOf(objects[0])[y, x] - expected).max() <= 2, (pixelsOf(objects[0])[y, x], expected)
+
+
+# A map 260 across about (8, 0): 960 pixels for 260 units, the fine grid's middle at (-80, 0), the coarse grid's at (0, 0), and the
+# mound's top at (80, 0).
+diagnosticMap = {"map": {"center": [8, 0], "width": 260}}
+pixelsPerUnit = 960 / 260
+# Ground facing up takes the shading's ambient 0.6 and 0.4 of the northwest light, which is 45 degrees up.
+upShade = 0.6 + 0.4 * math.sqrt(0.5)
+
+
+def mapPixel(x, y):
+  return int((x - 8 + 130) * pixelsPerUnit), int((540 / 2) - y * pixelsPerUnit)
+
+
+def rampColor(fraction):
+  stops = [(40, 70, 200), (40, 190, 230), (60, 190, 80), (240, 220, 40), (220, 40, 30)]
+  position = fraction * (len(stops) - 1)
+  low = min(int(position), len(stops) - 2)
+  share = position - low
+  return numpy.array(stops[low]) + (numpy.array(stops[low + 1]) - numpy.array(stops[low])) * share
+
+
+def testDiagnosticShadingsDrawCurvatureAndDensitiesAtTheirScales(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await freshScene(session)
+    for name, size, spacing, location, side in (("fine", 64, 8, [-80, 0, 0], 64), ("coarse", 64, 16, [0, 0, 0], 256)):
+      await session.expectSuccess("createTerrainGrid", {"name": name, "size": [size, size], "spacing": spacing, "location": location, "collection": "terrain"})
+      await session.expectSuccess("createMaterial", {"name": name, "diffuseTexture": str(writePNG(tmp_path / f"{name}.png", side, side, (120, 120, 120, 255)))})
+      await session.expectSuccess("assignMaterial", {"objectName": name, "materialName": name})
+      await session.expectSuccess("projectUVs", {"objectName": name, "method": "planar", "worldUnitsPerRepeat": 32, "direction": [0, 0, 1]})
+    await session.expectSuccess("createTerrainGrid", {"name": "mound", "size": [96, 96], "spacing": 8, "location": [80, 0, 0], "collection": "terrain"})
+    await session.expectSuccess("sculptAtPoint", {"objectName": "mound", "mode": "raise", "center": [80, 0, 0], "radius": 40, "strength": 20})
+    await session.expectSuccess("setZoneProperties", environment)
+    return {shading: await session.expectImage("renderView", {"view": diagnosticMap, "shading": shading}) for shading in ("curvature", "triangleDensity", "texelDensity")}
+
+  rendered = stageBlenderServer.session(steps)
+  curvature, curvatureScale = pixelsOf(rendered["curvature"][0]), rendered["curvature"][1]["curvature"]
+  # Flat ground draws neutral grey, the mound's top warm (convex), and the foot of its slope, curving up out of the flat, cool.
+  flat = curvature[mapPixel(-80, 0)[1], mapPixel(-80, 0)[0]]
+  assert numpy.abs(flat - numpy.array([160, 160, 155]) * upShade).max() <= 2, flat
+  top = curvature[mapPixel(80, 0)[1], mapPixel(80, 0)[0]]
+  foot = curvature[mapPixel(116, 0)[1], mapPixel(116, 0)[0]]
+  assert top[0] > top[2] + 60 and foot[2] > foot[0] + 30, (top, foot)
+  assert curvatureScale["warm"] == "convex" and curvatureScale["cool"] == "concave" and curvatureScale["halfColorRadius"] == 16.0
+  # The 8-unit grid holds 312.5 triangles per 10,000 square units and the 16-unit grid 78.125, each drawn where the fixed decades put it.
+  density, densityScale = pixelsOf(rendered["triangleDensity"][0]), rendered["triangleDensity"][1]["triangleDensity"]
+  assert densityScale["colors"] == [[1.0, "blue"], [10.0, "cyan"], [100.0, "green"], [1000.0, "yellow"], [10000.0, "red"]]
+  assert abs(densityScale["visibleRange"][1] - 312.5) <= 1 and densityScale["visibleRange"][0] == 78.1
+  for x, perTenThousand in ((-80, 312.5), (0, 78.125)):
+    column, row = mapPixel(x, 0)
+    assert numpy.abs(density[row, column] - rampColor(math.log10(perTenThousand) / 4) * upShade).max() <= 2, (x, density[row, column])
+  # A 64-pixel texture over 32 units is 2 pixels a unit and a 256-pixel one 8: the view's range runs between them, blue to red, and the
+  # mound, with no texture, draws dark grey.
+  texels, texelScale = pixelsOf(rendered["texelDensity"][0]), rendered["texelDensity"][1]["texelDensity"]
+  assert texelScale["range"] == [2.0, 8.0] and texelScale["colors"] == [[2.0, "blue"], [2.83, "cyan"], [4.0, "green"], [5.66, "yellow"], [8.0, "red"]]
+  for x, fraction in ((-80, 0.0), (0, 1.0)):
+    column, row = mapPixel(x, 0)
+    assert numpy.abs(texels[row, column] - rampColor(fraction) * upShade).max() <= 2, (x, texels[row, column])
+  column, row = mapPixel(116, 20)
+  assert texelScale["untexturedShare"] > 0 and numpy.abs(texels[row, column] - numpy.array([60, 60, 60]) * upShade).max() <= 6

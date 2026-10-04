@@ -1,7 +1,9 @@
-"""Views drawn from a value on each face instead of the client's light, and which objects a view shows. Every drawn mesh (each part of a
-collection instance as placed, and the scale figure) is replaced by a copy of its evaluated mesh carrying its values. An object pass
-draws each pixel's object, which tells what the view shows; then each object draws in a color of its own, lit softly from the
-northwest so the form still reads. Runs under Blender's Python."""
+"""Views drawn from a value on each face or vertex instead of the client's light, and which objects a view shows. Every drawn mesh (each
+part of a collection instance as placed, and the scale figure) is replaced by a copy of its evaluated mesh carrying its values. An object
+pass draws each pixel's object, which tells what the view shows, and a value pass each pixel's density, for the range it shows; then
+each object draws in a color of its own, or its curvature (convex warm, concave cool, flat neutral), triangle density, or texel density
+on a color ramp, lit softly from the northwest so the form still reads. Runs under Blender's Python."""
+import math
 import os
 
 import bpy
@@ -11,6 +13,7 @@ import numpy
 
 import bridgeExportChecks
 import bridgeMeshAccess
+import bridgeSurfacing
 import bridgeViews
 
 passAttributeName = "zonewrightPass"
@@ -25,10 +28,27 @@ objectColors = (
   ("teal", (70, 153, 144)), ("lavender", (220, 190, 255)), ("brown", (154, 99, 36)), ("olive", (128, 128, 0)),
 )
 otherColor = ("grey", (128, 128, 128))
+# A form curved to this radius draws at half its color, sharper forms fuller.
+halfColorRadius = 16.0
+flatColor = (160, 160, 155)
+convexColor = (235, 100, 30)
+concaveColor = (40, 110, 230)
+rampColors = (("blue", (40, 70, 200)), ("cyan", (40, 190, 230)), ("green", (60, 190, 80)), ("yellow", (240, 220, 40)), ("red", (220, 40, 30)))
+densityArea = 10000.0
+# Triangle density ramps over fixed decades, so a color reads alike in every view: the client's EQG terrains run from 8 to 5,083
+# triangles per 10,000 square units (10th to 90th percentile), 244 at the median.
+densityDecades = (0.0, 4.0)
+untexturedColor = (60, 60, 60)
+tinyArea = 1e-9
 # A pass draws through half floats and a slight scale, so a number goes as whole digits in base passBase, each a fraction of
 # passBase - 1, read back within passTolerance of a whole digit; further off means samples blended. An object's number takes two digits.
 passBase = 128
 passTolerance = 0.25
+valueAttributeName = "zonewrightValue"
+# A density shading's value pass carries each face's density for the range the view shows: its base-10 logarithm placed along
+# valueSpan as a whole digit and the fraction past it (half floats keep that fraction to a ten-thousandth of a digit); its third
+# channel marks a face without one.
+valueSpan = (-6.0, 10.0)
 
 
 def drawnParts(owner):
@@ -112,6 +132,21 @@ class ShadedCopies:
     digits = wholeDigits(pixels[:, :, :2], drawn)
     return Seen(self.owners, numpy.where(drawn, digits[:, :, 0] + passBase * digits[:, :, 1] - 1, -1).astype(numpy.int64))
 
+  def valuePass(self, logarithmsOf, passPath):
+    """Render each pixel's face's base-10 logarithm (logarithmsOf(entry), NaN for a face without one); returns those the view shows
+    and how many pixels show a face without one."""
+    low, high = valueSpan
+
+    def colors(entry):
+      logarithms = logarithmsOf(entry)
+      place = numpy.clip((numpy.nan_to_num(logarithms, nan=low) - low) / (high - low), 0, 1) * (passBase - 1)
+      digit = numpy.floor(place)
+      return "FACE", numpy.stack([digit / (passBase - 1), place - digit, numpy.isnan(logarithms).astype(float)], axis=1)
+    drawn, pixels = self.renderPass(valueAttributeName, colors, passPath)
+    valued = drawn & (pixels[:, :, 2] < 0.5)
+    place = wholeDigits(pixels[:, :, :1], valued)[:, :, 0] + pixels[:, :, 1]
+    return (low + place[valued] / (passBase - 1) * (high - low)), int((drawn & ~valued).sum())
+
 
 def wholeDigits(channels, drawn):
   """Pass channels read back as whole digits."""
@@ -193,12 +228,101 @@ def attributeMaterial(attributeName, lit):
   return material
 
 
+def triangleCorners(entry):
+  data = entry["data"]
+  return entry["positions"][data["loopVertices"][data["triangleLoops"]]]
+
+
+def triangleAreas(corners):
+  return numpy.linalg.norm(numpy.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0]), axis=1) / 2
+
+
+def faceSums(entry, weights):
+  return numpy.bincount(entry["data"]["trianglePolygons"], weights=weights, minlength=len(entry["data"]["loopStarts"]))
+
+
 def faceCount(entry):
   return len(entry["data"]["loopStarts"])
 
 
+def curvatures(entry):
+  """Each vertex's curvature (per unit; 1 / the radius across a ridge or trough): the signed bend of the edges around it, convex
+  positive, each by its length, over twice the area around it."""
+  data, positions = entry["data"], entry["positions"]
+  corners = triangleCorners(entry)
+  crosses = numpy.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0])
+  faceCross = numpy.stack([faceSums(entry, crosses[:, axis]) for axis in range(3)], axis=1)
+  normals = faceCross / numpy.maximum(numpy.linalg.norm(faceCross, axis=1, keepdims=True), tinyArea)
+  centers = numpy.add.reduceat(positions[data["loopVertices"]], data["loopStarts"]) / data["loopTotals"][:, None]
+  faceA, faceB = data["faceA"], data["faceB"]
+  # Across an edge whose faces are wound against each other, the far face's normal is turned to the near face's side first.
+  farNormals = normals[faceB] * numpy.where(data["consistent"], 1.0, -1.0)[:, None]
+  angles = numpy.arccos(numpy.clip((normals[faceA] * farNormals).sum(1), -1.0, 1.0))
+  convex = ((centers[faceB] - centers[faceA]) * normals[faceA]).sum(1) < 0
+  edges = data["edges"][data["sharedEdges"]]
+  lengths = numpy.linalg.norm(positions[edges[:, 0]] - positions[edges[:, 1]], axis=1)
+  bend = numpy.bincount(edges.ravel(), weights=numpy.repeat(numpy.where(convex, angles, -angles) * lengths, 2), minlength=len(positions))
+  vertexAreas = numpy.bincount(data["loopVertices"][data["triangleLoops"]].ravel(), weights=numpy.repeat(numpy.linalg.norm(crosses, axis=1) / 6, 3), minlength=len(positions))
+  return bend / (2 * numpy.maximum(vertexAreas, tinyArea))
+
+
+def triangleDensities(entry):
+  """Each face's triangles per 10,000 square units of its own area, as its base-10 logarithm."""
+  data = entry["data"]
+  areas = faceSums(entry, triangleAreas(triangleCorners(entry)))
+  return numpy.log10(numpy.bincount(data["trianglePolygons"], minlength=faceCount(entry)) * densityArea / numpy.maximum(areas, tinyArea))
+
+
+def texturePixels(material):
+  """The width and height of a material's diffuse texture, or None when it has none drawn."""
+  nodes = material.node_tree.nodes if material is not None and material.node_tree is not None else {}
+  node = nodes.get(bridgeSurfacing.diffuseNodeName)
+  if node is None or node.image is None or min(node.image.size) <= 0:
+    return None
+  return tuple(node.image.size)
+
+
+def texelDensities(entry):
+  """Each face's texture pixels per world unit, as its base-10 logarithm: the square root of the texels its texture coordinates cover
+  per square unit of its area; NaN where it has no diffuse texture, no texture coordinates, or none of their area."""
+  data = entry["data"]
+  if data["uvs"] is None:
+    return numpy.full(faceCount(entry), numpy.nan)
+  pixels = [texturePixels(material) for material in data["materials"]] + [None]
+  texelsPerRepeat = numpy.array([0.0 if size is None else float(size[0] * size[1]) for size in pixels])
+  textured = data["uvs"][data["triangleLoops"]]
+  firstUV, secondUV = textured[:, 1] - textured[:, 0], textured[:, 2] - textured[:, 0]
+  texels = faceSums(entry, numpy.abs(firstUV[:, 0] * secondUV[:, 1] - firstUV[:, 1] * secondUV[:, 0]) / 2) * texelsPerRepeat[numpy.minimum(data["materialIndices"], len(data["materials"]))]
+  areas = faceSums(entry, triangleAreas(triangleCorners(entry)))
+  return numpy.where(texels > 0, numpy.log10(numpy.maximum(texels, tinyArea) / numpy.maximum(areas, tinyArea)) / 2, numpy.nan)
+
+
+def significant(value, digits=3):
+  return 0.0 if value == 0 else round(float(value), digits - 1 - math.floor(math.log10(abs(value))))
+
+
+def rampOf(fractions, stops):
+  """Colors (0 to 1) at fractions along stops [(position, (r, g, b) of 255)]."""
+  positions = [position for position, _ in stops]
+  return numpy.stack([numpy.interp(fractions, positions, [color[channel] for _, color in stops]) for channel in range(3)], axis=1) / 255
+
+
+def rampStops():
+  return [(index / (len(rampColors) - 1), color) for index, (_, color) in enumerate(rampColors)]
+
+
+def rampScale(low, high):
+  """Each ramp color with the value it stands for, ramped over base-10 logarithms from low to high."""
+  steps = len(rampColors) - 1
+  return [[significant(10 ** (low + (high - low) * index / steps)), name] for index, (name, _) in enumerate(rampColors)]
+
+
 def hexColor(color):
   return "#" + "".join(f"{channel:02x}" for channel in color)
+
+
+def logRange(logarithms):
+  return None if not len(logarithms) else [significant(10 ** logarithms.min()), significant(10 ** logarithms.max())]
 
 
 def paintObjects(copies, seen, passPath):
@@ -209,7 +333,42 @@ def paintObjects(copies, seen, passPath):
   return {"legend": [{"object": seen.owners[index], "color": colorOf[index][0], "rgb": hexColor(colorOf[index][1]), "share": seen.share(seen.counts[index])} for index in shown]}
 
 
-painters = {"objects": paintObjects}
+def paintCurvature(copies, seen, passPath):
+  def colors(entry):
+    bent = curvatures(entry) * halfColorRadius
+    strength = numpy.abs(bent) / (1 + numpy.abs(bent))
+    toward = numpy.where((bent >= 0)[:, None], numpy.array(convexColor), numpy.array(concaveColor))
+    return "POINT", (numpy.array(flatColor) + (toward - numpy.array(flatColor)) * strength[:, None]) / 255
+  copies.paint(shadeAttributeName, attributeMaterial(shadeAttributeName, True), colors)
+  return {"warm": "convex", "cool": "concave", "neutral": "flat", "halfColorRadius": halfColorRadius, "unit": "a ridge or trough curved to halfColorRadius draws at half color, sharper ones fuller"}
+
+
+def paintTriangleDensity(copies, seen, passPath):
+  logarithms, _ = copies.valuePass(triangleDensities, passPath)
+  low, high = densityDecades
+  copies.paint(shadeAttributeName, attributeMaterial(shadeAttributeName, True), lambda entry: ("FACE", rampOf(numpy.clip((triangleDensities(entry) - low) / (high - low), 0, 1), rampStops())))
+  return {
+    "unit": "triangles per 10,000 square units of surface", "colors": rampScale(low, high), "beyondEnds": "drawn in the end colors",
+    "visibleRange": logRange(logarithms),
+  }
+
+
+def paintTexelDensity(copies, seen, passPath):
+  logarithms, untexturedPixels = copies.valuePass(texelDensities, passPath)
+  low, high = (float(logarithms.min()), float(logarithms.max())) if len(logarithms) else (0.0, 0.0)
+
+  def colors(entry):
+    densities = texelDensities(entry)
+    fractions = numpy.full(len(densities), 0.5) if high == low else numpy.clip((numpy.nan_to_num(densities) - low) / (high - low), 0, 1)
+    return "FACE", numpy.where(numpy.isnan(densities)[:, None], numpy.array(untexturedColor) / 255, rampOf(fractions, rampStops()))
+  copies.paint(shadeAttributeName, attributeMaterial(shadeAttributeName, True), colors)
+  return {
+    "unit": "texture pixels per world unit", "range": logRange(logarithms), "colors": rampScale(low, high) if len(logarithms) else None,
+    "untextured": "dark grey: no diffuse texture, no texture coordinates, or none of their area", "untexturedShare": seen.share(untexturedPixels),
+  }
+
+
+painters = {"objects": paintObjects, "curvature": paintCurvature, "triangleDensity": paintTriangleDensity, "texelDensity": paintTexelDensity}
 
 
 def deepestPixels(mask):

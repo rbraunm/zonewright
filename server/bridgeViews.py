@@ -48,7 +48,7 @@ figureStepDrop = 4.0
 figureMinimumDistance = 3.0
 figureSideOffset = 1.5
 mapClearance = 100.0
-valueShadings = ("objects",)
+valueShadings = ("objects", "curvature", "triangleDensity", "texelDensity")
 viewShadings = ("client", "layout", "relief", "coverage") + valueShadings
 # The sky is soft everywhere, so an equirectangular image at about a fifth of a degree a pixel draws it.
 skyImageHeight = 1024
