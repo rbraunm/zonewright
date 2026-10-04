@@ -57,6 +57,8 @@ Over the 52 EQ terrain zones: a median of 5 painted ecosystems per zone (10th to
 - `clearRegion`: all at once, with its surfacing erased (pass the edgeNoise it was painted with to take back the paint that spilled past its edge) and the objects placed in it removed.
 - `eraseSurface`, `setSurfaceLayer` (mute), `removeSurfaceLayer`: take surfacing decisions back.
 
+These are how work goes back and forth. Checkpoints are only for recovery: `saveCheckpoint` before a risky change (a broad generator, a topology change, a script through `runPython`), and `restoreCheckpoint` when the work is wrecked beyond what passes, layers, and the region tools take back; it keeps the wrecked state as a checkpoint first.
+
 ## What not to do
 
 - One hard slope or height rule and one palette across the whole terrain, with no areas, no bands, and speckled edges at the threshold.

@@ -106,12 +106,15 @@ def externalFileProblems(targetPath):
   return problems
 
 
-def saveFile(path):
+def saveFile(path, replaceExisting):
   targetPath = path if path is not None else bpy.data.filepath
   if not targetPath:
     raise ValueError("The open file has never been saved; pass a path")
   if not os.path.isabs(targetPath) or not targetPath.lower().endswith(".blend"):
     raise ValueError(f"'{targetPath}' is not an absolute path to a .blend file")
+  openPath = bpy.data.filepath
+  if os.path.exists(targetPath) and not (openPath and os.path.normcase(os.path.abspath(openPath)) == os.path.normcase(os.path.abspath(targetPath))) and not replaceExisting:
+    raise ValueError(f"'{targetPath}' already holds a file other than the open one; pass replaceExisting true to write over it")
   if not os.path.isdir(os.path.dirname(targetPath)):
     raise FileNotFoundError(f"folder '{os.path.dirname(targetPath)}' does not exist")
   problems = externalFileProblems(targetPath)

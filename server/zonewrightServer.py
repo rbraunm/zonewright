@@ -4,6 +4,7 @@ import functools
 import inspect
 import io
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -19,6 +20,7 @@ import assetCatalog
 import assetSheets
 import assetSurvey
 import blenderBridge
+import checkpoints
 import eqCalibration
 import eqEmitters
 import eqgExport
@@ -56,7 +58,8 @@ server = MCPServer(
     " stroke (paintSurface) and shape its edges deliberately (editSurface). Building a zone is visual iteration: iterate rough to fine and judge"
     " every pass and every review in pictures (renderView at eye height, from above, and close on the part being worked from several sides);"
     " measure, walkRoute, compareWithClientZones, and scripts check what a picture shows and never replace it. Take back what does not work"
-    " (passes, resetRegion, rebuildRegion, clearRegion, eraseSurface): removing is a way of adding."
+    " (passes, resetRegion, rebuildRegion, clearRegion, eraseSurface): removing is a way of adding. Before a risky change, keep a"
+    " recovery point (saveCheckpoint); restoreCheckpoint is for recovering from a wreck, not for iterating."
     " Steer by the EQ worlds: compareWithClientZones against reference zones, and the catalog's measured use of each asset. The"
     " author-zone skill and docs/zoneWorkflow.md in the zonewright repository hold the procedure."
   ),
@@ -391,7 +394,7 @@ findHelp = (
 )
 
 
-def catalogCall(function, *arguments):
+def callReportingFailures(function, *arguments):
   try:
     return function(*arguments)
   except (OSError, ValueError) as error:
@@ -432,7 +435,7 @@ async def surveyAssets(
   clientRoot = zoneSources.resolveClientRoot()
   if zones is not None or allZones:
     zoneNames = sorted({variant["zone"] for variant in zoneSources.discoverZones(clientRoot).values()}) if allZones else [zone.lower() for zone in zones]
-    outcomes = await anyio.to_thread.run_sync(catalogCall, catalog.surveyZones, clientRoot, toolingRoot / "models", zoneNames, refresh, progressReporter(context))
+    outcomes = await anyio.to_thread.run_sync(callReportingFailures, catalog.surveyZones, clientRoot, toolingRoot / "models", zoneNames, refresh, progressReporter(context))
     if len(zoneNames) == 1 and "error" not in outcomes[zoneNames[0]]:
       key = f"zone:{zoneNames[0]}"
       return sourceSummary(key, json.loads(catalog.sourcePath(key).read_text(encoding="utf-8")))
@@ -441,7 +444,7 @@ async def surveyAssets(
       "errors": {zoneName: outcome["error"] for zoneName, outcome in outcomes.items() if "error" in outcome},
     }
   if folder is not None:
-    key, sourcePaths = f"folder:{folder}", catalogCall(assetSurvey.looseFolderPaths, clientRoot, folder)
+    key, sourcePaths = f"folder:{folder}", callReportingFailures(assetSurvey.looseFolderPaths, clientRoot, folder)
     surveyFunction = lambda: assetSurvey.surveyLooseFolder(clientRoot, catalog.cacheRoot, folder)
   else:
     archivePath = Path(path)
@@ -451,7 +454,7 @@ async def surveyAssets(
     surveyFunction = lambda: assetSurvey.surveyZoneFile(clientRoot, catalog.cacheRoot, archivePath)
   reportProgress = progressReporter(context)
   await anyio.to_thread.run_sync(reportProgress, 0, 1, f"surveying {key}")
-  surveyed = await anyio.to_thread.run_sync(catalogCall, catalog.survey, surveyFunction, key, sourcePaths, refresh)
+  surveyed = await anyio.to_thread.run_sync(callReportingFailures, catalog.survey, surveyFunction, key, sourcePaths, refresh)
   await anyio.to_thread.run_sync(reportProgress, 1, 1, f"surveyed {key}")
   return sourceSummary(key, surveyed)
 
@@ -462,13 +465,13 @@ def findAssets(
   described: bool | None = None, colors: list[str] | None = None, minimumSide: int | None = None, tiles: bool | None = None,
   usedOn: list[str] | None = None, sortBy: str = "relevance", limit: int = 40,
 ):
-  return catalogCall(catalog.find, kind, text, categories, tags, source, described, sortBy, limit, colors, minimumSide, tiles, usedOn)
+  return callReportingFailures(catalog.find, kind, text, categories, tags, source, described, sortBy, limit, colors, minimumSide, tiles, usedOn)
 
 
 @guardedTool()
 def getAsset(id: str):
   """Everything the catalog holds for one asset: its measured facts, what differs in each source that holds it, and its description."""
-  return catalogCall(catalog.entry, id)
+  return callReportingFailures(catalog.entry, id)
 
 
 @guardedTool()
@@ -481,7 +484,7 @@ def getAssetVocabulary():
 @guardedTool()
 def extendAssetVocabulary(group: str, term: str, meaning: str):
   """Add a term to the vocabulary when no existing one fits: group is a tag group's name or category:<kind>; term is one camelCase word."""
-  return catalogCall(catalog.extendVocabulary, group, term, meaning)
+  return callReportingFailures(catalog.extendVocabulary, group, term, meaning)
 
 
 @guardedTool()
@@ -490,21 +493,21 @@ def describeAssets(descriptions: list[dict]):
   (where and how to use it: surfaces, scale, pairings, what to avoid), worldUnitsPerRepeat (textures: the repeat that reads right; the
   measured unitsPerRepeat is how the source zone used it), pairsWith (ids of assets it goes with: its normal map, transitions)}], in
   getAssetVocabulary's words. Each replaces its asset's earlier description."""
-  return {"described": catalogCall(catalog.describe, descriptions)}
+  return {"described": callReportingFailures(catalog.describe, descriptions)}
 
 
 def sheetEntries(ids, kind, text, categories, tags, source, described, sortBy, limit, measuredFilters=(None, None, None, None)):
   if ids is not None and any(value is not None for value in (text, categories, tags, source, described, *measuredFilters)):
     raise ToolError("Give ids or filters, not both")
   if ids is not None:
-    return [catalogCall(catalog.requireAsset, assetID) for assetID in ids]
-  found = catalogCall(catalog.find, kind, text, categories, tags, source, described, sortBy, limit, *measuredFilters)["assets"]
+    return [callReportingFailures(catalog.requireAsset, assetID) for assetID in ids]
+  found = callReportingFailures(catalog.find, kind, text, categories, tags, source, described, sortBy, limit, *measuredFilters)["assets"]
   return [catalog.assets()[entry["id"]] for entry in found]
 
 
 def writeSheetImage(cells, columns, legend, cellSide):
   outputPath = newRenderPath().with_suffix(".jpg")
-  size = catalogCall(assetSheets.writeSheet, cells, columns, outputPath, cellSide)
+  size = callReportingFailures(assetSheets.writeSheet, cells, columns, outputPath, cellSide)
   return [Image(data=outputPath.read_bytes(), format="jpeg"), {"outputPath": str(outputPath)} | size | {"cells": legend}]
 
 
@@ -583,9 +586,66 @@ async def openFile(context: Context, path: str, discardUnsavedChanges: bool = Fa
 
 
 @guardedTool()
-async def saveFile(context: Context, path: str | None = None):
-  """Save the open file, or save it as an absolute path. Textures and libraries become relative paths; packed or generated images are refused."""
-  return await callBridge(context, "saveFile", {"path": path})
+async def saveFile(context: Context, path: str | None = None, replaceExisting: bool = False):
+  """Save the open file, or save it as an absolute path; a path holding another file is written over only with replaceExisting. Textures and libraries become relative paths; packed or generated images are refused."""
+  return await callBridge(context, "saveFile", {"path": path, "replaceExisting": replaceExisting})
+
+
+async def openWorkFilePath(context, toolName):
+  """The open work file's path; a scene never saved has no work file to keep checkpoints of."""
+  status = await callBridge(context, "getStatus", {})
+  if status["filePath"] is None:
+    raise ToolError(f"{toolName} works on the open work file, and no work file is open: open it (openFile), or save this scene as a new work file (saveFile with a path)")
+  return status["filePath"]
+
+
+async def checkpointOpenFile(context, label):
+  callReportingFailures(checkpoints.validateLabel, label)
+  workFile = await openWorkFilePath(context, "saveCheckpoint")
+  await callBridge(context, "saveFile", {"path": None, "replaceExisting": False})
+  return await anyio.to_thread.run_sync(callReportingFailures, checkpoints.saveCheckpoint, toolingRoot, workFile, label)
+
+
+@guardedTool()
+async def saveCheckpoint(context: Context, label: str):
+  """Save the open work file, then keep a copy of it as a recovery point under the tooling root (never beside the work file), named for the UTC time and `label`. Refuses a scene never saved or one that cannot be saved. For recovering from a wreck, not for iterating: passes, layers, and the region tools take work back."""
+  return await checkpointOpenFile(context, label)
+
+
+@guardedTool()
+async def listCheckpoints(context: Context, path: str | None = None):
+  """The checkpoints of the open work file, or of the work file at `path` (absolute; it need not exist now): name, label, UTC time, and size, and their total size."""
+  workFile = path if path is not None else await openWorkFilePath(context, "listCheckpoints")
+  return await anyio.to_thread.run_sync(callReportingFailures, checkpoints.listCheckpoints, toolingRoot, workFile)
+
+
+@guardedTool()
+async def restoreCheckpoint(context: Context, name: str, discardUnsavedChanges: bool = False):
+  """Put a checkpoint back over the work file it was saved from, then open that file. The open file must be that work file, or nothing (as after a reconnect or a crash). Its unsaved changes are saved first unless discardUnsavedChanges; then the work file as it stands on disk is kept as a checkpoint labelled "before restore <time of the checkpoint restored>" (restore that to take the restore back). The copy goes in under a temporary name, so a failed restore leaves the work file as it was."""
+  checkpointPath, workFile = callReportingFailures(checkpoints.findCheckpoint, toolingRoot, name)
+  status = await callBridge(context, "getStatus", {})
+  if status["filePath"] is not None and not checkpoints.samePath(status["filePath"], workFile):
+    raise ToolError(f"Checkpoint '{name}' was saved from '{workFile}', but the open file is '{status['filePath']}'; a checkpoint is restored only over its own work file, whose textures are on paths relative to it: open '{workFile}' first")
+  if status["unsavedChanges"] and not discardUnsavedChanges:
+    if status["filePath"] is None:
+      raise ToolError("The open scene was never saved and has changes the restore would drop: save it as a new work file (saveFile with a path), or pass discardUnsavedChanges true")
+    try:
+      await callBridge(context, "saveFile", {"path": None, "replaceExisting": False})
+    except ToolError as error:
+      raise ToolError(f"restoreCheckpoint saves the open work file's changes before keeping it, and saving failed; pass discardUnsavedChanges true to give those changes up.\n\n{error}") from error
+  stamp = callReportingFailures(checkpoints.checkpointNameParts, checkpointPath)[0]
+  beforeRestore = None
+  if os.path.isfile(workFile):
+    beforeRestore = await anyio.to_thread.run_sync(callReportingFailures, checkpoints.saveCheckpoint, toolingRoot, workFile, f"before restore {stamp}")
+  await anyio.to_thread.run_sync(callReportingFailures, checkpoints.restoreOver, checkpointPath, workFile)
+  reopened = await callBridge(context, "openFile", {"path": workFile, "discardUnsavedChanges": True})
+  return reopened | {"restored": name, "beforeRestore": beforeRestore["name"] if beforeRestore is not None else None}
+
+
+@guardedTool()
+def deleteCheckpoints(names: list[str]):
+  """Delete the named checkpoints, and only those; none is ever deleted otherwise. Refuses, deleting none, when any name is unknown."""
+  return callReportingFailures(checkpoints.deleteCheckpoints, toolingRoot, names)
 
 
 @guardedTool()
@@ -1936,7 +1996,7 @@ def catalogTexturePath(texture):
   """A texture given as an absolute path, or as a catalog texture id (texture/<name>@<hash>), which uses the catalog's extracted file."""
   if texture is None or not texture.startswith("texture/"):
     return texture
-  asset = catalogCall(catalog.requireAsset, texture)
+  asset = callReportingFailures(catalog.requireAsset, texture)
   if "file" not in asset["measured"]:
     raise ToolError(f"{texture} has no readable file: {asset['measured'].get('problem')}")
   return asset["measured"]["file"]
