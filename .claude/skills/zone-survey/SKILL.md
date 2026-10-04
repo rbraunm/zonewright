@@ -1,6 +1,6 @@
 ---
 name: zone-survey
-description: Answer questions about existing EverQuest zones (size, polygons, layout, enclosure, water, textures, models, character) from the zonewright survey instead of raw client files. Use whenever a question compares or characterizes EQ zones, or when picking reference zones for scale or design.
+description: Answer questions about existing EverQuest zones (size, polygons, layout, enclosure, water, textures, models, character) from the zonewright survey instead of raw client files, and interpret zones (type, character, areas, landmarks) into it by its procedure. Use whenever a question compares or characterizes EQ zones, when picking reference zones for scale or design, or when a zone's interpretation is missing or stale.
 ---
 
 # Zone survey
@@ -21,17 +21,96 @@ The survey caches what zonewright knows about every zone in the EverQuest client
 | `construction` | How the zone is built: terrain triangles and density, textures on the terrain, the share of terrain triangles in material islands of one or two triangles (vertices welded by position), the terrain's steep share, how much steep area is terrain rather than placed models, and how much ground is painted from palette maps or blended |
 
 - `surveyZones(zones, groups, sortBy, limit)` returns rows for the named zones, or every zone when `zones` is omitted, sorted descending by a dotted path such as `dimensions.triangleCount`. Request only the groups the question needs.
-- `getZoneSurvey(zone)` returns every group for one zone, both lanes.
-- `getZoneNotes(zone)` returns Brewall map labels: place names for design notes only. Brewall maps are never geometry or scale.
+- `getZoneSurvey(zone)` returns every measured group of the zone's variants, and its interpretation with its state.
+- `getZoneNotes(zone)` returns Brewall map labels: place names, each with its map position and the scene position it roughly marks (scene x, y = map -y, -x). They are design notes only; Brewall maps are never geometry or scale.
 
 Each zone variant is keyed `zone:format` (`wld`, `eqgz`, `eqtzp`); some zones ship both a classic and an EQG version. A row with `error` is a variant whose files the parsers cannot read; report it, do not guess its values.
 
-**Interpretive lane** — Claude's own reading of a zone from renders and the technical data: zone type, character, areas, landmarks. It is token-heavy. Run it on your own judgment when a question needs it for a zone or a few zones. Before running it on a large sample, warn the user that it will take significant time and tokens through the MCP, and wait for them to agree. Its procedure is not written yet: zone rendering exists (importZone, renderView), and a pilot on three or four contrasting zones measuring tokens, time, and screenshots per zone comes before any larger run.
+**Interpretive lane** — Claude's own reading of a zone, judged from screenshots and checked against the technical lane: what kind of zone it is, its character, its areas and how they connect, its landmarks, what defines it, and numbers worth keeping that the technical lane lacks. It is written by the procedure below and kept with `recordZoneInterpretation`. It is token-heavy. Run it on your own judgment when a question needs it for a zone or a few zones. Before running it on a large sample, warn the user that it will take significant time and tokens through the MCP, and wait for them to agree. A pilot on a few contrasting zones, measuring tokens, time, and screenshots per zone, comes before any larger run.
 
 ## Caching
 
-Values are cached per zone variant, keyed by the SHA-256 of every source file and by each group's own version. Changing one group's method (its version in `server/surveyFields.py`) recomputes only that group; the other groups, and every interpreted group, keep their cached values.
+Measured values are cached per zone variant, keyed by the SHA-256 of every source file and by each group's own version. Changing one group's method (its version in `server/surveyFields.py`) recomputes only that group; the others keep their cached values.
+
+An interpretation is of the variant `importZone` draws: the classic one where a zone has one, else the EQ terrain one, else the EQG one. It is kept under the tooling root in `survey\interpretations\<zone>`, with copies of its screenshots, the SHA-256 of that variant's source files, and the version of the procedure it followed. `getZoneSurvey` reports its state:
+
+- `current`: the zone's files and the procedure's version are as they were when it was recorded.
+- `stale`: `staleBecause` names the zone files that changed (`zoneFilesChanged`) and the procedure version raised since (`procedureChanged`). It is still returned, for what it is worth, but it is never current again until it is recorded anew; nothing re-records it on its own.
+- `none`: none was recorded.
+
+## Interpretive procedure
+
+Interpretive procedure version: 1
+
+Raise this version with any change to the procedure, the zone types, or the fields `recordZoneInterpretation` takes. Every interpretation recorded under an older version then reads as stale, so batch changes.
+
+### 1. Read the measurements
+
+`getZoneSurvey(zone)` gives the variant the interpretation is of, the zone's size (`dimensions`), how enclosed it is and how many levels it stacks (`verticality`), its water and lava (`surfaces`, `regions`), the textures and models that dominate it (`content`), and how its ground is built (`construction`). `getZoneNotes(zone)` gives its place names and roughly where they are. These say where to look; the pictures say what the zone is.
+
+### 2. Open the zone in a scratch scene
+
+1. `newFile`. If the open file holds unsaved work, save it first; discard only the scratch scene of an earlier survey.
+2. `importZone(zone)`.
+3. `setZoneProperties` with the survey's stand-in view, since fog and view distance are the server's zone row, not the client's files: `sky` `{"type": <zone>, "hour": 13, "minute": 0}` (the client's own sky for the zone, or its `default`; the result's sky chain says which), `specialAmbientColor` [0, 0, 0], `fogOn` false, `fogStart` 0, `fogDensity` 0.33, `fogEnd`, `minClip`, and `maxClip` all twice the zone's longest `allGeometrySize` side, and `newEngineZone` false (EQEmu servers send false for every zone).
+
+The views are daylit and unfogged. An indoor zone is darker in the client: judge its mood by its baked light, textures, and forms, not by how bright the views are, and say nothing of its fog unless it is known.
+
+### 3. Look
+
+Directions follow the game's compass, as `/loc` and the in-game map do: north is the scene's +X and west its +Y. Map views and plans draw +Y up, so up is west there and north is to the right.
+
+1. **Overview.** A `renderView` map of the whole zone (`center` the middle of its extent, `width` its longest side and a margin) in client shading, and the same in layout shading (`bandHeight` about a tenth of its height range) for its shape. Plot the place names that matter as sketch points (`sketch` sheet `brewall`, each at its label's `scenePosition`) and draw them with `renderSketch` over the same frame. For a large zone, add a map of each part.
+2. **Find the areas.** An area is a part players experience as a place of its own: a valley, a town, a courtyard, a cave, a shore, a dungeon wing or level. Read them off the overview and the place names; `verticality` says whether to expect enclosed ground and stacked levels.
+3. **Each area:** an oblique view from above and outside it onto its middle (`eye` back from it by about its width and raised by 0.6 to 1 times that, 30 to 45 degrees down, `target` its middle), showing its layout and how it meets its neighbours; and an eye-level view inside it (`standAt` [x, y], or [x, y, z] in caves, buildings, and on stacked levels) facing its main feature or along its main route. A large or varied area takes more.
+4. **Each landmark:** an oblique or eye-level view that shows it clearly; the area views often do.
+5. **Stacked levels:** a `renderSection` across them.
+
+Look at every screenshot as it comes back (renderView returns it inline; otherwise Read its file) and judge from it: an interpretation is judged from the pictures, not from the data alone. A view that misses (a camera in rock, its subject hidden) is retaken, never recorded. The numbers confirm scale and give what pictures cannot.
+
+| Zone | Areas | Screenshots |
+|---|---|---|
+| Small | 1-3 | 6-10 |
+| Medium | 4-8 | 12-24 |
+| Large | 9 or more, or many levels | 25-40 or more: a map of each part and two views per area |
+
+### 4. Connect
+
+Work out how players get from each area to the others (gates, tunnels, ramps, bridges, stairs, drops they cannot climb back, water, teleports), which areas are hubs and which dead ends, what each overlooks, and where the zone lines lead (the `regions` group's zone lines and Brewall's "to <zone>" labels). Look again wherever a connection is unclear: an oblique view along it, or `walkRoute`.
+
+### 5. Write and record
+
+Write the interpretation from the pictures, then keep it with `recordZoneInterpretation(zone, interpretation)`. It refuses an interpretation that lacks a field or a view the procedure requires, listing every problem at once. `getZoneSurvey(zone)` then shows it `current`. Positions are the scene's coordinates, as the tools report them. Leave the scratch scene unsaved.
+
+| Field | Holds |
+|---|---|
+| `zoneType` | One of the zone types below: how most of the zone's walkable space is organized. Its other parts go in `areas` and `definingCharacteristics` |
+| `character` | `description`: the mood and setting as the pictures show them (light, palette, materials, weather, who seems to live there); `tags`: camelCase terms for its setting (forest, swamp, desert, tundra, mountains, canyon, coast, jungle, volcanic, underground, urban, otherworldly), its mood (dark, foreboding, peaceful, eerie, majestic, desolate, bustling, sacred, menacing), and the built style or inhabitants the pictures show (ruins, castle, village, temple, camp, undead, orcs, giants, bandits). Reuse these words before coining one |
+| `areas` | Each `name` (Brewall's, where it has one), `center` [x, y, z], `where` (its compass position and height in the zone), `what` (what it is, what it looks like, how big), and `connections` [{`to`, `by`}]: `to` another area's name or `zone:<short name>` for a zone line, `by` what way |
+| `landmarks` | Each `name`, `location` [x, y, z], `what` (what it is and looks like), and `significance` (why it matters: a meeting point, a route marker, the skyline, a gate) |
+| `definingCharacteristics` | Three to eight statements of what makes the zone itself: layout, scale, routes, skyline, palette, how it is built |
+| `screenshots` | Each `path` (the PNG renderView, renderSketch, or renderSection wrote), `view` (`map`, `oblique`, `eyeLevel`, or `section`), `caption` (what it shows and from where), and `shows` (the areas and landmarks in it). It needs a map view, an oblique and an eye-level view of every area, and an oblique or eye-level view of every landmark |
+| `structuredValues` | Optional: numbers worth keeping that the technical lane lacks, each `{value, unit, how}` with how it was measured: a gate's opening, a main route's length (walkRoute), a wall's height, the longest sight line. Never repeat the measured groups' sizes, counts, or textures |
+
+### Zone types
+
+| Type | Meaning |
+|---|---|
+| `openOutdoor` | Broad open land under the sky, roamed in any direction, with few structures: plains, desert, tundra, open forest |
+| `channeledOutdoor` | Outdoor ground divided by cliffs, ridges, or walls into valleys, passes, canyons, or trails that set the routes |
+| `outdoorWithRuins` | Outdoor ground organized around ruined or abandoned structures that hold most of what is there |
+| `outdoorWithSettlement` | Outdoor ground anchored by a lived-in village, town, camp, or keep that takes up a smaller part of it |
+| `city` | A settlement filling most of the zone: streets, buildings, districts |
+| `fortress` | One built complex (a castle, keep, temple, or tower) walked through as courtyards, halls, and floors |
+| `tightDungeon` | Enclosed, with narrow corridors and small rooms, short sight lines, and a few levels at most |
+| `bigDungeon` | Enclosed and large: many wings or levels, long routes, rooms of varied size |
+| `caveNetwork` | Natural caverns: irregular tunnels and chambers in rock |
+| `undergroundLandscape` | A vast enclosed space that reads as a landscape: open ground under a ceiling far overhead |
+| `islands` | Separate landmasses over water, sky, or void, reached by boat, bridge, swimming, or teleport |
+| `underwater` | Mostly under water: swimming is the main way through |
+| `plane` | An otherworldly realm not bound by natural geography: floating ground, impossible architecture, a god's domain |
+| `hub` | A small gathering place built around services or travel: a lobby, bazaar, guild hall, arena, or tutorial |
 
 ## Growing the survey
 
-If answering questions keeps requiring raw zone files for the same kind of fact, propose adding it to the survey as a new group or field: a technical group in `server/surveyFields.py` when it can be measured, an interpreted field when it needs judgment.
+If answering questions keeps requiring raw zone files for the same kind of fact, propose adding it to the survey: a technical group in `server/surveyFields.py` when it can be measured, an interpreted field when it needs judgment (a change to the procedure, so its version rises).

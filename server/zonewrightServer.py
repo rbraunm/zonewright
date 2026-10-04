@@ -39,12 +39,14 @@ import toolingManifest
 import toolingStatus
 import toolingSync
 import surveyFields
+import zoneInterpretation
 import zoneSources
 import zoneSurvey
 
 toolingRoot = toolingStatus.resolveToolingRoot()
 bridge = blenderBridge.BlenderBridge(toolingRoot)
 serverDirectory = Path(__file__).resolve().parent
+zoneSurveySkillPath = serverDirectory.parent / ".claude" / "skills" / "zone-survey" / "SKILL.md"
 
 server = MCPServer(
   "zonewright",
@@ -296,15 +298,37 @@ async def surveyZones(context: Context, zones: list[str] | None = None, groups: 
 
 @guardedTool()
 async def getZoneSurvey(context: Context, zone: str):
-  """Everything surveyed for one zone, both lanes: every measured group brought up to date, plus cached interpretations."""
+  """Everything surveyed for one zone, both lanes: every measured group of each of its variants, brought up to date, and its
+  interpretation (of the variant importZone draws) with its state: "current"; "stale", with staleBecause naming the zone files changed
+  and the procedure version raised since it was recorded (still returned, for what it is worth, and never current again until it is
+  recorded anew with recordZoneInterpretation); or "none"."""
   clientRoot = zoneSources.resolveClientRoot()
-  surveys = await anyio.to_thread.run_sync(zoneSurvey.surveyMeasured, clientRoot, toolingRoot, [zone.lower()], list(surveyFields.measuredGroups), progressReporter(context))
-  cached = zoneSurvey.readSurvey(toolingRoot, list(surveys))
-  return {
-    "zone": zone.lower(),
-    "brewallLabelCount": len(zoneSurvey.readBrewallLabels(clientRoot, zone.lower())),
-    "variants": {key: survey | {"interpreted": cached[key]["interpreted"] if cached[key] else {}} for key, survey in surveys.items()},
-  }
+  zoneName = zone.lower()
+  surveys = await anyio.to_thread.run_sync(zoneSurvey.surveyMeasured, clientRoot, toolingRoot, [zoneName], list(surveyFields.measuredGroups), progressReporter(context))
+  try:
+    interpreted = await anyio.to_thread.run_sync(zoneInterpretation.interpretationState, clientRoot, toolingRoot, zoneSurveySkillPath, zoneName)
+  except ValueError as error:
+    raise ToolError(str(error)) from error
+  return {"zone": zoneName, "brewallLabelCount": len(zoneSurvey.readBrewallLabels(clientRoot, zoneName)), "variants": surveys, "interpreted": interpreted}
+
+
+@guardedTool()
+async def recordZoneInterpretation(zone: str, interpretation: dict):
+  """Keep Claude's interpretation of a zone, written by the zone-survey skill's interpretive procedure from screenshots and the measured
+  groups: {zoneType (one of the skill's zone types), character {description, tags (camelCase terms)}, areas [{name, center [x, y, z],
+  where, what, connections [{to (another area's name, or zone:<short name> for a zone line), by}]}], landmarks [{name, location
+  [x, y, z], what, significance}], definingCharacteristics [statements], screenshots [{path (an absolute PNG from renderView,
+  renderSketch, or renderSection), view (map, oblique, eyeLevel, or section), caption, shows [the areas and landmarks it shows]}],
+  structuredValues (optional) {camelCaseName: {value, unit, how}}}, positions in the scene's coordinates. It needs a map view, an
+  oblique and an eyeLevel view of every area, and an oblique or eyeLevel view of every landmark; a refusal lists every problem at once
+  and keeps nothing. It is of the variant importZone draws, kept under the tooling root (survey/interpretations/<zone>) with copies of
+  its screenshots, that variant's source files' SHA-256, and the procedure's version, replacing the zone's earlier one; getZoneSurvey
+  returns it, stale once the files or the version change."""
+  clientRoot = zoneSources.resolveClientRoot()
+  try:
+    return await anyio.to_thread.run_sync(zoneInterpretation.recordInterpretation, clientRoot, toolingRoot, zoneSurveySkillPath, zone.lower(), interpretation)
+  except ValueError as error:
+    raise ToolError(str(error)) from error
 
 
 comparedMeasures = {
@@ -374,7 +398,8 @@ async def compareWithClientZones(context: Context, formats: list[str] = ["eqgz"]
 
 @guardedTool()
 def getZoneNotes(zone: str):
-  """Brewall map labels for a zone: place names for design notes, not geometry or scale."""
+  """Brewall map labels for a zone: place names for design notes, not geometry or scale. Each gives its map position and the scene
+  position it marks, roughly (scene x, y = map -y, -x)."""
   clientRoot = zoneSources.resolveClientRoot()
   if not zoneSurvey.brewallMapPaths(clientRoot, zone.lower()):
     raise ToolError(f"No Brewall map files for zone '{zone}' in {clientRoot / 'maps' / 'Brewall'}")

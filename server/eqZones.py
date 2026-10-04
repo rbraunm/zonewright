@@ -62,15 +62,20 @@ def placedPart(part, placement):
   return part | {"vertices": (part["vertices"] * placement["scale"]) @ rotation.T + placement["position"], "lighting": lighting}
 
 
-def zoneSource(clientRoot, zoneName):
-  """The zone variant to build: the classic one where the client has one, else the EQ terrain one."""
+def drawnVariant(clientRoot, zoneName):
+  """The key and source of the variant importZone draws: the classic one where the client has one, else the EQ terrain one, else EQG."""
   variants = zoneSources.zoneVariants(clientRoot, zoneName)
   for zoneFormat in readFormats:
     # The client loads a loose <zone>.zon beside the archive over the archive's own (EQGraphicsDX9.dll 0x10066230).
     for key in (f"{zoneName}:{zoneFormat}:loose", f"{zoneName}:{zoneFormat}"):
       if key in variants:
-        return variants[key]
+        return key, variants[key]
   raise ValueError(f"Zone '{zoneName}' has no classic (WLD), EQ terrain, or EQG variant in the client; it has {sorted(variants)}")
+
+
+def zoneSource(clientRoot, zoneName):
+  """The zone variant to build: the one importZone draws."""
+  return drawnVariant(clientRoot, zoneName)[1]
 
 
 def zoneLights(clientRoot, zoneName):

@@ -46,12 +46,14 @@ def readBrewallLabels(clientRoot, zoneName):
       fields = [field.strip() for field in line[2:].split(",", 7)]
       if len(fields) != 8:
         raise ValueError(f"{mapPath.name}: label line has {len(fields)} fields: {line}")
-      labels.append({"text": fields[7].replace("_", " "), "mapPosition": [float(value) for value in fields[0:3]], "layer": mapPath.stem})
+      mapX, mapY, mapZ = (float(value) for value in fields[0:3])
+      # A map draws the server's -x to the right and -y down, north up as the in-game map does, so map (x, y) marks the scene's (-y, -x).
+      labels.append({"text": fields[7].replace("_", " "), "mapPosition": [mapX, mapY, mapZ], "scenePosition": [-mapY, -mapX, mapZ], "layer": mapPath.stem})
   return labels
 
 
 class SurveyCache:
-  """Per zone variant: each source file's SHA-256 and each field group's value with the version that produced it; plus a git-style hash memo and the cached zone discovery."""
+  """Per zone variant: each source file's SHA-256 and each measured group's value with the version that produced it; plus a git-style hash memo and the cached zone discovery."""
 
   def __init__(self, toolingRoot):
     self.cachePath = toolingRoot / "survey" / "zoneSurvey.json"
@@ -66,7 +68,7 @@ class SurveyCache:
   def entry(self, key, fileHashes):
     entry = self.variants.get(key)
     if entry is None or entry["fileHashes"] != fileHashes:
-      entry = {"fileHashes": fileHashes, "measured": {}, "interpreted": {}}
+      entry = {"fileHashes": fileHashes, "measured": {}}
       self.variants[key] = entry
     return entry
 
@@ -116,6 +118,13 @@ def hashFiles(paths, cache, verifyHashes):
   return hashes
 
 
+def variantFileHashes(clientRoot, cache, variants, verifyHashes=False):
+  """Each variant's source files by lowercase name, with their SHA-256."""
+  sourcePaths = {key: zoneSources.sourceFiles(clientRoot, source) for key, source in variants.items()}
+  hashes = hashFiles([path for paths in sourcePaths.values() for path in paths], cache, verifyHashes)
+  return {key: {path.name.lower(): hashes[path] for path in paths} for key, paths in sourcePaths.items()}
+
+
 def staleMeasuredGroups(entry, groupNames):
   return [groupName for groupName in groupNames if entry["measured"].get(groupName, {}).get("version") != surveyFields.measuredGroups[groupName][0]]
 
@@ -139,10 +148,9 @@ def surveyMeasured(clientRoot, toolingRoot, zoneNames, groupNames, reportProgres
   validateMeasuredGroups(groupNames)
   cache = SurveyCache(toolingRoot)
   variants = selectVariants(clientRoot, cache, zoneNames)
-  sourcePaths = {key: zoneSources.sourceFiles(clientRoot, source) for key, source in variants.items()}
   reportProgress(0, None, "checking zone file hashes")
-  hashes = hashFiles([path for paths in sourcePaths.values() for path in paths], cache, verifyHashes)
-  entries = {key: cache.entry(key, {path.name.lower(): hashes[path] for path in sourcePaths[key]}) for key in variants}
+  fileHashes = variantFileHashes(clientRoot, cache, variants, verifyHashes)
+  entries = {key: cache.entry(key, fileHashes[key]) for key in variants}
   stale = {key: staleMeasuredGroups(entries[key], groupNames) for key in variants}
   stale = {key: groups for key, groups in stale.items() if groups}
   errors = {}
@@ -170,9 +178,3 @@ def surveyMeasured(clientRoot, toolingRoot, zoneNames, groupNames, reportProgres
     key: {"zone": source["zone"], "format": source["format"]} | ({"error": errors[key]} if key in errors else {groupName: entries[key]["measured"][groupName]["value"] for groupName in groupNames})
     for key, source in sorted(variants.items())
   }
-
-
-def readSurvey(toolingRoot, variantKeys):
-  """Everything cached for the given variants, both lanes, with each group's version."""
-  cache = SurveyCache(toolingRoot)
-  return {key: cache.variants.get(key) for key in variantKeys}

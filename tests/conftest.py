@@ -28,6 +28,7 @@ everquestClient = json.loads((repositoryRoot / ".mcp.json").read_text(encoding="
 # One install of each pinned Blender in the user's profile, shared by every test session in every worktree.
 sharedLocalAppDataPath = Path(os.environ["LOCALAPPDATA"]) / "zonewrightTests" / pinnedBlender["sha256"][:16]
 sharedInstallLockSeconds = 900
+zoneSurveySkill = Path(".claude") / "skills" / "zone-survey"
 readerFiles = {f"server/{name}.py" for name in (
   "eqAnimations", "eqArchive", "eqEmitters", "eqLinks", "eqLooks", "eqModels", "eqRaces", "eqSkeletons", "eqTerrainTextures", "eqTextures",
   "eqWorldFile", "eqZones", "eqgFiles", "eqgSkeletons", "eqgTerrain", "zoneGeometry", "zoneSources", "bridgeModels",
@@ -35,7 +36,8 @@ readerFiles = {f"server/{name}.py" for name in (
 # The slow tiers, in groups by the code their tests check. A run of the whole suite takes a group only when that code changed since the
 # branch left the last pushed claude, or is uncommitted; -m clientData or -m install runs a whole tier, and naming a test file runs it.
 heavyGroups = {
-  "survey": {f"server/{name}.py" for name in ("assetSurvey", "assetCatalog", "assetVocabulary", "assetSheets", "zoneSurvey", "surveyFields")},
+  "survey": {f"server/{name}.py" for name in ("assetSurvey", "assetCatalog", "assetVocabulary", "assetSheets", "zoneSurvey", "surveyFields", "zoneInterpretation")}
+    | {(zoneSurveySkill / "SKILL.md").as_posix()},
   "clientFiles": readerFiles,
   "calibration": {"server/eqCalibration.py", "server/bridgeClientLight.py"},
   "install": {f"server/{name}.py" for name in (
@@ -80,14 +82,15 @@ class ToolSession:
 
 
 class StagedServer:
-  """A copy of the server with its own tooling root. Its tool calls share one server process, as a client's calls do, until close;
-  each session gets a process of its own."""
+  """A copy of the server, and of the zone-survey skill it reads its interpretive procedure from, with its own tooling root. Its tool
+  calls share one server process, as a client's calls do, until close; each session gets a process of its own."""
 
   def __init__(self, rootPath, manifest, localAppData=None):
     self.repositoryPath = rootPath / "repository"
     self.localAppData = localAppData if localAppData is not None else rootPath / "localAppData"
     self.toolingRoot = self.localAppData / "zonewright"
     shutil.copytree(repositoryRoot / "server", self.repositoryPath / "server", ignore=shutil.ignore_patterns("__pycache__"))
+    shutil.copytree(repositoryRoot / zoneSurveySkill, self.repositoryPath / zoneSurveySkill)
     self.writeManifest(manifest)
     self.openContexts = contextlib.ExitStack()
     self.portal = None
