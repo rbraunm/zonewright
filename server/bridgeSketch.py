@@ -542,8 +542,7 @@ def planeSegments(positions, triangles, start, along, normal):
 
 
 def shownWater(segments, start, along, ground):
-  """The parts of a water body's section segments players see: not tucked under the ground. Each segment is sampled every
-  waterSectionStep along it, and where it goes under or comes out, the place is found by halving."""
+  """The parts of a water body's section segments players see, not tucked under the ground: sampled every waterSectionStep, each change placed by halving."""
   pieces = []
   for s0, z0, s1, z1 in segments:
     count = max(1, math.ceil(math.hypot(s1 - s0, z1 - z0) / waterSectionStep))

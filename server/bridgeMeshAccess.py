@@ -234,65 +234,82 @@ def worldTree(sceneObjects):
 
 # A point this close to a water surface lies on it: a vertex cut onto the waterline is at the level, not above it.
 waterlineTolerance = 1e-3
+waterlineHalvings = 20
 
 
 class WaterSurface:
-  """A pool or river's surface seen in plan: whether points lie over it, its height over them, and its waterline on a mesh, where the
-  mesh crosses that height. The surface runs on a little under its banks, so the waterline, not the surface's edge, is where players
-  see the water end."""
+  """A pool or river's surface in plan: what lies under it, its height, and the waterline where a mesh crosses it."""
 
   def __init__(self, waterObject):
     if json.loads(waterObject[waterProperty])["kind"] == "fall":
       raise ValueError(f"'{waterObject.name}' is a fall; it has no waterline, bed, or banks")
     self.name = waterObject.name
-    self.positions, self.triangles = worldTriangles([waterObject])
-    flat = self.positions.copy()
+    positions, triangles = worldTriangles([waterObject])
+    first, second, third = (positions[triangles[:, corner]] for corner in range(3))
+    normals = numpy.cross(second - first, third - first)
+    # A triangle of a clipped cell can come out without area; it has no plane to give a height.
+    triangles, normals, first = (values[numpy.abs(normals[:, 2]) > 1e-9] for values in (triangles, normals, first))
+    self.slopes = -normals[:, :2] / normals[:, 2:]
+    self.offsets = first[:, 2] - (self.slopes * first[:, :2]).sum(axis=1)
+    flat = positions.copy()
     flat[:, 2] = 0.0
-    self.plan = mathutils.bvhtree.BVHTree.FromPolygons(flat.tolist(), self.triangles.tolist())
-    self.low, self.high = self.positions[:, :2].min(0), self.positions[:, :2].max(0)
+    self.plan = mathutils.bvhtree.BVHTree.FromPolygons(flat.tolist(), triangles.tolist())
+    self.low, self.high = positions[:, :2].min(0), positions[:, :2].max(0)
 
   def heights(self, points):
-    """For [x, y] points: the height of the surface's plane nearest each in plan (its own height where it lies over the point), and
-    how far off the surface each lies in plan."""
-    heights, apart = numpy.empty(len(points)), numpy.empty(len(points))
-    for index, (x, y) in enumerate(points):
-      _, _, face, distance = self.plan.find_nearest(mathutils.Vector((x, y, 0.0)))
-      a, b, c = self.positions[self.triangles[face]]
-      normal = numpy.cross(b - a, c - a)
-      heights[index] = a[2] - (normal[0] * (x - a[0]) + normal[1] * (y - a[1])) / normal[2]
-      apart[index] = distance
-    return heights, apart
+    """For [x, y] points: the height of the surface's plane nearest each in plan, and how far off the surface each lies in plan."""
+    faces, apart = numpy.empty(len(points), dtype=numpy.int64), numpy.empty(len(points))
+    for index, (x, y) in enumerate(points[:, :2].tolist()):
+      _, _, faces[index], apart[index] = self.plan.find_nearest(mathutils.Vector((x, y, 0.0)))
+    return (self.slopes[faces] * points[:, :2]).sum(axis=1) + self.offsets[faces], apart
 
   def nearby(self, points, margin):
     return ((points[:, :2] >= self.low - margin) & (points[:, :2] <= self.high + margin)).all(axis=1)
 
+  def rise(self, positions):
+    """How far each point stands over the surface (negative under it), NaN where the surface does not lie over it."""
+    rise = numpy.full(len(positions), numpy.nan)
+    candidates = numpy.flatnonzero(self.nearby(positions, waterlineTolerance))
+    heights, apart = self.heights(positions[candidates])
+    rise[candidates] = numpy.where(apart <= waterlineTolerance, positions[candidates, 2] - heights, numpy.nan)
+    return rise
+
   def underMask(self, positions):
     """Which points lie under the surface or on it."""
-    under = numpy.zeros(len(positions), dtype=bool)
-    candidates = numpy.flatnonzero(self.nearby(positions, waterlineTolerance))
-    heights, apart = self.heights(positions[candidates, :2])
-    under[candidates] = (apart <= waterlineTolerance) & (positions[candidates, 2] <= heights + waterlineTolerance)
-    return under
+    return numpy.nan_to_num(self.rise(positions), nan=numpy.inf) <= waterlineTolerance
+
+  def above(self, positions):
+    """How far each point stands over the plane of the surface nearest it in plan, on or off the surface."""
+    return positions[:, 2] - self.heights(positions)[0]
+
+  def crossingFractions(self, starts, ends):
+    """Where segments from one side of the surface to the other cross it, as the fraction along each, by halving."""
+    low, high = numpy.zeros(len(starts)), numpy.ones(len(starts))
+    startsBelow = self.above(starts) < 0
+    for _ in range(waterlineHalvings):
+      middle = (low + high) / 2
+      sameSide = (self.above(starts + middle[:, None] * (ends - starts)) < 0) == startsBelow
+      low, high = numpy.where(sameSide, middle, low), numpy.where(sameSide, high, middle)
+    return (low + high) / 2
 
   def waterline(self, positions, triangles):
     """Where triangles of a mesh cross the surface over them, as plan segments (k x 2 x 2): the shore players see."""
     nearTriangles = triangles[self.nearby(positions, waterlineTolerance)[triangles].any(axis=1)]
     used = numpy.unique(nearTriangles)
-    values = numpy.full(len(positions), numpy.nan)
-    heights, _ = self.heights(positions[used, :2])
-    values[used] = positions[used, 2] - heights
-    segments = []
-    for triangle in nearTriangles:
-      below = values[triangle] < 0
-      if below.all() or not below.any():
-        continue
-      ends = []
-      for first, second in ((0, 1), (1, 2), (2, 0)):
-        if below[first] != below[second]:
-          a, b = values[triangle[first]], values[triangle[second]]
-          ends.append(positions[triangle[first], :2] + a / (a - b) * (positions[triangle[second], :2] - positions[triangle[first], :2]))
-      segments.append(ends)
-    segments = numpy.array(segments).reshape(-1, 2, 2)
+    values = numpy.zeros(len(positions))
+    values[used] = self.above(positions[used])
+    # A vertex cut onto the waterline is on it, not a hair to either side, so a cut mesh gives the same line as before the cut.
+    sides = numpy.sign(numpy.where(numpy.abs(values) <= waterlineTolerance, 0.0, values))
+    edges = nearTriangles[:, [0, 1, 1, 2, 2, 0]].reshape(-1, 3, 2)
+    straddling = sides[edges[:, :, 0]] * sides[edges[:, :, 1]] < 0
+    pairs, which = numpy.unique(numpy.sort(edges[straddling], axis=1), axis=0, return_inverse=True)
+    fractions = self.crossingFractions(positions[pairs[:, 0]], positions[pairs[:, 1]])
+    crossings = numpy.zeros(edges.shape)
+    crossings[straddling] = (positions[pairs[:, 0], :2] + fractions[:, None] * (positions[pairs[:, 1], :2] - positions[pairs[:, 0], :2]))[which.reshape(-1)]
+    points = numpy.stack([positions[nearTriangles][:, :, :2], crossings], axis=2).reshape(-1, 6, 2)
+    onLine = numpy.stack([sides[nearTriangles] == 0, straddling], axis=2).reshape(-1, 6)
+    paired = onLine.sum(axis=1) == 2
+    segments = points[paired][onLine[paired]].reshape(-1, 2, 2)
     segments = segments[numpy.linalg.norm(segments[:, 1] - segments[:, 0], axis=1) > waterlineTolerance]
     if len(segments):
       _, apart = self.heights(segments.mean(axis=1))
@@ -313,45 +330,51 @@ def waterlineDistances(segments, points):
   """Each point's distance in plan from a waterline (WaterSurface.waterline), infinite where there is none."""
   if not len(segments):
     return numpy.full(len(points), numpy.inf)
+  flat = numpy.zeros((len(points), 3))
+  flat[:, :2] = points[:, :2]
+  return waterlineBorder(segments).distances(flat)
+
+
+def waterlineBorder(segments):
   flat = numpy.zeros((len(segments), 2, 3))
   flat[:, :, :2] = segments
-  border = BorderDistance(flat[:, 0], flat[:, 1])
-  return numpy.array([border.nearest((x, y, 0.0))[0] for x, y in points[:, :2]])
+  return BorderDistance(flat[:, 0], flat[:, 1])
+
+
+def cornerCounts(sceneObject, vertexMask):
+  """For each face, how many of its corners a vertex mask holds, and how many corners it has."""
+  loopTotals, loopVertices = faceLoops(sceneObject)
+  return numpy.add.reduceat(vertexMask[loopVertices].astype(numpy.int64), numpy.cumsum(loopTotals) - loopTotals), loopTotals
 
 
 def underWaterMask(waterObject, sceneObject, elementKind):
-  """The vertices under a pool or river's surface or on it, or the faces every corner of which lies there: its bed. Faces are whole, so
-  where faces cross the waterline the bed stops short of it; cut the mesh along the waterline (carveWaterBed does, or cutContours at a
-  pool's level) for a bed that meets it."""
+  """The vertices under a pool or river's surface or on it, or the faces all of whose corners are: its bed."""
   positions, _ = readVertexArrays(sceneObject)
   under = WaterSurface(waterObject).underMask(positions)
   if elementKind == "vertices":
     return under
-  return numpy.array([under[corners].all() for corners in faceVertexIndices(sceneObject)], dtype=bool)
+  counts, totals = cornerCounts(sceneObject, under)
+  return counts == totals
 
 
 def nearWaterMask(waterObject, sceneObject, elementKind, distance):
-  """The vertices out of a pool or river within distance in plan of its waterline on the mesh, or the faces not under it that the
-  waterline crosses or whose middles lie within distance of it: its wet banks, as wide as the faces allow."""
+  """The vertices out of a pool or river within distance in plan of its waterline, or the faces the waterline crosses or meets and those all of whose corners are within distance: its wet banks."""
   if distance <= 0:
     raise ValueError(f"The nearWater selector's distance must be positive, got {distance}")
   surface = WaterSurface(waterObject)
   positions, _ = readVertexArrays(sceneObject)
   under = surface.underMask(positions)
   segments = surface.waterline(positions, meshTriangles(sceneObject))
-  if elementKind == "vertices":
-    points, outside, crossing = positions, ~under, numpy.zeros(len(positions), dtype=bool)
-  else:
-    points = readFaceArrays(sceneObject)[0]
-    cornersUnder = [under[corners] for corners in faceVertexIndices(sceneObject)]
-    outside = numpy.array([not corners.all() for corners in cornersUnder], dtype=bool)
-    crossing = numpy.array([corners.any() for corners in cornersUnder], dtype=bool)
-  near = numpy.zeros(len(points), dtype=bool)
+  near = numpy.zeros(len(positions), dtype=bool)
   if len(segments):
     low, high = segments.reshape(-1, 2).min(0) - distance, segments.reshape(-1, 2).max(0) + distance
-    candidates = numpy.flatnonzero(outside & ~crossing & ((points[:, :2] >= low) & (points[:, :2] <= high)).all(axis=1))
-    near[candidates] = waterlineDistances(segments, points[candidates]) <= distance
-  return outside & (near | crossing)
+    candidates = numpy.flatnonzero(~under & ((positions[:, :2] >= low) & (positions[:, :2] <= high)).all(axis=1))
+    near[candidates] = waterlineDistances(segments, positions[candidates]) <= distance + waterlineTolerance
+  if elementKind == "vertices":
+    return near
+  underCounts, totals = cornerCounts(sceneObject, under)
+  nearCounts, _ = cornerCounts(sceneObject, near)
+  return (underCounts < totals) & ((underCounts > 0) | (nearCounts == totals))
 
 
 def requireMeshObject(name):
@@ -647,6 +670,22 @@ class BorderDistance:
     best = int(distances.argmin())
     return float(distances[best]), int(segments[best]), float(fractions[best])
 
+  def distances(self, points):
+    """The distance from each of many points to the border, as nearest gives it."""
+    owners = self.owners.tolist()
+    pointIndices, segmentIndices = [], []
+    for index, point in enumerate(points.tolist()):
+      _, _, sampled = self.tree.find(point)
+      segments = {owners[sample] for _, sample, _ in self.tree.find_range(point, sampled + self.reach)}
+      pointIndices.extend([index] * len(segments))
+      segmentIndices.extend(segments)
+    pointIndices, segmentIndices = numpy.array(pointIndices, dtype=numpy.int64), numpy.array(segmentIndices, dtype=numpy.int64)
+    offsets, spans = points[pointIndices] - self.starts[segmentIndices], self.spans[segmentIndices]
+    fractions = numpy.clip((offsets * spans).sum(axis=1) / numpy.maximum((spans * spans).sum(axis=1), 1e-12), 0, 1)
+    distances = numpy.full(len(points), numpy.inf)
+    numpy.minimum.at(distances, pointIndices, numpy.linalg.norm(offsets - fractions[:, None] * spans, axis=1))
+    return distances
+
 
 def requireSelection(mask, selector, sceneObject, elementKind):
   count = int(mask.sum())
@@ -662,6 +701,14 @@ def loadBMesh(sceneObject):
   meshEditor.edges.ensure_lookup_table()
   meshEditor.faces.ensure_lookup_table()
   return meshEditor
+
+
+def storeSplitBMesh(meshEditor, sceneObject):
+  """Store a mesh whose edges and faces were only split or turned: bmesh places a split's new vertex alike in every shaping pass, so the passes stay."""
+  meshEditor.normal_update()
+  meshEditor.to_mesh(sceneObject.data)
+  meshEditor.free()
+  sceneObject.data.update()
 
 
 def storeBMesh(meshEditor, sceneObject):

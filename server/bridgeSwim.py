@@ -16,7 +16,6 @@ import bridgeObjects
 import bridgeSurfacing
 import bridgeWater
 
-swimProperty = bridgeMeshAccess.swimProperty
 swimCollectionName = "swimVolumes"
 volumePrefixes = {"water": "AWT_", "lava": "ALV_"}
 namePattern = re.compile(r"^[A-Za-z0-9]+$")
@@ -32,11 +31,11 @@ dryShare = 0.5
 
 
 def swimBoxes():
-  return sorted((sceneObject for sceneObject in bpy.context.scene.objects if swimProperty in sceneObject), key=lambda box: box.name)
+  return sorted((sceneObject for sceneObject in bpy.context.scene.objects if bridgeMeshAccess.swimProperty in sceneObject), key=lambda box: box.name)
 
 
 def readBox(box):
-  return json.loads(box[swimProperty])
+  return json.loads(box[bridgeMeshAccess.swimProperty])
 
 
 def boxBounds(box):
@@ -162,7 +161,7 @@ def boxObject(name, liquid, body, center, halfExtents, built, fingerprint):
   box.empty_display_size = 1.0
   box.location = center
   box.scale = halfExtents
-  box[swimProperty] = json.dumps({"liquid": liquid, "body": body, "built": built, "fingerprint": fingerprint})
+  box[bridgeMeshAccess.swimProperty] = json.dumps({"liquid": liquid, "body": body, "built": built, "fingerprint": fingerprint})
   bridgeObjects.targetCollection(swimCollectionName).objects.link(box)
   return box
 
@@ -245,7 +244,7 @@ def acceptSwimVolumes(body):
   ground = bridgeWater.Ground()
   fingerprint = bodyFingerprint(bodyObject, bodyCells(bodyObject, ground)[0])
   for box in boxes:
-    box[swimProperty] = json.dumps(readBox(box) | {"fingerprint": fingerprint})
+    box[bridgeMeshAccess.swimProperty] = json.dumps(readBox(box) | {"fingerprint": fingerprint})
   return {"body": body, "accepted": [box.name for box in boxes]} | describeBody(bodyObject, ground)
 
 
@@ -259,9 +258,7 @@ def describeBox(box):
 
 
 def describeBody(body, ground):
-  """A body's swim state (boxed, changed since its boxes were accepted, not swimmable, or undecided) and what its boxes leave uncovered
-  or hold that may not be meant (a top away from the surface, a box mostly over dry ground, a box mostly without the body's water over
-  it, as one left over a drained or moved basin): findings to look at, never errors."""
+  """A body's swim state (boxed, changed since accepted, not swimmable, undecided) and findings to look at, never errors: cells left uncovered, tops away from the surface, boxes mostly over dry ground or without water over them."""
   definition = bridgeWater.readDefinition(body)
   boxes = [box for box in swimBoxes() if readBox(box)["body"] == body.name]
   if definition.get("swimmable") is False:
@@ -322,8 +319,7 @@ def getSwimVolumes(name):
 
 
 def structuralErrors():
-  """What no zone file can hold: boxes turned or without size, names the client would mix up, prefixes against their liquid, bodies
-  gone, and boxes of a body marked not swimmable."""
+  """What no zone file can hold: boxes turned or without size, names the client mixes up, prefixes against their liquid, bodies gone, boxes of a body no one swims in."""
   errors = []
   swimmable = {body.name: bridgeWater.readDefinition(body).get("swimmable") is not False for body in swimBodies()}
   bodies = set(swimmable)

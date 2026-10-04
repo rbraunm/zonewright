@@ -36,13 +36,9 @@ up = mathutils.Vector((0.0, 0.0, 1.0))
 down = mathutils.Vector((0.0, 0.0, -1.0))
 reach = bridgeMeshAccess.waterReach
 surfaceContact = 1e-3
-# A cut along a cell's edge is placed to 2 to the -edgeHalvings of the edge; one this close to a corner is that corner.
 edgeHalvings = 20
+# A cut closer to a cell's corner than this share of its edge would leave a sliver of a face; it is taken as the corner.
 cornerSnap = 1e-4
-# A river's end line is followed this many times a cell to find every cell it crosses.
-endSamplesPerCell = 64
-# Where a body's surface shows is sampled at a quarter of its spacing, but at no more than this many points.
-visibleSampleLimit = 250000
 neighbourSteps = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
 
@@ -74,8 +70,7 @@ class Ground:
     return None if location is None else distance
 
   def barelyCovers(self, x, y, level):
-    """Whether the ground over [x, y] stands at `level` or above it by less than shoreTuck, so a surface ending there would barely
-    hide; ground shoreTuck above it already hides it."""
+    """Whether the ground over [x, y] stands at `level` or above it by less than shoreTuck, so a surface ending there would barely hide."""
     location, normal, _, _ = self.tree.ray_cast(mathutils.Vector((x, y, level + shoreTuck - surfaceContact)), down, shoreTuck)
     return location is not None and normal.z > 0
 
@@ -183,9 +178,7 @@ def requireLiquidMaterial(kind, materialName):
 # Pools and rivers
 
 def pathPositions(points, path):
-  """For [x, y] points: the distance along a path to the nearest spot on it, the signed distance across it (positive to the right going
-  along it; past either end, square across the line of the path's end), the path's level at that spot, and whether the point lies past
-  either end of the path."""
+  """For [x, y] points: the distance along a path to its nearest spot, the signed distance across it (right positive; past an end, square across the end's line), the level there, and whether it lies past an end."""
   pathArray = numpy.asarray(path, dtype=numpy.float64)
   starts, ends = pathArray[:-1], pathArray[1:]
   segments = ends[:, :2] - starts[:, :2]
@@ -222,10 +215,7 @@ def areaAllowance(points, area):
 
 
 def allowance(definition, points, throughEnds=False):
-  """Where the body may spread, as how far inside those bounds each [x, y] point lies (negative outside): inside `within` for a pool
-  (anywhere without one); for a river, within reach of the path and between its ends, cut square across it, since water past the end
-  of a river has gone on (over a fall, into a pool, out of the zone), or throughEnds, its reach running straight on past them; then
-  each stroke in order adding its area or taking it away."""
+  """How far inside where the body may spread each [x, y] point lies, negative outside: within for a pool, reach between its ends for a river (throughEnds, on past them), then each stroke adding or taking away its area."""
   if definition["kind"] == "pool":
     bounds = numpy.full(len(points), numpy.inf) if definition["within"] is None else areaAllowance(points, {"polygon": definition["within"]})
   else:
@@ -333,15 +323,21 @@ def riverEndCells(definition):
   cells = set()
   for end, outward in riverEnds(definition):
     across = numpy.array([-outward[1], outward[0]])
-    for offset in numpy.linspace(-reach, reach, math.ceil(2 * reach / spacing * endSamplesPerCell) + 1):
-      x, y = (end + across * offset) / spacing
+    first, last = (end - across * reach) / spacing, (end + across * reach) / spacing
+    crossings = [0.0, 1.0]
+    for axis in range(2):
+      if last[axis] != first[axis]:
+        lines = numpy.arange(math.ceil(min(first[axis], last[axis])), math.floor(max(first[axis], last[axis])) + 1)
+        crossings.extend(((lines - first[axis]) / (last[axis] - first[axis])).tolist())
+    crossings.sort()
+    for low, high in zip(crossings[:-1], crossings[1:]):
+      x, y = first + (low + high) / 2 * (last - first)
       cells.add((math.floor(x), math.floor(y)))
   return cells
 
 
 def cutRiverEnds(meshEditor, definition):
-  """Cut a river's surface square across its path at each end and take away what lies past it, but for water a stroke adds there. Its
-  reach runs on past its ends until this cut, so a river ending at a fall's lip ends along the lip all the way across."""
+  """Cut a river's surface square across its path at each end and take away what lies past it, but for water a stroke adds there."""
   near = definition["reach"] + 2 * definition["spacing"]
   for end, outward in riverEnds(definition):
 
@@ -363,8 +359,7 @@ def cellEdges(cell):
 
 
 def edgeCuts(cells, inside, step, isInside):
-  """Where each cell edge running from an inside corner (inside: corner -> bool) to an outside one leaves the inside, as the fraction of
-  the way from its inside corner, found by halving; keyed by the edge, inside corner first. isInside answers for [x, y] points at once."""
+  """Where each cell edge from an inside corner to an outside one leaves the inside, found by halving: {(inside corner, outside corner): fraction from the inside one}."""
   edges = sorted({(a, b) if inside[a] else (b, a) for cell in cells for a, b in cellEdges(cell) if inside[a] != inside[b]})
   if not edges:
     return {}
@@ -379,8 +374,7 @@ def edgeCuts(cells, inside, step, isInside):
 
 
 def clippedLoops(cells, inside, cuts):
-  """Each cell's part inside, as a loop of keys: its inside corners and, between an inside corner and an outside one, the edge where it
-  is cut (its inside corner, for a cut there). Neighbouring cells share their cuts, so the loops make one connected surface."""
+  """Each cell's inside part as a loop of keys: its inside corners, and the edge cuts between them and its outside ones, which neighbouring cells share."""
   loops = []
   for cell in sorted(cells):
     corners = cellCorners(cell)
@@ -407,12 +401,11 @@ def loopPoint(key, cuts, step):
 
 
 def surfaceMesh(name, definition, cells):
-  """The surface over the cells at the body's levels, cut cleanly along the bounds of where it may spread (reach and ends, within,
-  strokes) rather than stepping cell by cell: a pool's flat cells merged into larger faces, mapped in world units across the plan; a
-  river's mapped along its path (v downstream, u across), the way a scrolling water texture flows."""
+  """The surface over the cells at the body's levels, cut along the bounds of where it may spread; a pool's flat cells merged and mapped across the plan, a river's mapped along its path (v downstream, u across)."""
   spacing = definition["spacing"]
 
   def allowed(points):
+    # A river's reach runs on past its ends until cutRiverEnds cuts them square, so one ending at a fall's lip ends along all of it.
     return allowance(definition, points, throughEnds=True) >= 0
 
   corners = sorted({corner for cell in cells for corner in cellCorners(cell)})
@@ -453,13 +446,10 @@ def surfaceMesh(name, definition, cells):
 
 
 def visibleSurface(body, ground):
-  """Where a pool or river's surface shows, in plan: everywhere it is not tucked under the ground. Sampled on a grid a quarter of the
-  body's spacing (coarser over a body too large for that), its edges placed by halving between the grid's points: whole cells as row
-  runs [x0, y0, x1, y1], and the cells its edge crosses as loops of [x, y]."""
-  definition = readDefinition(body)
+  """Where a pool or river's surface shows in plan, not tucked under the ground, on the body's grid with its edges placed by halving: row runs [x0, y0, x1, y1] of whole cells and loops of [x, y] where its edge crosses a cell."""
+  step = readDefinition(body)["spacing"]
   positions, _ = bridgeMeshAccess.readVertexArrays(body)
   low, high = positions[:, :2].min(0), positions[:, :2].max(0)
-  step = max(definition["spacing"] / 4, math.sqrt(float(numpy.prod(high - low)) / visibleSampleLimit))
   surface = bridgeMeshAccess.worldTree([body])
   above = float(positions[:, 2].max()) + 1
 
@@ -486,8 +476,7 @@ def visibleSurface(body, ground):
 
 
 def visibleExtent(body, ground):
-  """The plan bounds of the water players see: a pool or river's surface where it is not tucked under its banks, a fall's sheet where it
-  is not inside the rock; None when none of it shows."""
+  """The plan bounds of the water players see (a surface not tucked under its banks, a fall's sheet out of the rock), or None."""
   if readDefinition(body)["kind"] == "fall":
     positions, _ = bridgeMeshAccess.readVertexArrays(body)
     shown = [point[:2] for point in positions if not ground.insideRock(point)]
@@ -690,7 +679,7 @@ def meshShape(mesh, matrix):
 def unchangedStrokeReason(definition, mode, area, ground):
   """Why a stroke left a body as it was, from the ground at the body's grid points inside the stroke's area."""
   if mode == "remove":
-    return "none of the water lies inside the area"
+    return "none of the water lies inside the area yet; it stops the water there once an edit spreads it so far"
   spacing = definition["spacing"]
   if "circle" in area:
     center, radius = numpy.asarray(area["circle"]["center"], dtype=numpy.float64), area["circle"]["radius"]
@@ -722,8 +711,7 @@ def unchangedStrokeReason(definition, mode, area, ground):
 
 
 def shapeWaterExtent(name, mode, area):
-  """Stroke where a pool or river may spread: add lets it flood an area its bounds left out, remove stops it where it leaks. A stroke that
-  would leave the body as it is is refused with the reason, rather than kept doing nothing."""
+  """Stroke where a pool or river may spread: add lets it flood an area its bounds left out, remove stops it where it leaks; a stroke that changes nothing yet is kept and says why."""
   sceneObject = bridgeMeshAccess.requireWater(name)
   definition = readDefinition(sceneObject)
   if definition["kind"] == "fall":
@@ -733,10 +721,11 @@ def shapeWaterExtent(name, mode, area):
   definition = validatedDefinition(definition | {"strokes": definition["strokes"] + [{"mode": mode, "area": requireArea(area)}]})
   ground = Ground()
   mesh, report = buildBody(name, definition, ground)
-  if meshShape(mesh, mathutils.Matrix.Identity(4)) == meshShape(sceneObject.data, sceneObject.matrix_world):
-    bpy.data.meshes.remove(mesh)
-    raise ValueError(f"The {mode} stroke changes nothing of '{name}': {unchangedStrokeReason(definition, mode, area, ground)}")
-  return installBody(sceneObject, definition, mesh, sceneObject.material_slots[0].material, ground, report)
+  changed = meshShape(mesh, mathutils.Matrix.Identity(4)) != meshShape(sceneObject.data, sceneObject.matrix_world)
+  description = installBody(sceneObject, definition, mesh, sceneObject.material_slots[0].material, ground, report)
+  if changed:
+    return description | {"strokeChanged": True}
+  return description | {"strokeChanged": False, "whyUnchanged": unchangedStrokeReason(definition, mode, area, ground)}
 
 
 def getWater():
@@ -750,49 +739,8 @@ def smoothStep(values):
   return values * values * (3 - 2 * values)
 
 
-def cutAlongWaterline(sceneObject, surface):
-  """Split a mesh's edges where they cross a pool or river's surface over them, and its faces between those splits, as an artist cuts an
-  edge loop along the waterline: each new vertex placed alike in every shaping pass, carrying UVs and face paint."""
-  tolerance = bridgeMeshAccess.waterlineTolerance
-  positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
-  edges = bridgeMeshAccess.meshEdges(sceneObject.data)
-  longest = float(numpy.linalg.norm(positions[edges[:, 0]] - positions[edges[:, 1]], axis=1).max())
-  values = numpy.full(len(positions), numpy.nan)
-  near = numpy.flatnonzero(surface.nearby(positions, longest))
-  values[near] = positions[near, 2] - surface.heights(positions[near, :2])[0]
-  meshEditor = bridgeMeshAccess.loadBMesh(sceneObject)
-  onLevel = {meshEditor.verts[index] for index in numpy.flatnonzero(numpy.abs(values) <= tolerance)}
-  splitEdges = splitFaces = 0
-  for edge in list(meshEditor.edges):
-    start, end = edge.verts
-    a, b = values[start.index], values[end.index]
-    if not (min(a, b) < -tolerance and max(a, b) > tolerance):
-      continue
-    fraction = a / (a - b)
-    crossing = positions[start.index, :2] + fraction * (positions[end.index, :2] - positions[start.index, :2])
-    if surface.heights(crossing[None])[1][0] > tolerance:
-      continue
-    _, vertex = bmesh.utils.edge_split(edge, start, fraction)
-    onLevel.add(vertex)
-    splitEdges += 1
-  cut = set()
-  for face in list({face for vertex in onLevel for face in vertex.link_faces}):
-    corners = [vertex for vertex in face.verts if vertex in onLevel]
-    if len(corners) == 2 and not any(corners[1] in edge.verts for edge in corners[0].link_edges if edge in face.edges):
-      newFace, _ = bmesh.utils.face_split(face, corners[0], corners[1])
-      cut.update((face, newFace))
-      splitFaces += 1
-  bmesh.ops.triangulate(meshEditor, faces=[face for face in cut if len(face.verts) > 3], quad_method="BEAUTY", ngon_method="BEAUTY")
-  meshEditor.to_mesh(sceneObject.data)
-  meshEditor.free()
-  sceneObject.data.update()
-  return {"splitEdges": splitEdges, "splitFaces": splitFaces}
-
-
 def carveWaterBed(name, objectName, depth, shoreWidth):
-  """Lower the ground under a pool or river: `depth` under its surface from `shoreWidth` out from its waterline, rising smoothly to the
-  surface at the waterline. The ground is first cut along the waterline, so the waterline stays exactly where it is: nothing at or
-  above the surface moves, and ground already deeper stays."""
+  """Lower the ground under a pool or river, `depth` under its surface from `shoreWidth` out from its waterline, after cutting the ground along the waterline so the shore stays put."""
   waterObject = bridgeMeshAccess.requireWater(name)
   if readDefinition(waterObject)["kind"] == "fall":
     raise ValueError(f"'{name}' is a fall; a fall has no bed")
@@ -800,21 +748,19 @@ def carveWaterBed(name, objectName, depth, shoreWidth):
     raise ValueError(f"depth and shoreWidth must be positive, got {depth} and {shoreWidth}")
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   surface = bridgeMeshAccess.WaterSurface(waterObject)
-  waterlineCut = cutAlongWaterline(sceneObject, surface)
   positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
-  heights, apart = numpy.full(len(positions), numpy.nan), numpy.full(len(positions), numpy.inf)
-  near = numpy.flatnonzero(surface.nearby(positions, 0.0))
-  heights[near], apart[near] = surface.heights(positions[near, :2])
-  under = (apart <= bridgeMeshAccess.waterlineTolerance) & (positions[:, 2] < heights - bridgeMeshAccess.waterlineTolerance)
-  if not under.any():
+  if not (surface.rise(positions) < -bridgeMeshAccess.waterlineTolerance).any():
     raise ValueError(f"No vertex of '{objectName}' lies under '{name}'")
+  measure = bridgeShaping.WaterlineMeasure(sceneObject, positions, surface, [0])
+  waterlineCut = bridgeShaping.cutAlongLevels(sceneObject, positions, measure, [0], numpy.ones(len(sceneObject.data.polygons), dtype=bool))
+  positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
+  rise = surface.rise(positions)
+  under = rise < -bridgeMeshAccess.waterlineTolerance
   waterline = surface.waterline(positions, bridgeMeshAccess.meshTriangles(sceneObject))
-  if not len(waterline):
-    raise ValueError(f"'{objectName}' never rises out of '{name}': it has no shore to measure from")
   fromShore = bridgeMeshAccess.waterlineDistances(waterline, positions[under])
-  targets = heights[under] - depth * smoothStep(numpy.clip(fromShore / shoreWidth, 0, 1))
+  targets = positions[under, 2] - rise[under] - depth * smoothStep(numpy.clip(fromShore / shoreWidth, 0, 1))
   updated = positions.copy()
-  updated[under, 2] = numpy.minimum(positions[under, 2], targets)
+  updated[under, 2] = numpy.where(targets < positions[under, 2] - bridgeMeshAccess.waterlineTolerance, targets, positions[under, 2])
   bridgeShaping.writeWorldPositions(sceneObject, updated)
   return bridgeShaping.moveSummary(sceneObject, positions, updated) | {
     "underWater": int(under.sum()), "deepestBed": round(float(updated[under, 2].min()), 2), "waterlineCut": waterlineCut,

@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
 import planDrawing
 from conftest import writePNG
 from testModelsAndDressing import freshScene
-from testWater import basin, environment, liquidMaterials
+from testWater import basin, environment, liquidMaterials, meshOf
 
 # Under the pool's middle (bed 20 down at its center) a hollow whose ceiling, at -22, lies within the 4 a box reaches under the bed.
 caveCode = """
@@ -210,21 +210,66 @@ def testPlanNamesEachSwimVolumeInsideItClearOfTheOthers(stageBlenderServer, tmp_
   volumes, drawn = stageBlenderServer.session(steps)
   frame = planDrawing.PlanFrame(plan["center"], plan["width"], (1440, 810))
   boxes = [{"name": volume["name"], "liquid": volume["liquid"], "corners": [volume["minimum"], volume["maximum"]]} for volume in volumes]
-  named, unnamed = planDrawing.drawSwim(ImageDraw.Draw(Image.new("RGBA", frame.size)), frame, boxes)
+  draw = ImageDraw.Draw(Image.new("RGBA", frame.size))
+  labels, unnamed = planDrawing.swimLabels(draw, frame, boxes)
+  bounds = {name: planDrawing.labelBounds(draw, position, text, planDrawing.swimLabelSize) for name, text, position in labels}
   rectangles = {}
   for box in boxes:
     (left, bottom), (right, top) = frame.pixel(box["corners"][0]), frame.pixel(box["corners"][1])
     rectangles[box["name"]] = (left, top, right, bottom)
   # Each box is named inside itself, in full where its name fits and by its number in the narrow strips where it does not, and no name
   # overlaps another; the drawing reports any box it left unnamed.
-  assert sorted([label["name"] for label in named] + unnamed) == sorted(rectangles)
-  assert {label["text"] for label in named} >= {"AWT_pool01"} and any(label["text"] == label["name"][-2:] for label in named)
-  for label in named:
-    left, top, right, bottom = label["bounds"]
-    boxLeft, boxTop, boxRight, boxBottom = rectangles[label["name"]]
+  assert sorted(list(bounds) + unnamed) == sorted(rectangles)
+  assert {text for _, text, _ in labels} >= {"AWT_pool01"} and any(text == name[-2:] for name, text, _ in labels)
+  for name, (left, top, right, bottom) in bounds.items():
+    boxLeft, boxTop, boxRight, boxBottom = rectangles[name]
     assert boxLeft <= left and right <= boxRight and boxTop <= top and bottom <= boxBottom
-  for index, first in enumerate(named):
-    for second in named[index + 1:]:
-      a, b = first["bounds"], second["bounds"]
+  named = list(bounds.values())
+  for index, a in enumerate(named):
+    for b in named[index + 1:]:
       assert a[2] <= b[0] or b[2] <= a[0] or a[3] <= b[1] or b[3] <= a[1]
   assert drawn["unnamedSwimVolumes"] == unnamed
+
+
+def pixelsOf(image):
+  return numpy.asarray(Image.open(io.BytesIO(image)).convert("RGB"), dtype=numpy.int64)
+
+
+hideRiver = "bpy.data.objects['river'].hide_render = {hidden}\nresult = bpy.data.objects['river'].hide_render"
+
+
+def testSwimVolumesTintASlopingRiverEvenlyAndNoHigherThanTheyStand(stageBlenderServer, tmp_path):
+  near = {"eye": [-120, -70, 24], "target": [-20, 0, -8]}
+  far = {"eye": [-1300, -1700, 900], "target": [0, 0, -6]}
+
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [400, 160], "spacing": 8, "location": [0, 0, 0], "collection": "terrain"})
+    await session.expectSuccess("sculptAlongPath", {"objectName": "ground", "mode": "carve", "path": [[-200, 0, -10], [200, 0, -10]], "radius": 34, "strength": 1, "profile": [[0, 0], [0.55, 0], [1, 10]], "conformRim": False})
+    await liquidMaterials(session, tmp_path)
+    await session.expectSuccess("runWater", {"name": "river", "path": [[-150, 0, -4], [150, 0, -8]], "reach": 30, "material": "water"})
+    await session.expectSuccess("setZoneProperties", environment)
+    built = await session.expectSuccess("buildSwimVolumes", {"body": "river"})
+    images = {}
+    for name, view in (("near", near), ("far", far)):
+      images[name] = (await session.expectImage("renderView", {"view": view}))[0]
+      images[name + "Swim"] = (await session.expectImage("renderView", {"view": view, "swimVolumes": True}))[0]
+    await session.expectSuccess("runPython", {"code": hideRiver.format(hidden=True)})
+    images["farDry"] = (await session.expectImage("renderView", {"view": far}))[0]
+    await session.expectSuccess("runPython", {"code": hideRiver.format(hidden=False)})
+    river = await meshOf(session, "river")
+    return built, images, river
+
+  built, images, river = stageBlenderServer.session(steps)
+  # The river falls 4 over its length, so its boxes step down a unit at a time with their tops up to a unit under its surface; drawn,
+  # they tint the river evenly, more blue and green than red, where boxes and a sloping surface once broke it into a sawtooth.
+  levels = numpy.array(river["vertices"])[:, 2]
+  assert len(built["built"]) >= 4 and levels.max() - levels.min() > 3.9
+  tint = (pixelsOf(images["nearSwim"]) - pixelsOf(images["near"]))[380:440, 20:260].reshape(-1, 3)
+  assert tint[:, 1].mean() > 30 and tint[:, 2].mean() > tint[:, 0].mean() + 30 and tint[:, 1:].std(axis=0).max() < 6
+  # From far off the tint rises no higher in the view than the water does: no box is drawn above where it stands (lifted by the square
+  # of the distance, they once stood 4 rows of pixels above it here).
+  water = numpy.abs(pixelsOf(images["far"]) - pixelsOf(images["farDry"])).sum(axis=2) > 12
+  tinted = numpy.abs(pixelsOf(images["farSwim"]) - pixelsOf(images["far"])).sum(axis=2) > 12
+  columns = numpy.flatnonzero(water.any(axis=0) & tinted.any(axis=0))
+  assert len(columns) > 40 and (tinted.argmax(axis=0)[columns] >= water.argmax(axis=0)[columns] - 1).all()

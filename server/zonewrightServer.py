@@ -644,7 +644,7 @@ async def setZoneProperties(
 
 @guardedTool()
 async def renderView(context: Context, view: dict, shading: str = "client", bandHeight: float = 50.0, guides: bool = True, swimVolumes: bool = False):
-  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], or with z on the ground within 50 units below it, for caves and under overhangs; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog. {"frame": {"objects": [names], "headingDegrees": h, "pitchDegrees": p}} looks at the named meshes or collection instances from that heading and pitch, standing back so they fit (its result's eye and target reproduce that camera). shading "client" draws the zone as the client does; "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout. Guides (plot outlines, sketch massing) draw unless guides is false; with swimVolumes, each swim volume draws as a see-through block (cyan water, magenta lava), its top a hair above the surface it meets so the two do not mottle."""
+  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], or with z on the ground within 50 units below it, for caves and under overhangs; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog. {"frame": {"objects": [names], "headingDegrees": h, "pitchDegrees": p}} looks at the named meshes or collection instances from that heading and pitch, standing back so they fit (its result's eye and target reproduce that camera). shading "client" draws the zone as the client does; "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout. Guides (plot outlines, sketch massing) draw unless guides is false; with swimVolumes, the view is tinted where the swim volumes stand (cyan water, magenta lava), each box seen through the water, so its top shows evenly under a surface it meets or lies just below, but hidden behind and under the ground."""
   outputPath = newRenderPath()
   figureModel = None
   zone = await callBridge(context, "getZoneProperties", {})
@@ -1097,8 +1097,8 @@ selectorHelp = (
   " {\"box\": {\"minimum\": [x,y,z], \"maximum\": [x,y,z]}}, {\"cylinder\": {\"center\": [x,y], \"radius\": r, \"bottom\": z, \"top\": z}},"
   " {\"facing\": {\"direction\": [x,y,z], \"withinDegrees\": d}}, {\"slope\": {\"minimumDegrees\": a, \"maximumDegrees\": b}} (0 flat, 90 vertical, over 90 overhanging), {\"height\": {\"minimum\": z, \"maximum\": z}}, {\"nearPath\": {\"path\": [[x,y,z], ...], \"radius\": r}} (horizontal distance), {\"material\": name}, {\"vertexGroup\": name}, {\"insideObject\": closedMeshName}, {\"region\": regionName} (inside a region createRegion made),"
   " {\"noise\": {\"featureSize\": f, \"share\": s, \"seed\": n}} (patches about f across covering about the fraction s of the surface, for breaking up one material with another),"
-  " {\"underWater\": waterBodyName} (under a pool or river's surface or on it: its bed; a face only when all its corners are), {\"nearWater\": {\"water\": name, \"distance\": d}} (out of the water within d in plan of its waterline, where the mesh meets the surface: wet banks; a face the waterline crosses or whose middle lies within d),"
-  " both following whole faces: for a bed that meets the waterline exactly, cut the mesh along it first (carveWaterBed does, as does cutContours at a pool's level), and for a bank band with a clean outer edge, cut along that too (cutContours with distanceFrom the bed),"
+  " {\"underWater\": waterBodyName} (under a pool or river's surface or on it: its bed; a face only when all its corners are), {\"nearWater\": {\"water\": name, \"distance\": d}} (out of the water within d in plan of its waterline, where the mesh meets the surface: wet banks; a face the waterline crosses or meets, so bed and banks leave no gap, or all of whose corners lie within d),"
+  " both following whole faces: for a bed and a bank band that end exactly on the waterline and d out from it, cut the mesh along those lines first (cutContours with waterline and levels [0, d]; carveWaterBed cuts the waterline itself),"
   " {\"and\": [selectors]}, {\"or\": [selectors]}, {\"not\": selector}. Shapes test vertex positions, or face centers for face operations."
   " A selector that matches nothing is an error. Masks such as slope and height pick within an area you chose (a region, a stroke);"
   " a recipe belongs to a region, not to the whole zone."
@@ -1243,8 +1243,10 @@ async def sculptOutline(
 @guardedTool()
 async def addShapingPass(context: Context, objectName: str, name: str):
   """Add a named shaping pass to a mesh and make it active: vertex moves and sculpting go into the active pass, which can later be
-  turned up or down, muted, removed, or collapsed, so a shaping step is revised without redoing the others. Tools that change faces
-  (delete, extrude, inset, bevel, subdivide, cut, decimate, join) refuse while a mesh has passes; collapse them first."""
+  turned up or down, muted, removed, or collapsed, so a shaping step is revised without redoing the others. Tools that add or remove
+  vertices otherwise (delete, extrude, inset, bevel, subdivide, booleanCut, decimate, join) refuse while a mesh has passes; collapse
+  them first. Cuts along a line (cutContours, carveWaterBed's cut along the waterline) and turned diagonals keep them, each new vertex
+  placed alike in every pass."""
   return await callBridge(context, "addShapingPass", {"objectName": objectName, "name": name})
 
 
@@ -1632,12 +1634,16 @@ async def conformSurfaceEdges(context: Context, objectName: str, layer: str, smo
 
 @guardedTool(description=(
   "Cut the selected faces along level lines, as an artist adds an edge loop where a material, a ledge, or a band should begin: lines of"
-  " equal height at each of `levels`, or with distanceFrom (a selector), lines at each distance in `levels` from the border of the"
-  " faces it picks. Each crossed edge splits where the line crosses it, the new vertex placed alike in every shaping pass with UVs and"
-  " surfacing paint carried over, and each crossed face splits along the line, so a height band, a stratum, or a transition strip"
-  " ends on a modeled edge instead of zigzagging across the triangles." + selectorHelp))
-async def cutContours(context: Context, objectName: str, levels: list[float], distanceFrom: dict | None = None, selector: dict = allSelector):
-  return await callBridge(context, "cutContours", {"objectName": objectName, "levels": levels, "distanceFrom": distanceFrom, "selector": selector})
+  " equal height at each of `levels`; with distanceFrom (a selector), lines at each distance in `levels` from the border of the"
+  " faces it picks; or with waterline (a pool or river), lines at each distance in `levels` in plan out of the water from where the"
+  " mesh meets its surface, 0 being that waterline itself, so a bed and a wet bank band (underWater, nearWater) end on clean lines,"
+  " for a sloping river too. Each crossed edge splits where the line crosses it, the new vertex placed alike in every shaping pass with"
+  " UVs and surfacing paint carried over, and each crossed face splits along the line, so a height band, a stratum, or a transition"
+  " strip ends on a modeled edge instead of zigzagging across the triangles." + selectorHelp))
+async def cutContours(
+  context: Context, objectName: str, levels: list[float], distanceFrom: dict | None = None, waterline: str | None = None, selector: dict = allSelector,
+):
+  return await callBridge(context, "cutContours", {"objectName": objectName, "levels": levels, "distanceFrom": distanceFrom, "waterline": waterline, "selector": selector})
 
 
 @guardedTool(description=(
@@ -1918,10 +1924,11 @@ async def editWater(
   "Stroke where a pool or river may spread, as an artist paints a mask: mode \"add\" lets it flood an `area` its bounds left out (a"
   " cove past its within outline, a backwater beyond a river's reach), \"remove\" stops it where it leaks (a stroke across a gap in"
   " the bank); `area` is {\"circle\": {\"center\": [x, y], \"radius\": r}} or {\"polygon\": [[x, y], ...]}. Strokes apply in order"
-  " and are kept, so later edits keep them; editWater with strokes [] clears them. A stroke that would leave the body as it is is"
-  " refused, saying why: no water inside a removed area, or for an added one, ground there at or above the level, low ground the water"
-  " already covers, or low ground that higher ground or the body's own bounds part from the water (open a way, stroke the gap in too,"
-  " or flood it as its own body)." + waterBodyHelp
+  " and are kept, so later edits keep them; editWater with strokes [] clears them. A stroke may be laid ahead of an edit (a removed"
+  " stroke across a side channel the water reaches only once its level is raised): one that changes nothing yet is kept all the same,"
+  " and the result says so (strokeChanged false) and why (whyUnchanged): no water inside a removed area yet, or for an added one,"
+  " ground there at or above the level, low ground the water already covers, or low ground that higher ground or the body's own bounds"
+  " part from the water (open a way, stroke the gap in too, or flood it as its own body)." + waterBodyHelp
 ))
 async def shapeWaterExtent(context: Context, name: str, mode: str, area: dict):
   return await callBridge(context, "shapeWaterExtent", {"name": name, "mode": mode, "area": area})
@@ -1931,9 +1938,10 @@ async def shapeWaterExtent(context: Context, name: str, mode: str, area: dict):
 async def carveWaterBed(context: Context, name: str, objectName: str, depth: float, shoreWidth: float):
   """Lower the ground (objectName) under a pool or river: `depth` under its surface from `shoreWidth` out from its waterline (where
   the ground meets the surface), rising smoothly to the surface at the waterline. It first cuts the ground along the waterline (an edge
-  loop, as cutContours makes; `waterlineCut` counts the splits), so the waterline stays exactly where it is: nothing at or above the
-  surface moves, and ground already deeper stays. With shaping passes it goes into the active pass. Paint the bed and wet banks with
-  paintSurface's underWater and nearWater selectors; along the cut, the bed meets the waterline exactly."""
+  loop, as cutContours with waterline makes; `waterlineCut` counts the splits), so the waterline stays exactly where it is: nothing at
+  or above the surface moves, and ground already deeper stays. With shaping passes the cut keeps them and the lowering goes into the
+  active pass. Paint the bed and wet banks with paintSurface's underWater and nearWater selectors; along the cut, the bed meets the
+  waterline exactly, and a bank band ends cleanly once cut at its width too (cutContours with waterline)."""
   return await callBridge(context, "carveWaterBed", {"name": name, "objectName": objectName, "depth": depth, "shoreWidth": shoreWidth})
 
 

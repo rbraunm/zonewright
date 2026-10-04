@@ -133,33 +133,47 @@ def drawWater(draw, frame, bodies):
       draw.polygon([frame.pixel(point) for point in loop], fill=fill)
 
 
-def drawSwim(draw, frame, boxes):
-  """Swim volumes as dashed rectangles in plan, each named inside its part in the drawing, clear of the other names: in full where that
-  fits, else by its number, else not at all. Returns the names drawn (name, text, pixel bounds) and the boxes in the drawing left
-  unnamed."""
-  font = fontOf(swimLabelSize)
+def labelBounds(draw, position, text, size):
+  """The pixel bounds of a label labelAt draws."""
+  return draw.textbbox(position, text, font=fontOf(size), anchor="mm", stroke_width=3)
+
+
+def swimLabels(draw, frame, boxes):
+  """Where each swim volume in the drawing is named, inside its part of the drawing and clear of the other names, in full where that fits, else by its number: [(name, text, position)], and the boxes left unnamed."""
   shown = []
+  for box in boxes:
+    (low, high) = box["corners"]
+    points = [frame.pixel(point) for point in ((low[0], low[1]), (high[0], high[1]))]
+    left, top = max(0, min(x for x, _ in points)), max(0, min(y for _, y in points))
+    right, bottom = min(frame.size[0], max(x for x, _ in points)), min(frame.size[1], max(y for _, y in points))
+    if right > left and bottom > top:
+      shown.append((box["name"], (left, top, right, bottom)))
+  labels, taken = [], []
+  for name, (left, top, right, bottom) in sorted(shown, key=lambda pair: (pair[1][2] - pair[1][0]) * (pair[1][3] - pair[1][1]), reverse=True):
+    middle = ((left + right) / 2, (top + bottom) / 2)
+    number = name[len(name.rstrip("0123456789")):]
+    for text in [name] + ([number] if number else []):
+      bounds = labelBounds(draw, middle, text, swimLabelSize)
+      inside = bounds[0] >= left + swimLabelMargin and bounds[2] <= right - swimLabelMargin and bounds[1] >= top + swimLabelMargin and bounds[3] <= bottom - swimLabelMargin
+      if inside and not any(bounds[0] < other[2] and other[0] < bounds[2] and bounds[1] < other[3] and other[1] < bounds[3] for other in taken):
+        labels.append((name, text, middle))
+        taken.append(bounds)
+        break
+  named = {name for name, _, _ in labels}
+  return labels, [name for name, _ in shown if name not in named]
+
+
+def drawSwim(draw, frame, boxes):
+  """Swim volumes as dashed rectangles in plan, named where swimLabels places them; returns the boxes in the drawing left unnamed."""
   for box in boxes:
     (low, high) = box["corners"]
     points = [frame.pixel(point) for point in ((low[0], low[1]), (high[0], low[1]), (high[0], high[1]), (low[0], high[1]))]
     dashedLine(draw, points + points[:1], (*swimColors[box["liquid"]], 255), 2)
-    left, top = max(0, min(x for x, _ in points)), max(0, min(y for _, y in points))
-    right, bottom = min(frame.size[0], max(x for x, _ in points)), min(frame.size[1], max(y for _, y in points))
-    if right > left and bottom > top:
-      shown.append((box, (left, top, right, bottom)))
-  named = []
-  for box, (left, top, right, bottom) in sorted(shown, key=lambda pair: (pair[1][2] - pair[1][0]) * (pair[1][3] - pair[1][1]), reverse=True):
-    middle = ((left + right) / 2, (top + bottom) / 2)
-    number = box["name"][len(box["name"].rstrip("0123456789")):]
-    for text in [box["name"]] + ([number] if number else []):
-      bounds = draw.textbbox(middle, text, font=font, anchor="mm", stroke_width=3)
-      inside = bounds[0] >= left + swimLabelMargin and bounds[2] <= right - swimLabelMargin and bounds[1] >= top + swimLabelMargin and bounds[3] <= bottom - swimLabelMargin
-      if inside and not any(bounds[0] < other[2] and other[0] < bounds[2] and bounds[1] < other[3] and other[1] < bounds[3] for other in (label["bounds"] for label in named)):
-        labelAt(draw, middle, text, swimColors[box["liquid"]], swimLabelSize)
-        named.append({"name": box["name"], "text": text, "bounds": list(bounds)})
-        break
-  namedBoxes = {label["name"] for label in named}
-  return named, [box["name"] for box, _ in shown if box["name"] not in namedBoxes]
+  liquids = {box["name"]: box["liquid"] for box in boxes}
+  labels, unnamed = swimLabels(draw, frame, boxes)
+  for name, text, position in labels:
+    labelAt(draw, position, text, swimColors[liquids[name]], swimLabelSize)
+  return unnamed
 
 
 def drawRegions(draw, frame, regions):
@@ -226,7 +240,7 @@ def drawPlan(basePath, outputPath, center, width, overlays):
   draw = ImageDraw.Draw(layer)
   step = drawGrid(draw, frame)
   drawWater(draw, frame, overlays["water"])
-  _, unnamedSwimVolumes = drawSwim(draw, frame, overlays["swim"])
+  unnamedSwimVolumes = drawSwim(draw, frame, overlays["swim"])
   drawRegions(draw, frame, overlays["regions"])
   drawPlots(draw, frame, overlays["plots"])
   drawSpots(draw, frame, overlays["spots"])

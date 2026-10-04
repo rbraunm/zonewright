@@ -1,6 +1,7 @@
 import io
 import math
 import sys
+import time
 from pathlib import Path
 
 import numpy
@@ -257,7 +258,19 @@ def testCarvingKeepsTheWaterlineWhereItWasAndTheBedMeetsIt(stageBlenderServer, t
   assert "distance must be positive" in banks
 
 
-def testBedAndBankSelectorsFollowTheWaterline(stageBlenderServer, tmp_path):
+def shoreAt(shore, points):
+  """The basin's shore radius (shoreOf, 72 headings) at the heading of each [x, y] point."""
+  headings = 2 * math.pi * numpy.arange(72) / 72
+  return numpy.interp(numpy.arctan2(points[:, 1], points[:, 0]) % (2 * math.pi), headings, shore, period=2 * math.pi)
+
+
+def testBedAndBankSelectorsFollowTheWaterlineAndEndOnItsCuts(stageBlenderServer, tmp_path):
+  async def paint(session, distance):
+    await session.expectSuccess("assignMaterial", {"objectName": "ground", "materialName": "stone"})
+    await session.expectSuccess("assignMaterial", {"objectName": "ground", "materialName": "sand", "selector": {"underWater": "pool"}})
+    await session.expectSuccess("assignMaterial", {"objectName": "ground", "materialName": "mud", "selector": {"nearWater": {"water": "pool", "distance": distance}}})
+    return await facesOf(session, "ground")
+
   async def steps(session):
     await freshScene(session)
     await basin(session)
@@ -265,37 +278,125 @@ def testBedAndBankSelectorsFollowTheWaterline(stageBlenderServer, tmp_path):
     await surfaceMaterials(session, tmp_path)
     await session.expectSuccess("floodWater", {"name": "pool", "seed": [0, 0], "level": -5, "material": "water"})
     shore = await shoreOf(session, -5)
-    painted = {}
-    for distance in (6, 1):
-      await session.expectSuccess("assignMaterial", {"objectName": "ground", "materialName": "stone"})
-      await session.expectSuccess("assignMaterial", {"objectName": "ground", "materialName": "sand", "selector": {"underWater": "pool"}})
-      await session.expectSuccess("assignMaterial", {"objectName": "ground", "materialName": "mud", "selector": {"nearWater": {"water": "pool", "distance": distance}}})
-      painted[distance] = await facesOf(session, "ground")
-    await session.expectSuccess("cutContours", {"objectName": "ground", "levels": [-5]})
-    await session.expectSuccess("assignMaterial", {"objectName": "ground", "materialName": "stone"})
-    await session.expectSuccess("assignMaterial", {"objectName": "ground", "materialName": "sand", "selector": {"underWater": "pool"}})
-    painted["cut"] = await facesOf(session, "ground")
-    return shore, painted
+    painted = {distance: await paint(session, distance) for distance in (6, 1)}
+    cut = await session.expectSuccess("cutContours", {"objectName": "ground", "levels": [0, 6], "waterline": "pool"})
+    again = await session.expectSuccess("cutContours", {"objectName": "ground", "levels": [0, 6], "waterline": "pool"})
+    painted["cut"] = await paint(session, 6)
+    refusals = [
+      await session.expectError("cutContours", {"objectName": "ground", "levels": [-2], "waterline": "pool"}),
+      await session.expectError("cutContours", {"objectName": "ground", "levels": [3], "waterline": "pool", "distanceFrom": {"material": "sand"}}),
+    ]
+    return shore, painted, cut, again, refusals
 
-  shore, painted = stageBlenderServer.session(steps)
+  shore, painted, cut, again, refusals = stageBlenderServer.session(steps)
   shoreBySector = numpy.array(shore).reshape(36, 2).max(axis=1)
-  for key in (6, 1, "cut"):
-    allUnder, anyUnder, middles = faceCorners(painted[key], -5)
+  for key, distance in ((6, 6), (1, 1), ("cut", 6)):
+    allUnder, _, _ = faceCorners(painted[key], -5)
+    vertices = numpy.array(painted[key]["vertices"])
     materials = numpy.array(painted[key]["materials"])
     # The bed is the faces wholly under the water: none reaches above the waterline, none under it is left out.
     assert numpy.array_equal(materials == "sand", allUnder)
-    if key == "cut":
-      # Cut along the level first, the faces follow the waterline and the bed reaches it in every direction: a clean shore.
-      vertices = numpy.array(painted[key]["vertices"])
-      bedCorners = vertices[numpy.unique(numpy.concatenate([face for face, under in zip(painted[key]["faces"], allUnder) if under]))][:, :2]
-      assert numpy.abs(outerRadii(bedCorners, 36) - shoreBySector).max() < 0.5
-      continue
-    # The banks start at the waterline, every face it crosses, and reach `distance` and at most one face (8) past it, evenly all round.
-    crossing = anyUnder & ~allUnder
+    # The banks are every face the waterline crosses or meets, so no ground shows between bed and bank, and every face out of the water
+    # all of whose corners lie within the distance of the waterline (here, of the basin's shore round its middle), and no other.
+    outward = numpy.linalg.norm(vertices[:, :2], axis=1) - shoreAt(shore, vertices)
+    farthest = numpy.array([outward[face].max() for face in painted[key]["faces"]])
     mud = materials == "mud"
-    assert crossing.any() and (mud | ~crossing).all()
-    bankReach = outerRadii(middles[mud], 36)
-    assert (bankReach <= shoreBySector + key + 8).all() and bankReach.max() - bankReach.min() <= 8
+    meets = numpy.array([(vertices[face, 2] <= -5 + 1e-3).any() for face in painted[key]["faces"]]) & ~allUnder
+    assert meets.any() and (mud | ~meets).all()
+    assert (farthest[mud & ~meets] <= distance + 0.4).all() and (mud | allUnder | (farthest > distance - 0.4)).all()
+  # Uncut, the band's outer edge is whole faces; cut along the waterline and 6 out from it first, the bed reaches the waterline and the
+  # band ends 6 out from it in every direction, and cutting again finds nothing more to cut.
+  vertices = numpy.array(painted["cut"]["vertices"])
+  allUnder, _, _ = faceCorners(painted["cut"], -5)
+  bedCorners = vertices[numpy.unique(numpy.concatenate([face for face, under in zip(painted["cut"]["faces"], allUnder) if under]))][:, :2]
+  assert numpy.abs(outerRadii(bedCorners, 36) - shoreBySector).max() < 0.5
+  mud = numpy.array(painted["cut"]["materials"]) == "mud"
+  bankCorners = vertices[numpy.unique(numpy.concatenate([face for face, isMud in zip(painted["cut"]["faces"], mud) if isMud]))][:, :2]
+  assert numpy.abs(outerRadii(bankCorners, 36) - (shoreBySector + 6)).max() < 0.5
+  assert cut["splitEdges"] > 144 and again["splitEdges"] == 0
+  assert "0 (the waterline) or more" in refusals[0] and "give one of them" in refusals[1]
+
+
+readShapedFacesAndShores = """
+import mathutils
+ground = bpy.data.objects['ground']
+depsgraph = bpy.context.evaluated_depsgraph_get()
+evaluated = ground.evaluated_get(depsgraph)
+mesh = evaluated.to_mesh()
+vertices = [list(vertex.co) for vertex in mesh.vertices]
+faces = [list(polygon.vertices) for polygon in mesh.polygons]
+materials = [ground.data.materials[polygon.material_index].name for polygon in mesh.polygons]
+evaluated.to_mesh_clear()
+bpy.data.objects['river'].hide_viewport = True
+depsgraph = bpy.context.evaluated_depsgraph_get()
+
+def height(x, y):
+  return bpy.context.scene.ray_cast(depsgraph, mathutils.Vector((x, y, 1000.0)), mathutils.Vector((0.0, 0.0, -1.0)))[1].z
+
+shores = []
+for x in range(-130, 131, 2):
+  level = -6 - x / 75
+  for side in (1, -1):
+    low, high = 15.0, 34.0
+    for _ in range(40):
+      middle = (low + high) / 2
+      low, high = (middle, high) if height(x, side * middle) < level else (low, middle)
+    shores.append([x, side * low])
+bpy.data.objects['river'].hide_viewport = False
+result = {"vertices": vertices, "faces": faces, "materials": materials, "shores": shores}
+"""
+
+
+def distancesToPolyline(points, polyline):
+  starts, spans = polyline[:-1], polyline[1:] - polyline[:-1]
+  offsets = points[:, None, :] - starts[None]
+  along = numpy.clip((offsets * spans[None]).sum(axis=2) / (spans * spans).sum(axis=1)[None], 0, 1)
+  return numpy.linalg.norm(offsets - along[:, :, None] * spans[None], axis=2).min(axis=1)
+
+
+def testABankBandEndsOnItsCutAlongASlopingRiverAndTheCutKeepsShapingPasses(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [400, 160], "spacing": 8, "location": [0, 0, 0], "collection": "terrain"})
+    await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "channel"})
+    # A straight channel along x, flat at -10 out to 18.7 each side and rising to the plain at 34: a river falling from -4 to -8 along
+    # it meets the banks along lines that close in on the middle as it falls.
+    await session.expectSuccess("sculptAlongPath", {"objectName": "ground", "mode": "carve", "path": [[-200, 0, -10], [200, 0, -10]], "radius": 34, "strength": 1, "profile": [[0, 0], [0.55, 0], [1, 10]], "conformRim": False})
+    await liquidMaterials(session, tmp_path)
+    await surfaceMaterials(session, tmp_path)
+    await session.expectSuccess("runWater", {"name": "river", "path": [[-150, 0, -4], [150, 0, -8]], "reach": 30, "material": "water"})
+    cut = await session.expectSuccess("cutContours", {"objectName": "ground", "levels": [0, 3], "waterline": "river"})
+    await session.expectSuccess("assignMaterial", {"objectName": "ground", "materialName": "stone"})
+    await session.expectSuccess("assignMaterial", {"objectName": "ground", "materialName": "sand", "selector": {"underWater": "river"}})
+    await session.expectSuccess("assignMaterial", {"objectName": "ground", "materialName": "mud", "selector": {"nearWater": {"water": "river", "distance": 3}}})
+    painted = (await session.expectSuccess("runPython", {"code": readShapedFacesAndShores}))["result"]
+    await session.expectSuccess("setShapingPass", {"objectName": "ground", "name": "channel", "muted": True})
+    flat = await meshOf(session, "ground")
+    return cut, painted, flat
+
+  cut, painted, flat = stageBlenderServer.session(steps)
+  vertices = numpy.array(painted["vertices"])
+  shores = numpy.array(painted["shores"])
+  banks = [shores[shores[:, 1] > 0], shores[shores[:, 1] < 0]]
+  fromShore = numpy.where(vertices[:, 1] > 0, distancesToPolyline(vertices[:, :2], banks[0]), distancesToPolyline(vertices[:, :2], banks[1]))
+  under = vertices[:, 2] <= -6 - vertices[:, 0] / 75 + 1e-3
+  faces = [numpy.array(face) for face in painted["faces"]]
+  # Away from the river's ends, the bed is exactly the faces under the water, and the bank exactly the faces out of it lying within
+  # 3 of the waterline: both end on the lines cut along the waterline and 3 out from it, on either bank as the river falls.
+  middle = numpy.array([numpy.abs(vertices[face, 0]).max() <= 120 for face in faces])
+  materials = numpy.array(painted["materials"])
+  allUnder = numpy.array([under[face].all() for face in faces])
+  farthest = numpy.array([fromShore[face].max() for face in faces])
+  assert numpy.array_equal((materials == "sand")[middle], allUnder[middle])
+  mud = (materials == "mud") & middle
+  assert mud.sum() > 60 and (farthest[mud] <= 3 + 0.15).all()
+  assert ((materials == "mud") | allUnder | (farthest > 3 - 0.15))[middle].all()
+  for bank in (1, -1):
+    for start in range(-120, 120, 16):
+      corners = numpy.unique(numpy.concatenate([face for face, isMud in zip(faces, mud) if isMud and start <= vertices[face, 0].mean() < start + 16 and vertices[face, 1].mean() * bank > 0]))
+      assert abs(fromShore[corners].max() - 3) < 0.15
+  # The cut put each new vertex alike in the channel's shaping pass: with the pass muted the ground is the flat grid it was.
+  assert cut["splitEdges"] > 100 and numpy.abs(numpy.array(flat["vertices"])[:, 2]).max() < 1e-4
 
 
 def testWaterExportsTheClientsShadersAndSwimVolumes(stageBlenderServer, tmp_path):
@@ -429,21 +530,22 @@ def testPoolWithinSeedAndStrokesShapeWhereItSpreads(stageBlenderServer, tmp_path
     whole = await meshOf(session, "pool")
     await session.expectSuccess("editWater", {"name": "pool", "within": within})
     cut = await meshOf(session, "pool")
-    await session.expectSuccess("shapeWaterExtent", {"name": "pool", "mode": "add", "area": {"circle": {"center": [20, 20], "radius": 20}}})
+    added = await session.expectSuccess("shapeWaterExtent", {"name": "pool", "mode": "add", "area": {"circle": {"center": [20, 20], "radius": 20}}})
     cove = await meshOf(session, "pool")
-    refusals = [
-      await session.expectError("shapeWaterExtent", {"name": "pool", "mode": "add", "area": {"circle": {"center": [130, 130], "radius": 30}}}),
-      await session.expectError("shapeWaterExtent", {"name": "pool", "mode": "add", "area": {"circle": {"center": [-180, -180], "radius": 12}}}),
-      await session.expectError("shapeWaterExtent", {"name": "pool", "mode": "add", "area": {"circle": {"center": [-20, -20], "radius": 12}}}),
-      await session.expectError("shapeWaterExtent", {"name": "pool", "mode": "remove", "area": {"circle": {"center": [-180, 180], "radius": 12}}}),
+    unchanged = [
+      await session.expectSuccess("shapeWaterExtent", {"name": "pool", "mode": "add", "area": {"circle": {"center": [130, 130], "radius": 30}}}),
+      await session.expectSuccess("shapeWaterExtent", {"name": "pool", "mode": "add", "area": {"circle": {"center": [-180, -180], "radius": 12}}}),
+      await session.expectSuccess("shapeWaterExtent", {"name": "pool", "mode": "add", "area": {"circle": {"center": [-20, -20], "radius": 12}}}),
+      await session.expectSuccess("shapeWaterExtent", {"name": "pool", "mode": "remove", "area": {"circle": {"center": [-180, 180], "radius": 12}}}),
     ]
+    stillCove = await meshOf(session, "pool")
     kept = (await session.expectSuccess("getWater", {}))["bodies"][0]["definition"]["strokes"]
     await session.expectSuccess("editWater", {"name": "pool", "within": [], "strokes": []})
     restored = await meshOf(session, "pool")
     moved = await session.expectSuccess("editWater", {"name": "pool", "seed": [130, 130]})
-    return whole, cut, cove, refusals, kept, restored, moved
+    return whole, cut, added, cove, unchanged, stillCove, kept, restored, moved
 
-  whole, cut, cove, refusals, kept, restored, moved = stageBlenderServer.session(steps)
+  whole, cut, added, cove, unchanged, stillCove, kept, restored, moved = stageBlenderServer.session(steps)
   # Inside a within outline that crosses open water, the pool ends along the outline itself (x + y = 20), not a cell past it.
   cutVertices = numpy.array(cut["vertices"])
   sums = cutVertices[:, 0] + cutVertices[:, 1]
@@ -452,15 +554,46 @@ def testPoolWithinSeedAndStrokesShapeWhereItSpreads(stageBlenderServer, tmp_path
   coveVertices = numpy.array(cove["vertices"])
   inCove = numpy.linalg.norm(coveVertices[:, :2] - [20, 20], axis=1) <= 20 + 1e-3
   assert (inCove | (coveVertices[:, 0] + coveVertices[:, 1] <= 20 + 1e-3)).all() and (coveVertices[inCove, 0] + coveVertices[inCove, 1] > 40).any()
-  # A stroke that would change nothing is refused with why, and not kept: low ground a ridge cuts off, ground above the level, ground
-  # already under the water, a removed area holding no water.
-  cutOff, dry, covered, empty = refusals
-  assert "changes nothing" in cutOff and "nothing joins them to the water" in cutOff
-  assert "at or above the water's level" in dry and "already covers" in covered and "none of the water lies inside the area" in empty
-  assert kept == [{"mode": "add", "area": {"circle": {"center": [20, 20], "radius": 20}}}]
+  # A stroke that changes nothing yet is kept for the edit it may be laid ahead of, the result saying so and why: low ground a ridge
+  # cuts off, ground above the level, ground already under the water, a removed area holding no water. The water is as it was.
+  assert added["strokeChanged"] is True and "whyUnchanged" not in added
+  assert all(result["strokeChanged"] is False for result in unchanged)
+  cutOff, dry, covered, empty = (result["whyUnchanged"] for result in unchanged)
+  assert "nothing joins them to the water" in cutOff
+  assert "at or above the water's level" in dry and "already covers" in covered and "none of the water lies inside the area yet" in empty
+  assert roundedVertices(stillCove) == roundedVertices(cove)
+  assert [stroke["area"]["circle"]["center"] for stroke in kept] == [[20, 20], [130, 130], [-180, -180], [-20, -20], [-180, 180]]
   # Without its outline and strokes the pool is whole again; seeded in the other basin it fills that one instead.
   assert roundedVertices(restored) == roundedVertices(whole)
   assert all(80 < value < 180 for value in moved["visibleExtent"]["minimum"] + moved["visibleExtent"]["maximum"])
+
+
+def testAStrokeLaidAheadOfARaisedLevelHoldsTheWaterWhenItArrives(stageBlenderServer, tmp_path):
+  stroke = {"polygon": [[100, -20], [108, -20], [108, 20], [100, 20]]}
+
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [400, 200], "spacing": 8, "location": [0, 0, 0], "collection": "terrain"})
+    # A pit 12 deep at the middle, and a side channel running east from its rim with its floor at -3: dry while the pool stands at -5.
+    await session.expectSuccess("sculptAlongPath", {"objectName": "ground", "mode": "carve", "path": [[0, 0, -12]], "radius": 50, "strength": 1, "profile": [[0, 0], [1, 12]], "conformRim": False})
+    await session.expectSuccess("sculptAlongPath", {"objectName": "ground", "mode": "carve", "path": [[40, 0, -3], [180, 0, -3]], "radius": 12, "strength": 1, "profile": [[0, 0], [0.5, 0], [1, 3]], "conformRim": False})
+    await liquidMaterials(session, tmp_path)
+    await session.expectSuccess("floodWater", {"name": "pool", "seed": [0, 0], "level": -5, "material": "water"})
+    ahead = await session.expectSuccess("shapeWaterExtent", {"name": "pool", "mode": "remove", "area": stroke})
+    await session.expectSuccess("editWater", {"name": "pool", "level": -2})
+    held = await meshOf(session, "pool")
+    await session.expectSuccess("editWater", {"name": "pool", "strokes": []})
+    unbounded = await meshOf(session, "pool")
+    return ahead, held, unbounded
+
+  ahead, held, unbounded = stageBlenderServer.session(steps)
+  # Laid across the dry channel, the stroke changes nothing yet and is kept, saying so; raised to -2, the pool runs into the channel
+  # and stops along the stroke's near edge, where without it the water runs on to the channel's end.
+  assert ahead["strokeChanged"] is False and "none of the water lies inside the area yet" in ahead["whyUnchanged"]
+  assert ahead["definition"]["strokes"] == [{"mode": "remove", "area": stroke}]
+  heldX = numpy.array(held["vertices"])[:, 0]
+  assert 99 < heldX.max() <= 100 + 1e-3
+  assert numpy.array(unbounded["vertices"])[:, 0].max() > 170
 
 
 def testGetWaterReportsEachBodyAndTheWaterPlayersSee(stageBlenderServer, tmp_path):
@@ -555,3 +688,29 @@ def testPlansAndSectionsDrawTheWaterPlayersSeeAndTheTuckStopsWhereItHides(stageB
   # The section's water runs from shore to shore, 75 each side of the middle (130 along the section), not on into the banks.
   segments = numpy.array(cut[0]["segments"])
   assert abs(segments[:, [0, 2]].min() - 55) < 0.6 and abs(segments[:, [0, 2]].max() - 205) < 0.6
+
+
+def testWaterToolsKeepUpWithALargeLake(stageBlenderServer, tmp_path):
+  async def timed(session, tool, arguments):
+    start = time.perf_counter()
+    await session.expectSuccess(tool, arguments)
+    return time.perf_counter() - start
+
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [1200, 1200], "spacing": 8, "location": [0, 0, 0], "collection": "terrain"})
+    await session.expectSuccess("sculptAlongPath", {"objectName": "ground", "mode": "carve", "path": [[0, 0, -20]], "radius": 420, "strength": 1, "profile": [[0, 0], [0.8, 10], [1, 20]], "conformRim": False})
+    await session.expectSuccess("roughen", {"objectName": "ground", "featureSize": 80, "amplitude": 3, "seed": 3})
+    await liquidMaterials(session, tmp_path)
+    await surfaceMaterials(session, tmp_path)
+    await session.expectSuccess("floodWater", {"name": "lake", "seed": [0, 0], "level": -5, "material": "water"})
+    return {
+      "getWater": await timed(session, "getWater", {}),
+      "nearWater": await timed(session, "assignMaterial", {"objectName": "ground", "materialName": "mud", "selector": {"nearWater": {"water": "lake", "distance": 6}}}),
+      "carve": await timed(session, "carveWaterBed", {"name": "lake", "objectName": "ground", "depth": 4, "shoreWidth": 16}),
+    }
+
+  seconds = stageBlenderServer.session(steps)
+  # An 840-wide lake on a 150 x 150 grid: describing it, painting its banks, and carving its bed each take a moment (they took 1.7, 1.7,
+  # and 2.5 seconds when its visible water was sampled at a quarter of its spacing and its waterline found point by point).
+  assert seconds["getWater"] < 1.0 and seconds["nearWater"] < 1.0 and seconds["carve"] < 2.0, seconds
