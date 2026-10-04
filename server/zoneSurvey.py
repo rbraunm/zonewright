@@ -67,7 +67,7 @@ def zoneNotes(labels, minimum, maximum, text):
     if not words <= labelWords(label["text"]):
       continue
     if all(minimum[axis] <= label["scenePosition"][axis] <= maximum[axis] for axis in (0, 1)):
-      onZone.setdefault(label["layer"], []).append({"text": label["text"], "at": [round(value) for value in label["scenePosition"]]})
+      onZone.setdefault(label["layer"], []).append({"text": label["text"], "scenePosition": [round(value) for value in label["scenePosition"]]})
     else:
       offZone.append(label["text"])
   return {"labels": onZone, "offZone": {"count": len(offZone), "texts": offZone}}

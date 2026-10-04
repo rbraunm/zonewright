@@ -153,7 +153,7 @@ def testZoneNotesListBrewallLabelsOnTheZoneByLayerAndTheRestByName(stageServer):
   notes, _ = server.callToolExpectingSuccess("getZoneNotes", {"zone": "gfaydark"})
   assert notes["variant"] == "gfaydark:wld" and list(notes["labels"]) == ["gfaydark_1"] and len(notes["labels"]["gfaydark_1"]) == 144
   # The map's file holds (-2657.4233, 1641.3786, 0.0008): x and y swap and turn negative in the scene.
-  assert {"text": "to Butcherblock Mountains", "at": [-1641, 2657, 0]} in notes["labels"]["gfaydark_1"]
+  assert {"text": "to Butcherblock Mountains", "scenePosition": [-1641, 2657, 0]} in notes["labels"]["gfaydark_1"]
   assert notes["offZone"] == {"count": 4, "texts": [
     "Original Map: EverQuest Default", "Revised Map: Brewall Rainsinger (Cazic-Thule)", "http://www.eqmaps.info", "Return of the Exiled (www.roteguild.org)",
   ]}
@@ -168,8 +168,8 @@ def testZoneNoteScenePositionsLieOnTheZone(stageServer):
   # The first layer names the places; the second holds the map's credits and its hunters in a column off the zone. Highpass Hold runs
   # about 3000 units along x and 1550 along y, so its places past 840 along x fall off its ground unless the axes swap.
   places = notes["labels"]["highpasshold_1"]
-  assert len(places) == 81 and max(abs(place["at"][0]) for place in places) > maximum[1]
-  assert {"text": "to Kithicor Forest", "at": [-1361, 198, -115]} in places
+  assert len(places) == 81 and max(abs(place["scenePosition"][0]) for place in places) > maximum[1]
+  assert {"text": "to Kithicor Forest", "scenePosition": [-1361, 198, -115]} in places
   assert notes["offZone"] == {"count": 7, "texts": [
     "http://www.eqmaps.info", "Return of the Exiled (www.roteguild.org)", "Grenix Mucktail", "Hagnis Shralok", "Recfek Shralok", "Vexven Mucktail", "Vopuk Shralok",
   ]}
@@ -182,11 +182,11 @@ def testZoneNotesKeepTheLabelsHoldingEveryWord(stageServer):
   credits, _ = server.callToolExpectingSuccess("getZoneNotes", {"zone": "crescent", "text": "map brewall"})
   # "To" is a word of "Bag-To-Token", but only part of "Skeleton", "Touch", and "Elevator", which stay out.
   assert exits["labels"] == {"crescent_1": [
-    {"text": "to Bixie Warfront", "at": [-1326, -2559, -160]}, {"text": "to Blightfire Moors", "at": [-1022, -2783, -73]},
-    {"text": "Realnyna (Bag-To-Token)", "at": [-1340, -1350, -91]},
+    {"text": "to Bixie Warfront", "scenePosition": [-1326, -2559, -160]}, {"text": "to Blightfire Moors", "scenePosition": [-1022, -2783, -73]},
+    {"text": "Realnyna (Bag-To-Token)", "scenePosition": [-1340, -1350, -91]},
   ]}
   assert exits["offZone"] == {"count": 0, "texts": []}
-  assert causeway["labels"] == {"draniksscar_1": [{"text": "to Nobles` Causeway", "at": [2039, -711, -260]}]}
+  assert causeway["labels"] == {"draniksscar_1": [{"text": "to Nobles` Causeway", "scenePosition": [2039, -711, -260]}]}
   assert credits["labels"] == {} and credits["offZone"] == {"count": 1, "texts": ["Revised Map: Brewall Rainsinger (Cazic-Thule)"]}
 
 
