@@ -203,8 +203,13 @@ def steepestDegrees(heights, spacing):
   return round(math.degrees(math.atan2(steepest, spacing)), 1)
 
 
+def rounded(value, digits=1):
+  """A measure rounded to digits, never negative zero."""
+  return round(float(value), digits) + 0.0
+
+
 def roundPoint(point):
-  return [round(float(component), 1) for component in point]
+  return [rounded(component) for component in point]
 
 
 def worldGeometry(sceneObject):
@@ -222,24 +227,24 @@ def measureShape(sceneObject, probe, others):
     outline = geometry[:, :2]
     heights, depths, spacing = groundUnder(probe, outline)
     found = heights[~numpy.isnan(heights)]
-    measured["area"] = round(abs(polygonArea(outline)), 1)
+    measured["area"] = rounded(abs(polygonArea(outline)))
     measured["centroid"] = roundPoint(outline.mean(axis=0))
     measured["bounds"] = [roundPoint(outline.min(axis=0)), roundPoint(outline.max(axis=0))]
     if len(found):
       measured["ground"] = {
-        "lowest": round(float(found.min()), 1), "mean": round(float(found.mean()), 1), "highest": round(float(found.max()), 1),
-        "steepestDegrees": steepestDegrees(heights, spacing), "sampleSpacing": round(spacing, 1),
-        "underWater": round(float((depths[~numpy.isnan(depths)] > 0).mean()), 3),
+        "lowest": rounded(found.min()), "mean": rounded(found.mean()), "highest": rounded(found.max()),
+        "steepestDegrees": steepestDegrees(heights, spacing), "sampleSpacing": rounded(spacing),
+        "underWater": rounded((depths[~numpy.isnan(depths)] > 0).mean(), 3),
       }
       if "floor" in spec:
-        measured["ground"]["cut"] = round(max(0.0, float(found.max()) - spec["floor"]), 1)
-        measured["ground"]["fill"] = round(max(0.0, spec["floor"] - float(found.min())), 1)
+        measured["ground"]["cut"] = rounded(max(0.0, float(found.max()) - spec["floor"]))
+        measured["ground"]["fill"] = rounded(max(0.0, spec["floor"] - float(found.min())))
     else:
       measured["ground"] = None
     measured["overlaps"] = sorted(name for name, otherOutline in others if name != spec["name"] and outlinesOverlap(outline, otherOutline))
     distances = [(polygonDistance(outline, otherOutline), name) for name, otherOutline in others if name != spec["name"]]
     nearest = min(distances, default=None)
-    measured["nearest"] = None if nearest is None else {"shape": nearest[1], "gap": round(nearest[0], 1)}
+    measured["nearest"] = None if nearest is None else {"shape": nearest[1], "gap": rounded(nearest[0])}
   elif spec["kind"] == "path":
     samples, along = [], 0.0
     for start, end in zip(geometry[:-1], geometry[1:]):
@@ -252,17 +257,17 @@ def measureShape(sceneObject, probe, others):
     samples.append((along, probe.height(*geometry[-1][:2])))
     found = [(distance, z) for distance, z in samples if z is not None]
     grades = [math.degrees(math.atan2(abs(z2 - z1), d2 - d1)) for (d1, z1), (d2, z2) in zip(found[:-1], found[1:]) if d2 > d1]
-    measured["length"] = round(along, 1)
+    measured["length"] = rounded(along)
     measured["ground"] = None if not found else {
-      "start": round(found[0][1], 1), "end": round(found[-1][1], 1), "lowest": round(min(z for _, z in found), 1), "highest": round(max(z for _, z in found), 1),
-      "steepestDegrees": round(max(grades, default=0.0), 1),
+      "start": rounded(found[0][1]), "end": rounded(found[-1][1]), "lowest": rounded(min(z for _, z in found)), "highest": rounded(max(z for _, z in found)),
+      "steepestDegrees": rounded(max(grades, default=0.0)),
     }
     width = spec.get("width", 0.0)
     measured["crosses"] = sorted(name for name, otherOutline in others if pathMeetsOutline(geometry[:, :2], width / 2, otherOutline))
   else:
     x, y = geometry[0][:2]
     z = probe.height(x, y)
-    measured["ground"] = None if z is None else round(z, 1)
+    measured["ground"] = None if z is None else rounded(z)
   return measured
 
 
@@ -476,7 +481,7 @@ def planOverlays(sheets, layers, spots):
     for x, y in spots:
       height = probe.height(x, y)
       if height is not None:
-        overlays["spots"].append({"at": [x, y], "height": round(height, 1)})
+        overlays["spots"].append({"at": [x, y], "height": rounded(height)})
   for sheet in chosen:
     shapes = []
     for shape in sketchObjects(sheet):
@@ -510,10 +515,84 @@ def renderedWater():
   return [body for body in bpy.context.scene.objects if bridgeMeshAccess.waterProperty in body and not body.hide_render]
 
 
-sectionLayers = ("ground", "water", "swim", "massing", "plots")
+sectionLayers = ("ground", "water", "swim", "massing", "sketch", "plots")
 # Cuts reaching past the drawing by this share of its size are dropped; the drawing clips the rest.
 sectionMargin = 0.1
 waterSectionStep = 0.5
+# A path's stretch within this angle of a section's line runs along it, and the section shows its rise and fall; one crossing it at a
+# steeper angle shows level across its width. A path without a width runs along the line when it lies this close to it.
+alongDegrees = 15.0
+alongTolerance = 1.0
+
+
+def insideStretches(outline, start, along, normal, length):
+  """The stretches [s0, s1] of a section's line, from 0 to length, that lie inside a closed outline."""
+  offsets = numpy.asarray(outline, dtype=numpy.float64)[:, :2] - start
+  sides, distances = offsets @ normal, offsets @ along
+  crossings = []
+  for index in range(len(offsets)):
+    following = (index + 1) % len(offsets)
+    if (sides[index] > 0) != (sides[following] > 0):
+      share = sides[index] / (sides[index] - sides[following])
+      crossings.append(float(distances[index] + share * (distances[following] - distances[index])))
+  crossings.sort()
+  return [[max(0.0, s0), min(length, s1)] for s0, s1 in zip(crossings[0::2], crossings[1::2]) if min(length, s1) > max(0.0, s0)]
+
+
+def plotCut(plot, start, along, normal, length):
+  """Where a section's line crosses a plot: its pad, level at the plot's height, and where its entrance side is crossed and which way
+  it faces along the line."""
+  corners = bridgeHousing.footprint(plot)
+  stretches = insideStretches(corners, start, along, normal, length)
+  if not stretches:
+    return None
+  sides = (corners[:2] - start) @ normal
+  entrance = None
+  if (sides[0] > 0) != (sides[1] > 0):
+    share = sides[0] / (sides[0] - sides[1])
+    entrance = rounded((corners[0] + share * (corners[1] - corners[0]) - start) @ along, 2)
+  outward = 1 if bridgeHousing.frontDirection(bridgeHousing.facingOf(plot)) @ along > 0 else -1
+  return {"name": plot.name, "s": [rounded(value, 2) for value in stretches[0]], "z": rounded(plot.matrix_world.translation.z, 2), "entrance": entrance, "outward": outward}
+
+
+def pathPieces(points, halfWidth, start, along, normal, length):
+  """Where a path meets a section: [s0, z0, s1, z1] pieces, its run where it goes along the line and a level span across its width
+  where it crosses it."""
+  heights = points[:, 2] - sketchLift
+  offsets = points[:, :2] - start
+  sides, distances = offsets @ normal, offsets @ along
+  pieces = []
+  for index in range(len(points) - 1):
+    run = float(numpy.hypot(*(points[index + 1, :2] - points[index, :2])))
+    if run < 1e-9:
+      continue
+    sine = abs(sides[index + 1] - sides[index]) / run
+    if sine < math.sin(math.radians(alongDegrees)):
+      if max(abs(sides[index]), abs(sides[index + 1])) <= max(halfWidth, alongTolerance):
+        pieces.append([distances[index], heights[index], distances[index + 1], heights[index + 1]])
+    elif (sides[index] > 0) != (sides[index + 1] > 0):
+      share = sides[index] / (sides[index] - sides[index + 1])
+      middle = distances[index] + share * (distances[index + 1] - distances[index])
+      height = heights[index] + share * (heights[index + 1] - heights[index])
+      pieces.append([middle - halfWidth / sine, height, middle + halfWidth / sine, height])
+  return [[rounded(value, 2) for value in piece] for piece in pieces if max(piece[0], piece[2]) >= 0 and min(piece[0], piece[2]) <= length]
+
+
+def sketchCuts(start, along, normal, length):
+  """Sketch areas with a floor, at that floor where the line lies inside them, and paths (pathPieces), by sheet."""
+  found = []
+  for shape in sketchObjects():
+    spec = readSpec(shape)
+    geometry = numpy.array(worldGeometry(shape))
+    if spec["kind"] == "area" and "floor" in spec:
+      pieces = [[rounded(value, 2) for value in (s0, spec["floor"], s1, spec["floor"])] for s0, s1 in insideStretches(geometry, start, along, normal, length)]
+    elif spec["kind"] == "path":
+      pieces = pathPieces(geometry, spec.get("width", 0.0) / 2, start, along, normal, length)
+    else:
+      continue
+    if pieces:
+      found.append({"sheet": spec["sheet"], "shape": spec["name"], "kind": spec["kind"], "label": spec.get("label") or spec["name"], "pieces": pieces})
+  return found
 
 
 def planeSegments(positions, triangles, start, along, normal):
@@ -577,7 +656,8 @@ def keptSegments(segments, length, bottom, top):
 
 def sectionCuts(start, end, bottom, top, layers):
   """What the zone holds where the vertical plane through the line from start to end cuts it, in the plane's own terms (s along the line
-  from start, z height): the ground players stand on, water surfaces, swim volumes, sketch massing, and plot pads."""
+  from start, z height): the ground players stand on, water surfaces, swim volumes, sketch massing, sketch area floors and paths, and
+  plot pads."""
   unknown = sorted(set(layers) - set(sectionLayers))
   if unknown:
     raise ValueError(f"Section layers are {list(sectionLayers)}; got {unknown}")
@@ -590,7 +670,10 @@ def sectionCuts(start, end, bottom, top, layers):
   along = (end - start) / length
   normal = numpy.array([-along[1], along[0]])
   bpy.context.view_layer.update()
-  cuts = {"length": round(length, 2), "ground": [], "water": [], "swim": [], "massing": [], "plots": []}
+  cuts = {
+    "length": round(length, 2), "ground": [], "water": [], "swim": [], "massing": [], "sketch": [], "plots": [],
+    "sheets": sorted({readSpec(shape)["sheet"] for shape in sketchObjects()}),
+  }
 
   def cutObjects(sceneObjects):
     found = []
@@ -615,8 +698,10 @@ def sectionCuts(start, end, bottom, top, layers):
         cuts["water"].append({"name": body.name, "segments": segments})
   if "massing" in layers:
     cuts["massing"] = [entry | {"label": readSpec(bpy.data.objects[entry["name"]]).get("label") or readSpec(bpy.data.objects[entry["name"]])["name"]} for entry in cutObjects([shape for shape in sketchObjects() if len(shape.data.polygons)])]
+  if "sketch" in layers:
+    cuts["sketch"] = sketchCuts(start, along, normal, length)
   if "plots" in layers:
-    cuts["plots"] = cutObjects(bridgeHousing.plotObjects())
+    cuts["plots"] = [cut for plot in bridgeHousing.plotObjects() if (cut := plotCut(plot, start, along, normal, length)) is not None]
   if "swim" in layers:
     for box in bridgeSwim.swimBoxes():
       (low, high) = bridgeSwim.boxCorners(box)

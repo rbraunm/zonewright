@@ -1,7 +1,8 @@
 """Housing as a zone designs it: first the zone's decision (whether it has housing, how central it is, what it is for, and how its plots
-are priced), then plots placed one at a time. A plot is a guide on the ground (its outline and an arrow out of its entrance) with the
+are priced), then plots placed one at a time. A plot is a guide on the ground (its outline and a mark at its entrance) with the
 client's own border model at its center, as players will see it; plots are moved, turned, resized, graded, assessed, and priced from
 where they lie and what they offer, and the zone's housing file is written from them. Runs under Blender's Python."""
+import contextlib
 import json
 import math
 import statistics
@@ -19,6 +20,9 @@ import bridgeWater
 
 housingProperty = "zonewrightHousing"
 plotProperty = "zonewrightPlot"
+# The ground a plot is graded on is held by reference, so renaming the ground keeps the grading, and deleting it leaves the reference
+# empty.
+gradingProperty = "zonewrightPlotGrading"
 housingCollectionName = "housing"
 housingRoles = ("none", "incidental", "featured", "primary")
 # Where the zone's plots live in Peridot's housing: in the public zone itself (its X3, world plots) or in instanced neighborhoods made
@@ -48,15 +52,24 @@ defaultPricing = {
 guideColors = {"player": (0.1, 0.85, 1.0), "guild": (1.0, 0.3, 0.9)}
 guideBand = 1.5
 guideLift = 0.4
-arrowWidth = 16.0
-arrowLength = 16.0
+# The entrance mark is a chevron with its tip on the middle of the entrance side, pointing out, kept within 9 units of that side: there
+# it lies below the view of someone standing on the entrance looking in (eye 5.5 up, pitched 6 down), and seen from the street it
+# stands on the plot's edge.
+entranceSpan = 12.0
+entranceDepth = 6.0
 # Ground under a plot is looked for from this far above the plot's height: an arch or overhang higher up is not its ground.
 groundCastHeight = 50.0
 footprintStep = 8.0
 gradeBatterReach = 600.0
+gradeMinimumReach = 20.0
+# A pass holds single-precision coordinates, so what it holds reads back within this of what was written.
+heldTolerance = 1e-3
+keptGradePrefix = "kept grade "
 # Assessment: how far around a plot it looks, and what counts as a drop, a wall, water at its edge, seclusion, prominence. A view is
 # judged by looking out from the plot, never measured.
 sideProbes = (10.0, 30.0, 60.0)
+# Grading names the other plots whose ground it changed within this far of their edges, as far as assessPlot looks past each side.
+touchedReach = sideProbes[-1]
 sideRise = 15.0
 waterfrontDistance = 40.0
 surroundingRadii = (200.0, 400.0, 600.0)
@@ -190,15 +203,18 @@ def frontDirection(facingDegrees):
   return numpy.array([math.sin(heading), math.cos(heading)])
 
 
-def footprint(plot, margin=0.0):
-  """A plot's corners in plan, counterclockwise from its front right."""
-  spec = readPlot(plot)
-  across, along = spec["size"]
-  front = frontDirection(facingOf(plot))
+def footprintOf(center, facingDegrees, size, margin=0.0):
+  """A footprint's corners in plan, counterclockwise from its front right."""
+  across, along = size
+  front = frontDirection(facingDegrees)
   right = numpy.array([front[1], -front[0]])
-  center = numpy.array(plot.matrix_world.translation[:2])
+  middle = numpy.array(center[:2], dtype=numpy.float64)
   halfAcross, halfAlong = across / 2 + margin, along / 2 + margin
-  return numpy.array([center + right * a * halfAcross + front * b * halfAlong for a, b in ((1, 1), (-1, 1), (-1, -1), (1, -1))])
+  return numpy.array([middle + right * a * halfAcross + front * b * halfAlong for a, b in ((1, 1), (-1, 1), (-1, -1), (1, -1))])
+
+
+def footprint(plot, margin=0.0):
+  return footprintOf(plot.matrix_world.translation[:2], facingOf(plot), readPlot(plot)["size"], margin)
 
 
 def overlapDepth(first, second):
@@ -230,16 +246,22 @@ def guideMaterial(kind):
 
 
 def guideMesh(name, kind, size):
-  """The plot's outline as a band just inside its edges, and an arrow out of the middle of its entrance side (local +Y)."""
+  """The plot's outline as a band just inside its edges, and a chevron pointing out of the middle of its entrance side (local +Y)."""
   across, along = size
   halfAcross, halfAlong = across / 2, along / 2
   outer = [(halfAcross, halfAlong), (-halfAcross, halfAlong), (-halfAcross, -halfAlong), (halfAcross, -halfAlong)]
   inner = [(x - math.copysign(guideBand, x), y - math.copysign(guideBand, y)) for x, y in outer]
   vertices = [(x, y, guideLift) for x, y in outer + inner]
   faces = [(index, (index + 1) % 4, 4 + (index + 1) % 4, 4 + index) for index in range(4)]
+  tip = halfAlong
+  armBack = tip - entranceDepth
+  thickness = guideBand * math.hypot(entranceSpan / 2, entranceDepth) / (entranceSpan / 2)
   base = len(vertices)
-  vertices += [(-arrowWidth / 2, halfAlong - arrowLength / 2, guideLift), (arrowWidth / 2, halfAlong - arrowLength / 2, guideLift), (0, halfAlong + arrowLength / 2, guideLift)]
-  faces.append((base, base + 1, base + 2))
+  vertices += [(x, y, guideLift) for x, y in (
+    (0, tip), (0, tip - thickness), (entranceSpan / 2, armBack), (entranceSpan / 2, armBack - thickness),
+    (-entranceSpan / 2, armBack), (-entranceSpan / 2, armBack - thickness),
+  )]
+  faces += [(base + 2, base, base + 1, base + 3), (base + 1, base, base + 4, base + 5)]
   mesh = bpy.data.meshes.new(name)
   mesh.from_pydata(vertices, [], faces)
   mesh.validate()
@@ -275,8 +297,28 @@ def setBorder(plot, kind, size, borderFolder):
   return {"model": borderModels[kind], "size": round(scale * 100), "borderAcross": round(float(stockBorder[1] * scale), 1), "borderAlong": round(float(stockBorder[0] * scale), 1)}
 
 
-def groundHeight(ground, x, y, aboveZ):
-  return ground.heightBelow(x, y, aboveZ)
+@contextlib.contextmanager
+def ungradedGround():
+  """The ground players stand on with every plot's grading taken out: what plots are seated on, whatever has been graded around them."""
+  muted = []
+  for plot in plotObjects():
+    grading = gradingOf(plot)
+    key = None if grading is None else gradeKey(grading["ground"], plot.name)
+    if key is not None and not key.mute:
+      key.mute = True
+      muted.append(key)
+  try:
+    yield bridgeWater.Ground()
+  finally:
+    for key in muted:
+      key.mute = False
+
+
+def seatHeights(centers):
+  """The ungraded ground's height under each center, None where there is none."""
+  with ungradedGround() as ground:
+    top = bridgeMeshAccess.sceneTopHeight() + 1
+    return [ground.heightBelow(x, y, top) for x, y in centers]
 
 
 def requireSize(kind, size):
@@ -329,7 +371,7 @@ def plotRecord(plot, housing):
   return {
     "address": plot.name, "kind": spec["kind"], "center": bridgeObjects.roundVector(plot.matrix_world.translation, 2),
     "facingDegrees": round(facingOf(plot), 2), "size": spec["size"], "items": spec["items"], "pets": spec["pets"], "tags": spec["tags"],
-    "border": None if border is None else {"size": round(border.scale[0] * 100)},
+    "border": None if border is None else {"size": round(border.scale[0] * 100)}, "grading": gradingRecord(plot),
   } | plotPrice(spec, housing)
 
 
@@ -351,7 +393,7 @@ def placePlot(address, kind, center, facingDegrees, size, height, items, pets, t
   }
   requireAllowances(spec)
   if height is None:
-    height = groundHeight(bridgeWater.Ground(), center[0], center[1], bridgeMeshAccess.sceneTopHeight() + 1)
+    height = seatHeights([center])[0]
     if height is None:
       raise ValueError(f"No ground under {center} to set the plot on")
   plot = bpy.data.objects.new(address, guideMesh(address, kind, size))
@@ -383,13 +425,17 @@ def overlapsOf(plot):
   return [{"plot": other.name, "depth": round(depth, 2)} for other in plotObjects() if other != plot for depth in [overlapDepth(mine, footprint(other))] if depth > 0.01]
 
 
-def editPlot(address, newAddress, kind, center, facingDegrees, size, height, items, pets, tags, pricePlatinum, borderFolder):
+def editPlot(address, newAddress, kind, center, facingDegrees, size, height, items, pets, tags, pricePlatinum, objectName, borderFolder):
   housing = requireHousing()
   plot = requirePlot(address)
   spec = readPlot(plot)
-  changes = [center, facingDegrees, size, height, items, pets, tags, pricePlatinum, kind, newAddress]
+  changes = [center, facingDegrees, size, height, items, pets, tags, pricePlatinum, kind, newAddress, objectName]
   if all(change is None for change in changes):
     raise ValueError("editPlot needs something to change")
+  grading = gradingOf(plot)
+  if objectName is not None and grading is None:
+    raise ValueError(f"Plot '{address}' is not graded; objectName names the ground a graded plot is graded on (gradePlot grades it)")
+  ground = None if grading is None else grading["ground"] if objectName is None else bridgeMeshAccess.requireMeshObject(objectName)
   rebuild = False
   if kind is not None and kind != spec["kind"]:
     if kind not in plotKinds:
@@ -400,6 +446,8 @@ def editPlot(address, newAddress, kind, center, facingDegrees, size, height, ite
   if size is not None:
     spec["size"] = requireSize(spec["kind"], size)
     rebuild = True
+  if rebuild and borderFolder is None:
+    raise ValueError("A plot whose kind or size changes needs its border model folder")
   if items is not None:
     spec["items"] = items
   if pets is not None:
@@ -409,30 +457,42 @@ def editPlot(address, newAddress, kind, center, facingDegrees, size, height, ite
     spec["tags"] = requireTags(tags, housing)
   if pricePlatinum is not None:
     spec["priceOverride"] = None if pricePlatinum == 0 else requirePrice(pricePlatinum)
+  name = plot.name
   if newAddress is not None and newAddress != plot.name:
     if not newAddress.strip():
       raise ValueError("A plot needs its address")
     bridgeObjects.requireNewName(newAddress)
-    plot.name = newAddress
-    plot.data.name = newAddress
+    name = newAddress
+  location = numpy.array(plot.matrix_world.translation)
   if center is not None:
     if len(center) != 2:
       raise ValueError(f"center is [x, y], got {center!r}")
-    plot.location.x, plot.location.y = center
+    location[:2] = center
     if height is None:
-      found = groundHeight(bridgeWater.Ground(), center[0], center[1], bridgeMeshAccess.sceneTopHeight() + 1)
+      found = seatHeights([center])[0]
       if found is None:
         raise ValueError(f"No ground under {center} to set the plot on")
-      plot.location.z = found
+      location[2] = found
   if height is not None:
-    plot.location.z = height
+    location[2] = height
+  facing = facingOf(plot) if facingDegrees is None else facingDegrees
+  plans = []
+  if grading is not None and (name != plot.name or center is not None or height is not None or facingDegrees is not None or rebuild or ground != grading["ground"]):
+    pad = padOf(name, location, facing, spec["size"], location[2], grading)
+    if ground == grading["ground"]:
+      plans.append(planGrading(ground, {plot.name: None, name: pad}, {plot.name, name}))
+    else:
+      plans += [planGrading(grading["ground"], {plot.name: None}, {plot.name}), planGrading(ground, {name: pad}, {name})]
+  plot.name = name
+  plot.data.name = name
+  plot.location = location.tolist()
   if facingDegrees is not None:
     plot.rotation_euler = (0, 0, -math.radians(facingDegrees))
   plot[plotProperty] = json.dumps(spec)
+  if grading is not None:
+    setGrading(plot, ground, grading["margin"], grading["batterDegrees"])
   border = None
   if rebuild:
-    if borderFolder is None:
-      raise ValueError("A plot whose kind or size changes needs its border model folder")
     oldMesh = plot.data
     plot.data = guideMesh(plot.name, spec["kind"], spec["size"])
     bpy.data.meshes.remove(oldMesh)
@@ -443,11 +503,29 @@ def editPlot(address, newAddress, kind, center, facingDegrees, size, height, ite
       existing.name = f"{plot.name} border"
       existing[bridgeMeshAccess.plotBorderProperty] = plot.name
   bpy.context.view_layer.update()
-  return plotRecord(plot, housing) | ({"border": border} if border else {}) | {"overlaps": overlapsOf(plot)}
+  graded = {}
+  if plans:
+    applied = [applyGrading(plan) for plan in plans]
+    graded = {"grading": applied[-1] | padSummary(plans[-1], name) | ({"formerGround": applied[0]} if len(plans) > 1 else {})}
+  return plotRecord(plot, housing) | ({"border": border} if border else {}) | {"overlaps": overlapsOf(plot)} | graded
 
 
-def removePlot(address, terrainObject):
+def removePlot(address, keepGrading):
+  """Remove a plot and its border, taking its grading back unless keepGrading keeps it as ordinary shaping."""
   plot = requirePlot(address)
+  stored = plot.get(gradingProperty)
+  plan = None
+  if stored is not None and stored["ground"] is None and not keepGrading:
+    raise ValueError(f"Plot '{address}' was graded on ground that no longer exists, so there is no grading to take back; removePlot with keepGrading true removes the plot alone")
+  if stored is not None and stored["ground"] is not None:
+    sceneObject = stored["ground"]
+    key = gradeKey(sceneObject, address)
+    if key is None and not keepGrading:
+      raise ValueError(f"'{sceneObject.name}' has no shaping pass '{gradePassName(address)}' to take back (were its passes collapsed?); removePlot with keepGrading true keeps the ground as it is")
+    keys = sceneObject.data.shape_keys
+    if keepGrading and key is not None and keys.key_blocks.get(keptGradePrefix + address) is not None:
+      raise ValueError(f"'{sceneObject.name}' already has a shaping pass '{keptGradePrefix}{address}'; rename or remove it first")
+    plan = planGrading(sceneObject, {address: None}, {address}, kept=address if keepGrading else None)
   removed = [plot.name]
   border = borderOf(plot)
   if border is not None:
@@ -459,63 +537,270 @@ def removePlot(address, terrainObject):
   guide = plot.data
   bpy.data.objects.remove(plot)
   bpy.data.meshes.remove(guide)
-  grading = None
-  if terrainObject is not None:
-    grading = bridgePasses.removeShapingPass(terrainObject, gradePassName(address))
-  return {"removed": removed, "grading": grading}
+  return {"removed": removed, "grading": None if plan is None else applyGrading(plan)}
 
 
 def gradePassName(address):
   return f"grade {address}"
 
 
+def gradeKey(sceneObject, address):
+  keys = sceneObject.data.shape_keys
+  return None if keys is None else keys.key_blocks.get(gradePassName(address))
+
+
+def setGrading(plot, ground, margin, batterDegrees):
+  plot[gradingProperty] = {"ground": ground, "margin": float(margin), "batterDegrees": float(batterDegrees)}
+
+
+def gradingOf(plot):
+  """A plot's grading (the ground it is graded on, its margin and batter), or None when it is not graded."""
+  stored = plot.get(gradingProperty)
+  if stored is None:
+    return None
+  if stored["ground"] is None:
+    raise ValueError(f"Plot '{plot.name}' was graded on ground that no longer exists; grade it on the ground it stands on (gradePlot), or remove it (removePlot with keepGrading true)")
+  return {"ground": stored["ground"], "margin": stored["margin"], "batterDegrees": stored["batterDegrees"]}
+
+
+def gradingRecord(plot):
+  stored = plot.get(gradingProperty)
+  if stored is None:
+    return None
+  return {"object": None if stored["ground"] is None else stored["ground"].name, "margin": stored["margin"], "batterDegrees": stored["batterDegrees"]}
+
+
+def gradedOn(sceneObject):
+  """The plots graded on an object, by address."""
+  return {plot.name: plot for plot in plotObjects() if (stored := plot.get(gradingProperty)) is not None and stored["ground"] == sceneObject}
+
+
+def padOf(address, center, facingDegrees, size, height, grading):
+  """A graded plot's pad: its footprint, that grown by its margin (all level at its height), and the slope of its batters."""
+  return {
+    "plot": address, "footprint": footprintOf(center, facingDegrees, size), "outline": footprintOf(center, facingDegrees, size, grading["margin"]),
+    "height": float(height), "slope": math.tan(math.radians(grading["batterDegrees"])),
+  }
+
+
+def plotPad(plot):
+  return padOf(plot.name, plot.matrix_world.translation, facingOf(plot), readPlot(plot)["size"], plot.matrix_world.translation.z, gradingOf(plot))
+
+
+def ungradedPositions(sceneObject, addresses):
+  """The mesh as seen; as seen without the named plots' passes; and the rows each of those passes moves, and how far."""
+  shown, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
+  keys = sceneObject.data.shape_keys
+  held = {}
+  if keys is not None:
+    reference = bridgePasses.keyCoordinates(keys.reference_key)
+    for address in addresses:
+      key = gradeKey(sceneObject, address)
+      if key is not None and not key.mute:
+        offsets = (bridgePasses.keyCoordinates(key) - reference) * key.value
+        rows = numpy.flatnonzero(numpy.abs(offsets).max(axis=1) > 0)
+        held[address] = (rows, offsets[rows])
+  local = numpy.zeros_like(shown)
+  for rows, offsets in held.values():
+    local[rows] += offsets
+  return shown, shown - local @ bridgeMeshAccess.matrixArray(sceneObject.matrix_world)[:3, :3].T, held
+
+
+class GroundLookup:
+  """A mesh's vertices sorted along x and its edges by vertex, so a pad looks only at the ground near it."""
+
+  def __init__(self, sceneObject, ground):
+    self.sceneObject, self.ground = sceneObject, ground
+    self.order = numpy.argsort(ground[:, 0], kind="stable")
+    self.xs = ground[self.order, 0]
+    self.edges = numpy.stack(bridgeShaping.meshEdgeEnds(sceneObject), axis=1)
+    ends = numpy.concatenate([self.edges[:, 0], self.edges[:, 1]])
+    self.byVertex = numpy.argsort(ends, kind="stable")
+    self.firsts = numpy.searchsorted(ends[self.byVertex], numpy.arange(len(ground) + 1))
+
+  def inBox(self, low, high):
+    rows = self.order[numpy.searchsorted(self.xs, low[0], "left"):numpy.searchsorted(self.xs, high[0], "right")]
+    y = self.ground[rows, 1]
+    return numpy.sort(rows[(y >= low[1]) & (y <= high[1])])
+
+  def medianEdgeLength(self, rows):
+    """The median length of the edges touching the vertices at rows."""
+    counts = self.firsts[rows + 1] - self.firsts[rows]
+    slots = numpy.repeat(self.firsts[rows] - numpy.cumsum(counts) + counts, counts) + numpy.arange(counts.sum())
+    touching = self.edges[numpy.unique(self.byVertex[slots] % len(self.edges))]
+    return float(numpy.median(numpy.linalg.norm(self.ground[touching[:, 0]] - self.ground[touching[:, 1]], axis=1)))
+
+
+def padReach(lookup, pad):
+  """The vertices a pad's batters reach, how far each lies beyond its level ground, and how far they reach."""
+  ground = lookup.ground
+  reach, edgeLength = gradeMinimumReach, None
+  while True:
+    candidates = lookup.inBox(pad["outline"].min(axis=0) - reach, pad["outline"].max(axis=0) + reach)
+    outside = -bridgeShaping.signedDistanceToOutline(ground[candidates], pad["outline"])[0]
+    within = outside <= reach
+    if edgeLength is None:
+      if not within.any():
+        raise ValueError(f"No vertex of '{lookup.sceneObject.name}' lies under or near plot '{pad['plot']}'; grade it on the ground it stands on (objectName)")
+      edgeLength = lookup.medianEdgeLength(candidates[within])
+    needed = max(gradeMinimumReach, float(numpy.abs(ground[candidates[within], 2] - pad["height"]).max()) / pad["slope"] + 2 * edgeLength)
+    if needed > gradeBatterReach:
+      raise ValueError(f"Plot '{pad['plot']}' stands {needed * pad['slope']:.0f} units off the ground around it; its slopes would reach {needed:.0f} units out. Move it, change its height, or steepen batterDegrees")
+    if needed <= reach:
+      return candidates[within], numpy.maximum(outside[within], 0.0), reach
+    reach = needed + edgeLength
+
+
+def gradedHeights(ground, pads, reached):
+  """The ground graded to every pad at once, the pad holding each vertex's change (-1 for none), and banks steeper than the batters."""
+  # Each vertex is kept between the lowest and highest the batters reaching it allow, so the result does not depend on the order plots
+  # were graded in. Where two pads stand too close for their difference in height, every batter between them steepens alike, just
+  # enough that both edges are met; where two pads' level ground overlaps, a vertex takes the height of the footprint it lies deeper in.
+  heights = ground[:, 2]
+  count = len(heights)
+  steepening = numpy.ones(count)
+  banks = {}
+  tied = numpy.zeros(count, dtype=bool)
+  tiedPads = set()
+  boxes = [(ground[rows, :2].min(axis=0), ground[rows, :2].max(axis=0)) for rows, _, _ in reached]
+  for first in range(len(pads)):
+    for second in range(first + 1, len(pads)):
+      rise = abs(pads[first]["height"] - pads[second]["height"])
+      if rise == 0 or (boxes[first][0] > boxes[second][1]).any() or (boxes[second][0] > boxes[first][1]).any():
+        continue
+      rows, inFirst, inSecond = numpy.intersect1d(reached[first][0], reached[second][0], assume_unique=True, return_indices=True)
+      if not len(rows):
+        continue
+      run = reached[first][1][inFirst] * pads[first]["slope"] + reached[second][1][inSecond] * pads[second]["slope"]
+      level = run == 0
+      if level.any():
+        tied[rows[level]] = True
+        tiedPads |= {first, second}
+      ratio = rise / numpy.where(level, 1.0, run)
+      steepening[rows[~level]] = numpy.maximum(steepening[rows[~level]], ratio[~level])
+      worst = math.inf if level.any() else float(ratio.max())
+      if worst > 1:
+        pair = (pads[first]["plot"], pads[second]["plot"])
+        banks[pair] = 90.0 if worst == math.inf else math.degrees(math.atan(worst * max(pads[first]["slope"], pads[second]["slope"])))
+  low, high = numpy.full(count, -numpy.inf), numpy.full(count, numpy.inf)
+  lowPad, highPad = numpy.full(count, -1), numpy.full(count, -1)
+  for index, (pad, (rows, excess, _)) in enumerate(zip(pads, reached)):
+    spread = excess * pad["slope"] * steepening[rows]
+    padLow, padHigh = pad["height"] - spread, pad["height"] + spread
+    raising, lowering = padLow > low[rows], padHigh < high[rows]
+    low[rows[raising]], lowPad[rows[raising]] = padLow[raising], index
+    high[rows[lowering]], highPad[rows[lowering]] = padHigh[lowering], index
+  graded = numpy.minimum(numpy.maximum(heights, low), high)
+  owner = numpy.where(graded > heights, lowPad, numpy.where(graded < heights, highPad, -1))
+  if tied.any():
+    rows = numpy.flatnonzero(tied)
+    deepest, winner = numpy.full(len(rows), -numpy.inf), numpy.full(len(rows), -1)
+    for index in sorted(tiedPads):
+      padRows, excess, _ = reached[index]
+      onLevel = numpy.isin(rows, padRows[excess == 0])
+      depth = numpy.where(onLevel, bridgeShaping.signedDistanceToOutline(ground[rows], pads[index]["footprint"])[0], -numpy.inf)
+      deeper = depth > deepest
+      deepest[deeper], winner[deeper] = depth[deeper], index
+    graded[rows] = numpy.array([pad["height"] for pad in pads])[winner]
+    owner[rows] = winner
+  return graded, owner, [{"plots": list(pair), "steepestDegrees": round(degrees, 1)} for pair, degrees in sorted(banks.items())]
+
+
+def planGrading(sceneObject, overrides, subjects, kept=None):
+  """Work out the grading of every plot on an object, overrides {address: pad or None} applied, before anything changes."""
+  if sceneObject.modifiers:
+    raise ValueError(f"'{sceneObject.name}' has modifiers; grading passes combine before modifiers, so apply or remove them first")
+  current = gradedOn(sceneObject)
+  pads = {address: plotPad(plot) for address, plot in current.items()} | overrides
+  pads = [pad for _, pad in sorted(pads.items()) if pad is not None]
+  owned = (set(current) | set(overrides)) - {kept}
+  shown, ground, held = ungradedPositions(sceneObject, sorted(owned))
+  lookup = GroundLookup(sceneObject, ground)
+  reached = [padReach(lookup, pad) for pad in pads]
+  graded, owner, banks = gradedHeights(ground, pads, reached)
+  return {
+    "object": sceneObject, "shown": shown, "ground": ground, "graded": graded, "owner": owner, "pads": pads, "reaches": [reach for _, _, reach in reached],
+    "held": held, "banks": banks, "stale": sorted(owned - {pad["plot"] for pad in pads}), "kept": kept, "subjects": subjects,
+  }
+
+
+def applyGrading(plan):
+  """Write a worked-out grading into the plots' passes, each holding the part of the change its own pad makes."""
+  sceneObject = plan["object"]
+  keys = sceneObject.data.shape_keys
+  active = None if keys is None or sceneObject.active_shape_key in (None, keys.reference_key) else sceneObject.active_shape_key.name
+  if plan["kept"] is not None and (key := gradeKey(sceneObject, plan["kept"])) is not None:
+    key.name = keptGradePrefix + plan["kept"]
+  for address in plan["stale"]:
+    if gradeKey(sceneObject, address) is not None:
+      bridgePasses.removeShapingPass(sceneObject.name, gradePassName(address))
+  for pad in plan["pads"]:
+    if gradeKey(sceneObject, pad["plot"]) is None:
+      bridgePasses.addShapingPass(sceneObject.name, gradePassName(pad["plot"]))
+  change = plan["graded"] - plan["ground"][:, 2]
+  if plan["pads"]:
+    local = change[:, None] * bridgeMeshAccess.matrixArray(sceneObject.matrix_world.inverted())[:3, 2][None, :]
+    reference = bridgePasses.keyCoordinates(sceneObject.data.shape_keys.reference_key)
+    for index, pad in enumerate(plan["pads"]):
+      key = gradeKey(sceneObject, pad["plot"])
+      rows = numpy.flatnonzero(plan["owner"] == index)
+      previous = plan["held"].get(pad["plot"])
+      if previous is not None and key.value == 1.0 and numpy.array_equal(previous[0], rows) and numpy.allclose(previous[1], local[rows], rtol=0, atol=heldTolerance):
+        continue
+      coordinates = reference.copy()
+      coordinates[rows] += local[rows]
+      key.data.foreach_set("co", coordinates.astype(numpy.float32).ravel())
+      key.mute, key.value = False, 1.0
+  keys = sceneObject.data.shape_keys
+  if keys is not None:
+    # Grading rewrites the plots' passes whole, so shaping must never go into one: the pass active before stays active, or none is.
+    gradeNames = {gradePassName(address) for address in plan["stale"]} | {gradePassName(pad["plot"]) for pad in plan["pads"]}
+    keep = active is not None and active not in gradeNames and keys.key_blocks.get(active) is not None
+    sceneObject.active_shape_key_index = list(keys.key_blocks).index(keys.key_blocks[active]) if keep else 0
+  sceneObject.data.update()
+  after, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
+  difference = numpy.abs(after[:, 2] - plan["shown"][:, 2])
+  shaped = difference > heldTolerance
+  folded = 0
+  if shaped.any():
+    bridgeShaping.triangulateAlongContours(sceneObject, after, shaped)
+    folded = int(bridgeShaping.overturnedFaces(sceneObject, after, shaped).sum())
+  changed = numpy.flatnonzero(difference > 0.01)
+  touched = []
+  for plot in plotObjects():
+    if plot.name in plan["subjects"]:
+      continue
+    near = changed[bridgeMeshAccess.insidePolygon(after[changed, :2], footprint(plot, touchedReach))]
+    if len(near):
+      touched.append({"plot": plot.name, "largestChange": round(float(difference[near].max()), 2)})
+  return {"object": sceneObject.name, "gradedPlots": [pad["plot"] for pad in plan["pads"]], "foldedFaces": folded, "touched": touched, "steepBanks": plan["banks"]}
+
+
+def padSummary(plan, address):
+  """What a plot's own pass holds: its pad's height, how far its batters reach, and its deepest cut and highest fill."""
+  index = [pad["plot"] for pad in plan["pads"]].index(address)
+  change = (plan["graded"] - plan["ground"][:, 2])[plan["owner"] == index]
+  return {
+    "pass": gradePassName(address), "height": round(plan["pads"][index]["height"], 2), "slopesReach": round(plan["reaches"][index], 1),
+    "deepestCut": round(0.0 - float(change.min(initial=0.0)), 2), "highestFill": round(float(change.max(initial=0.0)), 2),
+    "movedVertices": int((numpy.abs(change) > 1e-6).sum()),
+  }
+
+
 def gradePlot(address, objectName, margin, batterDegrees):
-  """Level the ground under a plot and a margin around it to the plot's height, in its own shaping pass, cutting into ground above it
-  and filling ground below it, each meeting the slope around it at `batterDegrees`, as a builder's cut and fill slopes do. Grading again
-  replaces what the pass held."""
+  """Grade a plot on a mesh, with every plot graded on it, taking its grading back from the ground it was graded on before."""
   plot = requirePlot(address)
   if margin < 0 or not 5 <= batterDegrees <= 85:
     raise ValueError(f"margin must be at least 0 and batterDegrees from 5 to 85, got {margin} and {batterDegrees}")
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
-  passName = gradePassName(address)
-  keys = sceneObject.data.shape_keys
-  existing = keys.key_blocks.get(passName) if keys is not None else None
-  previous = sceneObject.active_shape_key.name if keys is not None and sceneObject.active_shape_key != keys.reference_key else None
-  positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
-  if existing is not None and not existing.mute:
-    held = (bridgePasses.keyCoordinates(existing) - bridgePasses.keyCoordinates(keys.reference_key)) * existing.value
-    positions = positions - held @ bridgeMeshAccess.matrixArray(sceneObject.matrix_world)[:3, :3].T
-  outline = footprint(plot, margin)
-  base = float(plot.matrix_world.translation.z)
-  distance, _ = bridgeShaping.signedDistanceToOutline(positions, outline)
-  slope = math.tan(math.radians(batterDegrees))
-  reachOut = 20.0
-  for _ in range(4):
-    near = distance >= -reachOut
-    if not near.any():
-      raise ValueError(f"No vertex of '{objectName}' lies under or near plot '{address}'")
-    reachOut = max(20.0, float(numpy.abs(positions[near, 2] - base).max()) / slope + 2 * bridgeShaping.medianEdgeLength(sceneObject, positions, near))
-  if reachOut > gradeBatterReach:
-    raise ValueError(f"Plot '{address}' stands {reachOut * slope:.0f} units off the ground around it; its slopes would reach {reachOut:.0f} units out. Move it, change its height, or steepen batterDegrees")
-  if existing is not None:
-    existing.data.foreach_set("co", bridgePasses.keyCoordinates(keys.reference_key).ravel())
-    existing.mute, existing.value = False, 1.0
-    sceneObject.active_shape_key_index = list(keys.key_blocks).index(existing)
-    sceneObject.data.update()
-  else:
-    bridgePasses.addShapingPass(objectName, passName)
-  inside = float(distance.max()) + 1
-  carved = bridgeShaping.sculptOutline(objectName, "carve", outline.tolist(), base, [[-reachOut, reachOut * slope], [0, 0], [inside, 0]], 1.0, False)
-  filled = bridgeShaping.sculptOutline(objectName, "fill", outline.tolist(), base, [[-reachOut, -reachOut * slope], [0, 0], [inside, 0]], 1.0, False)
-  if previous is not None and previous != passName:
-    sceneObject.active_shape_key_index = list(sceneObject.data.shape_keys.key_blocks).index(sceneObject.data.shape_keys.key_blocks[previous])
-  after, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
-  moved = after[:, 2] - positions[:, 2]
-  return {
-    "plot": address, "pass": passName, "height": round(base, 2), "slopesReach": round(reachOut, 1),
-    "deepestCut": round(float(-moved.min()), 2), "highestFill": round(float(moved.max()), 2),
-    "movedVertices": int((numpy.abs(moved) > 1e-6).sum()), "foldedFaces": carved["foldedFaces"] + filled["foldedFaces"],
-  }
+  stored = plot.get(gradingProperty)
+  # Grading again where the ground it was graded on was deleted is how such a plot is put right: there is nothing there to take back.
+  former = None if stored is None or stored["ground"] in (None, sceneObject) else planGrading(stored["ground"], {address: None}, {address})
+  pad = padOf(address, plot.matrix_world.translation, facingOf(plot), readPlot(plot)["size"], plot.matrix_world.translation.z, {"margin": margin, "batterDegrees": batterDegrees})
+  plan = planGrading(sceneObject, {address: pad}, {address})
+  setGrading(plot, sceneObject, margin, batterDegrees)
+  formerGround = {} if former is None else {"formerGround": applyGrading(former)}
+  return {"plot": address} | padSummary(plan, address) | applyGrading(plan) | formerGround
 
 
 # Judging a plot
@@ -639,8 +924,10 @@ def assessPlot(address):
 
 def layOutPlots(street, path, side, kind, size, firstNumber, gap, setback, items, pets, tags, borderFolder, collection):
   """A row of plots along a street as a starting point: stations along the path a plot's width plus `gap` apart, each plot `setback`
-  from the path on the chosen side (or both), facing the street, numbered in order along it (left before right at each station). Plots
-  that would overlap another, or find no ground, are skipped and listed. Adjust each one afterwards."""
+  from the path on the chosen side (or both), facing the street. Each station's place on each side takes the next address number in
+  order along the street (left before right), whether or not a plot fits there, so an address says where along the street a plot
+  stands and, on both sides, each side keeps its own odd or even numbers. Places where a plot would overlap another or find no ground
+  are skipped and listed with the address they keep free. Adjust each plot afterwards."""
   housing = requireHousing()
   if kind not in plotKinds:
     raise ValueError(f"kind is one of {list(plotKinds)}, got '{kind}'")
@@ -652,33 +939,32 @@ def layOutPlots(street, path, side, kind, size, firstNumber, gap, setback, items
   if pathArray.ndim != 2 or pathArray.shape[1] != 2 or len(pathArray) < 2:
     raise ValueError(f"path is at least two [x, y] points, got {path!r}")
   across, along = requireSize(kind, size)
+  requireTags(tags or [], housing)
+  requireAllowances({"items": housing["pricing"]["defaultItems"][kind] if items is None else items, "pets": housing["pricing"]["defaultPets"][kind] if pets is None else pets})
   segments = numpy.diff(pathArray, axis=0)
   lengths = numpy.linalg.norm(segments, axis=1)
   arc = numpy.concatenate([[0.0], numpy.cumsum(lengths)])
-  stations = numpy.arange(across / 2, arc[-1] - across / 2 + 1e-9, across + gap)
-  placed, skipped = [], []
-  number = firstNumber
-  for station in stations:
+  places = []
+  for station in numpy.arange(across / 2, arc[-1] - across / 2 + 1e-9, across + gap):
     segment = min(int(numpy.searchsorted(arc, station, side="right")) - 1, len(segments) - 1)
     point = pathArray[segment] + segments[segment] * (station - arc[segment]) / lengths[segment]
     tangent = segments[segment] / lengths[segment]
     leftward = numpy.array([-tangent[1], tangent[0]])
-    sides = {"left": [leftward], "right": [-leftward], "both": [leftward, -leftward]}[side]
-    for offset in sides:
-      address = f"{number} {street}"
-      number += 1
+    for offset in {"left": [leftward], "right": [-leftward], "both": [leftward, -leftward]}[side]:
       center = point + offset * (setback + along / 2)
-      facing = math.degrees(math.atan2(-offset[0], -offset[1])) % 360
-      try:
-        result = placePlot(address, kind, center.tolist(), facing, [across, along], None, items, pets, tags, None, borderFolder, collection)
-      except ValueError as error:
-        skipped.append({"address": address, "center": [round(float(value), 1) for value in center], "reason": str(error)})
-        continue
-      if result["overlaps"]:
-        removePlot(address, None)
-        skipped.append({"address": address, "center": [round(float(value), 1) for value in center], "reason": f"overlaps {[entry['plot'] for entry in result['overlaps']]}"})
-        continue
-      placed.append({key: result[key] for key in ("address", "center", "facingDegrees", "pricePlatinum")})
+      places.append((f"{firstNumber + len(places)} {street}", center, math.degrees(math.atan2(-offset[0], -offset[1])) % 360))
+  taken = [address for address, _, _ in places if bpy.data.objects.get(address) is not None]
+  if taken:
+    raise ValueError(f"Addresses {taken} are taken; remove those plots or start from another firstNumber")
+  placed, skipped = [], []
+  for (address, center, facing), height in zip(places, seatHeights([center for _, center, _ in places])):
+    entry = {"address": address, "center": [round(float(value), 1) for value in center]}
+    overlapping = [plot.name for plot in plotObjects() if overlapDepth(footprintOf(center, facing, (across, along)), footprint(plot)) > 0.01]
+    if height is None or overlapping:
+      skipped.append(entry | {"reason": "no ground under it" if height is None else f"overlaps {overlapping}"})
+      continue
+    result = placePlot(address, kind, center.tolist(), facing, [across, along], height, items, pets, tags, None, borderFolder, collection)
+    placed.append({key: result[key] for key in ("address", "center", "facingDegrees", "pricePlatinum")})
   return {"street": street, "placed": placed, "skipped": skipped, "housing": housing["role"]}
 
 

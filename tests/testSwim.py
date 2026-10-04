@@ -210,9 +210,9 @@ def testPlanNamesEachSwimVolumeInsideItClearOfTheOthers(stageBlenderServer, tmp_
   volumes, drawn = stageBlenderServer.session(steps)
   frame = planDrawing.PlanFrame(plan["center"], plan["width"], (1440, 810))
   boxes = [{"name": volume["name"], "liquid": volume["liquid"], "corners": [volume["minimum"], volume["maximum"]]} for volume in volumes]
-  draw = ImageDraw.Draw(Image.new("RGBA", frame.size))
-  labels, unnamed = planDrawing.swimLabels(draw, frame, boxes, [])
-  bounds = {name: planDrawing.labelBounds(draw, position, text, planDrawing.swimLabelSize) for name, text, position in labels}
+  board = planDrawing.LabelBoard(ImageDraw.Draw(Image.new("RGBA", frame.size)), frame.size)
+  labels, unnamed = planDrawing.swimLabels(board, frame, boxes)
+  bounds = {name: board.textBox(position, text, planDrawing.swimLabelSize) for name, text, position in labels}
   rectangles = {}
   for box in boxes:
     (left, bottom), (right, top) = frame.pixel(box["corners"][0]), frame.pixel(box["corners"][1])

@@ -1,4 +1,5 @@
 import io
+import math
 import sys
 from pathlib import Path
 
@@ -45,9 +46,14 @@ def testASketchIsMeasuredAgainstTheGroundUnderIt(stageBlenderServer, tmp_path):
     unsure = await session.expectError("eraseSketch", {"sheet": "camp"})
     erased = await session.expectSuccess("eraseSketch", {"sheet": "camp", "names": ["shed"]})
     listed = await session.expectSuccess("getSketch", {"sheet": "camp"})
-    return drawn, taller, objects["result"], walk, crossing, unsure, erased, listed
+    await session.expectSuccess("sketch", {"sheet": "spare", "shapes": [{"name": "well", "kind": "point", "at": [0, 100]}]})
+    wholly = await session.expectSuccess("eraseSketch", {"sheet": "camp", "wholeSheet": True})
+    collections = (await session.expectSuccess("runPython", {"code": "result = sorted(c.name for c in bpy.data.collections if c.name.startswith('sketch'))"}))["result"]
+    gone = await session.expectError("getSketch", {"sheet": "camp"})
+    remaining = await session.expectSuccess("getSketch", {})
+    return drawn, taller, objects["result"], walk, crossing, unsure, erased, listed, (wholly, collections, gone, remaining)
 
-  drawn, taller, objects, walk, crossing, unsure, erased, listed = stageBlenderServer.session(steps)
+  drawn, taller, objects, walk, crossing, unsure, erased, listed, (wholly, collections, gone, remaining) = stageBlenderServer.session(steps)
   shapes = {shape["name"]: shape for shape in drawn["shapes"]}
   tavern = shapes["tavern"]
   assert tavern["area"] == 1200.0 and tavern["bounds"] == [[135.0, -20.0], [165.0, 20.0]] and tavern["facingDegrees"] == 90.0
@@ -72,6 +78,9 @@ def testASketchIsMeasuredAgainstTheGroundUnderIt(stageBlenderServer, tmp_path):
   assert erased == {"sheet": "camp", "erased": 1, "remaining": 5}
   assert [shape["name"] for shape in listed["sheets"][0]["shapes"]] == ["idea", "road", "tavern", "yard", "zoneIn"]
   assert listed["sheets"][0]["shapes"][2]["nearest"]["shape"] == "yard"
+  # Erased whole, a sheet takes its collection with it and leaves the other sheets.
+  assert wholly == {"sheet": "camp", "erased": 5, "remaining": 0} and collections == ["sketch spare"]
+  assert "No sketch sheet 'camp'; sheets: ['spare']" in gone and [sheet["sheet"] for sheet in remaining["sheets"]] == ["spare"]
 
 
 def testAPlanDrawsSketchesOverAReliefMap(stageBlenderServer, tmp_path):
@@ -88,8 +97,9 @@ def testAPlanDrawsSketchesOverAReliefMap(stageBlenderServer, tmp_path):
   def at(x, y):
     return pixels[round(405 - y * scale), round(720 + x * scale)]
 
-  # Inside the tavern the sheet's red fill shows over the grey relief; over the pool, the water's blue.
-  tavern, pool, ground = at(150, 8), at(-40, 30), at(-200, -100)
+  # Inside the tavern (clear of its name, set just above the spot height at its middle) the sheet's red fill shows over the grey
+  # relief; over the pool, the water's blue.
+  tavern, pool, ground = at(140, -12), at(-40, 30), at(-200, -100)
   assert tavern[0] > tavern[1] + 40 and tavern[0] > tavern[2] + 40
   assert pool[2] > pool[0] + 30
   assert abs(ground[0] - ground[1]) < 12 and abs(ground[1] - ground[2]) < 12
@@ -97,22 +107,151 @@ def testAPlanDrawsSketchesOverAReliefMap(stageBlenderServer, tmp_path):
 
 def testPlanNamesSitBesideTheSpotHeightsNotOnThem():
   image = Image.new("RGBA", (720, 405), (0, 0, 0, 0))
-  draw = ImageDraw.Draw(image)
+  board = planDrawing.LabelBoard(ImageDraw.Draw(image), (720, 405))
   frame = planDrawing.PlanFrame([0, 0], 300, (720, 405))
-  spots = [{"at": [x, y], "height": 23.0} for x in (-25, 0, 25) for y in (-25, 0, 25)]
-  covered = planDrawing.spotCovers(draw, frame, spots)
-  spotBoxes = list(covered)
-  planDrawing.drawRegions(draw, frame, [{"name": "hollow", "outline": [[-40, -40], [40, -40], [40, 40], [-40, 40]]}], covered)
-  label = covered[-1]
-
-  def overlap(a, b):
-    return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
-
+  marks = planDrawing.spotMarks(board, frame, [{"at": [x, y], "height": 23.0} for x in (-25, 0, 25) for y in (-25, 0, 25)])
+  spotBoxes = [box for dot, number, _, _ in marks for box in (dot, number)]
+  for box in spotBoxes:
+    board.avoid(box)
+  middle = planDrawing.centroidOf([frame.pixel(point) for point in [[-40, -40], [40, -40], [40, 40], [-40, 40]]])
+  board.place(middle, "hollow", planDrawing.regionColor, 13)
+  label = board.taken[-1]
   # The region's middle is a grid crossing with a spot height on it: the name there would cover the spot, so it moves beside it,
   # within a grid step of the middle and over no spot's dot or number.
-  middle = frame.pixel((0, 0))
-  atMiddle = draw.textbbox(middle, "hollow", font=planDrawing.fontOf(13), anchor="mm", stroke_width=3)
-  assert any(overlap(atMiddle, box) for box in spotBoxes)
-  assert len(covered) == len(spotBoxes) + 1 and not any(overlap(label, box) for box in spotBoxes)
+  atMiddle = board.textBox(middle, "hollow", 13)
+  assert any(planDrawing.boxesOverlap(atMiddle, box) for box in spotBoxes)
+  assert len(board.taken) == 1 and not any(planDrawing.boxesOverlap(label, box) for box in spotBoxes)
   step = frame.length(25)
   assert abs((label[0] + label[2]) / 2 - middle[0]) < step and abs((label[1] + label[3]) / 2 - middle[1]) < step
+  # So no spot height gives way to it: every one is drawn, its dot and its number.
+  planDrawing.drawSpots(board, marks)
+  assert len(board.taken) == 1 + len(spotBoxes)
+
+
+def testASpotHeightGivesWayToANameWithNowhereElseToGo():
+  image = Image.new("RGBA", (720, 405), (0, 0, 0, 0))
+  board = planDrawing.LabelBoard(ImageDraw.Draw(image), (720, 405))
+  frame = planDrawing.PlanFrame([0, 0], 300, (720, 405))
+  marks = planDrawing.spotMarks(board, frame, [{"at": [0, 0], "height": 23.0}])
+  for dot, number, _, _ in marks:
+    board.avoid(dot)
+    board.avoid(number)
+  # The name may not leave a box hugging it; the spot height inside the box gives way rather than the name being left out.
+  middle = frame.pixel((0, 0))
+  around = board.textBox(middle, "hollow", 13)
+  spot = board.clearSpot(middle, "hollow", 13, within=around)
+  assert spot == middle
+  board.write(spot, "hollow", planDrawing.regionColor, 13)
+  planDrawing.drawSpots(board, marks)
+  assert len(board.taken) == 1
+
+
+def testAPlanDrawsShapesInsideAnAreaOverItsFill(stageBlenderServer):
+  # The yard's name sorts after the house and the note inside it, and another sheet's footprint lies under it too.
+  yard = [
+    {"name": "yard", "kind": "area", "outline": [[-100, -60], [100, -60], [100, 60], [-100, 60]]},
+    {"name": "aHouse", "kind": "footprint", "rectangle": {"center": [-50, 0], "size": [30, 30], "headingDegrees": 0}, "height": 10},
+    {"name": "bNote", "kind": "note", "at": [40, 30], "label": "a note"},
+  ]
+
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [400, 400], "spacing": 10, "location": [0, 0, 0]})
+    await session.expectSuccess("setZoneProperties", environment)
+    await session.expectSuccess("sketch", {"sheet": "camp", "shapes": yard})
+    await session.expectSuccess("sketch", {"sheet": "other", "shapes": [{"name": "under", "kind": "footprint", "rectangle": {"center": [50, -25], "size": [24, 24], "headingDegrees": 0}}]})
+    return await session.expectImage("renderSketch", {"center": [0, 0], "width": 300, "layers": [], "spotHeights": False})
+
+  image, description = stageBlenderServer.session(steps)
+  pixels = numpy.asarray(Image.open(io.BytesIO(image)).convert("RGB"), dtype=numpy.int64)
+  assert description["sheetColors"] == {"camp": [200, 40, 40], "other": [30, 90, 200]}
+
+  def at(x, y):
+    return pixels[round(405 - y * 4.8), round(720 + x * 4.8)]
+
+  # The house's fill shows red over the yard's faint tint, the other sheet's footprint blue, and the note's words are written.
+  house, under, bare = at(-58, -8), at(56, -31), at(-80, 40)
+  assert house[0] > house[1] + 60 and house[0] > house[2] + 60 and bare[0] - bare[1] < 40
+  assert under[2] > under[0] + 40
+  note = pixels[round(405 - 30 * 4.8) - 12:round(405 - 30 * 4.8) + 12, round(720 + 40 * 4.8) - 50:round(720 + 40 * 4.8) + 50]
+  assert (numpy.abs(note - numpy.array([200, 40, 40])).max(axis=-1) <= 35).sum() > 20
+
+
+def testMeasuresAndSpotHeightsNeverShowNegativeZero(stageBlenderServer):
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [200, 200], "spacing": 10, "location": [0, 0, -0.01]})
+    return await session.expectSuccess("sketch", {"sheet": "flat", "shapes": [
+      {"name": "court", "kind": "area", "outline": [[-50, -50], [50, -50], [50, 50], [-50, 50]], "floor": 0},
+      {"name": "lane", "kind": "path", "points": [[-80, 0], [80, 0]]},
+      {"name": "well", "kind": "point", "at": [0, 0]},
+    ]})
+
+  drawn = stageBlenderServer.session(steps)
+
+  def numbers(value):
+    if isinstance(value, float):
+      yield value
+    elif isinstance(value, dict):
+      for item in value.values():
+        yield from numbers(item)
+    elif isinstance(value, list):
+      for item in value:
+        yield from numbers(item)
+
+  # The ground at -0.01 measures 0 to a tenth: never -0.0, nor a spot height of -0.
+  zeros = [number for number in numbers(drawn) if number == 0]
+  assert len(zeros) > 5 and all(math.copysign(1.0, number) == 1.0 for number in zeros)
+  assert planDrawing.heightLabel(-0.3) == "0" and planDrawing.heightLabel(-0.6) == "-1"
+
+
+def testASectionDrawsAreaFloorsAndAStairAlongIt(stageBlenderServer):
+  court = [
+    {"name": "lowerCourt", "kind": "area", "rectangle": {"center": [0, -30], "size": [100, 80], "headingDegrees": 0}, "floor": 0},
+    {"name": "upperTerrace", "kind": "area", "rectangle": {"center": [0, 110], "size": [100, 60], "headingDegrees": 0}, "floor": 40},
+    {"name": "stair", "kind": "path", "points": [[30, 10, 0], [30, 80, 40]], "width": 12},
+    {"name": "crossing", "kind": "path", "points": [[-60, 50, 20], [60, 50, 20]], "width": 10},
+  ]
+
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [300, 300], "spacing": 10, "location": [0, 0, 0]})
+    await session.expectSuccess("sketch", {"sheet": "court", "shapes": court})
+    return await session.expectImage("renderSection", {"start": [30, -60], "end": [30, 140], "bottom": -20, "top": 60})
+
+  image, cut = stageBlenderServer.session(steps)
+  # Along x 30 from y -60: the lower court's floor from the line's start to its north edge (s 70), the stair rising along the line
+  # from there to the terrace's floor at 40, and the path crossing at y 50 level across its 10 width.
+  assert {entry["shape"]: entry["pieces"] for entry in cut["sketch"]} == {
+    "crossing": [[105.0, 20.0, 115.0, 20.0]], "lowerCourt": [[0.0, 0.0, 70.0, 0.0]], "stair": [[70.0, 0.0, 140.0, 40.0]],
+    "upperTerrace": [[140.0, 40.0, 200.0, 40.0]],
+  }
+  pixels = numpy.asarray(Image.open(io.BytesIO(image)).convert("RGB"), dtype=numpy.int64)
+  # 200 along and 80 up at 6.6 pixels a unit; the stair drawn in the sheet's red halfway up.
+  column, row = round(60 + 6.6 * 87.5), round(669 - (10 + 20) * 6.6)
+  assert (numpy.abs(pixels[row - 3:row + 4, column - 3:column + 4] - numpy.array([200, 40, 40])).max(axis=-1) <= 30).any()
+
+
+def testAPlanNamesOnlyTheAreasThatReachIntoIt(stageBlenderServer):
+  areas = [
+    {"name": "farNorth", "kind": "area", "rectangle": {"center": [-100, 600], "size": [100, 100], "headingDegrees": 0}},
+    {"name": "edge", "kind": "area", "rectangle": {"center": [80, 100], "size": [100, 80], "headingDegrees": 0}},
+  ]
+
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [1600, 1600], "spacing": 20, "location": [0, 0, 0]})
+    await session.expectSuccess("setZoneProperties", environment)
+    await session.expectSuccess("sketch", {"sheet": "camp", "shapes": areas})
+    return await session.expectImage("renderSketch", {"center": [0, 0], "width": 300, "layers": [], "spotHeights": False})
+
+  image, _ = stageBlenderServer.session(steps)
+  pixels = numpy.asarray(Image.open(io.BytesIO(image)).convert("RGB"), dtype=numpy.int64)
+
+  def red(rows, columns):
+    return (numpy.abs(pixels[rows, columns] - numpy.array([200, 40, 40])).max(axis=-1) <= 35).sum()
+
+  # 4.8 pixels a unit: the frame reaches y 84.4. The area crossing its top edge (x 30..130, columns 864..1344) is named just inside
+  # the top; the one wholly north of it (x -150..-50, columns 0..480) is not named at all.
+  assert red(slice(0, 60), slice(954, 1254)) > 20
+  assert red(slice(0, 60), slice(0, 480)) == 0

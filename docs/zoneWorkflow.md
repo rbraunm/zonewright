@@ -78,7 +78,7 @@ Water is laid in body by body, each a named object rebuilt from what it was made
 
 ### Housing
 
-A zone decides its housing before any plot exists: whether it has any, how central it is, what it is for, where the server hosts it (the public zone or instanced neighborhoods), how many plots, how they are priced, and its main routes. Plots are then placed one at a time, each an outline with the client's own border model as players will see it, graded level in its own shaping pass, assessed where it lies (the ground, drops and walls around it, water, view, seclusion, how much of the main routes see it), and priced from the zone's rules and its features. Export writes the zone's housing file in the shape Peridot's housing reads (plots, their border doors, prices, capacities) and lists the border models' archive for the zone.
+A zone decides its housing before any plot exists: whether it has any, how central it is, what it is for, where the server hosts it (the public zone or instanced neighborhoods), how many plots, how they are priced, and its main routes. Plots are then placed one at a time, each an outline with the client's own border model as players will see it, graded level in its own shaping pass (every plot on a ground graded together, so none disturbs another's pad and a bank too steep between two is reported), assessed where it lies (the ground, drops and walls around it, water, view, seclusion, how much of the main routes see it), and priced from the zone's rules and its features. Export writes the zone's housing file in the shape Peridot's housing reads (plots, their border doors, prices, capacities) and lists the border models' archive for the zone.
 
 ### Arrangement
 

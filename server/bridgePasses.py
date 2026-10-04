@@ -34,16 +34,17 @@ def activePass(sceneObject):
   keys = sceneObject.data.shape_keys
   key = sceneObject.active_shape_key
   if key is None or key == keys.reference_key:
-    raise ValueError(f"'{sceneObject.name}' has shaping passes but none is active; make one active with setShapingPass")
+    raise ValueError(f"'{sceneObject.name}' has shaping passes but none is active; add one for this shaping (addShapingPass) or make one active (setShapingPass)")
   if key.mute or key.value == 0:
     raise ValueError(f"Shaping pass '{key.name}' of '{sceneObject.name}' is {'muted' if key.mute else 'at strength 0'}, so shaping it would not show; unmute it or set a strength first")
   return key
 
 
 def keyCoordinates(key):
-  coordinates = numpy.empty(len(key.data) * 3)
+  # Read in the pass's own single precision, which loses nothing and takes under half the time of converting each value.
+  coordinates = numpy.empty(len(key.data) * 3, dtype=numpy.float32)
   key.data.foreach_get("co", coordinates)
-  return coordinates.reshape(-1, 3)
+  return coordinates.reshape(-1, 3).astype(numpy.float64)
 
 
 def writeIntoActivePass(sceneObject, localPositions):
