@@ -376,26 +376,12 @@ def organize(renames, parents, collections):
 
 
 def uvDensity(sceneObject):
-  """World units per texture repeat: the square root of the mesh's world area over its UV area."""
-  mesh = sceneObject.data
-  if not mesh.uv_layers:
+  """World units per texture repeat over the whole mesh."""
+  areas = bridgeMeshAccess.textureAreas(sceneObject)
+  if areas is None:
     return None
-  mesh.calc_loop_triangles()
-  triangleLoops = numpy.empty(len(mesh.loop_triangles) * 3, dtype=numpy.int64)
-  mesh.loop_triangles.foreach_get("loops", triangleLoops)
-  triangleLoops = triangleLoops.reshape(-1, 3)
-  loopVertices = numpy.empty(len(mesh.loops), dtype=numpy.int64)
-  mesh.loops.foreach_get("vertex_index", loopVertices)
-  worldPositions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
-  uvs = numpy.empty(len(mesh.loops) * 2)
-  mesh.uv_layers.active.data.foreach_get("uv", uvs)
-  uvs = uvs.reshape(-1, 2)
-  corners = worldPositions[loopVertices[triangleLoops]]
-  worldArea = numpy.linalg.norm(numpy.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0]), axis=1).sum() / 2
-  uvCorners = uvs[triangleLoops]
-  uvEdgeA, uvEdgeB = uvCorners[:, 1] - uvCorners[:, 0], uvCorners[:, 2] - uvCorners[:, 0]
-  uvArea = numpy.abs(uvEdgeA[:, 0] * uvEdgeB[:, 1] - uvEdgeA[:, 1] * uvEdgeB[:, 0]).sum() / 2
-  return round(math.sqrt(worldArea / uvArea), 3) if uvArea > 0 else None
+  density = bridgeMeshAccess.worldUnitsPerRepeat(areas[0].sum(), areas[1].sum())
+  return None if density is None else round(density, 3)
 
 
 def getObjectDetail(name):

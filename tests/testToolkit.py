@@ -141,10 +141,111 @@ def testBooleanCutsAndRefusesToErase(stageBlenderServer):
   assert cut["before"]["faces"] == 6
   assert cut["after"]["faces"] > 6
   assert "No object named 'bore'" in cutterGone
-  assert "would leave 'pebble' with no faces; nothing was changed" in erased
+  assert "'dome' does not cross the surface of 'pebble'" in erased and "nothing was changed" in erased
   assert pebble["faces"] == 6
   assert pebble["modifiers"] == []
   assert dome["type"] == "MESH"
+
+
+async def texturedBlock(session, name, size, location, material, density):
+  await session.expectSuccess("createPrimitive", {"kind": "cube", "name": name, "size": size, "location": location})
+  await session.expectSuccess("assignMaterial", {"objectName": name, "materialName": material})
+  await session.expectSuccess("projectUVs", {"objectName": name, "method": "box", "worldUnitsPerRepeat": density})
+
+
+def testExtrudedAndInsetFacesRepeatAsTheFacesTheyGrewFrom(stageBlenderServer, tmp_path):
+  texture = writePNG(tmp_path / "rock.png", 8, 8, (100, 96, 90, 255))
+
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createMaterial", {"name": "rock", "diffuseTexture": str(texture)})
+    await texturedBlock(session, "tower", [30, 30, 30], [0, 0, 0], "rock", 15)
+    extruded = await session.expectSuccess("extrudeFaces", {"objectName": "tower", "selector": upFacing, "distance": 30})
+    tower = await session.expectSuccess("getObjectDetail", {"name": "tower"})
+    await texturedBlock(session, "well", [30, 30, 30], [60, 0, 0], "rock", 15)
+    inset = await session.expectSuccess("insetFaces", {"objectName": "well", "selector": upFacing, "thickness": 4, "depth": -6})
+    well = await session.expectSuccess("getObjectDetail", {"name": "well"})
+    await session.expectSuccess("projectUVs", {"objectName": "well", "method": "box", "worldUnitsPerRepeat": 15})
+    wellReprojected = await session.expectSuccess("getObjectDetail", {"name": "well"})
+    await session.expectSuccess("createTerrainGrid", {"name": "yard", "size": [160, 160], "spacing": 8, "location": [0, 120, 0]})
+    await session.expectSuccess("assignMaterial", {"objectName": "yard", "materialName": "rock"})
+    await session.expectSuccess("projectUVs", {"objectName": "yard", "method": "planar", "worldUnitsPerRepeat": 64, "direction": [0, 0, 1]})
+    raised = await session.expectSuccess("extrudeFaces", {"objectName": "yard", "selector": {"box": {"minimum": [-30, 90, -1], "maximum": [30, 150, 1]}}, "distance": 12})
+    yard = await session.expectSuccess("getObjectDetail", {"name": "yard"})
+    return extruded, tower, inset, well, wellReprojected, raised, yard
+
+  extruded, tower, inset, well, wellReprojected, raised, yard = stageBlenderServer.session(steps)
+  # The cube was box-projected at 15 units a repeat; the walls extrusion adds repeat at 15 as well, where their UVs copied from the rim
+  # stretched them to about 19.7 over the whole mesh.
+  assert extruded["mappedFaces"] == [{"material": "rock", "faces": 4, "worldUnitsPerRepeat": 15.0}]
+  assert tower["worldUnitsPerTextureRepeat"] == 15.0
+  # The recess walls inset adds slope inward, so box projection at 15 spreads them a little (15.17 over the mesh): exactly what
+  # projecting the whole mesh again gives.
+  assert inset["mappedFaces"] == [{"material": "rock", "faces": 4, "worldUnitsPerRepeat": 15.0}]
+  assert 15.0 < well["worldUnitsPerTextureRepeat"] == wellReprojected["worldUnitsPerTextureRepeat"] < 15.5
+  # A patch of ground 8 cells square raised 12: its 32 sides repeat at the ground's 64.
+  assert raised["mappedFaces"] == [{"material": "rock", "faces": 32, "worldUnitsPerRepeat": 64.0}]
+  assert yard["worldUnitsPerTextureRepeat"] == 64.0
+
+
+caveFacesCode = """
+import math
+import numpy
+plot = bpy.data.objects['plot']
+mesh = plot.data
+layer = mesh.uv_layers.active.data
+rows = []
+for polygon in mesh.polygons:
+  center = plot.matrix_world @ polygon.center
+  if center.x > -99.5 and abs(math.hypot(center.y - 105, center.z - 17) - 12) < 0.6:
+    corners = [plot.matrix_world @ mesh.vertices[mesh.loops[index].vertex_index].co for index in polygon.loop_indices]
+    uvs = [layer[index].uv for index in polygon.loop_indices]
+    area = sum(((corners[0] - corners[index]).cross(corners[0] - corners[index + 1])).length / 2 for index in range(1, len(corners) - 1))
+    uvArea = sum(abs((uvs[index] - uvs[0]).cross(uvs[index + 1] - uvs[0])) / 2 for index in range(1, len(uvs) - 1))
+    rows.append([plot.material_slots[polygon.material_index].material.name, area, uvArea])
+result = rows
+"""
+
+
+def testBooleanCutLinesTheOpeningWithTheMaterialItCutsThrough(stageBlenderServer, tmp_path):
+  stone = writePNG(tmp_path / "stone.png", 8, 8, (120, 110, 100, 255))
+  grass = writePNG(tmp_path / "grass.png", 8, 8, (60, 120, 40, 255))
+
+  async def steps(session):
+    await freshScene(session)
+    for name, texture in (("stone", stone), ("grass", grass), ("cliff", stone)):
+      await session.expectSuccess("createMaterial", {"name": name, "diffuseTexture": str(texture)})
+    await texturedBlock(session, "wall", [40, 6, 20], [0, -100, 0], "stone", 20)
+    await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "doorCutter", "size": [10, 10, 14], "location": [0, -100, -1]})
+    doorway = await session.expectSuccess("booleanCut", {"objectName": "wall", "cutterName": "doorCutter"})
+    wall = await session.expectSuccess("getObjectDetail", {"name": "wall"})
+    await session.expectSuccess("createTerrainGrid", {"name": "plot", "size": [320, 320], "spacing": 8, "location": [0, 0, 0]})
+    await session.expectSuccess("sculptOutline", {"objectName": "plot", "mode": "fill", "outline": [[-100, 60], [0, 60], [0, 150], [-100, 150]], "base": 0, "profile": [[-4, 0], [0, 40], [300, 40]]})
+    await session.expectSuccess("assignMaterial", {"objectName": "plot", "materialName": "grass"})
+    await session.expectSuccess("assignMaterial", {"objectName": "plot", "materialName": "cliff", "selector": {"slope": {"minimumDegrees": 40, "maximumDegrees": 180}}})
+    await session.expectSuccess("projectUVs", {"objectName": "plot", "method": "box", "worldUnitsPerRepeat": 64})
+    plotBefore = await session.expectSuccess("getObjectDetail", {"name": "plot"})
+    await session.expectSuccess("createPrimitive", {"kind": "cylinder", "name": "caveCutter", "size": [24, 24, 50], "location": [-130, 105, 17], "rotationDegrees": [0, 90, 0], "segments": 16})
+    cave = await session.expectSuccess("booleanCut", {"objectName": "plot", "cutterName": "caveCutter"})
+    plotAfter = await session.expectSuccess("getObjectDetail", {"name": "plot"})
+    lining = (await session.expectSuccess("runPython", {"code": caveFacesCode}))["result"]
+    return doorway, wall, plotBefore, cave, plotAfter, lining
+
+  doorway, wall, plotBefore, cave, plotAfter, lining = stageBlenderServer.session(steps)
+  # The doorway's jambs and lintel are stone at the wall's 20 a repeat, and the wall gains no empty material slot.
+  assert doorway["madeFaces"] > 0 and doorway["mappedFaces"] == [{"material": "stone", "faces": doorway["madeFaces"], "worldUnitsPerRepeat": 20.0}]
+  assert [entry["material"] for entry in wall["materials"]] == ["stone"]
+  assert wall["worldUnitsPerTextureRepeat"] == 20.0
+  # The cave cut into the cliff is lined with cliff, mapped, not grass at constant UVs; the grass is untouched and no slot is added.
+  assert cave["madeFaces"] > 0 and [entry["material"] for entry in cave["mappedFaces"]] == ["cliff"]
+  assert [entry["material"] for entry in plotAfter["materials"]] == ["grass", "cliff"]
+  assert plotAfter["materials"][0]["faces"] == plotBefore["materials"][0]["faces"]
+  assert len(lining) >= 16 and all(name == "cliff" for name, _, _ in lining)
+  # Box projection maps each lining face along its nearest axis, at most 45 degrees off it round the cave's axis: between the cliff's
+  # density and that over the square root of cos 45.
+  density = cave["mappedFaces"][0]["worldUnitsPerRepeat"]
+  assert abs(density - 64) < 3
+  assert all(uvArea > 0 and density - 0.01 <= (area / uvArea) ** 0.5 <= density / 0.5 ** 0.25 + 0.01 for _, area, uvArea in lining)
 
 
 def testDecimateHalvesTriangles(stageBlenderServer):

@@ -10,6 +10,7 @@ import numpy
 import bridgeMeshAccess
 import bridgeNoise
 import bridgePasses
+import bridgeSurfacing
 
 falloffCurves = ("constant", "linear", "smooth", "sharp")
 sculptModes = ("raise", "lower", "smooth", "flatten", "crease", "carve", "fill")
@@ -17,6 +18,9 @@ fractionModes = ("smooth", "flatten", "carve", "fill")
 # carve lowers ground to a cross-section profile along a path; fill raises it to one.
 profileModes = ("carve", "fill")
 booleanOperations = ("DIFFERENCE", "UNION", "INTERSECT")
+# Marks the cutter's faces through a cut, so the faces it makes are told from the target's own.
+cutterFaceAttribute = "zonewrightCutterFace"
+faceValueTypes = {"INT": numpy.int32, "INT8": numpy.int8, "FLOAT": numpy.float32, "BOOLEAN": bool}
 creasePinch = 0.25
 maximumOctaves = 8
 roughenDirections = ("normal", "up")
@@ -406,30 +410,75 @@ def deleteFaces(objectName, selector):
   return {"deletedFaces": len(faces)} | bridgeMeshAccess.meshCounts(sceneObject)
 
 
+def materialDensities(sceneObject):
+  """World units per texture repeat of each material slot's faces as the object's UVs map them now (None for a slot whose faces have
+  no UV area); None when the mesh has no UV layer."""
+  areas = bridgeMeshAccess.textureAreas(sceneObject)
+  if areas is None:
+    return None
+  worldAreas, uvAreas, materialIndices = areas
+  return {int(slot): bridgeMeshAccess.worldUnitsPerRepeat(worldAreas[materialIndices == slot].sum(), uvAreas[materialIndices == slot].sum()) for slot in numpy.unique(materialIndices)}
+
+
+def mapNewFaces(meshEditor, sceneObject, faces, densities):
+  """Map faces a topology edit made as projectUVs' box projection maps them, each at the density its material had on the object
+  before the edit (materialDensities), so they repeat as the faces they grew from; a material that had none leaves its faces as they
+  are. Returns what was mapped, per material."""
+  uvLayer = meshEditor.loops.layers.uv.active
+  if densities is None or uvLayer is None:
+    return []
+  meshEditor.normal_update()
+  matrix = sceneObject.matrix_world
+  normalMatrix = matrix.to_3x3().inverted().transposed()
+  boxAxes = [bridgeSurfacing.planarAxes(numpy.eye(3)[axis]) for axis in range(3)]
+  mapped = {}
+  for face in faces:
+    density = densities.get(face.material_index)
+    if density is None:
+      continue
+    across, along = boxAxes[int(numpy.abs(numpy.array(normalMatrix @ face.normal)).argmax())]
+    for loop in face.loops:
+      point = numpy.array(matrix @ loop.vert.co)
+      loop[uvLayer].uv = (float(point @ across) / density, float(point @ along) / density)
+    mapped[face.material_index] = mapped.get(face.material_index, 0) + 1
+  slots = sceneObject.material_slots
+  return [{
+    "material": slots[slot].material.name if slot < len(slots) and slots[slot].material else None, "faces": count,
+    "worldUnitsPerRepeat": round(densities[slot], 3),
+  } for slot, count in sorted(mapped.items())]
+
+
 def extrudeFaces(objectName, selector, distance, direction):
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   _, faceNormals, _ = bridgeMeshAccess.readFaceArrays(sceneObject)
+  densities = materialDensities(sceneObject)
   meshEditor = bridgeMeshAccess.loadBMesh(sceneObject)
   faces, mask = selectedFaces(meshEditor, sceneObject, selector)
   worldDirection = faceNormals[mask].sum(0) if direction is None else bridgeMeshAccess.toArray(direction)
   if numpy.linalg.norm(worldDirection) == 0:
+    meshEditor.free()
     raise ValueError("The selected faces' normals cancel out; pass a direction")
   worldDirection = worldDirection / numpy.linalg.norm(worldDirection) * distance
+  existing = set(meshEditor.faces)
   extruded = bmesh.ops.extrude_face_region(meshEditor, geom=faces)
+  moved = {element for element in extruded["geom"] if isinstance(element, bmesh.types.BMFace)}
   newVertices = [element for element in extruded["geom"] if isinstance(element, bmesh.types.BMVert)]
   bmesh.ops.translate(meshEditor, verts=newVertices, vec=mathutils.Vector(bridgeMeshAccess.localDirection(sceneObject, worldDirection)))
   bmesh.ops.delete(meshEditor, geom=faces, context="FACES")
+  mapped = mapNewFaces(meshEditor, sceneObject, [face for face in meshEditor.faces if face not in existing and face not in moved], densities)
   bridgeMeshAccess.storeBMesh(meshEditor, sceneObject)
-  return {"extrudedFaces": len(faces)} | bridgeMeshAccess.meshCounts(sceneObject)
+  return {"extrudedFaces": len(faces), "mappedFaces": mapped} | bridgeMeshAccess.meshCounts(sceneObject)
 
 
 def insetFaces(objectName, selector, thickness, depth):
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  densities = materialDensities(sceneObject)
   meshEditor = bridgeMeshAccess.loadBMesh(sceneObject)
   faces, _ = selectedFaces(meshEditor, sceneObject, selector)
-  bmesh.ops.inset_region(meshEditor, faces=faces, thickness=thickness, depth=depth, use_even_offset=True)
+  rim = bmesh.ops.inset_region(meshEditor, faces=faces, thickness=thickness, depth=depth, use_even_offset=True, use_interpolate=True)["faces"]
+  mapped = mapNewFaces(meshEditor, sceneObject, rim, densities)
   bridgeMeshAccess.storeBMesh(meshEditor, sceneObject)
-  return {"insetFaces": len(faces)} | bridgeMeshAccess.meshCounts(sceneObject)
+  return {"insetFaces": len(faces), "mappedFaces": mapped} | bridgeMeshAccess.meshCounts(sceneObject)
 
 
 def bevelEdges(objectName, selector, width, segments, minimumAngleDegrees):
@@ -482,25 +531,87 @@ def requireNoModifiers(sceneObject):
     raise ValueError(f"'{sceneObject.name}' has modifiers {[modifier.name for modifier in sceneObject.modifiers]}; this operation applies the whole stack, so remove or apply them first")
 
 
+def worldFaceTree(sceneObject, faceIndices):
+  """A BVH over the given faces of a mesh in world space; its hits name the faces by their place in faceIndices."""
+  positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
+  polygons = bridgeMeshAccess.faceVertexIndices(sceneObject)
+  return mathutils.bvhtree.BVHTree.FromPolygons(positions.tolist(), [polygons[index].tolist() for index in faceIndices])
+
+
+def faceValues(mesh):
+  """Each face attribute a cut carries over to the faces it makes (all but Blender's own hidden ones), by name, as an array."""
+  values = {}
+  for attribute in mesh.attributes:
+    if attribute.domain != "FACE" or attribute.name.startswith("."):
+      continue
+    if attribute.data_type not in faceValueTypes:
+      raise ValueError(f"'{mesh.name}' has a face attribute '{attribute.name}' of type {attribute.data_type}, which a cut cannot carry over")
+    array = numpy.empty(len(mesh.polygons), dtype=faceValueTypes[attribute.data_type])
+    attribute.data.foreach_get("value", array)
+    values[attribute.name] = array
+  return values
+
+
 def booleanCut(objectName, cutterName, operation, keepCutter):
+  """Cut with the exact solver; the faces the cut makes take every face attribute (material, surfacing layers, shading) of the nearest
+  face the cutter crosses and are mapped at that material's density (mapNewFaces)."""
   if operation not in booleanOperations:
     raise ValueError(f"operation must be one of {list(booleanOperations)}, got '{operation}'")
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   cutter = bridgeMeshAccess.requireMeshObject(cutterName)
+  if cutter == sceneObject:
+    raise ValueError(f"'{objectName}' cannot cut itself")
   bridgeMeshAccess.requireNoShapingPasses(sceneObject, "cut it")
   requireNoModifiers(sceneObject)
   before = bridgeMeshAccess.meshCounts(sceneObject)
+  pairs = worldFaceTree(sceneObject, range(len(sceneObject.data.polygons))).overlap(worldFaceTree(cutter, range(len(cutter.data.polygons))))
+  crossed = sorted({first for first, _ in pairs})
+  if not crossed:
+    raise ValueError(f"'{cutterName}' does not cross the surface of '{objectName}' (it lies apart from it, wholly inside it, or wholly around it), so it cuts no opening; nothing was changed")
+  crossedTree = worldFaceTree(sceneObject, crossed)
+  densities = materialDensities(sceneObject)
+  materials = list(sceneObject.data.materials)
+  values = faceValues(sceneObject.data)
+  values["material_index"] = numpy.empty(len(sceneObject.data.polygons), dtype=numpy.int32)
+  sceneObject.data.polygons.foreach_get("material_index", values["material_index"])
+  marker = cutter.data.attributes.new(cutterFaceAttribute, "INT", "FACE")
+  marker.data.foreach_set("value", numpy.ones(len(cutter.data.polygons), dtype=numpy.int32))
   modifier = sceneObject.modifiers.new("zonewrightBoolean", "BOOLEAN")
   modifier.object = cutter
   modifier.operation = operation
   modifier.solver = "EXACT"
-  applyModifier(sceneObject, modifier)
+  try:
+    applyModifier(sceneObject, modifier)
+  finally:
+    cutter.data.attributes.remove(cutter.data.attributes[cutterFaceAttribute])
+  mesh = sceneObject.data
+  fromCutter = numpy.empty(len(mesh.polygons), dtype=numpy.int32)
+  mesh.attributes[cutterFaceAttribute].data.foreach_get("value", fromCutter)
+  mesh.attributes.remove(mesh.attributes[cutterFaceAttribute])
+  made = numpy.flatnonzero(fromCutter)
+  centers = numpy.empty(len(mesh.polygons) * 3)
+  mesh.polygons.foreach_get("center", centers)
+  centers = bridgeMeshAccess.worldPositions(sceneObject, centers.reshape(-1, 3))
+  sources = numpy.array([crossed[crossedTree.find_nearest(mathutils.Vector(centers[face]))[2]] for face in made], dtype=numpy.int64)
+  for name, array in values.items():
+    target = mesh.polygons if name == "material_index" else mesh.attributes[name].data
+    field = "material_index" if name == "material_index" else "value"
+    current = numpy.empty(len(mesh.polygons), dtype=array.dtype)
+    target.foreach_get(field, current)
+    current[made] = array[sources]
+    target.foreach_set(field, current)
+  while len(mesh.materials) > len(materials):
+    mesh.materials.pop()
+  mesh.update()
+  meshEditor = bridgeMeshAccess.loadBMesh(sceneObject)
+  mapped = mapNewFaces(meshEditor, sceneObject, [meshEditor.faces[int(face)] for face in made], densities)
+  bridgeMeshAccess.storeBMesh(meshEditor, sceneObject)
   if not keepCutter:
     cutterMesh = cutter.data
     bpy.data.objects.remove(cutter)
     if cutterMesh.users == 0:
       bpy.data.meshes.remove(cutterMesh)
-  return {"before": before, "after": bridgeMeshAccess.meshCounts(sceneObject), "cutterKept": keepCutter}
+  return {"before": before, "after": bridgeMeshAccess.meshCounts(sceneObject), "cutterKept": keepCutter, "madeFaces": len(made), "mappedFaces": mapped}
 
 
 def decimate(objectName, ratio):

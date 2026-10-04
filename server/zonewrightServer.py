@@ -1189,13 +1189,17 @@ async def measure(context: Context, points: list[list[float]], snapToSurface: bo
 @guardedTool()
 async def walkRoute(context: Context, path: list[list[float]], sampleSpacing: float = 4.0):
   """Walk a route as a player would, over what players stand on (rendered meshes and collection instances; not water, which is waded
-  or swum, nor guides, regions, spawns, or doors, taken as open): from its first point,
-  following the footing underfoot past each point of `path` [[x, y, z], ...], whose heights only need to be near the footing (so a
-  route can run over an arch or under it). Judged for a player 6 units tall who walks slopes up to 60 degrees: the route's length
-  across the ground, its steepest slope, its narrowest footing (how far it runs to each side before a drop or a wall; null beyond 60),
-  its lowest headroom, its deepest water over the footing, every problem (too steep, too low, a drop, a rise too steep to climb), and a
-  profile along the way (each row with the water depth over its footing, or null). Use it on
-  decks, ramps, ledges, and the ways into an area."""
+  or swum, nor guides, regions, spawns, or doors, taken as open): from its first point, following the footing underfoot past each
+  point of `path` [[x, y, z], ...], whose heights only need to be within a step of the footing (so a route can run over an arch or
+  under it). Judged for a player 6 units tall who walks slopes up to 60 degrees and steps up 2, in half-unit strides whatever
+  `sampleSpacing`, which sets only the profile's rows. Returns the length walked, the steepest face stood on, the narrowest footing (how
+  far it runs to each side before a drop of more than a player's height, a wall, a step too high, or a face too steep; null beyond
+  60), the lowest headroom, the deepest water over the footing; `problems`, everything that stops a player, each once over the stretch
+  it covers: rise (a wall or step over 2 in the way, its height, null past 60), drop (no footing within 60 below), steep (a face over 60
+  climbed, its steepest), headroom (under 6, its lowest); after a rise or a drop the walk takes up again where the route's own heights
+  find footing (resumesAt, null if never); `oneWay`, ways down a player cannot climb back: ledge (a drop over a step, its height) and
+  steep (a face over 60 descended); walkable when there are no problems; and a profile along the way (each row with the water depth
+  over its footing, or null). Use it on decks, ramps, ledges, and the ways into an area."""
   return await callBridge(context, "walkRoute", {"path": path, "sampleSpacing": sampleSpacing})
 
 
@@ -1313,12 +1317,17 @@ async def deleteFaces(context: Context, objectName: str, selector: dict):
   return await callBridge(context, "deleteFaces", {"objectName": objectName, "selector": selector})
 
 
-@guardedTool(description="Extrude the selected faces of a mesh by `distance` units along their average normal, or along `direction`." + selectorHelp)
+@guardedTool(description=(
+  "Extrude the selected faces of a mesh by `distance` units along their average normal, or along `direction`. The new side faces take"
+  " the material of the faces beside them and, where the mesh has UVs, are box-mapped at the density that material had on the mesh"
+  " (mappedFaces), so they repeat as the faces they grew from." + selectorHelp))
 async def extrudeFaces(context: Context, objectName: str, selector: dict, distance: float, direction: list[float] | None = None):
   return await callBridge(context, "extrudeFaces", {"objectName": objectName, "selector": selector, "distance": distance, "direction": direction})
 
 
-@guardedTool(description="Inset the selected faces of a mesh as one region by `thickness`, pushed in or out by `depth`." + selectorHelp)
+@guardedTool(description=(
+  "Inset the selected faces of a mesh as one region by `thickness`, pushed in or out by `depth`. The inset faces keep their texture as"
+  " it lay; the new rim faces are box-mapped at the density their material had on the mesh (mappedFaces)." + selectorHelp))
 async def insetFaces(context: Context, objectName: str, selector: dict, thickness: float, depth: float = 0.0):
   return await callBridge(context, "insetFaces", {"objectName": objectName, "selector": selector, "thickness": thickness, "depth": depth})
 
@@ -1335,7 +1344,10 @@ async def subdivide(context: Context, objectName: str, cuts: int, selector: dict
 
 @guardedTool()
 async def booleanCut(context: Context, objectName: str, cutterName: str, operation: str = "DIFFERENCE", keepCutter: bool = False):
-  """Apply a boolean (DIFFERENCE, UNION, INTERSECT) of a cutter mesh to a mesh, for cave mouths and openings; the cutter is deleted unless keepCutter."""
+  """Apply a boolean (DIFFERENCE, UNION, INTERSECT) of a cutter mesh to a mesh, for cave mouths and openings; the cutter is deleted
+  unless keepCutter. The faces the cut makes (madeFaces) take the material and surfacing of the nearest face the cutter crosses (a cave
+  cut into a cliff is lined with the cliff's material) and are box-mapped at that material's density on the mesh (mappedFaces); no
+  material slot is added. A cutter that crosses none of the mesh's faces is refused."""
   return await callBridge(context, "booleanCut", {"objectName": objectName, "cutterName": cutterName, "operation": operation, "keepCutter": keepCutter})
 
 

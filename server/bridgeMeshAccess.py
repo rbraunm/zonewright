@@ -362,6 +362,34 @@ def readFaceArrays(sceneObject):
   return worldPositions(sceneObject, centers.reshape(-1, 3)), worldDirections(sceneObject, normals.reshape(-1, 3)), materialIndices
 
 
+def textureAreas(sceneObject):
+  """Each triangle's world area, its area on the active UV layer, and its material slot; None when the mesh has no UV layer."""
+  mesh = sceneObject.data
+  if not mesh.uv_layers:
+    return None
+  mesh.calc_loop_triangles()
+  triangleLoops = numpy.empty(len(mesh.loop_triangles) * 3, dtype=numpy.int64)
+  mesh.loop_triangles.foreach_get("loops", triangleLoops)
+  triangleLoops = triangleLoops.reshape(-1, 3)
+  materialIndices = numpy.empty(len(mesh.loop_triangles), dtype=numpy.int64)
+  mesh.loop_triangles.foreach_get("material_index", materialIndices)
+  loopVertices = numpy.empty(len(mesh.loops), dtype=numpy.int64)
+  mesh.loops.foreach_get("vertex_index", loopVertices)
+  positions, _ = readVertexArrays(sceneObject)
+  uvs = numpy.empty(len(mesh.loops) * 2)
+  mesh.uv_layers.active.data.foreach_get("uv", uvs)
+  corners = positions[loopVertices[triangleLoops]]
+  worldAreas = numpy.linalg.norm(numpy.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0]), axis=1) / 2
+  uvCorners = uvs.reshape(-1, 2)[triangleLoops]
+  uvEdgeA, uvEdgeB = uvCorners[:, 1] - uvCorners[:, 0], uvCorners[:, 2] - uvCorners[:, 0]
+  return worldAreas, numpy.abs(uvEdgeA[:, 0] * uvEdgeB[:, 1] - uvEdgeA[:, 1] * uvEdgeB[:, 0]) / 2, materialIndices
+
+
+def worldUnitsPerRepeat(worldArea, uvArea):
+  """How many world units one texture repeat spans over faces of these areas; None when they have no UV area."""
+  return math.sqrt(worldArea / uvArea) if uvArea > 0 else None
+
+
 def vertexGroupMask(sceneObject, groupName):
   group = sceneObject.vertex_groups.get(groupName)
   if group is None:
