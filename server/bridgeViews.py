@@ -31,6 +31,9 @@ renderHeight = 540
 renderSamples = 4
 # Measured by aligning renders to Plane of Knowledge and Eastern Wastes screenshots (16:9 crops of the live client's first-person view).
 verticalFieldOfViewDegrees = 46.5
+minimumFieldOfViewDegrees = 10.0
+maximumFieldOfViewDegrees = 120.0
+maximumFrameSide = 1920
 eyeHeight = 5.5
 cameraClipStart = 0.5
 # A point given with its height finds the ground from this far above it, so a height read off a floor or a little under it still
@@ -102,6 +105,20 @@ class PreviewScene:
     self.configureRender()
     self.configureWorld()
     bridgeClientLight.applyEnvironment(zone)
+
+  def setFrame(self, frame):
+    """Render at frame's size [width, height] and vertical field of view, as a camera matched to concept art does."""
+    self.scene.render.resolution_x, self.scene.render.resolution_y = frame["size"]
+    self.camera.data.angle = math.radians(frame["verticalFieldOfViewDegrees"])
+
+  def frameSize(self):
+    return self.scene.render.resolution_x, self.scene.render.resolution_y
+
+  def fittingHalfAngle(self):
+    """Half the narrower of the camera's vertical and horizontal fields of view, in radians."""
+    width, height = self.frameSize()
+    verticalHalf = self.camera.data.angle / 2
+    return min(verticalHalf, math.atan(math.tan(verticalHalf) * width / height))
 
   def addObject(self, newObject):
     self.scene.collection.objects.link(newObject)
@@ -330,6 +347,9 @@ def placeCamera(preview, view, figureModel):
     # again differs in the last bits and moves the picture by a fraction of a pixel.
     location, rotation = bridgeReviewGuides.reviewPose(source) or source.matrix_world.decompose()[:2]
     camera.location, camera.rotation_quaternion = location, rotation
+    concept = bridgeReviewGuides.savedConcept(source)
+    if concept is not None:
+      preview.setFrame(concept)
     description = {"eye": list(location), "forward": list(rotation @ mathutils.Vector((0, 0, -1))), "figure": None}
     saved = bridgeReviewGuides.savedFigure(source)
     if figureModel is not None and saved is not None:
@@ -484,7 +504,7 @@ def placeFrameCamera(preview, frame):
   center = (low + high) / 2
   radius = max((high - low).length / 2, frameMinimumRadius)
   forward = headingPitchForward(frame["headingDegrees"], frame["pitchDegrees"])
-  distance = radius / math.sin(math.radians(verticalFieldOfViewDegrees / 2)) * frameMargin
+  distance = radius / math.sin(preview.fittingHalfAngle()) * frameMargin
   camera = preview.camera
   camera.location = center - forward * distance
   camera.rotation_quaternion = lookRotation(forward)
@@ -552,13 +572,31 @@ def roundVector(vector, digits=3):
   return [round(float(component), digits) for component in vector]
 
 
-def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes, labels):
+def requireFrame(frame):
+  """A render frame other than the preview's own: {size: [width, height], verticalFieldOfViewDegrees}."""
+  if (
+    not isinstance(frame, dict) or set(frame) != {"size", "verticalFieldOfViewDegrees"} or len(frame["size"]) != 2
+    or not all(isinstance(side, int) and 16 <= side <= maximumFrameSide for side in frame["size"])
+    or not minimumFieldOfViewDegrees <= frame["verticalFieldOfViewDegrees"] <= maximumFieldOfViewDegrees
+  ):
+    raise ValueError(
+      f"A frame is {{size: [width, height] of 16 to {maximumFrameSide} pixels, verticalFieldOfViewDegrees {minimumFieldOfViewDegrees:g} to"
+      f" {maximumFieldOfViewDegrees:g}}}, got {frame!r}"
+    )
+  return frame
+
+
+def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes, labels, frame=None):
   if shading not in viewShadings:
     raise ValueError(f"shading must be one of {list(viewShadings)}, got '{shading}'")
+  if frame is not None and ("map" in view or "camera" in view):
+    raise ValueError("A frame is set for an eye, standAt, or frame view; a map keeps the preview's frame and a review camera its own")
   # A map, or a drawing for reading shape, coverage, or values, is neither fogged nor has a sky.
   shapeOnly = "map" in view or shading != "client"
   preview = PreviewScene(sourceScene, zone | {"fogOn": False} if shapeOnly else zone, guides, None if shapeOnly else sky)
   try:
+    if frame is not None:
+      preview.setFrame(requireFrame(frame))
     description = placeCamera(preview, view, figureModel)
     preview.drawSky()
     if shading != "client" and preview.camera.data.type != "ORTHO":
@@ -581,12 +619,13 @@ def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, b
     if overlays:
       preview.tint(outputPath, overlays)
     renderSeconds = time.perf_counter() - start
+    width, height = preview.frameSize()
   finally:
     preview.remove()
   return {key: roundVector(value) if isinstance(value, list) else value for key, value in description.items()} | {
     "outputPath": outputPath,
-    "width": renderWidth,
-    "height": renderHeight,
+    "width": width,
+    "height": height,
     "renderSeconds": round(renderSeconds, 2),
   }
 
@@ -628,14 +667,15 @@ def renderPasses(sourceScene, zone, view, outputFolder, passNames):
 
 
 def pick(sourceScene, zone, view, pixel):
-  if len(pixel) != 2 or not (0 <= pixel[0] < renderWidth and 0 <= pixel[1] < renderHeight):
-    raise ValueError(f"pixel {pixel} is outside the {renderWidth}x{renderHeight} render")
   preview = PreviewScene(sourceScene, zone)
   try:
     placeCamera(preview, view, None)
+    width, height = preview.frameSize()
+    if len(pixel) != 2 or not (0 <= pixel[0] < width and 0 <= pixel[1] < height):
+      raise ValueError(f"pixel {pixel} is outside the {width}x{height} render")
     topRight, _, bottomLeft, topLeft = preview.camera.data.view_frame(scene=preview.scene)
-    across = (pixel[0] + 0.5) / renderWidth
-    down = (pixel[1] + 0.5) / renderHeight
+    across = (pixel[0] + 0.5) / width
+    down = (pixel[1] + 0.5) / height
     localPoint = topLeft + (topRight - topLeft) * across + (bottomLeft - topLeft) * down
     rotation = preview.camera.rotation_quaternion
     if preview.camera.data.type == "ORTHO":

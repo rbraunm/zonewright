@@ -22,6 +22,7 @@ import assetSheets
 import assetSurvey
 import blenderBridge
 import checkpoints
+import conceptComparison
 import eqCalibration
 import eqEmitters
 import eqgExport
@@ -752,7 +753,7 @@ async def scaleFigureModel(zone, view):
 async def renderView(
   context: Context, view: dict, shading: str = "client", bandHeight: float = 50.0, guides: bool = True, swimVolumes: bool = False, labels: list[str] | None = None,
 ):
-  """Render the EQ preview of a view: {"camera": name} (a review camera saved from a standAt view stands the scale figure again where she stood, her ground found as figureAt's is), {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], or with z on the ground found from 3 above z down to 50 below it, for caves, under overhangs, and on ledges; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera, or stood by hand facing the camera with "figureAt": [x,y] or [x,y,z] in the view, its ground found as standAt's is, on a ledge or ramp too narrow to walk her ahead on), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog. {"frame": {"objects": [names], "headingDegrees": h, "pitchDegrees": p}} looks at the named meshes or collection instances from that heading and pitch, standing back so they fit (its result's eye and target reproduce that camera). shading "client" draws the zone as the client does; "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout; "coverage" draws only what exportZone would export, each face in the color of its export check status (checkExport): black where it cannot export, red for zero texture area, brown for a blockout material, yellow for texture stretched or squeezed, orange where the base material shows, magenta along a ground border without a transition strip, grey when fine, and blue wherever a face is seen from its back, lit from the northwest as layout is, softer so no shaded face reads as black, and without fog; the result counts the exported faces by status. The value shadings draw every mesh (each part of a collection instance as placed, and the scale figure) from a value of its own, lit softly from the northwest, without fog, the result giving the scale: "objects" draws each object in its own flat color, the ones the view shows most of first (blue, orange, green, red, purple, yellow, cyan, magenta, lime, pink, teal, lavender, brown, olive, then grey for the rest), with a legend of the objects the view shows, each with its color and share of the view; "curvature" draws convex forms warm (orange), concave cool (blue), and flat neutral grey, a ridge or trough curved to a radius of 16 at half color and sharper ones fuller, from the bend of the edges around each vertex (so where two meshes meet without sharing edges, as a rock sunk into the ground, there is none); "triangleDensity" draws each face's triangles per 10,000 square units of its own area over fixed decades, blue 1, cyan 10, green 100, yellow 1,000, red 10,000 (the client's EQG terrains run from 8 to 5,083, 244 at the median), with the range the view shows; "texelDensity" draws each face's texture pixels per world unit (its diffuse texture's pixels over the area its texture coordinates spread them across) blue lowest through cyan, green, and yellow to red highest across the range the view shows (the result gives it and each color's value), dark grey where a face has no diffuse texture or texture coordinates: coverage's stretch check compares a face with its own material's usual scale, texelDensity compares materials with each other. labels [names] writes each named object's name on the view by its place (where its middle projects when the object shows there, else the middle of what shows of it), marked with a white dot, but only for the objects the view shows; the result lists the places and the named objects it does not show (an object hidden from renders, a guide with guides off, or one that is not a mesh or collection instance is refused). Guides (plot outlines, sketch massing) draw unless guides is false, and with them, in every shading, the view is tinted red where the boundaries (walls, lids, floors) stand, which the client never draws, a wall as a slab thick enough to show from above, and green where the zone lines stand, seen through the water but hidden behind and under the ground; with swimVolumes, the view is tinted where the swim volumes stand (cyan water, magenta lava), each box seen through the water, so its top shows evenly under a surface it meets or lies just below, but hidden behind and under the ground."""
+  """Render the EQ preview of a view: {"camera": name} (a review camera saved from a standAt view stands the scale figure again where she stood, her ground found as figureAt's is; one matched to concept art renders at the art's aspect and its own field of view), {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], or with z on the ground found from 3 above z down to 50 below it, for caves, under overhangs, and on ledges; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera, or stood by hand facing the camera with "figureAt": [x,y] or [x,y,z] in the view, its ground found as standAt's is, on a ledge or ramp too narrow to walk her ahead on), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog. {"frame": {"objects": [names], "headingDegrees": h, "pitchDegrees": p}} looks at the named meshes or collection instances from that heading and pitch, standing back so they fit (its result's eye and target reproduce that camera). shading "client" draws the zone as the client does; "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout; "coverage" draws only what exportZone would export, each face in the color of its export check status (checkExport): black where it cannot export, red for zero texture area, brown for a blockout material, yellow for texture stretched or squeezed, orange where the base material shows, magenta along a ground border without a transition strip, grey when fine, and blue wherever a face is seen from its back, lit from the northwest as layout is, softer so no shaded face reads as black, and without fog; the result counts the exported faces by status. The value shadings draw every mesh (each part of a collection instance as placed, and the scale figure) from a value of its own, lit softly from the northwest, without fog, the result giving the scale: "objects" draws each object in its own flat color, the ones the view shows most of first (blue, orange, green, red, purple, yellow, cyan, magenta, lime, pink, teal, lavender, brown, olive, then grey for the rest), with a legend of the objects the view shows, each with its color and share of the view; "curvature" draws convex forms warm (orange), concave cool (blue), and flat neutral grey, a ridge or trough curved to a radius of 16 at half color and sharper ones fuller, from the bend of the edges around each vertex (so where two meshes meet without sharing edges, as a rock sunk into the ground, there is none); "triangleDensity" draws each face's triangles per 10,000 square units of its own area over fixed decades, blue 1, cyan 10, green 100, yellow 1,000, red 10,000 (the client's EQG terrains run from 8 to 5,083, 244 at the median), with the range the view shows; "texelDensity" draws each face's texture pixels per world unit (its diffuse texture's pixels over the area its texture coordinates spread them across) blue lowest through cyan, green, and yellow to red highest across the range the view shows (the result gives it and each color's value), dark grey where a face has no diffuse texture or texture coordinates: coverage's stretch check compares a face with its own material's usual scale, texelDensity compares materials with each other. labels [names] writes each named object's name on the view by its place (where its middle projects when the object shows there, else the middle of what shows of it), marked with a white dot, but only for the objects the view shows; the result lists the places and the named objects it does not show (an object hidden from renders, a guide with guides off, or one that is not a mesh or collection instance is refused). Guides (plot outlines, sketch massing) draw unless guides is false, and with them, in every shading, the view is tinted red where the boundaries (walls, lids, floors) stand, which the client never draws, a wall as a slab thick enough to show from above, and green where the zone lines stand, seen through the water but hidden behind and under the ground; with swimVolumes, the view is tinted where the swim volumes stand (cyan water, magenta lava), each box seen through the water, so its top shows evenly under a surface it meets or lies just below, but hidden behind and under the ground."""
   outputPath = newRenderPath()
   zone = await callBridge(context, "getZoneProperties", {})
   description = await callBridge(context, "renderView", {
@@ -1928,7 +1929,8 @@ async def saveReviewCamera(context: Context, name: str, view: dict, note: str):
 
 @guardedTool()
 async def getReviewCameras(context: Context):
-  """The review cameras by name: each one's note, the view it was saved from, its eye, heading, and pitch, and where its scale figure stands."""
+  """The review cameras by name: each one's note, the view it was saved from, its eye, heading, and pitch, where its scale figure stands,
+  and the concept art it was matched to (compareToConcept saveAs: the art's path, the frame size, and the vertical field of view)."""
   return await callBridge(context, "getReviewCameras", {})
 
 
@@ -1952,6 +1954,73 @@ async def renderReviewSet(context: Context, names: list[str] | None = None, shad
     context, zone, [{"camera": name} for name in chosen], [f"{name}: {cameras[name]['note']}" for name in chosen], shading, await zoneFigureModel(zone),
   )
   return [sheet, size | {"cameras": [{"name": name, "note": cameras[name]["note"], "outputPath": path} for name, path in zip(chosen, paths)]}]
+
+
+@guardedTool()
+async def compareToConcept(
+  context: Context, camera: str | None = None, concept: str | None = None, view: dict | None = None,
+  verticalFieldOfViewDegrees: float = 46.5, saveAs: str | None = None, note: str | None = None, guides: bool = True,
+):
+  """Compare concept art with the zone seen as the art sees it, as an artist checks work against the art: the zone rendered at the art's
+  aspect with a vertical field of view of verticalFieldOfViewDegrees (the client's is 46.5), beside the art; the art at half over the
+  render with the render's eye level drawn, for matching the camera to the art's horizon and framing; both squinted into their dark,
+  middle, and light thirds, with where the render's masses are lighter or darker; their strongest edges (the big forms' outlines) over each
+  other; and their palettes. The numbers: the share of the picture in the same third and the masses' correlation, the share of each one's
+  edges the other meets, each palette's color difference (CIE76 dE) from the other's, and each one's lightness, its spread, chroma, and
+  warmth (red-green, yellow-blue). Try a camera with concept (the art's path) and view (an {eye, target}, {standAt, headingDegrees,
+  pitchDegrees}, or {frame} view as renderView takes them; no scale figure is drawn) and move it until the art and the render line up;
+  keep it with saveAs (a name) and note (what to judge from it): a review camera that holds the art's path (relative to the .blend once it
+  is saved), its frame, and its field of view, which renderView {"camera": name}, renderReviewSet, and compareToConcept camera render as
+  matched. compareToConcept camera compares a kept one with its art again."""
+  if camera is not None:
+    if concept is not None or view is not None or saveAs is not None or note is not None:
+      raise ToolError("compareToConcept takes a kept camera alone, or concept and view (with saveAs and note to keep the camera)")
+    cameras = {entry["name"]: entry for entry in (await callBridge(context, "getReviewCameras", {}))["cameras"]}
+    if camera not in cameras or cameras[camera]["concept"] is None:
+      matched = sorted(name for name, entry in cameras.items() if entry["concept"] is not None)
+      raise ToolError(f"'{camera}' is not a review camera matched to concept art; those are {matched}")
+    kept = cameras[camera]["concept"]
+    conceptPath, fieldOfView, renderedView, frame = kept["path"], kept["verticalFieldOfViewDegrees"], {"camera": camera}, None
+  else:
+    if concept is None or view is None:
+      raise ToolError("compareToConcept needs a kept camera, or concept (the art's path) and view")
+    if not isinstance(view, dict) or {"camera", "map"} & set(view):
+      raise ToolError(f"Try a camera on the art with an {{eye, target}}, {{standAt, headingDegrees, pitchDegrees}}, or {{frame}} view, got {view!r}")
+    if (saveAs is None) != (note is None):
+      raise ToolError("Keep a matched camera with both saveAs (its name) and note (what to judge from it)")
+    conceptPath = str(Path(concept).resolve())
+    try:
+      size = conceptComparison.renderSize(conceptPath)
+    except (ValueError, OSError) as error:
+      raise ToolError(f"The concept art cannot be read: {error}") from error
+    fieldOfView, renderedView = verticalFieldOfViewDegrees, view
+    frame = {"size": size, "verticalFieldOfViewDegrees": fieldOfView}
+  zone = await callBridge(context, "getZoneProperties", {})
+  sky = await zoneSky(zone)
+  renderPath = newRenderPath()
+  described = await callBridge(context, "renderView", {
+    "view": renderedView, "outputPath": str(renderPath), "figureModel": None, "shading": "client", "bandHeight": 50.0, "guides": guides,
+    "sky": sky, "swimVolumes": False, "labels": None, "frame": frame,
+  })
+  sheetPath = newRenderPath().with_suffix(".jpg")
+  try:
+    compared = await anyio.to_thread.run_sync(conceptComparison.compare, conceptPath, str(renderPath), str(sheetPath), described["forward"], fieldOfView)
+  except (ValueError, OSError) as error:
+    raise ToolError(f"The concept art cannot be read: {error}") from error
+  keptCamera = None
+  if saveAs is not None:
+    keptCamera = await callBridge(context, "saveReviewCamera", {
+      "name": saveAs, "view": view, "note": note, "sky": sky, "figureModel": None, "concept": {"path": conceptPath} | frame,
+    })
+  forward, width, height = described["forward"], described["width"], described["height"]
+  return [Image(data=sheetPath.read_bytes(), format="jpeg"), {
+    "outputPath": str(sheetPath), "renderPath": str(renderPath), "concept": conceptPath, "eye": described["eye"], "forward": forward,
+    "headingDegrees": round(math.degrees(math.atan2(forward[0], forward[1])) % 360, 2),
+    "pitchDegrees": round(math.degrees(math.asin(max(-1.0, min(1.0, forward[2])))), 2),
+    "frameSize": [width, height], "verticalFieldOfViewDegrees": fieldOfView,
+    "horizontalFieldOfViewDegrees": round(math.degrees(2 * math.atan(math.tan(math.radians(fieldOfView) / 2) * width / height)), 2),
+    "keptCamera": keptCamera,
+  } | compared]
 
 
 @guardedTool()

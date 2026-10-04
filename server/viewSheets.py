@@ -44,8 +44,17 @@ def wrappedLines(draw, text, font, width):
   return lines
 
 
+def fitted(image):
+  """The image scaled to fit a cell, keeping its aspect, centered on the sheet's background."""
+  scale = min(cellSize[0] / image.width, cellSize[1] / image.height)
+  size = (max(1, round(image.width * scale)), max(1, round(image.height * scale)))
+  cell = Image.new("RGB", cellSize, backgroundColor)
+  cell.paste(image.resize(size, Image.Resampling.LANCZOS), ((cellSize[0] - size[0]) // 2, (cellSize[1] - size[1]) // 2))
+  return cell
+
+
 def writeGrid(cells, columns, outputPath):
-  """cells: [(image, label)] laid out in rows of `columns`, each scaled to cellSize, labeled under it (wrapped to its width, every row
+  """cells: [(image, label)] laid out in rows of `columns`, each fitted to cellSize, labeled under it (wrapped to its width, every row
   as tall as the longest label needs); written as JPEG."""
   rows = -(-len(cells) // columns)
   width, height = cellSize
@@ -58,7 +67,7 @@ def writeGrid(cells, columns, outputPath):
   for index, ((image, _), lines) in enumerate(zip(cells, labels)):
     left = gap + index % columns * (width + gap)
     top = gap + index // columns * (height + labelArea + gap)
-    sheet.paste(image.resize(cellSize, Image.Resampling.LANCZOS), (left, top))
+    sheet.paste(fitted(image), (left, top))
     for line, text in enumerate(lines):
       draw.text((left, top + height + 2 + line * lineHeight), text, fill=labelColor, font=font)
   sheet.save(outputPath, "JPEG", quality=jpegQuality)

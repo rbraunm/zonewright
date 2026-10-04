@@ -290,8 +290,8 @@ def previewZone(sky):
   return zone | sky["environment"] if sky is not None else zone
 
 
-def renderView(view, outputPath, figureModel, shading, bandHeight, guides, sky, swimVolumes, labels):
-  return bridgeViews.renderView(bpy.context.scene, previewZone(sky), sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes, labels)
+def renderView(view, outputPath, figureModel, shading, bandHeight, guides, sky, swimVolumes, labels, frame=None):
+  return bridgeViews.renderView(bpy.context.scene, previewZone(sky), sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes, labels, frame)
 
 
 def pick(view, pixel, sky):
