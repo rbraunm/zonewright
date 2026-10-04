@@ -53,7 +53,7 @@ def testConformSurfaceEdgesRunsTheBorderOnSmoothEdgesInEveryPass(stageBlenderSer
     await twoMaterials(session, tmp_path)
     await stripedGround(session, "ground", 256, 8)
     await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "bump"})
-    await session.expectSuccess("sculptAtPoint", {"objectName": "ground", "mode": "raise", "center": [0, 0, 0], "radius": 120, "strength": 20})
+    await session.expectSuccess("sculptAtPoint", {"objectName": "ground", "mode": "raise", "center": [0, 0, 0], "radius": 80, "strength": 20})
     await session.expectSuccess("addSurfaceLayer", {"objectName": "ground", "name": "path"})
     await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "path", "material": "stone", "selector": {"nearPath": {"path": [[-128, -40, 0], [128, 30, 0]], "radius": 30}}})
     await session.expectSuccess("projectUVs", {"objectName": "ground", "method": "planar", "direction": [0, 0, 1], "worldUnitsPerRepeat": 32})
