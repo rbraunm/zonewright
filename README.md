@@ -15,6 +15,8 @@ python -m venv .venv
 claude
 ```
 
+Tests run against the real pinned Blender through the real bridge. That Blender is installed once by `syncTooling` under `%LOCALAPPDATA%\zonewrightTests\<pin>` and shared by every test session in every worktree; each session has its own tooling root whose `blender` folder links to it. One server and Blender stay running for a session, each test starting from an empty file; a test that needs a process of its own (a crash, a code change, the machine profile) takes `freshBlenderServer`. Sessions running at the same time each need their own short `--basetemp`: pytest prunes its shared temp folder, and long paths break Blender.
+
 Run Claude Code from the repository root, since `.mcp.json` launches the server with paths relative to it. On first launch, accept the workspace trust prompt and approve the `zonewright` server. `claude mcp list` then shows `zonewright` as connected.
 
 ## Tooling

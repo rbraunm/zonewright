@@ -180,7 +180,7 @@ def testAmplitudeIsTheTypicalMove(stageBlenderServer):
   assert abs(numpy.sqrt(numpy.mean(warpMoves ** 2)) - 3) < 0.3
 
 
-def testAWarpsSeedGivesTheSameGroundInEveryBlender(stageBlenderServer):
+def testAWarpsSeedGivesTheSameGroundInEveryBlender(freshBlenderServer):
   async def steps(session):
     await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
     await newGrid(session, "ground")
@@ -188,6 +188,6 @@ def testAWarpsSeedGivesTheSameGroundInEveryBlender(stageBlenderServer):
     return await worldVertices(session, "ground")
 
   # Each session starts its own Blender.
-  first, second = stageBlenderServer.session(steps), stageBlenderServer.session(steps)
+  first, second = freshBlenderServer.session(steps), freshBlenderServer.session(steps)
   assert numpy.abs(first[:, :2] - numpy.round(first[:, :2] / 8) * 8).max() > 1
   assert numpy.array_equal(first, second)
