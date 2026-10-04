@@ -46,6 +46,10 @@ A terrain's face materials are composed from named, ordered layers (`addSurfaceL
 
 Passes hold moves, not shapes. A later pass that raised ground to a level (a fill's plateau, a terrace) holds the lift it needed over the passes beneath, so taking back an earlier pass under it moves that level: a plateau built on a hill dishes where the hill is taken back. `resetRegion` names the kept passes still shaping the area (`stillShapedBy`); level the plateau again (`rebuildRegion` height) or take that pass back too.
 
+### Recovering from a wreck
+
+Work goes forward: passes, layers, and the region tools take a decision back without losing what came after it. Checkpoints are for when something goes badly wrong (a broad change that wrecks the terrain, a bad script): `saveCheckpoint` before a risky change saves the work file and keeps a copy of it under the tooling root, never in the work repository, and `restoreCheckpoint` puts one back, first keeping the current state as a checkpoint so a restore can itself be taken back. A checkpoint goes back only over the work file it came from, since that file's textures are on paths relative to it. `listCheckpoints` gives their sizes; nothing deletes one but `deleteCheckpoints`, by name.
+
 ### Measured against the client
 
 The zone survey's `construction` group measures every client zone: terrain triangle density, textures on the terrain, the share of terrain triangles in one- or two-triangle material islands, steep share, steep area on terrain rather than placed models, painted share, and placements. `compareWithClientZones` measures the open scene the same way and places each measure among chosen client zones by percentile. The `author-zone` skill lists the EQG distributions.
