@@ -13,7 +13,7 @@ maximumCapacity = 100000
 # CEmitter keeps the full particle count beyond its definition's distance only down to 16 particles (constructor, 0x1006c687).
 lodFloorParticles = 16
 millisecondsPerSecond = 1000.0
-billboardModes = {0: "screen", 1: "beam"}
+billboardModes = {0: "screen", 1: "beam", 2: "flat"}
 shapes = {0: "point", 1: "evenRing", 2: "evenCylinder", 3: "cylinder", 4: "disc", 5: "sphere", 6: "box", 7: "cone", 8: "torus", 9: "ring"}
 
 
@@ -158,8 +158,8 @@ def seedFor(emitterName, position):
 
 def steadyParticles(definition, emitterName, position, lifespanMilliseconds, cameraPosition):
   """The particles an emitter shows at a moment of its steady state, oldest first: each with its center, its age, its billboard's width
-  and height (sizes in world units), its turn on screen (radians), its RGBA color (0-1), and its texture cell. Refuses what the client
-  would not draw or what is not traced (a definition with no particle life, a billboard mode other than 0 and 1)."""
+  and height (sizes in world units), its turn (radians), its RGBA color (0-1), and its texture cell. Refuses what is not traced: a
+  billboard mode other than 0-2, and billboards turned to their velocity on screen."""
   if definition["billboard"] not in billboardModes:
     raise ValueError(f"billboard mode {definition['billboard']}, whose orientation is not traced")
   if definition["velocityAligned"]:

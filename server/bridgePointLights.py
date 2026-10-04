@@ -16,10 +16,11 @@ previewCopySuffix = "PointLit"
 
 def sceneLights(scene):
   """The scene's zone lights as the client keeps them: point lights carrying an EQ radius, drawn in renders."""
+  depsgraph = bridgeEnvironment.sceneDepsgraph(scene)
   lights = []
   for sceneObject in scene.objects:
     if sceneObject.type == "LIGHT" and not sceneObject.hide_render and bridgeEnvironment.radiusProperty in sceneObject.data:
-      lights.append(bridgeEnvironment.lightRecord(sceneObject))
+      lights.append(bridgeEnvironment.lightRecord(sceneObject.evaluated_get(depsgraph)))
   return lights
 
 
@@ -59,9 +60,10 @@ class Unit:
   """One thing the preview draws whose light the client chooses together: a mesh object, or a collection instance with every mesh it
   places, with its kind (region, zone, or model) and what decides its lights."""
 
-  def __init__(self, owner, kind):
+  def __init__(self, owner, kind, origin):
     self.owner = owner
     self.kind = kind
+    self.origin = origin
     self.parts = []
 
   def bounds(self):
@@ -108,7 +110,7 @@ def collectUnits(preview, depsgraph, terrainNames, reached):
         kind = "region"
       else:
         kind = "model"
-      units[owner.name] = Unit(owner, kind)
+      units[owner.name] = Unit(owner, kind, numpy.array(owner.evaluated_get(depsgraph).matrix_world.translation))
     mesh = evaluated.data
     positions, cornerVertices, normals = readMesh(mesh, matrix)
     units[owner.name].parts.append({
@@ -131,8 +133,7 @@ def unitLight(unit, lights):
   for part in unit.parts:
     cornerPositions = part["positions"][part["cornerVertices"]]
     if unit.kind == "model":
-      center = numpy.array(unit.owner.matrix_world.translation)
-      chosen = clientPointLights.selectForDraw(reaching, center, low, high, True)
+      chosen = clientPointLights.selectForDraw(reaching, unit.origin, low, high, True)
       results.append(clientPointLights.addedLight(cornerPositions, part["normals"], chosen))
     elif unit.kind == "region":
       results.append(clientPointLights.addedLightPerVertex(cornerPositions, part["normals"], clientPointLights.eligible(reaching, False)))

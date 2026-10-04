@@ -15,6 +15,8 @@ import emitterParticles
 
 particleColorAttribute = "eqParticleColor"
 materialPrefix = "zonewrightParticles"
+originScale = 1e-3
+notDrawnNames = 5
 assetsCache = {}
 
 
@@ -29,7 +31,12 @@ def loadAssets(assetsPath):
 
 
 def sceneEmitters(scene):
-  return [sceneObject for sceneObject in scene.objects if bridgeEnvironment.isEmitter(sceneObject) and not sceneObject.hide_render]
+  """The scene's emitters drawn in renders, as export records them (bridgeEnvironment.emitterRecord)."""
+  depsgraph = bridgeEnvironment.sceneDepsgraph(scene)
+  return [
+    bridgeEnvironment.emitterRecord(sceneObject.evaluated_get(depsgraph))
+    for sceneObject in scene.objects if bridgeEnvironment.isEmitter(sceneObject) and not sceneObject.hide_render
+  ]
 
 
 def particleMaterial(preview, texturePath, additive):
@@ -88,16 +95,20 @@ def particleMaterial(preview, texturePath, additive):
 
 
 def quadCorners(particle, mode, camera):
-  """A particle's four corners (top left, top right, bottom right, bottom left as the screen sees them): a quad square to the view
-  turned by its spin, or a beam its height long along its axis, its width across, turned toward the camera."""
+  """A particle's four corners (the texture's top left, top right, bottom right, bottom left): a quad square to the view turned by its
+  spin; a beam its height long along its axis, its width across, turned toward the camera; or a quad lying flat in the world's level
+  plane turned by its spin, its height along (cos, sin, 0) and its width along (sin, -cos, 0) of its turn (0x10074d5f)."""
   center = mathutils.Vector(particle["center"])
   halfWidth, halfHeight = particle["width"] * 0.5, particle["height"] * 0.5
+  offsets = [(-halfWidth, halfHeight), (halfWidth, halfHeight), (halfWidth, -halfHeight), (-halfWidth, -halfHeight)]
+  turn = particle["turn"]
+  cosine, sine = math.cos(turn), math.sin(turn)
   if mode == "screen":
     right, up = camera["right"], camera["up"]
-    turn = particle["turn"]
-    cosine, sine = math.cos(turn), math.sin(turn)
-    offsets = [(-halfWidth, halfHeight), (halfWidth, halfHeight), (halfWidth, -halfHeight), (-halfWidth, -halfHeight)]
     return [center + right * (x * cosine - y * sine) + up * (x * sine + y * cosine) for x, y in offsets]
+  if mode == "flat":
+    along, across = mathutils.Vector((cosine, sine, 0.0)), mathutils.Vector((sine, -cosine, 0.0))
+    return [center + across * x + along * y for x, y in offsets]
   axis = mathutils.Vector(particle["axis"]).normalized()
   toCamera = camera["position"] - center
   across = axis.cross(toCamera)
@@ -106,11 +117,15 @@ def quadCorners(particle, mode, camera):
   return [top - across * halfWidth, top + across * halfWidth, bottom + across * halfWidth, bottom - across * halfWidth]
 
 
-def emitterMesh(preview, label, particles, mode, camera, material):
+def emitterMesh(preview, label, particles, mode, camera, material, emitterPosition):
   """One mesh of an emitter's particle quads, farthest first so nearer ones blend over them, with each corner's texture coordinates
   and color."""
   forward = camera["forward"]
   ordered = sorted(particles, key=lambda particle: -forward.dot(mathutils.Vector(particle["center"]) - camera["position"]))
+  # The client draws its particles after the whole world, blended surfaces too (its frame, 0x10097420, draws the scene at 0x1008b470 and
+  # the particles at 0x10072110). Blender orders blended objects by their origins, so each emitter's mesh keeps its origin just off the
+  # camera, a farther emitter's farther off.
+  origin = camera["position"] + (mathutils.Vector(emitterPosition) - camera["position"]) * originScale
   points, uvs, colors = [], [], []
   for particle in ordered:
     points.extend(quadCorners(particle, mode, camera))
@@ -119,17 +134,39 @@ def emitterMesh(preview, label, particles, mode, camera, material):
     uvs.extend([(u, 1 - v), (u + width, 1 - v), (u + width, 1 - v - height), (u, 1 - v - height)])
     colors.extend([particle["color"]] * 4)
   mesh = bpy.data.meshes.new(label)
-  mesh.from_pydata([tuple(point) for point in points], [], [tuple(range(index, index + 4)) for index in range(0, len(points), 4)])
+  mesh.from_pydata([tuple(point - origin) for point in points], [], [tuple(range(index, index + 4)) for index in range(0, len(points), 4)])
   layer = mesh.uv_layers.new(name="UVMap")
   layer.data.foreach_set("uv", numpy.array(uvs, dtype=numpy.float32).ravel())
   attribute = mesh.color_attributes.new(particleColorAttribute, "FLOAT_COLOR", "CORNER")
   attribute.data.foreach_set("color", numpy.array(colors, dtype=numpy.float32).ravel())
   mesh.materials.append(material)
-  return preview.addObject(bpy.data.objects.new(label, mesh))
+  meshObject = bpy.data.objects.new(label, mesh)
+  meshObject.location = origin
+  return preview.addObject(meshObject)
+
+
+def emitterParticlesOrReason(emitter, definitions, textures, cameraPosition):
+  """An emitter's particles and its definition, or why it draws none."""
+  index, lifespan = emitter["definition"], emitter["lifespan"]
+  if index >= len(definitions):
+    return None, None, f"definition {index} is past the client's {len(definitions)} environment emitter definitions"
+  definition = definitions[index]
+  if lifespan <= 0:
+    return None, None, f"lifespan {lifespan}: the client makes an emitter only for a lifespan above 0"
+  try:
+    particles = emitterParticles.steadyParticles(definition, emitter["name"], emitter["position"], lifespan, cameraPosition)
+  except ValueError as error:
+    return None, None, f"definition {index} ('{definition['name']}'): {error}"
+  if not particles:
+    return None, None, f"definition {index} ('{definition['name']}') makes no particles"
+  if definition["texture"].lower() not in textures:
+    return None, None, f"definition {index} ('{definition['name']}') names texture '{definition['texture']}', which no effect folder holds"
+  return particles, definition, None
 
 
 def drawEmitters(preview, sourceScene, assetsPath):
-  """Draw the source scene's emitters into the preview for its camera; returns what was drawn and what was not, with why."""
+  """Draw the source scene's emitters into the preview for its camera; returns how many were drawn and their particles, and the ones
+  not drawn grouped by why, each group with its count and its first names."""
   emitters = sceneEmitters(sourceScene)
   if not emitters:
     return {"emitters": 0, "particles": 0, "notDrawn": []}
@@ -137,36 +174,28 @@ def drawEmitters(preview, sourceScene, assetsPath):
     raise ValueError("The scene has emitters and no client emitter definitions were passed; the server reads them from the client (EVERQUEST_CLIENT)")
   assets = loadAssets(assetsPath)
   definitions, textures = assets["definitions"], assets["textures"]
-  matrix = preview.camera.matrix_world
+  # The camera was just placed; its world matrix is current only once the preview's depsgraph is evaluated.
+  matrix = preview.camera.evaluated_get(preview.depsgraph()).matrix_world
   camera = {
     "position": matrix.translation.copy(), "right": matrix.col[0].xyz.normalized(), "up": matrix.col[1].xyz.normalized(),
     "forward": -matrix.col[2].xyz.normalized(),
   }
-  materials, drawn, particleCount, notDrawn = {}, 0, 0, []
+  materials, drawn, particleCount, notDrawn = {}, 0, 0, {}
   for emitter in emitters:
-    index = int(emitter[bridgeEnvironment.definitionProperty])
-    if index >= len(definitions):
-      notDrawn.append({"emitter": emitter.name, "reason": f"definition {index} is past the client's {len(definitions)} environment emitter definitions"})
+    particles, definition, reason = emitterParticlesOrReason(emitter, definitions, textures, list(camera["position"]))
+    if reason is not None:
+      notDrawn.setdefault(reason, []).append(emitter["name"])
       continue
-    definition = definitions[index]
-    try:
-      particles = emitterParticles.steadyParticles(
-        definition, emitter.name, list(emitter.matrix_world.translation), int(emitter[bridgeEnvironment.lifespanProperty]), list(camera["position"]),
-      )
-    except ValueError as error:
-      notDrawn.append({"emitter": emitter.name, "reason": f"definition {index} ('{definition['name']}'): {error}"})
-      continue
-    if not particles:
-      notDrawn.append({"emitter": emitter.name, "reason": f"definition {index} ('{definition['name']}') shows no particles with lifespan {emitter[bridgeEnvironment.lifespanProperty]}"})
-      continue
-    texturePath = textures.get(definition["texture"].lower())
-    if texturePath is None:
-      notDrawn.append({"emitter": emitter.name, "reason": f"definition {index} ('{definition['name']}') names texture '{definition['texture']}', which no effect folder holds"})
-      continue
-    key = (texturePath, definition["additive"] == 1)
+    key = (textures[definition["texture"].lower()], definition["additive"] == 1)
     if key not in materials:
       materials[key] = particleMaterial(preview, *key)
-    emitterMesh(preview, f"{materialPrefix}{emitter.name}", particles, emitterParticles.billboardModes[definition["billboard"]], camera, materials[key])
+    emitterMesh(
+      preview, f"{materialPrefix}{emitter['name']}", particles, emitterParticles.billboardModes[definition["billboard"]], camera, materials[key],
+      emitter["position"],
+    )
     drawn += 1
     particleCount += len(particles)
-  return {"emitters": drawn, "particles": particleCount, "notDrawn": notDrawn}
+  return {
+    "emitters": drawn, "particles": particleCount,
+    "notDrawn": [{"reason": reason, "count": len(names), "emitters": sorted(names)[:notDrawnNames]} for reason, names in notDrawn.items()],
+  }

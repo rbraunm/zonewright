@@ -30,8 +30,9 @@ sharedLocalAppDataPath = Path(os.environ["LOCALAPPDATA"]) / "zonewrightTests" / 
 sharedInstallLockSeconds = 900
 zoneSurveySkill = Path(".claude") / "skills" / "zone-survey"
 readerFiles = {f"server/{name}.py" for name in (
-  "eqAnimations", "eqArchive", "eqEmitters", "eqLinks", "eqLooks", "eqModels", "eqRaces", "eqSkeletons", "eqTerrainTextures", "eqTextures",
-  "eqWorldFile", "eqZones", "eqgFiles", "eqgSkeletons", "eqgTerrain", "zoneGeometry", "zoneSources", "bridgeModels",
+  "eqAnimations", "eqArchive", "eqEmitterDefinitions", "eqEmitters", "eqLinks", "eqLooks", "eqModels", "eqRaces", "eqSkeletons",
+  "eqTerrainTextures", "eqTextures", "eqWorldFile", "eqZones", "eqgFiles", "eqgSkeletons", "eqgTerrain", "zoneGeometry", "zoneSources",
+  "bridgeModels", "emitterAssets", "emitterParticles", "bridgeEmitterDrawing",
 )}
 # The slow tiers, in groups by the code their tests check. A run of the whole suite takes a group only when that code changed since the
 # branch left the last pushed claude, or is uncommitted; -m clientData or -m install runs a whole tier, and naming a test file runs it.

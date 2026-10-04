@@ -85,6 +85,12 @@ def isEmitter(sceneObject):
   return sceneObject.type == "EMPTY" and definitionProperty in sceneObject
 
 
+def sceneDepsgraph(scene):
+  """The scene evaluated, so a light or emitter placed or moved since its last evaluation reads where it now stands."""
+  with bpy.context.temp_override(scene=scene, view_layer=scene.view_layers[0]):
+    return bpy.context.evaluated_depsgraph_get()
+
+
 def emitterRecord(emitterObject):
   lifespan = emitterObject.get(lifespanProperty)
   if not isinstance(lifespan, int):
