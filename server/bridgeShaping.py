@@ -5,7 +5,6 @@ import bmesh
 import bpy
 import mathutils
 import mathutils.kdtree
-import mathutils.noise
 import numpy
 
 import bridgeMeshAccess
@@ -32,6 +31,8 @@ diagonalStretch = 1.5
 # A triangle under this share of the square on the mesh's edge length is a sliver: no diagonal turns to make one, and one is always
 # turned away.
 diagonalSliverShare = 0.05
+# A face whose area in plan is this share of an edge squared or less is as good as folded: stored in single precision, its sign is noise.
+degenerateAreaShare = 1e-6
 diagonalSweeps = 4
 # A vertex this close to a level already lies on it, and a cut runs through it.
 contourTolerance = 1e-6
@@ -186,10 +187,12 @@ def medianEdgeLength(sceneObject, positions, vertexMask):
 
 
 def overturnedFaces(sceneObject, worldPositions, vertexMask):
-  """Faces touching the masked vertices that lie flat or face down seen from above: on ground shaped by moves up and down, folds."""
+  """Faces touching the masked vertices that face down seen from above or have next to no area in plan: on ground shaped by moves up
+  and down, folds."""
   loopTotals, loopVertices = bridgeMeshAccess.faceLoops(sceneObject)
   touching = numpy.add.reduceat(vertexMask[loopVertices].astype(numpy.int64), numpy.cumsum(loopTotals) - loopTotals) > 0
-  return touching & (bridgeMeshAccess.faceNormals(sceneObject, worldPositions)[:, 2] <= 0)
+  edgeLength = medianEdgeLength(sceneObject, worldPositions, vertexMask)
+  return touching & (bridgeMeshAccess.faceNormals(sceneObject, worldPositions)[:, 2] <= degenerateAreaShare * edgeLength * edgeLength)
 
 
 def overturnedVertexMask(sceneObject, worldPositions, vertexMask):
@@ -450,7 +453,8 @@ def subdivide(objectName, selector, cuts):
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   meshEditor = bridgeMeshAccess.loadBMesh(sceneObject)
   faces, _ = selectedFaces(meshEditor, sceneObject, selector)
-  edges = list({edge for face in faces for edge in face.edges})
+  # Sets of mesh elements iterate in memory order, which changes from run to run; index order keeps the result the same.
+  edges = sorted({edge for face in faces for edge in face.edges}, key=lambda edge: edge.index)
   bmesh.ops.subdivide_edges(meshEditor, edges=edges, cuts=cuts, use_grid_fill=True)
   bridgeMeshAccess.storeBMesh(meshEditor, sceneObject)
   return {"subdividedFaces": len(faces)} | bridgeMeshAccess.meshCounts(sceneObject)
@@ -575,7 +579,7 @@ def triangulateAlongContours(sceneObject, worldPositions, vertexMask):
   meshEditor = bridgeMeshAccess.loadBMesh(sceneObject)
   layers = [layer for kind in ("bool", "float", "int", "string") for layer in getattr(meshEditor.faces.layers, kind).values()]
   maskedVertices = [meshEditor.verts[index] for index in numpy.flatnonzero(vertexMask)]
-  quads = list({face for vertex in maskedVertices for face in vertex.link_faces if len(face.verts) == 4})
+  quads = sorted({face for vertex in maskedVertices for face in vertex.link_faces if len(face.verts) == 4}, key=lambda face: face.index)
   bmesh.ops.triangulate(meshEditor, faces=quads, quad_method="FIXED")
   turned = 0
   for _ in range(diagonalSweeps):
@@ -731,7 +735,7 @@ def warp(objectName, featureSize, amplitude, seed, plane, selector, fadeDistance
   samplePositions = positions.copy()
   if plane == "horizontal":
     samplePositions[:, 2] = 0
-  vectors = numpy.array([list(mathutils.noise.noise_vector(mathutils.Vector(point), noise_basis=bridgeNoise.noiseBasis)) for point in bridgeNoise.noiseSamplePoints(samplePositions, featureSize, seed)])
+  vectors = bridgeNoise.noiseVectors(bridgeNoise.noiseSamplePoints(samplePositions, featureSize, seed))
   if plane == "horizontal":
     vectors[:, 2] = 0
   elif plane == "surface":

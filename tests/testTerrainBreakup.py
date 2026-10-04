@@ -160,3 +160,16 @@ def testAmplitudeIsTheTypicalMove(stageBlenderServer):
   # Over thousands of bumps, the root mean square move is the amplitude.
   assert abs(numpy.sqrt(numpy.mean(roughMoves ** 2)) - 3) < 0.3
   assert abs(numpy.sqrt(numpy.mean(warpMoves ** 2)) - 3) < 0.3
+
+
+def testAWarpsSeedGivesTheSameGroundInEveryBlender(stageBlenderServer):
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    await newGrid(session, "ground")
+    await session.expectSuccess("warp", {"objectName": "ground", "featureSize": 40, "amplitude": 10, "seed": 3, "plane": "full"})
+    return await worldVertices(session, "ground")
+
+  # Each session starts its own Blender.
+  first, second = stageBlenderServer.session(steps), stageBlenderServer.session(steps)
+  assert numpy.abs(first[:, :2] - numpy.round(first[:, :2] / 8) * 8).max() > 1
+  assert numpy.array_equal(first, second)
