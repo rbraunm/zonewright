@@ -2209,12 +2209,13 @@ async def generateCopies(
 
 @guardedTool()
 async def settleObjects(context: Context, names: list[str], depth: float = 0.0, tiltShare: float = 0.0, onto: str | None = None):
-  """Drop objects onto what lies below them, from above the whole scene, by their footprint rather than their origin: onto the ground
-  (what players stand on, apart from the objects being settled), sunk to the lowest ground under the footprint so no edge floats; or
-  onto a named object, resting on it with no vertex below its surface (a crate on a table, or tilted on a ramp); then `depth` lower. tiltShare (0 to 1) turns each
-  that share of the way toward the slope of the ground under it, keeping its heading (and replacing any tilt it had). Settling again after
-  the ground changes puts everything back on it. Each result gives the ground's lowest and highest under the footprint and the object's own
-  bottom and top. For a spot under an overhang or in a cave, use placeOnSurface, which casts from just above the object's top."""
+  """Drop objects onto what lies below them by their footprint rather than their origin, from above the whole scene, or from their own
+  tops where rock lies over them (a cave's ceiling, an overhang), so one in a cave lands on its floor, not on the hill over it: onto
+  the ground (what players stand on, apart from the objects being settled), sunk to the lowest ground under the footprint so no edge
+  floats; or onto a named object, resting on it with no vertex below its surface (a crate on a table, or tilted on a ramp); then
+  `depth` lower. tiltShare (0 to 1) turns each that share of the way toward the slope of the ground under it, keeping its heading (and
+  replacing any tilt it had). Settling again after the ground changes puts everything back on it. Each result gives the ground's
+  lowest and highest under the footprint and the object's own bottom and top."""
   return await callBridge(context, "settleObjects", {"names": names, "depth": depth, "tiltShare": tiltShare, "onto": onto})
 
 
@@ -2223,8 +2224,8 @@ async def placeOnSurface(context: Context, objectNames: list[str], at: list[list
   """Drop objects, with what is parented to them, onto the surface below `at` points, or below their own origins cast from just above
   their tops, so one sunk into the ground, under an overhang, or in a cave lands on the ground beneath it. They land on what players
   stand on (not water, guides, regions, spawns, or doors), or only on surfaceObjects, never on themselves, what they carry, or each
-  other; optionally tilted to the surface normal keeping their heading, then lifted `offset`. To set props on open ground by their
-  footprint, settleObjects casts from above the whole scene."""
+  other; optionally tilted to the surface normal keeping their heading, then lifted `offset`. To set props by their footprint,
+  settleObjects drops them from above the whole scene, or from their own tops where rock lies over them."""
   return await callBridge(context, "placeOnSurface", {"objectNames": objectNames, "at": at, "alignToNormal": alignToNormal, "surfaceObjects": surfaceObjects, "offset": offset})
 
 
@@ -2239,7 +2240,9 @@ async def scatterInRegion(
   square units, at least `minimumSpacing` apart, random yaw within yawRangeDegrees, each copy's scale the source's times a factor from
   scaleRange, dropped from `castFromHeight` (default just above the scene) onto what players stand on (not water, guides, regions,
   spawns, or doors; never the source) or only onto surfaceObjects, skipped where steeper than maximumSlopeDegrees or inside or within
-  avoidClearance of any avoidObjects. Deterministic for a seed."""
+  avoidClearance of any avoidObjects. Without castFromHeight, refused where rock lies over ground at any of the region's points (a
+  cave under a hill, an overhang), naming one: give castFromHeight, just under the rock's underside for the ground under it, or above
+  the top. Deterministic for a seed."""
   return await callBridge(context, "scatterInRegion", {
     "sourceObject": sourceObject, "region": region, "density": density, "minimumSpacing": minimumSpacing, "yawRangeDegrees": yawRangeDegrees,
     "scaleRange": scaleRange, "alignToNormal": alignToNormal, "maximumSlopeDegrees": maximumSlopeDegrees, "surfaceObjects": surfaceObjects,
@@ -2474,7 +2477,9 @@ async def getHousing(context: Context):
 
 @guardedTool(description=(
   "Place one plot at `center` [x, y], its address its name (\"101 Canyon Way\"); its height is the ground's under its center unless"
-  " `height` is given (the ground as it lies, without any plot's grading). `features` (from the zone's featureMultipliers) and `pricePlatinum` (an override of the derived price) set its"
+  " `height` is given (the ground as it lies, without any plot's grading). Where rock lies over ground there (a cave under a hill, an"
+  " overhang) either could be meant, so without `height` it is refused, naming the top, the rock's underside, and the ground under it:"
+  " give the height of the one meant (a cavern's level stretch from cutCave gives its floor). `features` (from the zone's featureMultipliers) and `pricePlatinum` (an override of the derived price) set its"
   " price. The result gives its price and any plots it overlaps." + plotHelp
 ))
 async def placePlot(
@@ -2491,7 +2496,7 @@ async def placePlot(
 
 @guardedTool(description=(
   "Change one plot: newAddress, kind, center (its height follows the ground as it lies, without any plot's grading, unless `height` is"
-  " given), facingDegrees, size, height, items, pets, features (replacing its list), pricePlatinum (an override; 0 returns it to its"
+  " given; refused where rock lies over ground, as placePlot is), facingDegrees, size, height, items, pets, features (replacing its list), pricePlatinum (an override; 0 returns it to its"
   " derived price). A plot whose kind or size changes gets a new border. A graded plot keeps its grading: renamed, its pass is renamed;"
   " moved, turned, resized, or raised, its ground is graded again where it now lies, and the result's grading says as gradePlot does"
   " what that changed. It stays graded on the ground it is graded on; `objectName` grades it on another (moved onto another terrain"
@@ -2553,9 +2558,12 @@ async def gradePlot(context: Context, address: str, objectName: str, margin: flo
 async def assessPlot(context: Context, address: str):
   """Measure a plot where it lies: the ground under it (unevenness, tilt, the cut and fill to level it), what rises and falls beyond each
   side, its entrance point (for walkRoute from the street), water beside it, how high it stands over its surroundings, how enclosed it
-  is, rock over it, its nearest plot and route, how much of the zone's main routes see it, and overlaps; and the features those
-  suggest, for pricing (set them with editPlot features). A view is never suggested: judge it from pictures taken at the plot's edge,
-  looking out as its owner would. The measures check what a picture shows; look at the plot too."""
+  is, rock or roof over it (overhead: the height of its underside over the plot's center, or null), its nearest plot and route, how
+  much of the zone's main routes see it, and overlaps; and the features those suggest, for pricing (set them with editPlot features).
+  The ground under it, beyond its sides, and at its entrance is looked up from the plot's own height (ground standing above it, or the
+  footing under a step over it), so a plot in a cave measures the cave's floor and walls, not the hill over it. A view is never
+  suggested: judge it from pictures taken at the plot's edge, looking out as its owner would. The measures check what a picture shows;
+  look at the plot too."""
   return await callBridge(context, "assessPlot", {"address": address})
 
 
@@ -2569,7 +2577,8 @@ async def layOutPlots(
   `setback` from the path on `side` (left, right, or both, looking along the path), facing the street, addressed "<number> <street>".
   Every place takes the next number from firstNumber in order along the street (left before right at each station) whether or not a
   plot fits there, so an address says where along the street it stands and, on both sides, each side keeps its own odd or even
-  numbers; places where a plot would overlap another or find no ground are skipped and listed with the address they leave free.
+  numbers; places where a plot would overlap another, find no ground, or find rock over ground (a cave under a hill: place those with
+  placePlot and their height) are skipped and listed with the address they leave free.
   Refused when any of its addresses is taken. Then look at each plot and adjust it (editPlot, gradePlot, assessPlot): a street of
   identical plots is a draft, not a neighborhood."""
   if kind not in ("player", "guild"):

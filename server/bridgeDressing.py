@@ -142,6 +142,14 @@ def scatterInRegion(sourceObject, region, density, minimumSpacing, yawRangeDegre
   destination = bridgeObjects.targetCollection(collection)
   castHeight = castFromHeight if castFromHeight is not None else bridgeMeshAccess.sceneTopHeight() + castLift
   surfaces = landingSurfaces(surfaceObjects, withDescendants(source))
+  if castFromHeight is None:
+    stacked = [(point, levels) for point in candidates if (levels := bridgeMeshAccess.rockOverGround(surfaces.castWithNormal, point[0], point[1], castHeight)) is not None]
+    if stacked:
+      point, levels = stacked[0]
+      raise ValueError(
+        f"At {len(stacked)} of the region's {len(candidates)} points {bridgeMeshAccess.describeRockOverGround([round(float(value), 1) for value in point], levels)}, so where"
+        " to scatter is a choice: give castFromHeight, just under the rock's underside for the ground under it or above the top for its top"
+      )
   rejected = {"noSurface": 0, "tooSteep": 0, "nearAvoidedObject": 0}
   landings = []
   depsgraph = bpy.context.evaluated_depsgraph_get()

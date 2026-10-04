@@ -74,6 +74,10 @@ class Ground:
     location, normal, _, _ = self.tree.ray_cast(mathutils.Vector((x, y, level + shoreTuck - surfaceContact)), down, shoreTuck)
     return location is not None and normal.z > 0
 
+  def castWithNormal(self, origin, direction, distance):
+    location, normal, _, _ = self.tree.ray_cast(origin, direction, distance)
+    return None if location is None else (location, normal)
+
   def heightBelow(self, x, y, z):
     location, _, _, _ = self.tree.ray_cast(mathutils.Vector((x, y, z)), down, reach)
     return None if location is None else location.z

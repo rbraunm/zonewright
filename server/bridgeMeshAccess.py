@@ -14,6 +14,7 @@ import numpy
 
 import bridgeCaveData
 import bridgeNoise
+import playerScale
 
 selectorKeys = (
   "all", "sphere", "box", "cylinder", "facing", "slope", "height", "nearPath", "material", "vertexGroup", "insideObject", "region", "noise",
@@ -231,6 +232,17 @@ class PlayerSurfaces:
     hit = self.castOn(origin, direction, distance)
     return hit[:2] if hit else None
 
+  def groundAtLevel(self, x, y, level):
+    """The ground at [x, y] for a player at `level` (a plot's): where the point a step over the level lies inside a solid, the top of
+    it (ground standing above the level); otherwise the footing under that point, so rock over a cave's floor is never taken for its
+    ground. None where neither is found."""
+    origin = mathutils.Vector((x, y, level + playerScale.stepHeight))
+    above = self.castWithNormal(origin, up, waterReach)
+    if above is not None and above[1].z > 0 and self.enclosedAround(origin):
+      return above[0].z
+    footing = self.footingBelow(origin, waterReach)
+    return None if footing is None else footing.z
+
   def castOn(self, origin, direction, distance):
     """castWithNormal's hit with the name of the object it belongs to, or None."""
     nearest = None
@@ -243,6 +255,31 @@ class PlayerSurfaces:
       if along <= distance and (nearest is None or along < nearest[0]):
         nearest = (along, hit, (matrix.to_3x3().inverted().transposed() @ normal).normalized(), name)
     return nearest[1:] if nearest else None
+
+
+def rockOverGround(castWithNormal, x, y, top):
+  """Looking down at [x, y] from `top` (castWithNormal(origin, direction, distance) gives (point, normal) or None): where the highest
+  ground is the top of rock with room for a player between its underside and ground under it (a hill over a cave, an overhang), the
+  heights of the top, the underside, and that ground; None where the column holds one level of ground (a block resting on the ground
+  is one)."""
+  highest = castWithNormal(mathutils.Vector((x, y, top)), down, waterReach)
+  if highest is None:
+    return None
+  underside = castWithNormal(highest[0] + down * castNudge, down, waterReach)
+  if underside is None or underside[1].z >= 0:
+    return None
+  floor = castWithNormal(underside[0] + down * castNudge, down, waterReach)
+  if floor is None or underside[0].z - floor[0].z < playerScale.playerHeight:
+    return None
+  return highest[0].z, underside[0].z, floor[0].z
+
+
+def describeRockOverGround(where, levels):
+  top, underside, floor = levels
+  return (
+    f"rock lies over ground at {where}: the highest ground there, at {top:.1f}, is the top of rock whose underside is at {underside:.1f},"
+    f" over ground at {floor:.1f} (a cave or an overhang)"
+  )
 
 
 def swimSurfaces():

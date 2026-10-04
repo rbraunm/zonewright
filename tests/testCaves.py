@@ -1,4 +1,5 @@
 import json
+import re
 
 import numpy
 
@@ -310,6 +311,50 @@ def testATracedGalleryIsEvenlyGradedInsideTheRockByItsShareLevelAcrossAndWalkedU
   assert walk["walkable"] is True and walk["problems"] == []
   covered = [row["headroom"] is not None for row in walk["profile"]]
   assert 2 * sum(covered) >= len(covered)
+
+
+def testUnderRockPlotsAndDroppedThingsFindTheCaveFloorNotTheHill(stageBlenderServer, tmp_path):
+  housing = {"role": "featured", "intent": "plots in caves", "placement": "world", "plotBudget": {"player": 2, "guild": 0}}
+  plot = {"address": "1 Hall", "center": [0, 170], "facingDegrees": 180, "size": [80, 80]}
+  readColumn = r"""
+import mathutils
+depsgraph = bpy.context.evaluated_depsgraph_get()
+up, down = mathutils.Vector((0, 0, 1)), mathutils.Vector((0, 0, -1))
+result = {
+  'ceiling': bpy.context.scene.ray_cast(depsgraph, mathutils.Vector((0, 170, 10)), up)[1].z,
+  'hill': bpy.context.scene.ray_cast(depsgraph, mathutils.Vector((0, 170, 1000)), down)[1].z,
+}
+"""
+  readPebbles = "result = sorted(round(pebble.location.z, 2) for pebble in bpy.data.collections['pebbles'].objects)"
+
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    await session.expectSuccess("cutCave", hall)
+    await session.expectSuccess("setZoneHousing", housing)
+    unseated = await session.expectError("placePlot", plot)
+    await session.expectSuccess("placePlot", plot | {"height": 8})
+    assessed = await session.expectSuccess("assessPlot", {"address": "1 Hall"})
+    column = (await session.expectSuccess("runPython", {"code": readColumn}))["result"]
+    await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "boulder", "size": [4, 4, 4], "location": [30, 220, 28]})
+    settled = await session.expectSuccess("settleObjects", {"names": ["boulder"]})
+    await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "pebble", "size": [1, 1, 1], "location": [150, -120, 0]})
+    scatter = {"sourceObject": "pebble", "region": {"circle": {"center": [-20, 230], "radius": 15}}, "density": 100, "minimumSpacing": 2, "collection": "pebbles"}
+    unscattered = await session.expectError("scatterInRegion", scatter)
+    scattered = await session.expectSuccess("scatterInRegion", scatter | {"castFromHeight": 40})
+    pebbles = (await session.expectSuccess("runPython", {"code": readPebbles}))["result"]
+    return unseated, assessed, column, settled, unscattered, scattered, pebbles
+
+  unseated, assessed, column, settled, unscattered, scattered, pebbles = stageBlenderServer.session(steps)
+  # Under the hill stands the room: placing a plot without its height is refused, naming the hill's top, the rock's underside, and the floor.
+  named = re.search(r"at (-?\d+\.\d), is the top of rock whose underside is at (-?\d+\.\d), over ground at (-?\d+\.\d)", unseated)
+  assert named is not None and numpy.allclose([float(value) for value in named.groups()], [column["hill"], column["ceiling"], 8.0], atol=0.051)
+  # Placed on the floor, it is measured there: its ground is the floor and the rock over it is the room's ceiling.
+  assert abs(assessed["under"]["lowest"] - 8) <= 1 and abs(assessed["under"]["highest"] - 8) <= 1 and abs(assessed["overhead"] - column["ceiling"]) <= 1
+  # A boulder let go 20 over the floor lands on it, not on the hill.
+  assert settled["settled"][0]["spans"][0] == 8.0 and settled["settled"][0]["under"] == [8.0, 8.0]
+  # Scattering over the room needs to be told which ground; told to drop from under the ceiling, every pebble lands on the floor.
+  assert "rock lies over ground" in unscattered and "give castFromHeight" in unscattered
+  assert scattered["placed"] == scattered["targetCount"] > 0 and pebbles == [8.0] * scattered["placed"]
 
 
 def testACaveExportsAndIsWalkedAfterImport(stageBlenderServer, tmp_path):

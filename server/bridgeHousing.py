@@ -19,6 +19,7 @@ import bridgeObjects
 import bridgePasses
 import bridgeShaping
 import bridgeWater
+import playerScale
 
 housingProperty = "zonewrightHousing"
 plotProperty = "zonewrightPlot"
@@ -59,8 +60,8 @@ guideLift = 0.4
 # stands on the plot's edge.
 entranceSpan = 12.0
 entranceDepth = 6.0
-# Ground under a plot is looked for from this far above the plot's height: an arch or overhang higher up is not its ground.
-groundCastHeight = 50.0
+# assessPlot counts rock or roof this far over a plot's center as cover.
+overheadReach = 1000.0
 footprintStep = 8.0
 gradeBatterReach = 600.0
 gradeMinimumReach = 20.0
@@ -316,11 +317,22 @@ def ungradedGround():
       key.mute = False
 
 
-def seatHeights(centers):
-  """The ungraded ground's height under each center, None where there is none."""
+def seatGround(centers):
+  """The ungraded ground's height under each center (None where there is none), and where rock lies over ground there, its levels
+  (bridgeMeshAccess.rockOverGround)."""
   with ungradedGround() as ground:
     top = bridgeMeshAccess.sceneTopHeight() + 1
-    return [ground.heightBelow(x, y, top) for x, y in centers]
+    return [(ground.heightBelow(x, y, top), bridgeMeshAccess.rockOverGround(ground.castWithNormal, x, y, top)) for x, y in centers]
+
+
+def seatHeight(center):
+  """The ungraded ground's height at a plot's center; refused where there is none, or where rock lies over ground and either could be meant."""
+  height, levels = seatGround([center])[0]
+  if height is None:
+    raise ValueError(f"No ground under {center} to set the plot on")
+  if levels is not None:
+    raise ValueError(f"A plot's ground is a choice here: {bridgeMeshAccess.describeRockOverGround(center, levels)}; give the plot its height, the ground under the rock or its top")
+  return height
 
 
 def requireSize(kind, size):
@@ -395,9 +407,7 @@ def placePlot(address, kind, center, facingDegrees, size, height, items, pets, t
   }
   requireAllowances(spec)
   if height is None:
-    height = seatHeights([center])[0]
-    if height is None:
-      raise ValueError(f"No ground under {center} to set the plot on")
+    height = seatHeight(center)
   plot = bpy.data.objects.new(address, guideMesh(address, kind, size))
   plot[plotProperty] = json.dumps(spec)
   plot[bridgeMeshAccess.guideProperty] = True
@@ -471,10 +481,7 @@ def editPlot(address, newAddress, kind, center, facingDegrees, size, height, ite
       raise ValueError(f"center is [x, y], got {center!r}")
     location[:2] = center
     if height is None:
-      found = seatHeights([center])[0]
-      if found is None:
-        raise ValueError(f"No ground under {center} to set the plot on")
-      location[2] = found
+      location[2] = seatHeight(center)
   if height is not None:
     location[2] = height
   facing = facingOf(plot) if facingDegrees is None else facingDegrees
@@ -827,9 +834,11 @@ def assessPlot(address):
   across, along = spec["size"]
   center = numpy.array(plot.matrix_world.translation)
   ground = bridgeWater.Ground()
-  castFrom = center[2] + groundCastHeight
+  # The ground under, beside, and in front of the plot is looked up from its own height, so a plot in a cave measures the cave, not the
+  # hill over it.
+  surfaces = bridgeMeshAccess.PlayerSurfaces()
   samples = toWorld(plot, localGrid(across, along, footprintStep))
-  heights = numpy.array([numpy.nan if (height := ground.heightBelow(x, y, castFrom)) is None else height for x, y in samples])
+  heights = numpy.array([numpy.nan if (height := surfaces.groundAtLevel(x, y, center[2])) is None else height for x, y in samples])
   onGround = ~numpy.isnan(heights)
   under = {"samples": len(samples), "offGround": int((~onGround).sum())}
   if onGround.any():
@@ -849,7 +858,7 @@ def assessPlot(address):
     for distance in sideProbes:
       for offset in (-0.6, 0.0, 0.6):
         x, y = center[:2] + outward * (halfDepth + distance) + sideways * offset * halfWidth
-        height = ground.heightBelow(x, y, center[2] + 200)
+        height = surfaces.groundAtLevel(x, y, center[2])
         relative.append(numpy.nan if height is None else height - center[2])
     relative = numpy.array(relative)
     finite = relative[~numpy.isnan(relative)]
@@ -859,7 +868,7 @@ def assessPlot(address):
       "offGround": int(numpy.isnan(relative).sum()),
     }
   entrance = center[:2] + front * (along / 2 + 10)
-  entranceGround = ground.heightBelow(*entrance, center[2] + 200)
+  entranceGround = surfaces.groundAtLevel(*entrance, center[2])
   water = None
   bodies = [body for body in bpy.context.scene.objects if bridgeMeshAccess.waterProperty in body and not body.hide_render]
   if bodies:
@@ -877,7 +886,8 @@ def assessPlot(address):
       direction = mathutils.Vector((math.sin(angle) * math.cos(elevation), math.cos(angle) * math.cos(elevation), math.sin(elevation)))
       blocked += ground.tree.ray_cast(eye, direction, enclosureReach)[0] is not None
   enclosure = round(blocked / (2 * enclosureDirections), 2)
-  overhead = ground.tree.ray_cast(mathutils.Vector((center[0], center[1], center[2] + 10)), mathutils.Vector((0, 0, 1)), 1000)[0] is not None
+  cover = surfaces.cast(mathutils.Vector((center[0], center[1], center[2] + playerScale.stepHeight)), bridgeMeshAccess.up, overheadReach)
+  overhead = None if cover is None else round(cover.z, 2)
   others = [other for other in plotObjects() if other != plot]
   nearestPlot = min((float(numpy.linalg.norm(numpy.array(other.matrix_world.translation[:2]) - center[:2])) for other in others), default=None)
   routes = housing["routes"]
@@ -910,8 +920,8 @@ def assessPlot(address):
     suggested.append({"feature": "secluded", "because": f"nearest plot {None if nearestPlot is None else round(nearestPlot)} units off, enclosed on {round(enclosure * 100)}% of sides"})
   if prominence is not None and prominence["routeSamplesInRange"] >= prominentSamples and prominence["share"] >= prominentShare:
     suggested.append({"feature": "prominent", "because": f"seen from {prominence['seenFrom']} of {prominence['routeSamplesInRange']} route points within {prominenceRange:.0f}"})
-  if overhead:
-    suggested.append({"feature": "sheltered", "because": "rock or roof over its center"})
+  if overhead is not None:
+    suggested.append({"feature": "sheltered", "because": f"rock or roof over its center at {overhead}"})
   return {
     "address": address, "under": under, "sides": sides,
     "entrance": {"point": [round(float(value), 1) for value in entrance], "ground": None if entranceGround is None else round(entranceGround, 2)},
@@ -957,11 +967,17 @@ def layOutPlots(street, path, side, kind, size, firstNumber, gap, setback, items
   if taken:
     raise ValueError(f"Addresses {taken} are taken; remove those plots or start from another firstNumber")
   placed, skipped = [], []
-  for (address, center, facing), height in zip(places, seatHeights([center for _, center, _ in places])):
+  for (address, center, facing), (height, levels) in zip(places, seatGround([center for _, center, _ in places])):
     entry = {"address": address, "center": [round(float(value), 1) for value in center]}
     overlapping = [plot.name for plot in plotObjects() if overlapDepth(footprintOf(center, facing, (across, along)), footprint(plot)) > 0.01]
-    if height is None or overlapping:
-      skipped.append(entry | {"reason": "no ground under it" if height is None else f"overlaps {overlapping}"})
+    if height is None:
+      skipped.append(entry | {"reason": "no ground under it"})
+      continue
+    if levels is not None:
+      skipped.append(entry | {"reason": bridgeMeshAccess.describeRockOverGround(entry["center"], levels) + "; place it with placePlot and its height"})
+      continue
+    if overlapping:
+      skipped.append(entry | {"reason": f"overlaps {overlapping}"})
       continue
     result = placePlot(address, kind, center.tolist(), facing, [across, along], height, items, pets, tags, None, borderFolder, collection)
     placed.append({key: result[key] for key in ("address", "center", "facingDegrees", "pricePlatinum")})

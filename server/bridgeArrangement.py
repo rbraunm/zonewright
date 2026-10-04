@@ -204,10 +204,19 @@ def restingLift(sceneObject, surfaces, castHeight):
   return max(gaps) if gaps else None
 
 
+def dropHeight(sceneObject, surfaces, castHeight):
+  """Where an object drops from: from its own top where rock lies over it (in a cave, under an overhang), so it lands on the ground
+  under that rock; else from above the whole scene."""
+  _, top, samples = footprint(sceneObject)
+  middle = numpy.mean(samples, axis=0)
+  location, normal, _, _ = surfaces.ray_cast(mathutils.Vector((middle[0], middle[1], top)), mathutils.Vector((0.0, 0.0, 1.0)), castHeight)
+  return top if location is not None and normal.z < 0 else castHeight
+
+
 def settleObjects(names, depth, tiltShare, onto):
-  """Drop each object from above the whole scene by its footprint: onto the ground, sunk to the lowest ground under its footprint so no
-  edge floats; or onto a named object, resting on it with no vertex below its surface; then `depth` lower. tiltShare (0 to 1) turns it
-  that share of the way toward the slope under it, keeping its heading."""
+  """Drop each object by its footprint, from above the whole scene, or from where it is when rock lies over it: onto the ground, sunk
+  to the lowest ground under its footprint so no edge floats; or onto a named object, resting on it with no vertex below its surface;
+  then `depth` lower. tiltShare (0 to 1) turns it that share of the way toward the slope under it, keeping its heading."""
   if not 0 <= tiltShare <= 1:
     raise ValueError(f"tiltShare is 0 to 1, got {tiltShare}")
   objects = [bridgeMeshAccess.requireObject(name) for name in names]
@@ -216,10 +225,12 @@ def settleObjects(names, depth, tiltShare, onto):
   down = mathutils.Vector((0.0, 0.0, -1.0))
   settled, missed = [], []
   for sceneObject in objects:
+    bpy.context.view_layer.update()
+    dropFrom = dropHeight(sceneObject, surfaces, castHeight)
     for _ in range(settleRounds if tiltShare > 0 else 1):
       bpy.context.view_layer.update()
       _, _, samples = footprint(sceneObject)
-      hits = [surfaces.ray_cast(mathutils.Vector((x, y, castHeight)), down, castHeight + bridgeMeshAccess.waterReach)[0] for x, y in samples]
+      hits = [surfaces.ray_cast(mathutils.Vector((x, y, dropFrom)), down, dropFrom + bridgeMeshAccess.waterReach)[0] for x, y in samples]
       hits = [location for location in hits if location is not None]
       if not hits:
         break
@@ -236,7 +247,7 @@ def settleObjects(names, depth, tiltShare, onto):
       if onto is None:
         lift = min(heights) - footprint(sceneObject)[0]
       else:
-        lift = restingLift(sceneObject, surfaces, castHeight)
+        lift = restingLift(sceneObject, surfaces, dropFrom)
         if lift is None:
           hits = []
           break
