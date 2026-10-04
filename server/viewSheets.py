@@ -1,9 +1,11 @@
 """Sheets of preview renders: the same view before and after a change with what changed between them, views around a subject, review
-cameras, and frames along a route."""
+cameras, and frames along a route; and object names written on a render."""
 from pathlib import Path
 
 import numpy
 from PIL import Image, ImageDraw, ImageFont
+
+import planDrawing
 
 cellSize = (640, 360)
 jpegQuality = 90
@@ -12,6 +14,10 @@ labelHeight = 20
 lineHeight = 17
 backgroundColor = (40, 40, 40)
 labelColor = (235, 235, 235)
+nameColor = (20, 20, 20)
+nameSize = 15
+markRadius = 3
+markColor = (255, 255, 255)
 # A pixel counts as changed when a channel moved more than this (of 255); identical input renders byte-identical, so anything above
 # antialiasing noise is a real change.
 changeThreshold = 6
@@ -57,6 +63,24 @@ def writeGrid(cells, columns, outputPath):
       draw.text((left, top + height + 2 + line * lineHeight), text, fill=labelColor, font=font)
   sheet.save(outputPath, "JPEG", quality=jpegQuality)
   return {"width": sheet.width, "height": sheet.height}
+
+
+def writeNames(path, places):
+  """Write each object's name by its place on a render ([{object, at: [x, y]}]): a mark on the place and the name just above it,
+  moved the least it can to stay clear of the other names and marks."""
+  with Image.open(path) as opened:
+    image = opened.convert("RGB")
+  draw = ImageDraw.Draw(image)
+  board = planDrawing.LabelBoard(draw, image.size)
+  for place in places:
+    x, y = place["at"]
+    mark = [x - markRadius, y - markRadius, x + markRadius, y + markRadius]
+    draw.ellipse(mark, fill=markColor, outline=nameColor)
+    board.avoid(mark)
+  for place in places:
+    x, y = place["at"]
+    board.place((x, y - markRadius - nameSize // 2 - 3), place["object"], nameColor, nameSize)
+  image.save(path, "PNG")
 
 
 def compareSheet(beforePath, afterPath, outputPath, labels):

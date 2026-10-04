@@ -2,12 +2,17 @@ import io
 import math
 from pathlib import Path
 
+import numpy
 from PIL import Image
 
 from testModelsAndDressing import freshScene
 from testReviewViews import crateScene, environment
 
 longNote = "The crate from the south, low over the ground: does it sit on the grass, and does the grass run on behind it to the edge"
+
+
+def pixelsOf(image):
+  return numpy.asarray(Image.open(io.BytesIO(image)).convert("RGB"), dtype=numpy.int64)
 
 
 def excludedFor(report, reason):
@@ -114,3 +119,46 @@ def testReviewRoutesWalkByNameAndRenderAsAStripOfEyeLevelFrames(stageBlenderServ
   assert "more than 16 on a sheet" in tooMany and "spacing of at least" in tooMany
   assert excludedFor(exported, "a guide") == ["offLedge"]
   assert deleted == {"deleted": ["offLedge"], "remaining": []} and "No review route named 'offLedge'" in gone
+
+
+labelScene = [
+  ("crate", "cube", [10, 10, 10], [40, 20, 0]), ("pillar", "cylinder", [4, 4, 30], [-45, 30, 0]), ("wall", "cube", [40, 2, 20], [0, -10, 0]),
+  ("hidden", "cube", [6, 6, 6], [0, 10, 0]),
+]
+southLow = {"eye": [0, -60, 6], "target": [0, 40, 6]}
+
+
+def testLabelsNameOnlyWhatTheViewShowsAndTheObjectsShadingColorsEachObject(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [200, 200], "spacing": 8, "location": [0, 0, 0], "collection": "terrain"})
+    for name, kind, size, location in labelScene:
+      await session.expectSuccess("createPrimitive", {"kind": kind, "name": name, "size": size, "location": location} | ({"segments": 12} if kind == "cylinder" else {}))
+    await session.expectSuccess("createRegion", {"name": "yard", "outline": [[-50, -50], [50, -50], [50, 50], [-50, 50]], "bottom": -5, "top": 40, "intent": "a yard"})
+    await session.expectSuccess("setZoneProperties", environment)
+    labelled = await session.expectImage("renderView", {"view": southLow, "labels": ["crate", "pillar", "hidden", "wall"]})
+    plain = await session.expectImage("renderView", {"view": southLow})
+    picks = {place["object"]: await session.expectSuccess("pick", {"view": southLow, "pixel": place["at"]}) for place in labelled[1]["labels"]["shown"]}
+    objects = await session.expectImage("renderView", {"view": southLow, "shading": "objects"})
+    unknown = await session.expectError("renderView", {"view": southLow, "labels": ["nope"]})
+    region = await session.expectError("renderView", {"view": southLow, "labels": ["yard"]})
+    return labelled, plain, picks, objects, unknown, region
+
+  labelled, plain, picks, objects, unknown, region = stageBlenderServer.session(steps)
+  places = labelled[1]["labels"]
+  # The box behind the wall is not shown, so it gets no name; each name is written by a mark on its own object.
+  assert [place["object"] for place in places["shown"]] == ["crate", "pillar", "wall"] and places["notVisible"] == ["hidden"]
+  for place in places["shown"]:
+    assert picks[place["object"]]["object"] == place["object"]
+    x, y = place["at"]
+    assert pixelsOf(labelled[0])[y, x].tolist() == [255, 255, 255] and pixelsOf(plain[0])[y, x].tolist() != [255, 255, 255]
+  assert "No object named 'nope'" in unknown and "'yard' draws nothing in views" in region
+  # Each object the view shows takes its own color, the largest first, and the crate's face toward the camera (south, away from the
+  # northwest light) draws its color at the shading's ambient share.
+  legend = objects[1]["objects"]["legend"]
+  assert [entry["object"] for entry in legend][0] == "ground" and {entry["object"] for entry in legend} == {"ground", "crate", "pillar", "wall"}
+  assert len({entry["color"] for entry in legend}) == 4 and [entry["share"] for entry in legend] == sorted([entry["share"] for entry in legend], reverse=True)
+  crate = next(entry for entry in legend if entry["object"] == "crate")
+  x, y = next(place["at"] for place in places["shown"] if place["object"] == "crate")
+  expected = numpy.array([int(crate["rgb"][index:index + 2], 16) for index in (1, 3, 5)]) * 0.6
+  assert numpy.abs(pixelsOf(objects[0])[y, x] - expected).max() <= 2, (pixelsOf(objects[0])[y, x], expected)

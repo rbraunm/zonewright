@@ -174,6 +174,7 @@ def readPart(part, depsgraph):
       "edges": readArray(mesh.edges, "vertices", 2), "triangleLoops": readArray(mesh.loop_triangles, "loops", 3),
       "trianglePolygons": readArray(mesh.loop_triangles, "polygon_index"),
       "uvs": readArray(mesh.uv_layers.active.data, "uv", 2, numpy.float64) if mesh.uv_layers.active is not None else None,
+      "cornerNormals": readArray(mesh.corner_normals, "vector", 3, numpy.float64),
       "materials": [slot.material for slot in evaluated.material_slots],
     }
   finally:
@@ -598,9 +599,9 @@ def collectZoneExport(outputFolder, zoneName, purpose):
   return {"report": report, "collected": None if report["failures"] else bridgeExport.collectZoneExport(outputFolder, zoneName)}
 
 
-def coverageMesh(data, statuses):
-  """A copy of an exported mesh's evaluated faces, each colored by its coverage status."""
-  mesh = bpy.data.meshes.new(bridgeViews.previewName + "Coverage")
+def meshFromData(data, name):
+  """A mesh of the faces readPart read, in the part's own space, shaded with the part's own normals."""
+  mesh = bpy.data.meshes.new(name)
   mesh.vertices.add(len(data["positions"]))
   mesh.vertices.foreach_set("co", data["positions"].ravel())
   mesh.loops.add(len(data["loopVertices"]))
@@ -608,6 +609,14 @@ def coverageMesh(data, statuses):
   mesh.polygons.add(len(data["loopStarts"]))
   mesh.polygons.foreach_set("loop_start", data["loopStarts"].astype(numpy.int32))
   mesh.update(calc_edges=True)
+  if len(data["loopStarts"]):
+    mesh.normals_split_custom_set(data["cornerNormals"])
+  return mesh
+
+
+def coverageMesh(data, statuses):
+  """A copy of an exported mesh's evaluated faces, each colored by its coverage status."""
+  mesh = meshFromData(data, bridgeViews.previewName + "Coverage")
   palette = numpy.array([(*coverageColors[name], 1.0) for name in statusNames], dtype=numpy.float32)
   mesh.attributes.new(coverageAttributeName, "FLOAT_COLOR", "FACE").data.foreach_set("color", palette[statuses].ravel())
   return mesh

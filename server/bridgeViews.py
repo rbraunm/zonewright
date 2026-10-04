@@ -14,6 +14,7 @@ import bridgeExportChecks
 import bridgeMeshAccess
 import bridgeModels
 import bridgeReviewGuides
+import bridgeShadings
 import bridgeSwim
 import skyDrawing
 from playerScale import swimEyeAboveSurface
@@ -47,7 +48,8 @@ figureStepDrop = 4.0
 figureMinimumDistance = 3.0
 figureSideOffset = 1.5
 mapClearance = 100.0
-viewShadings = ("client", "layout", "relief", "coverage")
+valueShadings = ("objects",)
+viewShadings = ("client", "layout", "relief", "coverage") + valueShadings
 # The sky is soft everywhere, so an equirectangular image at about a fifth of a degree a pixel draws it.
 skyImageHeight = 1024
 # Layout shading lights from the northwest, as relief maps do, so slopes read the same whatever the zone's sun.
@@ -550,23 +552,24 @@ def roundVector(vector, digits=3):
   return [round(float(component), digits) for component in vector]
 
 
-def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes):
+def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes, labels):
   if shading not in viewShadings:
     raise ValueError(f"shading must be one of {list(viewShadings)}, got '{shading}'")
-  # A map, or a layout, relief, or coverage drawing, is for reading shape or coverage, so none is fogged nor has a sky.
+  # A map, or a drawing for reading shape, coverage, or values, is neither fogged nor has a sky.
   shapeOnly = "map" in view or shading != "client"
   preview = PreviewScene(sourceScene, zone | {"fogOn": False} if shapeOnly else zone, guides, None if shapeOnly else sky)
   try:
     description = placeCamera(preview, view, figureModel)
     preview.drawSky()
+    if shading != "client" and preview.camera.data.type != "ORTHO":
+      preview.camera.data.clip_end = max((corner - preview.camera.location).length for corner in sceneCorners(preview)) + mapClearance
+    if labels is not None or shading in valueShadings:
+      description |= bridgeShadings.prepareView(preview, shading, labels, os.path.splitext(outputPath)[0] + "_pass.exr")
     if shading == "coverage":
       description["coverage"] = bridgeExportChecks.drawCoverage(preview)
-    elif shading != "client":
+    elif shading in ("layout", "relief"):
       description["heightRange"] = list(applyLayoutShading(preview, bandHeight, layoutHeightColors if shading == "layout" else reliefHeightColors))
       description["bandHeight"] = bandHeight
-    if shading != "client":
-      if preview.camera.data.type != "ORTHO":
-        preview.camera.data.clip_end = max((corner - preview.camera.location).length for corner in sceneCorners(preview)) + mapClearance
     preview.scene.render.filepath = outputPath
     start = time.perf_counter()
     bpy.ops.render.render(write_still=True, scene=preview.scene.name)
