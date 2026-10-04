@@ -260,7 +260,8 @@ def otherRock(sceneObject):
   """What else in the terrain collection could stand over a route on sceneObject: rock masses, arches."""
   collection = bpy.data.collections.get(bridgeExport.terrainCollectionName)
   others = [] if collection is None else [member for member in collection.all_objects if member != sceneObject and bridgeMeshAccess.isPlayerSolid(member) and member.type == "MESH"]
-  return bridgeMeshAccess.PlayerSurfaces(objects=others) if others else None
+  trees = bridgeMeshAccess.solidTrees(others)
+  return bridgeMeshAccess.PlayerSurfaces(trees=trees) if trees else None
 
 
 def planRoute(sceneObject, name, definition, ground, faces, edgeLength):

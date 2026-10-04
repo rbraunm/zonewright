@@ -187,7 +187,7 @@ def testEveryLookupForGroundPassesThroughACanopyAndWhatIsMarkedPassable(stageBle
     await session.expectSuccess("assignMaterial", {"objectName": "canopy", "materialName": "leaves"})
     await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "moss", "size": [20, 20, 8], "location": [60, 60, 0]})
     await session.expectSuccess("markPassable", {"objects": ["moss"]})
-    for name, location in (("stone", [5, 5, 40]), ("pebble", [-5, -5, 40])):
+    for name, location in (("stone", [5, 5, 40]), ("pebble", [-5, -5, 40]), ("nest", [-10, 10, 40])):
       await session.expectSuccess("createPrimitive", {"kind": "cube", "name": name, "size": [2, 2, 2], "location": location})
     await session.expectSuccess("setZoneProperties", {
       "ambientColor": [0.3, 0.3, 0.3], "specialAmbientColor": [0, 0, 0], "bounceColor": [0, 0, 0], "sunColor": [0.6, 0.6, 0.6],
@@ -199,13 +199,14 @@ def testEveryLookupForGroundPassesThroughACanopyAndWhatIsMarkedPassable(stageBle
     sketched = await session.expectSuccess("sketch", {"sheet": "plot", "shapes": [{"name": "under", "kind": "point", "at": [0, 0]}, {"name": "onMoss", "kind": "point", "at": [60, 60]}]})
     placed = await session.expectSuccess("placeOnSurface", {"objectNames": ["stone"]})
     settled = await session.expectSuccess("settleObjects", {"names": ["pebble"]})
+    nested = await session.expectSuccess("placeOnSurface", {"objectNames": ["nest"], "surfaceObjects": ["canopy"]})
     walked = await session.expectSuccess("walkRoute", {"path": [[-50, 0, 0], [50, 0, 0]]})
     _, section = await session.expectImage("renderSection", {"start": [-50, 0], "end": [50, 0], "bottom": -10, "top": 40})
     await session.expectSuccess("deleteObjects", {"names": ["canopy"]})
     _, bareSection = await session.expectImage("renderSection", {"start": [-50, 0], "end": [50, 0], "bottom": -10, "top": 40})
-    return under, mossy, measured, sketched, placed, settled, walked, section, bareSection
+    return under, mossy, measured, sketched, placed, settled, nested, walked, section, bareSection
 
-  under, mossy, measured, sketched, placed, settled, walked, section, bareSection = stageBlenderServer.session(steps)
+  under, mossy, measured, sketched, placed, settled, nested, walked, section, bareSection = stageBlenderServer.session(steps)
   # The cutout canopy 20 up and the crate marked passable are passed through by every lookup for the ground, as walkRoute passes them:
   # the views stand on the ground under them, and the stones land and settle on it.
   assert under["ground"] == [0.0, 0.0, 0.0] and under["eye"] == [0.0, 0.0, 5.5] and under["figure"] == [10.0, 0.0, 0.0]
@@ -214,5 +215,7 @@ def testEveryLookupForGroundPassesThroughACanopyAndWhatIsMarkedPassable(stageBle
   assert [shape["ground"] for shape in sketched["shapes"]] == [0.0, 0.0]
   assert placed["placements"][0]["location"] == [5.0, 5.0, 0.0] and placed["placements"][0]["surface"] == "ground"
   assert settled["settled"][0]["under"] == [0.0, 0.0] and settled["settled"][0]["spans"] == [0.0, 2.0]
+  # A surface named to place on is that surface, whole: a nest goes onto the canopy itself.
+  assert nested["placements"][0]["location"] == [-10.0, 10.0, 20.0] and nested["placements"][0]["surface"] == "canopy"
   assert walked["walkable"] and walked["lowestHeadroom"] is None and all(row["at"][2] == 0.0 for row in walked["profile"])
   assert section["groundSegments"] == bareSection["groundSegments"]

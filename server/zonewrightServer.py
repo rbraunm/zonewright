@@ -2478,7 +2478,7 @@ async def settleObjects(context: Context, names: list[str], depth: float = 0.0, 
 async def placeOnSurface(context: Context, objectNames: list[str], at: list[list[float]] | None = None, alignToNormal: bool = False, surfaceObjects: list[str] | None = None, offset: float = 0.0):
   """Drop objects, with what is parented to them, onto the surface below `at` points, or below their own origins cast from just above
   their tops, so one sunk into the ground, under an overhang, or in a cave lands on the ground beneath it. They land on what players
-  stand on (not water, faces players pass through, guides, regions, spawns, or doors), or only on surfaceObjects, never on themselves, what they carry, or each
+  stand on (not water, faces players pass through, guides, regions, spawns, or doors), or only on surfaceObjects, every face of them, never on themselves, what they carry, or each
   other; optionally tilted to the surface normal keeping their heading, then lifted `offset`. To set props by their footprint,
   settleObjects drops them from above the whole scene, or from their own tops where rock lies over them."""
   return await callBridge(context, "placeOnSurface", {"objectNames": objectNames, "at": at, "alignToNormal": alignToNormal, "surfaceObjects": surfaceObjects, "offset": offset})
@@ -2494,7 +2494,7 @@ async def scatterInRegion(
   """Scatter linked copies of an object over a region ({"circle": {center, radius}} or {"polygon": [[x,y], ...]}): `density` per 10,000
   square units, at least `minimumSpacing` apart, random yaw within yawRangeDegrees, each copy's scale the source's times a factor from
   scaleRange, dropped from `castFromHeight` (default just above the scene) onto what players stand on (not water, faces players pass
-  through, guides, regions, spawns, or doors; never the source) or only onto surfaceObjects, skipped where steeper than maximumSlopeDegrees or inside or within
+  through, guides, regions, spawns, or doors; never the source) or only onto surfaceObjects, every face of them, skipped where steeper than maximumSlopeDegrees or inside or within
   avoidClearance of any avoidObjects. Without castFromHeight, refused where rock lies over ground at any of the region's points (a
   cave under a hill, an overhang), naming one: give castFromHeight, just under the rock's underside for the ground under it, or above
   the top. Deterministic for a seed."""

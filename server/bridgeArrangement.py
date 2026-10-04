@@ -167,10 +167,11 @@ def generateCopies(source, pattern, jitter, seed, collection, settle, depth, til
 
 
 def surfacesExcept(names, onto):
-  """A BVH over what objects settle on: one named object, or what players stand on apart from the objects being settled; never the
-  faces players pass through."""
-  owners = [bridgeMeshAccess.requireObject(onto)] if onto is not None else bridgeMeshAccess.playerSolidObjects(names)
-  positions, triangles = bridgeMeshAccess.selectedTriangles(owners, bridgeMeshAccess.solidFaces)
+  """A BVH over what objects settle on: one named object, whole, or what players stand on apart from the objects being settled."""
+  if onto is not None:
+    positions, triangles = bridgeMeshAccess.partTriangles(bridgeMeshAccess.objectParts(bridgeMeshAccess.requireObject(onto)))
+  else:
+    positions, triangles = bridgeMeshAccess.selectedTriangles(bridgeMeshAccess.playerSolidObjects(names), bridgeMeshAccess.solidFaces)
   if len(triangles) == 0:
     raise ValueError("Nothing to settle onto")
   return mathutils.bvhtree.BVHTree.FromPolygons(positions.tolist(), triangles.tolist())

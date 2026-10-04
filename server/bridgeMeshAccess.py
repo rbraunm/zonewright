@@ -237,6 +237,13 @@ def solidTrees(owners):
   return trees
 
 
+def wholeTrees(owners):
+  """(owner name, world matrix, BVH tree in the mesh's own space) for each of the objects' meshes (objectParts), every face of it."""
+  bpy.context.view_layer.update()
+  depsgraph = bpy.context.evaluated_depsgraph_get()
+  return [(owner.name, matrix, mathutils.bvhtree.BVHTree.FromObject(part, depsgraph)) for owner in owners for part, matrix in objectParts(owner)]
+
+
 def selectedTriangles(owners, select):
   """The world positions of the objects' meshes (objectParts) and the triangles select(MeshFaces) picks of them, all in one."""
   bpy.context.view_layer.update()
@@ -273,14 +280,15 @@ class Footing(typing.NamedTuple):
 
 class PlayerSurfaces:
   """Ray casts against what players stand on and are blocked by, never the faces they pass through (solidTrees): playerSolidObjects
-  but excluding, or only objects, or given (object name, world matrix, BVH tree) trees."""
+  but excluding; or against objects named as the surfaces to use, whole, whatever players do there (wholeTrees); or given (object
+  name, world matrix, BVH tree) trees."""
 
   def __init__(self, excluding=(), objects=None, trees=None):
     if trees is None:
-      trees = solidTrees(playerSolidObjects(excluding) if objects is None else [sceneObject for sceneObject in objects if sceneObject.name not in excluding])
+      trees = solidTrees(playerSolidObjects(excluding)) if objects is None else wholeTrees([sceneObject for sceneObject in objects if sceneObject.name not in excluding])
     self.members = [(name, matrix, matrix.inverted(), tree) for name, matrix, tree in trees]
     if not self.members:
-      what = "the named objects have no faces players do not pass through" if objects is not None else "the scene has nothing players stand on besides water, guides, regions, spawns, doors, and what they pass through"
+      what = "the named objects have no meshes" if objects is not None else "the scene has nothing players stand on besides water, guides, regions, spawns, doors, and what they pass through"
       raise ValueError(f"Nothing to cast against: {what}" + (f" once {sorted(excluding)} are left out" if excluding else ""))
 
   def cast(self, origin, direction, distance):
