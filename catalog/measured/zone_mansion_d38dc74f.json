@@ -19760,7 +19760,8 @@
      "vertical": 0.369
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.971,
+     "solid": 0.029
     },
     "unitsPerRepeat": 21.6
    },
@@ -20664,7 +20665,8 @@
      "vertical": 0.044
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.906,
+     "solid": 0.094
     },
     "unitsPerRepeat": 2.7
    },
@@ -21686,7 +21688,7 @@
      "vertical": 0.727
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 94.8
    },
@@ -23168,7 +23170,7 @@
      "vertical": 0.986
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 81.6
    },
@@ -24376,7 +24378,7 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 48.5
    },
@@ -24711,7 +24713,8 @@
      "vertical": 0.431
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.034,
+     "solid": 0.966
     },
     "unitsPerRepeat": 1.1
    },
@@ -25333,7 +25336,8 @@
      "vertical": 0.933
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.985,
+     "solid": 0.015
     },
     "unitsPerRepeat": 21.5
    },
@@ -27219,7 +27223,7 @@
      "vertical": 0.959
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 7.2
    },
@@ -28215,7 +28219,8 @@
      "vertical": 0.587
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.012,
+     "solid": 0.988
     },
     "unitsPerRepeat": 11.3
    },
@@ -28547,7 +28552,8 @@
      "vertical": 0.684
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.501,
+     "solid": 0.499
     },
     "unitsPerRepeat": 5.0
    },
@@ -29156,7 +29162,8 @@
      "vertical": 0.066
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.935,
+     "solid": 0.065
     },
     "unitsPerRepeat": 11.2
    },
@@ -29220,7 +29227,8 @@
      "vertical": 0.461
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.256,
+     "solid": 0.744
     },
     "unitsPerRepeat": 5.5
    },
@@ -29350,7 +29358,8 @@
      "vertical": 0.567
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.149,
+     "solid": 0.851
     },
     "unitsPerRepeat": 12.1
    },
@@ -29811,7 +29820,7 @@
      "vertical": 1.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 24.1
    },
@@ -30205,7 +30214,7 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 26.7
    },
@@ -30826,7 +30835,8 @@
      "vertical": 0.958
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.006,
+     "solid": 0.994
     },
     "unitsPerRepeat": 3.2
    },
@@ -31104,12 +31114,13 @@
     "slopeShares": {
      "flat": 0.102,
      "overhang": 0.316,
-     "slope": 0.151,
-     "steep": 0.148,
+     "slope": 0.149,
+     "steep": 0.15,
      "vertical": 0.283
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.015,
+     "solid": 0.985
     },
     "unitsPerRepeat": 8.1
    },
@@ -31678,8 +31689,8 @@
     "slopeShares": {
      "flat": 0.302,
      "overhang": 0.0,
-     "slope": 0.195,
-     "steep": 0.176,
+     "slope": 0.139,
+     "steep": 0.232,
      "vertical": 0.327
     },
     "surfaces": {
@@ -32070,7 +32081,8 @@
      "vertical": 0.309
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.063,
+     "solid": 0.937
     },
     "unitsPerRepeat": 0.7
    },
@@ -33443,6 +33455,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:mansion",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "mansion"
 }

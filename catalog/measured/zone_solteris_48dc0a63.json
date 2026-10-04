@@ -12644,7 +12644,7 @@
      "vertical": 0.505
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 72.0
    },
@@ -13467,7 +13467,8 @@
      "vertical": 0.865
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.126,
+     "solid": 0.874
     },
     "unitsPerRepeat": 13.9
    },
@@ -13531,7 +13532,8 @@
      "vertical": 0.195
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.123,
+     "solid": 0.877
     },
     "unitsPerRepeat": 15.2
    },
@@ -13591,12 +13593,13 @@
     "slopeShares": {
      "flat": 0.335,
      "overhang": 0.092,
-     "slope": 0.139,
-     "steep": 0.097,
+     "slope": 0.117,
+     "steep": 0.119,
      "vertical": 0.336
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.041,
+     "solid": 0.959
     },
     "unitsPerRepeat": 11.9
    },
@@ -14822,7 +14825,7 @@
      "vertical": 0.001
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 7.9
    },
@@ -15054,7 +15057,8 @@
      "vertical": 0.058
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.328,
+     "solid": 0.672
     },
     "unitsPerRepeat": 29.9
    },
@@ -15119,7 +15123,8 @@
      "vertical": 0.779
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.141,
+     "solid": 0.859
     },
     "unitsPerRepeat": 13.1
    },
@@ -15353,12 +15358,13 @@
     "slopeShares": {
      "flat": 0.059,
      "overhang": 0.089,
-     "slope": 0.039,
+     "slope": 0.038,
      "steep": 0.02,
      "vertical": 0.793
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.116,
+     "solid": 0.884
     },
     "unitsPerRepeat": 10.6
    },
@@ -15772,7 +15778,8 @@
      "vertical": 0.623
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.177,
+     "solid": 0.823
     },
     "unitsPerRepeat": 13.5
    },
@@ -15833,7 +15840,8 @@
      "vertical": 0.5
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.043,
+     "solid": 0.957
     },
     "unitsPerRepeat": 15.9
    },
@@ -15894,7 +15902,8 @@
      "vertical": 0.367
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.005,
+     "solid": 0.995
     },
     "unitsPerRepeat": 19.8
    },
@@ -15954,7 +15963,7 @@
      "vertical": 0.402
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 20.2
    },
@@ -16059,7 +16068,7 @@
      "vertical": 0.874
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 34.3
    },
@@ -16164,7 +16173,7 @@
      "vertical": 0.729
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 21.5
    },
@@ -16269,7 +16278,7 @@
      "vertical": 0.684
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 18.5
    },
@@ -16374,7 +16383,7 @@
      "vertical": 0.925
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 38.3
    },
@@ -16546,7 +16555,8 @@
      "vertical": 0.681
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.047,
+     "solid": 0.953
     },
     "unitsPerRepeat": 10.4
    },
@@ -16659,7 +16669,8 @@
      "vertical": 0.418
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.171,
+     "solid": 0.829
     },
     "unitsPerRepeat": 76.7
    },
@@ -16885,7 +16896,8 @@
      "vertical": 0.866
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.013,
+     "solid": 0.987
     },
     "unitsPerRepeat": 14.1
    },
@@ -16950,6 +16962,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:solteris",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "solteris"
 }

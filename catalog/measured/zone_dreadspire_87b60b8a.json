@@ -26559,7 +26559,8 @@
      "vertical": 0.34
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.412,
+     "solid": 0.588
     },
     "unitsPerRepeat": 0.2
    },
@@ -26846,7 +26847,7 @@
    "transparentShare": 0.0,
    "uses": {
     "areaShare": 0.0,
-    "objectShare": 0.761,
+    "objectShare": 0.958,
     "slopeShares": {
      "flat": 0.0,
      "overhang": 0.0,
@@ -26855,9 +26856,10 @@
      "vertical": 1.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.958,
+     "solid": 0.042
     },
-    "unitsPerRepeat": 19.0
+    "unitsPerRepeat": 17.0
    },
    "width": 256
   },
@@ -27661,18 +27663,18 @@
    "transparentShare": 0.0,
    "uses": {
     "areaShare": 0.0,
-    "objectShare": 0.0,
+    "objectShare": 0.003,
     "slopeShares": {
      "flat": 0.0,
-     "overhang": 1.0,
+     "overhang": 0.997,
      "slope": 0.0,
      "steep": 0.0,
-     "vertical": 0.0
+     "vertical": 0.003
     },
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 92.4
+    "unitsPerRepeat": 34.6
    },
    "width": 256
   },
@@ -27735,7 +27737,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 78.7
+    "unitsPerRepeat": 29.4
    },
    "width": 256
   },
@@ -27789,18 +27791,19 @@
    "transparentShare": 0.0,
    "uses": {
     "areaShare": 0.0001,
-    "objectShare": 0.005,
+    "objectShare": 0.032,
     "slopeShares": {
      "flat": 0.0,
-     "overhang": 0.996,
+     "overhang": 0.974,
      "slope": 0.0,
      "steep": 0.0,
-     "vertical": 0.004
+     "vertical": 0.026
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.032,
+     "solid": 0.968
     },
-    "unitsPerRepeat": 91.2
+    "unitsPerRepeat": 34.6
    },
    "width": 256
   },
@@ -27864,7 +27867,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 23.8
+    "unitsPerRepeat": 8.9
    },
    "width": 256
   },
@@ -27977,7 +27980,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 42.4
+    "unitsPerRepeat": 15.8
    },
    "width": 256
   },
@@ -28079,7 +28082,7 @@
    "transparentShare": 0.0,
    "uses": {
     "areaShare": 0.0,
-    "objectShare": 0.53,
+    "objectShare": 0.89,
     "slopeShares": {
      "flat": 0.0,
      "overhang": 0.0,
@@ -28090,7 +28093,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 15.2
+    "unitsPerRepeat": 11.7
    },
    "width": 256
   },
@@ -28204,7 +28207,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 14.6
+    "unitsPerRepeat": 5.5
    },
    "width": 256
   },
@@ -28317,9 +28320,10 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.003,
+     "solid": 0.997
     },
-    "unitsPerRepeat": 17.8
+    "unitsPerRepeat": 6.6
    },
    "width": 256
   },
@@ -28433,7 +28437,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 29.2
+    "unitsPerRepeat": 10.9
    },
    "width": 256
   },
@@ -28546,7 +28550,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 22.1
+    "unitsPerRepeat": 8.3
    },
    "width": 256
   },
@@ -28647,19 +28651,19 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0,
-    "objectShare": 0.404,
+    "areaShare": 0.0002,
+    "objectShare": 0.829,
     "slopeShares": {
-     "flat": 0.302,
-     "overhang": 0.312,
+     "flat": 0.324,
+     "overhang": 0.334,
      "slope": 0.0,
      "steep": 0.0,
-     "vertical": 0.386
+     "vertical": 0.342
     },
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 9.9
+    "unitsPerRepeat": 6.9
    },
    "width": 256
   },
@@ -28761,18 +28765,18 @@
    "transparentShare": 0.0,
    "uses": {
     "areaShare": 0.0,
-    "objectShare": 0.485,
+    "objectShare": 0.871,
     "slopeShares": {
      "flat": 0.0,
      "overhang": 0.0,
-     "slope": 0.059,
-     "steep": 0.052,
-     "vertical": 0.888
+     "slope": 0.048,
+     "steep": 0.051,
+     "vertical": 0.9
     },
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 4.8
+    "unitsPerRepeat": 3.5
    },
    "width": 256
   },
@@ -28873,19 +28877,19 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0002,
-    "objectShare": 0.058,
+    "areaShare": 0.0003,
+    "objectShare": 0.307,
     "slopeShares": {
-     "flat": 0.005,
-     "overhang": 0.032,
+     "flat": 0.004,
+     "overhang": 0.027,
      "slope": 0.002,
      "steep": 0.0,
-     "vertical": 0.96
+     "vertical": 0.968
     },
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 14.2
+    "unitsPerRepeat": 6.2
    },
    "width": 256
   },
@@ -28988,18 +28992,19 @@
    "transparentShare": 0.0,
    "uses": {
     "areaShare": 0.0004,
-    "objectShare": 0.014,
+    "objectShare": 0.091,
     "slopeShares": {
-     "flat": 0.012,
-     "overhang": 0.193,
+     "flat": 0.022,
+     "overhang": 0.23,
      "slope": 0.0,
      "steep": 0.0,
-     "vertical": 0.795
+     "vertical": 0.748
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.062,
+     "solid": 0.938
     },
-    "unitsPerRepeat": 35.4
+    "unitsPerRepeat": 13.8
    },
    "width": 256
   },
@@ -29059,7 +29064,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 43.6
+    "unitsPerRepeat": 16.3
    },
    "width": 256
   },
@@ -29161,19 +29166,20 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0001,
-    "objectShare": 0.079,
+    "areaShare": 0.0002,
+    "objectShare": 0.38,
     "slopeShares": {
-     "flat": 0.009,
-     "overhang": 0.194,
+     "flat": 0.041,
+     "overhang": 0.181,
      "slope": 0.0,
      "steep": 0.0,
-     "vertical": 0.798
+     "vertical": 0.777
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.042,
+     "solid": 0.958
     },
-    "unitsPerRepeat": 17.6
+    "unitsPerRepeat": 8.0
    },
    "width": 256
   },
@@ -29316,7 +29322,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 1940.1
+    "unitsPerRepeat": 724.9
    },
    "width": 256
   },
@@ -29588,7 +29594,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 92.5
+    "unitsPerRepeat": 34.6
    },
    "width": 256
   },
@@ -29689,19 +29695,20 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0176,
-    "objectShare": 0.001,
+    "areaShare": 0.0175,
+    "objectShare": 0.004,
     "slopeShares": {
      "flat": 0.0,
-     "overhang": 0.012,
-     "slope": 0.002,
+     "overhang": 0.014,
+     "slope": 0.003,
      "steep": 0.032,
-     "vertical": 0.954
+     "vertical": 0.951
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.004,
+     "solid": 0.996
     },
-    "unitsPerRepeat": 714.4
+    "unitsPerRepeat": 267.4
    },
    "width": 256
   },
@@ -29814,7 +29821,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 546.9
+    "unitsPerRepeat": 204.3
    },
    "width": 256
   },
@@ -30007,7 +30014,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 670.4
+    "unitsPerRepeat": 250.5
    },
    "width": 256
   },
@@ -30120,7 +30127,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 622.3
+    "unitsPerRepeat": 232.5
    },
    "width": 256
   },
@@ -30222,7 +30229,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0174,
+    "areaShare": 0.0173,
     "objectShare": 0.0,
     "slopeShares": {
      "flat": 0.012,
@@ -30234,7 +30241,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 112.4
+    "unitsPerRepeat": 42.0
    },
    "width": 256
   },
@@ -30339,7 +30346,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.8001,
+    "areaShare": 0.7934,
     "objectShare": 0.0,
     "slopeShares": {
      "flat": 0.056,
@@ -30351,7 +30358,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 148.6
+    "unitsPerRepeat": 55.5
    },
    "width": 256
   },
@@ -30470,7 +30477,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 23.8
+    "unitsPerRepeat": 8.9
    },
    "width": 256
   },
@@ -30583,7 +30590,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 20.4
+    "unitsPerRepeat": 7.6
    },
    "width": 256
   },
@@ -30684,7 +30691,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0494,
+    "areaShare": 0.049,
     "objectShare": 0.0,
     "slopeShares": {
      "flat": 0.001,
@@ -30696,7 +30703,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 553.5
+    "unitsPerRepeat": 206.8
    },
    "width": 256
   },
@@ -30752,19 +30759,20 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0104,
-    "objectShare": 0.065,
+    "areaShare": 0.0145,
+    "objectShare": 0.332,
     "slopeShares": {
-     "flat": 0.095,
-     "overhang": 0.109,
-     "slope": 0.01,
-     "steep": 0.01,
-     "vertical": 0.776
+     "flat": 0.088,
+     "overhang": 0.118,
+     "slope": 0.016,
+     "steep": 0.021,
+     "vertical": 0.757
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.331,
+     "solid": 0.669
     },
-    "unitsPerRepeat": 77.5
+    "unitsPerRepeat": 34.5
    },
    "width": 256
   },
@@ -30817,18 +30825,18 @@
    "transparentShare": 0.0,
    "uses": {
     "areaShare": 0.0,
-    "objectShare": 0.133,
+    "objectShare": 0.524,
     "slopeShares": {
      "flat": 0.0,
-     "overhang": 0.016,
+     "overhang": 0.062,
      "slope": 0.0,
-     "steep": 0.01,
-     "vertical": 0.974
+     "steep": 0.006,
+     "vertical": 0.932
     },
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 11.1
+    "unitsPerRepeat": 5.6
    },
    "width": 256
   },
@@ -30929,19 +30937,20 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0002,
-    "objectShare": 0.086,
+    "areaShare": 0.0003,
+    "objectShare": 0.402,
     "slopeShares": {
-     "flat": 0.19,
-     "overhang": 0.627,
-     "slope": 0.0,
+     "flat": 0.213,
+     "overhang": 0.53,
+     "slope": 0.001,
      "steep": 0.0,
-     "vertical": 0.183
+     "vertical": 0.256
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.015,
+     "solid": 0.985
     },
-    "unitsPerRepeat": 22.9
+    "unitsPerRepeat": 10.6
    },
    "width": 256
   },
@@ -31050,7 +31059,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 24.4
+    "unitsPerRepeat": 9.1
    },
    "width": 256
   },
@@ -31153,18 +31162,19 @@
    "transparentShare": 0.0,
    "uses": {
     "areaShare": 0.0001,
-    "objectShare": 0.078,
+    "objectShare": 0.378,
     "slopeShares": {
-     "flat": 0.069,
-     "overhang": 0.199,
-     "slope": 0.111,
-     "steep": 0.028,
-     "vertical": 0.593
+     "flat": 0.047,
+     "overhang": 0.201,
+     "slope": 0.08,
+     "steep": 0.022,
+     "vertical": 0.65
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.019,
+     "solid": 0.981
     },
-    "unitsPerRepeat": 13.0
+    "unitsPerRepeat": 5.9
    },
    "width": 256
   },
@@ -31316,19 +31326,20 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0001,
-    "objectShare": 0.196,
+    "areaShare": 0.0002,
+    "objectShare": 0.636,
     "slopeShares": {
-     "flat": 0.076,
-     "overhang": 0.077,
+     "flat": 0.083,
+     "overhang": 0.095,
      "slope": 0.0,
-     "steep": 0.001,
-     "vertical": 0.846
+     "steep": 0.003,
+     "vertical": 0.819
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.253,
+     "solid": 0.747
     },
-    "unitsPerRepeat": 17.1
+    "unitsPerRepeat": 9.5
    },
    "width": 256
   },
@@ -31380,19 +31391,20 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0002,
-    "objectShare": 0.432,
+    "areaShare": 0.0006,
+    "objectShare": 0.845,
     "slopeShares": {
      "flat": 0.0,
      "overhang": 0.001,
      "slope": 0.0,
      "steep": 0.001,
-     "vertical": 0.999
+     "vertical": 0.997
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.056,
+     "solid": 0.944
     },
-    "unitsPerRepeat": 14.8
+    "unitsPerRepeat": 10.6
    },
    "width": 256
   },
@@ -31494,7 +31506,7 @@
    "transparentShare": 0.0,
    "uses": {
     "areaShare": 0.0,
-    "objectShare": 0.85,
+    "objectShare": 0.976,
     "slopeShares": {
      "flat": 0.0,
      "overhang": 0.0,
@@ -31505,7 +31517,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 4.8
+    "unitsPerRepeat": 4.5
    },
    "width": 256
   },
@@ -31697,7 +31709,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 29.3
+    "unitsPerRepeat": 10.9
    },
    "width": 256
   },
@@ -31800,18 +31812,18 @@
    "transparentShare": 0.0,
    "uses": {
     "areaShare": 0.0,
-    "objectShare": 0.733,
+    "objectShare": 0.952,
     "slopeShares": {
-     "flat": 0.023,
-     "overhang": 0.023,
+     "flat": 0.03,
+     "overhang": 0.03,
      "slope": 0.0,
      "steep": 0.0,
-     "vertical": 0.953
+     "vertical": 0.939
     },
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 6.6
+    "unitsPerRepeat": 5.8
    },
    "width": 256
   },
@@ -31913,19 +31925,19 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0,
-    "objectShare": 0.285,
+    "areaShare": 0.0001,
+    "objectShare": 0.74,
     "slopeShares": {
-     "flat": 0.005,
-     "overhang": 0.181,
-     "slope": 0.055,
-     "steep": 0.035,
-     "vertical": 0.724
+     "flat": 0.004,
+     "overhang": 0.162,
+     "slope": 0.071,
+     "steep": 0.076,
+     "vertical": 0.687
     },
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 17.6
+    "unitsPerRepeat": 10.9
    },
    "width": 256
   },
@@ -31978,18 +31990,18 @@
    "transparentShare": 0.329,
    "uses": {
     "areaShare": 0.0001,
-    "objectShare": 0.025,
+    "objectShare": 0.157,
     "slopeShares": {
-     "flat": 0.975,
+     "flat": 0.843,
      "overhang": 0.0,
      "slope": 0.0,
      "steep": 0.0,
-     "vertical": 0.025
+     "vertical": 0.157
     },
     "surfaces": {
      "cutout": 1.0
     },
-    "unitsPerRepeat": 13.5
+    "unitsPerRepeat": 5.4
    },
    "width": 256
   },
@@ -32217,18 +32229,19 @@
    "transparentShare": 0.0,
    "uses": {
     "areaShare": 0.0017,
-    "objectShare": 0.009,
+    "objectShare": 0.061,
     "slopeShares": {
-     "flat": 0.263,
-     "overhang": 0.311,
-     "slope": 0.09,
-     "steep": 0.0,
-     "vertical": 0.336
+     "flat": 0.249,
+     "overhang": 0.302,
+     "slope": 0.085,
+     "steep": 0.001,
+     "vertical": 0.363
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.03,
+     "solid": 0.97
     },
-    "unitsPerRepeat": 34.5
+    "unitsPerRepeat": 13.2
    },
    "width": 256
   },
@@ -32332,19 +32345,20 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0002,
-    "objectShare": 0.132,
+    "areaShare": 0.0003,
+    "objectShare": 0.522,
     "slopeShares": {
-     "flat": 0.008,
-     "overhang": 0.209,
-     "slope": 0.073,
-     "steep": 0.043,
-     "vertical": 0.669
+     "flat": 0.004,
+     "overhang": 0.17,
+     "slope": 0.051,
+     "steep": 0.077,
+     "vertical": 0.697
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.083,
+     "solid": 0.917
     },
-    "unitsPerRepeat": 22.9
+    "unitsPerRepeat": 11.5
    },
    "width": 256
   },
@@ -32448,18 +32462,19 @@
    "transparentShare": 0.0,
    "uses": {
     "areaShare": 0.0001,
-    "objectShare": 0.047,
+    "objectShare": 0.259,
     "slopeShares": {
-     "flat": 0.032,
-     "overhang": 0.114,
-     "slope": 0.127,
-     "steep": 0.01,
-     "vertical": 0.716
+     "flat": 0.025,
+     "overhang": 0.132,
+     "slope": 0.113,
+     "steep": 0.023,
+     "vertical": 0.707
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.072,
+     "solid": 0.928
     },
-    "unitsPerRepeat": 19.8
+    "unitsPerRepeat": 8.4
    },
    "width": 256
   },
@@ -32561,19 +32576,20 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0005,
-    "objectShare": 0.097,
+    "areaShare": 0.0008,
+    "objectShare": 0.434,
     "slopeShares": {
-     "flat": 0.136,
-     "overhang": 0.302,
-     "slope": 0.056,
-     "steep": 0.004,
-     "vertical": 0.502
+     "flat": 0.099,
+     "overhang": 0.2,
+     "slope": 0.038,
+     "steep": 0.003,
+     "vertical": 0.661
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.021,
+     "solid": 0.979
     },
-    "unitsPerRepeat": 25.9
+    "unitsPerRepeat": 12.2
    },
    "width": 256
   },
@@ -37026,7 +37042,7 @@
    "tiles": true,
    "transparentShare": 0.699,
    "uses": {
-    "areaShare": 0.0003,
+    "areaShare": 0.0019,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.235,
@@ -37037,7 +37053,7 @@
     },
     "surfaces": {
      "cutout": 0.272,
-     "solid": 0.728
+     "passable": 0.728
     },
     "unitsPerRepeat": 30.1
    },
@@ -39136,7 +39152,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0004,
+    "areaShare": 0.0003,
     "objectShare": 0.0,
     "slopeShares": {
      "flat": 0.931,
@@ -39148,7 +39164,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 19.0
+    "unitsPerRepeat": 7.1
    },
    "width": 256
   },
@@ -39251,18 +39267,18 @@
    "transparentShare": 0.0,
    "uses": {
     "areaShare": 0.0005,
-    "objectShare": 0.0,
+    "objectShare": 0.002,
     "slopeShares": {
-     "flat": 0.104,
-     "overhang": 0.5,
+     "flat": 0.105,
+     "overhang": 0.499,
      "slope": 0.163,
      "steep": 0.09,
-     "vertical": 0.143
+     "vertical": 0.144
     },
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 43.8
+    "unitsPerRepeat": 16.4
    },
    "width": 256
   },
@@ -39365,19 +39381,20 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0007,
-    "objectShare": 0.027,
+    "areaShare": 0.0008,
+    "objectShare": 0.167,
     "slopeShares": {
      "flat": 0.0,
-     "overhang": 0.042,
+     "overhang": 0.09,
      "slope": 0.0,
-     "steep": 0.0,
-     "vertical": 0.958
+     "steep": 0.001,
+     "vertical": 0.909
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.133,
+     "solid": 0.867
     },
-    "unitsPerRepeat": 18.0
+    "unitsPerRepeat": 7.3
    },
    "width": 256
   },
@@ -39429,8 +39446,8 @@
    "tiles": false,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0,
-    "objectShare": 0.681,
+    "areaShare": 0.0002,
+    "objectShare": 0.939,
     "slopeShares": {
      "flat": 0.0,
      "overhang": 0.0,
@@ -39439,9 +39456,10 @@
      "vertical": 1.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.05,
+     "solid": 0.95
     },
-    "unitsPerRepeat": 9.7
+    "unitsPerRepeat": 8.3
    },
    "width": 256
   },
@@ -39503,7 +39521,8 @@
      "vertical": 1.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.829,
+     "solid": 0.171
     },
     "unitsPerRepeat": 9.3
    },
@@ -39606,19 +39625,20 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0002,
-    "objectShare": 0.053,
+    "areaShare": 0.0003,
+    "objectShare": 0.286,
     "slopeShares": {
-     "flat": 0.024,
-     "overhang": 0.332,
+     "flat": 0.02,
+     "overhang": 0.276,
      "slope": 0.002,
      "steep": 0.002,
-     "vertical": 0.641
+     "vertical": 0.701
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.203,
+     "solid": 0.797
     },
-    "unitsPerRepeat": 13.7
+    "unitsPerRepeat": 5.9
    },
    "width": 256
   },
@@ -39719,19 +39739,20 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0002,
-    "objectShare": 0.176,
+    "areaShare": 0.0003,
+    "objectShare": 0.604,
     "slopeShares": {
-     "flat": 0.016,
-     "overhang": 0.415,
+     "flat": 0.008,
+     "overhang": 0.213,
      "slope": 0.0,
      "steep": 0.0,
-     "vertical": 0.569
+     "vertical": 0.78
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.016,
+     "solid": 0.984
     },
-    "unitsPerRepeat": 16.5
+    "unitsPerRepeat": 8.9
    },
    "width": 256
   },
@@ -39881,19 +39902,20 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0004,
-    "objectShare": 0.048,
+    "areaShare": 0.0006,
+    "objectShare": 0.267,
     "slopeShares": {
-     "flat": 0.112,
-     "overhang": 0.557,
-     "slope": 0.023,
+     "flat": 0.218,
+     "overhang": 0.485,
+     "slope": 0.02,
      "steep": 0.0,
-     "vertical": 0.308
+     "vertical": 0.277
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.017,
+     "solid": 0.983
     },
-    "unitsPerRepeat": 24.1
+    "unitsPerRepeat": 10.3
    },
    "width": 256
   },
@@ -40106,7 +40128,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.091,
+    "areaShare": 0.0902,
     "objectShare": 0.0,
     "slopeShares": {
      "flat": 1.0,
@@ -40118,7 +40140,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 6424.8
+    "unitsPerRepeat": 2400.5
    },
    "width": 256
   },
@@ -40228,7 +40250,7 @@
      "vertical": 1.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 27.1
    },
@@ -40997,7 +41019,7 @@
      "vertical": 0.645
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.5
    },
@@ -41877,6 +41899,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:dreadspire",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "dreadspire"
 }

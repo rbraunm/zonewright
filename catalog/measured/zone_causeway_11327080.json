@@ -10019,7 +10019,8 @@
      "vertical": 0.653
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.333,
+     "solid": 0.667
     },
     "unitsPerRepeat": 7.1
    },
@@ -13827,6 +13828,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:causeway",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "causeway"
 }

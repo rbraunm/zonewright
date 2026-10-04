@@ -48061,7 +48061,7 @@
    "archive": "morellcastle.eqg",
    "kind": "texture",
    "name": "coverage_tree.dds",
-   "problem": "UnidentifiedImageError: cannot identify image file <_io.BytesIO object at 0x000001518091F920>"
+   "problem": "UnidentifiedImageError: no image reader identifies it"
   },
   "texture/coverage_wallstains_green.dds@0ee6fe0f": {
    "archives": [
@@ -48503,7 +48503,8 @@
      "vertical": 0.454
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.95,
+     "solid": 0.05
     },
     "unitsPerRepeat": 3.2
    },
@@ -48671,7 +48672,8 @@
      "vertical": 0.781
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.104,
+     "solid": 0.896
     },
     "unitsPerRepeat": 8.6
    },
@@ -49178,7 +49180,8 @@
      "vertical": 0.246
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.716,
+     "solid": 0.284
     },
     "unitsPerRepeat": 31.2
    },
@@ -49458,7 +49461,8 @@
      "vertical": 0.136
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.507,
+     "solid": 0.493
     },
     "unitsPerRepeat": 13.0
    },
@@ -51431,7 +51435,7 @@
      "vertical": 0.994
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 21.7
    },
@@ -52088,7 +52092,8 @@
      "vertical": 0.904
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.66,
+     "solid": 0.34
     },
     "unitsPerRepeat": 21.8
    },
@@ -52204,7 +52209,7 @@
      "vertical": 1.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 36.2
    },
@@ -52317,7 +52322,7 @@
      "vertical": 1.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 27.3
    },
@@ -52432,7 +52437,8 @@
      "vertical": 0.494
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.55,
+     "solid": 0.45
     },
     "unitsPerRepeat": 16.5
    },
@@ -52646,7 +52652,8 @@
      "vertical": 0.871
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.668,
+     "solid": 0.332
     },
     "unitsPerRepeat": 24.6
    },
@@ -52713,7 +52720,8 @@
      "vertical": 0.819
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.352,
+     "solid": 0.648
     },
     "unitsPerRepeat": 15.7
    },
@@ -52826,7 +52834,8 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.787,
+     "solid": 0.213
     },
     "unitsPerRepeat": 15.3
    },
@@ -53548,7 +53557,8 @@
      "vertical": 0.316
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.036,
+     "solid": 0.964
     },
     "unitsPerRepeat": 5.0
    },
@@ -53612,7 +53622,8 @@
      "vertical": 0.055
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.003,
+     "solid": 0.997
     },
     "unitsPerRepeat": 19.8
    },
@@ -53725,7 +53736,8 @@
      "vertical": 0.785
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.152,
+     "solid": 0.848
     },
     "unitsPerRepeat": 19.8
    },
@@ -53838,7 +53850,7 @@
      "vertical": 0.99
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 44.5
    },
@@ -55095,7 +55107,8 @@
      "vertical": 0.598
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.375,
+     "solid": 0.625
     },
     "unitsPerRepeat": 6.5
    },
@@ -55239,7 +55252,8 @@
      "vertical": 0.359
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.835,
+     "solid": 0.165
     },
     "unitsPerRepeat": 13.1
    },
@@ -56016,7 +56030,7 @@
      "vertical": 0.288
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.4
    },
@@ -56995,7 +57009,7 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 4.3
    },
@@ -57058,7 +57072,7 @@
      "vertical": 0.094
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 3.1
    },
@@ -57121,7 +57135,7 @@
      "vertical": 0.159
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 3.8
    },
@@ -58568,7 +58582,7 @@
      "vertical": 0.288
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 4.3
    },
@@ -58730,7 +58744,7 @@
      "vertical": 0.922
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 7.4
    },
@@ -59539,7 +59553,7 @@
      "vertical": 0.203
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.4
    },
@@ -60436,7 +60450,7 @@
      "vertical": 0.563
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 5.7
    },
@@ -60706,7 +60720,7 @@
      "vertical": 0.12
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 12.0
    },
@@ -61149,7 +61163,7 @@
      "vertical": 0.355
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 2.1
    },
@@ -61311,6 +61325,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:morellcastle",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "morellcastle"
 }

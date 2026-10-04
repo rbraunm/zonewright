@@ -20115,7 +20115,8 @@
      "vertical": 0.638
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.05,
+     "solid": 0.95
     },
     "unitsPerRepeat": 4.2
    },
@@ -22113,6 +22114,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:stonesnake",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "stonesnake"
 }

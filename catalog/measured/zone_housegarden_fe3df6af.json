@@ -10927,7 +10927,7 @@
      "vertical": 0.619
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 12.3
    },
@@ -11184,7 +11184,8 @@
      "vertical": 0.723
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0,
+     "solid": 0.0
     },
     "unitsPerRepeat": 13.0
    },
@@ -12360,7 +12361,8 @@
      "vertical": 0.831
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.988,
+     "solid": 0.012
     },
     "unitsPerRepeat": 8.6
    },
@@ -15933,7 +15935,8 @@
      "vertical": 1.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.154,
+     "solid": 0.846
     },
     "unitsPerRepeat": 43.1
    },
@@ -17182,7 +17185,7 @@
      "vertical": 0.028
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 2.4
    },
@@ -17240,7 +17243,7 @@
      "vertical": 0.437
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.4
    },
@@ -19709,7 +19712,8 @@
      "vertical": 0.551
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.003,
+     "solid": 0.997
     },
     "unitsPerRepeat": 17.1
    },
@@ -20642,7 +20646,8 @@
      "vertical": 0.614
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.124,
+     "solid": 0.876
     },
     "unitsPerRepeat": 9.1
    },
@@ -20757,7 +20762,8 @@
      "vertical": 0.103
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.009,
+     "solid": 0.991
     },
     "unitsPerRepeat": 14.9
    },
@@ -21169,6 +21175,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:housegarden",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "housegarden"
 }

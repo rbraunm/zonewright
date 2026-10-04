@@ -22314,7 +22314,7 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 30.6
    },
@@ -28229,7 +28229,8 @@
      "vertical": 0.422
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.022,
+     "solid": 0.978
     },
     "unitsPerRepeat": 16.1
    },
@@ -28528,6 +28529,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:ashengate",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "ashengate"
 }

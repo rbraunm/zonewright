@@ -19983,8 +19983,8 @@
     "slopeShares": {
      "flat": 0.01,
      "overhang": 0.034,
-     "slope": 0.018,
-     "steep": 0.006,
+     "slope": 0.011,
+     "steep": 0.013,
      "vertical": 0.932
     },
     "surfaces": {
@@ -31658,7 +31658,8 @@
      "vertical": 0.297
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.835,
+     "solid": 0.165
     },
     "unitsPerRepeat": 2.2
    },
@@ -32348,7 +32349,7 @@
      "vertical": 0.389
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.2
    },
@@ -33439,6 +33440,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:coolingchamber",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "coolingchamber"
 }

@@ -8129,7 +8129,7 @@
      "vertical": 0.303
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 4.9
    },
@@ -8463,7 +8463,7 @@
      "vertical": 0.988
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 9.1
    },
@@ -8527,7 +8527,7 @@
      "vertical": 0.989
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 3.7
    },
@@ -8591,7 +8591,7 @@
      "vertical": 0.991
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.5
    },
@@ -8707,7 +8707,7 @@
      "vertical": 0.862
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 9.0
    },
@@ -8821,7 +8821,8 @@
      "vertical": 0.629
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.838,
+     "solid": 0.162
     },
     "unitsPerRepeat": 7.0
    },
@@ -8894,7 +8895,8 @@
      "vertical": 0.351
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.062,
+     "solid": 0.938
     },
     "unitsPerRepeat": 7.2
    },
@@ -9011,7 +9013,8 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.736,
+     "solid": 0.264
     },
     "unitsPerRepeat": 8.6
    },
@@ -9075,7 +9078,7 @@
      "vertical": 0.314
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 13.1
    },
@@ -9140,7 +9143,7 @@
      "vertical": 0.233
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.4
    },
@@ -9373,7 +9376,8 @@
      "vertical": 0.482
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.001,
+     "solid": 0.999
     },
     "unitsPerRepeat": 17.8
    },
@@ -10028,7 +10032,7 @@
      "vertical": 0.723
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.4
    },
@@ -10523,7 +10527,8 @@
      "vertical": 0.135
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.494,
+     "solid": 0.506
     },
     "unitsPerRepeat": 6.4
    },
@@ -10645,6 +10650,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:roost",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "roost"
 }

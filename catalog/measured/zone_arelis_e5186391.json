@@ -6045,7 +6045,7 @@
      "vertical": 0.795
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.8
    },
@@ -6661,13 +6661,13 @@
    "archive": "arelis.eqg",
    "kind": "texture",
    "name": "argath_metal_normal_01.dds",
-   "problem": "UnidentifiedImageError: cannot identify image file <_io.BytesIO object at 0x000002D0D6547240>"
+   "problem": "UnidentifiedImageError: no image reader identifies it"
   },
   "texture/argath_metal_normal_02.dds@unreadable": {
    "archive": "arelis.eqg",
    "kind": "texture",
    "name": "argath_metal_normal_02.dds",
-   "problem": "UnidentifiedImageError: cannot identify image file <_io.BytesIO object at 0x000002D0D6547240>"
+   "problem": "UnidentifiedImageError: no image reader identifies it"
   },
   "texture/ash.dds@cf688094": {
    "archives": [
@@ -7454,7 +7454,7 @@
    "archive": "arelis.eqg",
    "kind": "texture",
    "name": "clz_stone_base_3_n.dds",
-   "problem": "UnidentifiedImageError: cannot identify image file <_io.BytesIO object at 0x000002D0D6547970>"
+   "problem": "UnidentifiedImageError: no image reader identifies it"
   },
   "texture/concrete.dds@fffa346d": {
    "archives": [
@@ -7529,7 +7529,7 @@
    "archive": "arelis.eqg",
    "kind": "texture",
    "name": "concrete_bump_n.dds",
-   "problem": "UnidentifiedImageError: cannot identify image file <_io.BytesIO object at 0x000002D0D65479C0>"
+   "problem": "UnidentifiedImageError: no image reader identifies it"
   },
   "texture/cover_b.dds@984eabb6": {
    "archives": [
@@ -8600,7 +8600,7 @@
      "vertical": 0.742
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.7
    },
@@ -8610,7 +8610,7 @@
    "archive": "arelis.eqg",
    "kind": "texture",
    "name": "di_ent_metal01_n.dds",
-   "problem": "UnidentifiedImageError: cannot identify image file <_io.BytesIO object at 0x000002D0D6547F10>"
+   "problem": "UnidentifiedImageError: no image reader identifies it"
   },
   "texture/di_fobone_flora_dry_shrub.dds@1fe9fad3": {
    "archives": [
@@ -9580,7 +9580,7 @@
    "archive": "arelis.eqg",
    "kind": "texture",
    "name": "di_frott_rock02_6n.dds",
-   "problem": "UnidentifiedImageError: cannot identify image file <_io.BytesIO object at 0x000002D0D6547F10>"
+   "problem": "UnidentifiedImageError: no image reader identifies it"
   },
   "texture/di_frott_rock_face01.dds@7357de3a": {
    "archives": [
@@ -9616,7 +9616,7 @@
    "archive": "arelis.eqg",
    "kind": "texture",
    "name": "di_frott_rock_face01_6n.dds",
-   "problem": "UnidentifiedImageError: cannot identify image file <_io.BytesIO object at 0x000002D0D6547F10>"
+   "problem": "UnidentifiedImageError: no image reader identifies it"
   },
   "texture/di_frott_rock_icon01.dds@64205786": {
    "archives": [
@@ -9892,7 +9892,7 @@
    "archive": "arelis.eqg",
    "kind": "texture",
    "name": "di_frott_stone_base_6n.dds",
-   "problem": "UnidentifiedImageError: cannot identify image file <_io.BytesIO object at 0x000002D0D6547F10>"
+   "problem": "UnidentifiedImageError: no image reader identifies it"
   },
   "texture/di_frott_stone_cinderblock.dds@bd2f3afa": {
    "archives": [
@@ -10869,7 +10869,7 @@
      "vertical": 0.636
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 19.2
    },
@@ -10977,7 +10977,8 @@
      "vertical": 0.829
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.987,
+     "solid": 0.013
     },
     "unitsPerRepeat": 12.4
    },
@@ -11455,7 +11456,7 @@
    "archive": "arelis.eqg",
    "kind": "texture",
    "name": "di_uquarry_cavehall_wall01_10n.dds",
-   "problem": "UnidentifiedImageError: cannot identify image file <_io.BytesIO object at 0x000002D0D6AD8810>"
+   "problem": "UnidentifiedImageError: no image reader identifies it"
   },
   "texture/ew_coals001_c.dds@a2f4cc97": {
    "archives": [
@@ -11660,7 +11661,7 @@
      "vertical": 0.021
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.5
    },
@@ -12067,7 +12068,7 @@
      "vertical": 0.7
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 6.0
    },
@@ -12171,7 +12172,7 @@
      "vertical": 0.033
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 2.6
    },
@@ -12516,7 +12517,7 @@
      "vertical": 0.253
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 3.2
    },
@@ -12575,7 +12576,7 @@
      "vertical": 0.229
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 5.1
    },
@@ -13112,7 +13113,7 @@
    "archive": "arelis.eqg",
    "kind": "texture",
    "name": "metal01_n.dds",
-   "problem": "UnidentifiedImageError: cannot identify image file <_io.BytesIO object at 0x000002D0D6AD8FE0>"
+   "problem": "UnidentifiedImageError: no image reader identifies it"
   },
   "texture/metal_c.dds@f6ccf165": {
    "archives": [
@@ -14412,7 +14413,7 @@
    "archive": "arelis.eqg",
    "kind": "texture",
    "name": "rustyoldmetal_n.dds",
-   "problem": "UnidentifiedImageError: cannot identify image file <_io.BytesIO object at 0x000002D0D6AD97B0>"
+   "problem": "UnidentifiedImageError: no image reader identifies it"
   },
   "texture/sarith_dirt_01_c.dds@5cb3bc8d": {
    "archives": [
@@ -14504,7 +14505,7 @@
    "archive": "arelis.eqg",
    "kind": "texture",
    "name": "sb_rock01_10n.dds",
-   "problem": "UnidentifiedImageError: cannot identify image file <_io.BytesIO object at 0x000002D0D6AD98A0>"
+   "problem": "UnidentifiedImageError: no image reader identifies it"
   },
   "texture/sb_rock01_c.dds@1316c118": {
    "archives": [
@@ -14560,7 +14561,7 @@
      "vertical": 0.203
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.1
    },
@@ -15450,7 +15451,8 @@
      "vertical": 0.586
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.248,
+     "solid": 0.752
     },
     "unitsPerRepeat": 3.1
    },
@@ -15564,7 +15566,8 @@
      "vertical": 0.436
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.396,
+     "solid": 0.604
     },
     "unitsPerRepeat": 3.9
    },
@@ -16171,7 +16174,7 @@
      "vertical": 0.355
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.8
    },
@@ -16218,6 +16221,6 @@
   "This EQ terrain zone's lights are not read"
  ],
  "source": "zone:arelis",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "arelis"
 }

@@ -4892,7 +4892,7 @@
      "vertical": 0.83
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 9.4
    },
@@ -7330,7 +7330,7 @@
      "vertical": 0.535
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 4.6
    },
@@ -7625,7 +7625,7 @@
      "vertical": 0.993
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 2.9
    },
@@ -8703,7 +8703,7 @@
      "vertical": 0.636
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 23.8
    },
@@ -8808,7 +8808,7 @@
      "vertical": 0.833
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 16.2
    },
@@ -11425,7 +11425,8 @@
      "vertical": 0.298
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.159,
+     "solid": 0.841
     },
     "unitsPerRepeat": 0.5
    },
@@ -12801,7 +12802,7 @@
      "vertical": 0.375
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.9
    },
@@ -15647,6 +15648,6 @@
   "This EQ terrain zone's lights are not read"
  ],
  "source": "zone:moors",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "moors"
 }

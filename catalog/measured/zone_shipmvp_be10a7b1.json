@@ -29100,7 +29100,8 @@
      "vertical": 0.599
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.051,
+     "solid": 0.949
     },
     "unitsPerRepeat": 1.7
    },
@@ -29697,7 +29698,7 @@
      "vertical": 0.568
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 5.0
    },
@@ -31173,7 +31174,8 @@
      "vertical": 0.358
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.055,
+     "solid": 0.945
     },
     "unitsPerRepeat": 0.7
    },
@@ -31628,6 +31630,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:shipmvp",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "shipmvp"
 }

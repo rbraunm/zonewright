@@ -11133,7 +11133,8 @@
      "vertical": 0.525
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.852,
+     "solid": 0.148
     },
     "unitsPerRepeat": 8.5
    },
@@ -16291,6 +16292,6 @@
   "This EQ terrain zone's lights are not read"
  ],
  "source": "zone:pellucid",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "pellucid"
 }

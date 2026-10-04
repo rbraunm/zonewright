@@ -32349,7 +32349,7 @@
      "vertical": 0.755
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 10.0
    },
@@ -32930,7 +32930,8 @@
      "vertical": 0.315
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.007,
+     "solid": 0.993
     },
     "unitsPerRepeat": 3.9
    },
@@ -32989,7 +32990,7 @@
      "vertical": 1.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 52.4
    },
@@ -33094,7 +33095,7 @@
      "vertical": 1.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 49.6
    },
@@ -36478,7 +36479,8 @@
      "vertical": 0.747
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.107,
+     "solid": 0.893
     },
     "unitsPerRepeat": 5.6
    },
@@ -38993,6 +38995,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:harbingers",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "harbingers"
 }

@@ -2607,7 +2607,7 @@
      "vertical": 0.7
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 13.1
    },
@@ -5023,7 +5023,7 @@
      "vertical": 0.189
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.5
    },
@@ -10556,7 +10556,8 @@
      "vertical": 0.233
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.791,
+     "solid": 0.209
     },
     "unitsPerRepeat": 7.4
    },
@@ -11612,6 +11613,6 @@
   "This EQ terrain zone's lights are not read"
  ],
  "source": "zone:oldkithicor",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "oldkithicor"
 }

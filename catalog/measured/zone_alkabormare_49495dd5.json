@@ -41376,7 +41376,7 @@
      "vertical": 0.596
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 11.2
    },
@@ -41485,7 +41485,7 @@
      "vertical": 0.546
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 7.0
    },
@@ -46683,7 +46683,8 @@
      "vertical": 0.895
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.96,
+     "solid": 0.04
     },
     "unitsPerRepeat": 12.9
    },
@@ -47091,7 +47092,8 @@
      "vertical": 0.506
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.299,
+     "solid": 0.701
     },
     "unitsPerRepeat": 13.9
    },
@@ -47474,7 +47476,8 @@
      "vertical": 0.161
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.006,
+     "solid": 0.994
     },
     "unitsPerRepeat": 31.4
    },
@@ -50430,7 +50433,8 @@
      "vertical": 0.856
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.608,
+     "solid": 0.392
     },
     "unitsPerRepeat": 7.5
    },
@@ -50952,7 +50956,7 @@
      "vertical": 0.578
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 7.7
    },
@@ -51253,6 +51257,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:alkabormare",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "alkabormare"
 }

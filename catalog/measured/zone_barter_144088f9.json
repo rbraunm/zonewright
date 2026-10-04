@@ -11527,7 +11527,8 @@
      "vertical": 0.594
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.08,
+     "solid": 0.92
     },
     "unitsPerRepeat": 1.4
    },
@@ -11724,7 +11725,8 @@
      "vertical": 0.264
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.321,
+     "solid": 0.679
     },
     "unitsPerRepeat": 4.4
    },
@@ -12104,7 +12106,8 @@
      "vertical": 0.601
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.183,
+     "solid": 0.817
     },
     "unitsPerRepeat": 8.2
    },
@@ -12516,7 +12519,8 @@
      "vertical": 0.413
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.261,
+     "solid": 0.739
     },
     "unitsPerRepeat": 1.3
    },
@@ -15565,6 +15569,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:barter",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "barter"
 }

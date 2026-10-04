@@ -7509,7 +7509,8 @@
      "vertical": 0.123
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.422,
+     "solid": 0.578
     },
     "unitsPerRepeat": 5.3
    },
@@ -8291,7 +8292,7 @@
      "vertical": 0.503
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 2.2
    },
@@ -8960,6 +8961,6 @@
   "This EQ terrain zone's lights are not read"
  ],
  "source": "zone:fungalforest",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "fungalforest"
 }

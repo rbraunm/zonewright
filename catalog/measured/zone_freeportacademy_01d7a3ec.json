@@ -10053,7 +10053,7 @@
    "tiles": false,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0001,
+    "areaShare": 0.0,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.82,
@@ -10063,7 +10063,8 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.876,
+     "solid": 0.124
     },
     "unitsPerRepeat": 3.0
    },
@@ -10246,7 +10247,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0022,
+    "areaShare": 0.0012,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.0,
@@ -10582,7 +10583,8 @@
      "vertical": 0.842
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.934,
+     "solid": 0.066
     },
     "unitsPerRepeat": 9.3
    },
@@ -10640,7 +10642,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0221,
+    "areaShare": 0.0123,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.054,
@@ -10650,7 +10652,8 @@
      "vertical": 0.708
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.065,
+     "solid": 0.935
     },
     "unitsPerRepeat": 22.4
    },
@@ -10759,19 +10762,20 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.1663,
-    "objectShare": 0.912,
+    "areaShare": 0.145,
+    "objectShare": 0.58,
     "slopeShares": {
      "flat": 0.004,
      "overhang": 0.004,
      "slope": 0.0,
      "steep": 0.0,
-     "vertical": 0.993
+     "vertical": 0.991
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.579,
+     "solid": 0.421
     },
-    "unitsPerRepeat": 21.2
+    "unitsPerRepeat": 26.6
    },
    "width": 256
   },
@@ -10872,7 +10876,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0196,
+    "areaShare": 0.0109,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.0,
@@ -11015,7 +11019,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0076,
+    "areaShare": 0.0042,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.024,
@@ -11025,7 +11029,8 @@
      "vertical": 0.002
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.032,
+     "solid": 0.968
     },
     "unitsPerRepeat": 21.9
    },
@@ -11132,7 +11137,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0047,
+    "areaShare": 0.0195,
     "objectShare": 0.0,
     "slopeShares": {
      "flat": 1.0,
@@ -11144,7 +11149,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 83.2
+    "unitsPerRepeat": 228.2
    },
    "width": 256
   },
@@ -11241,7 +11246,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0004,
+    "areaShare": 0.0002,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.0,
@@ -11445,7 +11450,7 @@
      "vertical": 0.96
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.1
    },
@@ -11548,7 +11553,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0002,
+    "areaShare": 0.0001,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.657,
@@ -11558,7 +11563,7 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 9.4
    },
@@ -11612,7 +11617,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0003,
+    "areaShare": 0.0001,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.626,
@@ -11622,7 +11627,8 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.851,
+     "solid": 0.149
     },
     "unitsPerRepeat": 7.6
    },
@@ -11887,7 +11893,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0001,
+    "areaShare": 0.0,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.0,
@@ -11951,7 +11957,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0004,
+    "areaShare": 0.0002,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.471,
@@ -11961,7 +11967,7 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 8.0
    },
@@ -12071,7 +12077,7 @@
      "vertical": 0.818
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 12.3
    },
@@ -12177,7 +12183,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.1108,
+    "areaShare": 0.0615,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.012,
@@ -12187,7 +12193,8 @@
      "vertical": 0.801
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.076,
+     "solid": 0.924
     },
     "unitsPerRepeat": 26.5
    },
@@ -12290,7 +12297,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0078,
+    "areaShare": 0.0043,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.084,
@@ -12300,7 +12307,8 @@
      "vertical": 0.124
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.004,
+     "solid": 0.996
     },
     "unitsPerRepeat": 24.5
    },
@@ -12403,7 +12411,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0022,
+    "areaShare": 0.0012,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.0,
@@ -12413,7 +12421,8 @@
      "vertical": 0.313
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.009,
+     "solid": 0.991
     },
     "unitsPerRepeat": 23.8
    },
@@ -12516,7 +12525,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.08,
+    "areaShare": 0.0444,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.005,
@@ -12526,6 +12535,7 @@
      "vertical": 0.893
     },
     "surfaces": {
+     "passable": 0.0,
      "solid": 1.0
     },
     "unitsPerRepeat": 24.3
@@ -12629,19 +12639,20 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0632,
-    "objectShare": 0.851,
+    "areaShare": 0.0691,
+    "objectShare": 0.432,
     "slopeShares": {
-     "flat": 0.801,
+     "flat": 0.899,
      "overhang": 0.0,
-     "slope": 0.198,
+     "slope": 0.101,
      "steep": 0.0,
      "vertical": 0.0
     },
     "surfaces": {
+     "passable": 0.0,
      "solid": 1.0
     },
-    "unitsPerRepeat": 17.8
+    "unitsPerRepeat": 25.1
    },
    "width": 256
   },
@@ -12745,19 +12756,20 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.3395,
-    "objectShare": 0.956,
+    "areaShare": 0.2425,
+    "objectShare": 0.742,
     "slopeShares": {
-     "flat": 0.053,
-     "overhang": 0.176,
-     "slope": 0.034,
-     "steep": 0.092,
-     "vertical": 0.644
+     "flat": 0.12,
+     "overhang": 0.199,
+     "slope": 0.072,
+     "steep": 0.095,
+     "vertical": 0.514
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.074,
+     "solid": 0.926
     },
-    "unitsPerRepeat": 21.4
+    "unitsPerRepeat": 24.3
    },
    "width": 256
   },
@@ -12858,7 +12870,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0011,
+    "areaShare": 0.0006,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.517,
@@ -12971,7 +12983,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0076,
+    "areaShare": 0.0042,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.202,
@@ -12981,7 +12993,8 @@
      "vertical": 0.45
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.293,
+     "solid": 0.707
     },
     "unitsPerRepeat": 12.7
    },
@@ -13085,19 +13098,20 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0174,
-    "objectShare": 0.862,
+    "areaShare": 0.0183,
+    "objectShare": 0.454,
     "slopeShares": {
-     "flat": 0.165,
-     "overhang": 0.244,
-     "slope": 0.056,
-     "steep": 0.019,
-     "vertical": 0.515
+     "flat": 0.187,
+     "overhang": 0.22,
+     "slope": 0.03,
+     "steep": 0.01,
+     "vertical": 0.554
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.281,
+     "solid": 0.719
     },
-    "unitsPerRepeat": 13.8
+    "unitsPerRepeat": 19.0
    },
    "width": 256
   },
@@ -13198,7 +13212,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0004,
+    "areaShare": 0.0002,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.0,
@@ -13387,19 +13401,20 @@
    "tiles": true,
    "transparentShare": 0.707,
    "uses": {
-    "areaShare": 0.0066,
-    "objectShare": 0.63,
+    "areaShare": 0.0126,
+    "objectShare": 0.185,
     "slopeShares": {
      "flat": 0.0,
-     "overhang": 0.18,
-     "slope": 0.016,
+     "overhang": 0.053,
+     "slope": 0.035,
      "steep": 0.0,
-     "vertical": 0.804
+     "vertical": 0.912
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.053,
+     "solid": 0.947
     },
-    "unitsPerRepeat": 13.9
+    "unitsPerRepeat": 25.7
    },
    "width": 256
   },
@@ -13500,7 +13515,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.024,
+    "areaShare": 0.0133,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.091,
@@ -13510,7 +13525,8 @@
      "vertical": 0.745
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.383,
+     "solid": 0.617
     },
     "unitsPerRepeat": 24.1
    },
@@ -13564,19 +13580,20 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0469,
-    "objectShare": 0.857,
+    "areaShare": 0.0503,
+    "objectShare": 0.444,
     "slopeShares": {
-     "flat": 0.178,
-     "overhang": 0.109,
-     "slope": 0.025,
-     "steep": 0.038,
-     "vertical": 0.65
+     "flat": 0.361,
+     "overhang": 0.095,
+     "slope": 0.031,
+     "steep": 0.024,
+     "vertical": 0.489
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.015,
+     "solid": 0.985
     },
-    "unitsPerRepeat": 15.6
+    "unitsPerRepeat": 21.6
    },
    "width": 256
   },
@@ -13808,11 +13825,11 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0347,
-    "objectShare": 0.006,
+    "areaShare": 0.1438,
+    "objectShare": 0.001,
     "slopeShares": {
-     "flat": 0.503,
-     "overhang": 0.497,
+     "flat": 0.5,
+     "overhang": 0.5,
      "slope": 0.0,
      "steep": 0.0,
      "vertical": 0.0
@@ -13820,7 +13837,7 @@
     "surfaces": {
      "water": 1.0
     },
-    "unitsPerRepeat": 3.9
+    "unitsPerRepeat": 10.7
    },
    "width": 256
   },
@@ -14027,7 +14044,7 @@
    "tiles": true,
    "transparentShare": 0.232,
    "uses": {
-    "areaShare": 0.0335,
+    "areaShare": 0.1395,
     "objectShare": 0.0,
     "slopeShares": {
      "flat": 0.0,
@@ -14039,7 +14056,7 @@
     "surfaces": {
      "water": 1.0
     },
-    "unitsPerRepeat": 35.4
+    "unitsPerRepeat": 97.0
    },
    "width": 256
   },
@@ -14082,6 +14099,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:freeportacademy",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "freeportacademy"
 }

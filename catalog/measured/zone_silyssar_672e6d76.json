@@ -20716,11 +20716,11 @@
     "areaShare": 0.2042,
     "objectShare": 0.035,
     "slopeShares": {
-     "flat": 0.002,
-     "overhang": 0.066,
-     "slope": 0.008,
-     "steep": 0.059,
-     "vertical": 0.866
+     "flat": 0.732,
+     "overhang": 0.016,
+     "slope": 0.234,
+     "steep": 0.012,
+     "vertical": 0.006
     },
     "surfaces": {
      "solid": 1.0
@@ -21347,11 +21347,11 @@
     "areaShare": 0.2807,
     "objectShare": 0.995,
     "slopeShares": {
-     "flat": 0.513,
-     "overhang": 0.482,
+     "flat": 0.515,
+     "overhang": 0.485,
      "slope": 0.0,
      "steep": 0.0,
-     "vertical": 0.005
+     "vertical": 0.0
     },
     "surfaces": {
      "water": 1.0
@@ -22067,7 +22067,8 @@
      "vertical": 0.458
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.458,
+     "solid": 0.542
     },
     "unitsPerRepeat": 2.9
    },
@@ -22178,7 +22179,8 @@
      "vertical": 0.645
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.189,
+     "solid": 0.811
     },
     "unitsPerRepeat": 1.5
    },
@@ -22708,7 +22710,7 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 129.5
    },
@@ -23098,6 +23100,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:silyssar",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "silyssar"
 }

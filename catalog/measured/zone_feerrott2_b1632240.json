@@ -10566,7 +10566,7 @@
      "vertical": 0.636
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 30.7
    },
@@ -10708,7 +10708,8 @@
      "vertical": 0.832
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.999,
+     "solid": 0.001
     },
     "unitsPerRepeat": 20.6
    },
@@ -15321,7 +15322,7 @@
      "vertical": 0.203
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.1
    },
@@ -16714,7 +16715,8 @@
      "vertical": 0.444
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.764,
+     "solid": 0.236
     },
     "unitsPerRepeat": 4.4
    },
@@ -17214,7 +17216,7 @@
      "vertical": 0.355
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.8
    },
@@ -17351,6 +17353,6 @@
   "This EQ terrain zone's lights are not read"
  ],
  "source": "zone:feerrott2",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "feerrott2"
 }

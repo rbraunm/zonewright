@@ -5299,7 +5299,8 @@
      "vertical": 0.942
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.004,
+     "solid": 0.996
     },
     "unitsPerRepeat": 32.9
    },
@@ -9448,7 +9449,7 @@
      "vertical": 0.267
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 18.0
    },
@@ -9703,7 +9704,8 @@
      "vertical": 0.176
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.119,
+     "solid": 0.881
     },
     "unitsPerRepeat": 169.3
    },
@@ -9873,7 +9875,8 @@
      "vertical": 0.932
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.975,
+     "solid": 0.025
     },
     "unitsPerRepeat": 3.4
    },
@@ -10269,7 +10272,7 @@
      "vertical": 0.503
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 10.9
    },
@@ -11690,6 +11693,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:brellsrest",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "brellsrest"
 }

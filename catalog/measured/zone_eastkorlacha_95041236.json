@@ -3030,7 +3030,7 @@
      "vertical": 0.461
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 15.2
    },
@@ -3285,7 +3285,7 @@
      "vertical": 0.605
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 3.0
    },
@@ -4067,7 +4067,8 @@
      "vertical": 0.063
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.863,
+     "solid": 0.137
     },
     "unitsPerRepeat": 19.3
    },
@@ -4374,7 +4375,7 @@
      "vertical": 0.085
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 7.7
    },
@@ -4660,7 +4661,8 @@
      "vertical": 0.983
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.874,
+     "solid": 0.126
     },
     "unitsPerRepeat": 9.4
    },
@@ -4724,7 +4726,8 @@
      "vertical": 0.989
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.95,
+     "solid": 0.05
     },
     "unitsPerRepeat": 9.0
    },
@@ -5316,7 +5319,7 @@
      "vertical": 1.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 29.6
    },
@@ -5673,7 +5676,8 @@
      "vertical": 0.133
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.337,
+     "solid": 0.663
     },
     "unitsPerRepeat": 6.4
    },
@@ -5786,7 +5790,8 @@
      "vertical": 0.782
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.787,
+     "solid": 0.213
     },
     "unitsPerRepeat": 21.7
    },
@@ -6163,7 +6168,8 @@
      "vertical": 0.661
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.081,
+     "solid": 0.919
     },
     "unitsPerRepeat": 14.7
    },
@@ -7021,7 +7027,7 @@
      "vertical": 1.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 5.1
    },
@@ -7253,7 +7259,7 @@
      "vertical": 0.084
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 5.4
    },
@@ -7365,7 +7371,7 @@
      "vertical": 1.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 5.1
    },
@@ -7427,6 +7433,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:eastkorlacha",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "eastkorlacha"
 }

@@ -52353,7 +52353,7 @@
      "vertical": 0.68
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 10.4
    },
@@ -55802,7 +55802,7 @@
      "vertical": 0.556
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 0.5
    },
@@ -56491,7 +56491,7 @@
      "vertical": 0.993
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 0.8
    },
@@ -59971,7 +59971,8 @@
      "vertical": 0.125
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.276,
+     "solid": 0.724
     },
     "unitsPerRepeat": 3.3
    },
@@ -60131,6 +60132,7 @@
      "vertical": 0.054
     },
     "surfaces": {
+     "passable": 0.0,
      "solid": 1.0
     },
     "unitsPerRepeat": 16.8
@@ -60820,7 +60822,8 @@
      "vertical": 0.205
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.001,
+     "solid": 0.999
     },
     "unitsPerRepeat": 6.6
    },
@@ -61142,7 +61145,8 @@
      "vertical": 0.438
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.056,
+     "solid": 0.944
     },
     "unitsPerRepeat": 3.5
    },
@@ -61441,7 +61445,8 @@
      "vertical": 0.855
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.004,
+     "solid": 0.996
     },
     "unitsPerRepeat": 11.8
    },
@@ -62325,7 +62330,8 @@
      "vertical": 0.095
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.012,
+     "solid": 0.988
     },
     "unitsPerRepeat": 17.9
    },
@@ -62390,7 +62396,7 @@
      "vertical": 1.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 2.8
    },
@@ -63499,7 +63505,8 @@
      "vertical": 0.496
     },
     "surfaces": {
-     "solid": 0.864,
+     "passable": 0.283,
+     "solid": 0.581,
      "translucent": 0.136
     },
     "unitsPerRepeat": 15.4
@@ -65058,6 +65065,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:sarithcity",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "sarithcity"
 }

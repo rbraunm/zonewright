@@ -36960,7 +36960,7 @@
    "archive": "westsepulcher.eqg",
    "kind": "texture",
    "name": "concrete_bump_n.dds",
-   "problem": "UnidentifiedImageError: cannot identify image file <_io.BytesIO object at 0x00000258A2DBD490>"
+   "problem": "UnidentifiedImageError: no image reader identifies it"
   },
   "texture/coverage.dds@df5624ec": {
    "archives": [
@@ -37624,7 +37624,7 @@
      "vertical": 0.429
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 3.3
    },
@@ -37774,7 +37774,7 @@
      "vertical": 0.833
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 4.2
    },
@@ -37840,7 +37840,8 @@
      "vertical": 0.117
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.019,
+     "solid": 0.981
     },
     "unitsPerRepeat": 9.8
    },
@@ -38139,7 +38140,8 @@
      "vertical": 0.029
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.1,
+     "solid": 0.9
     },
     "unitsPerRepeat": 2.7
    },
@@ -40371,6 +40373,7 @@
      "vertical": 0.004
     },
     "surfaces": {
+     "passable": 0.0,
      "solid": 1.0
     },
     "unitsPerRepeat": 175.9
@@ -40612,7 +40615,8 @@
      "vertical": 0.471
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.008,
+     "solid": 0.992
     },
     "unitsPerRepeat": 6.1
    },
@@ -40678,7 +40682,8 @@
      "vertical": 0.384
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.002,
+     "solid": 0.998
     },
     "unitsPerRepeat": 12.2
    },
@@ -41005,6 +41010,7 @@
      "vertical": 0.892
     },
     "surfaces": {
+     "passable": 0.0,
      "solid": 1.0
     },
     "unitsPerRepeat": 13.4
@@ -41118,7 +41124,8 @@
      "vertical": 0.875
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.001,
+     "solid": 0.999
     },
     "unitsPerRepeat": 12.3
    },
@@ -43339,6 +43346,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:westsepulcher",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "westsepulcher"
 }

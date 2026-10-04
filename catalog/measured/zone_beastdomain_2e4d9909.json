@@ -11327,7 +11327,8 @@
      "vertical": 0.999
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.999,
+     "solid": 0.001
     },
     "unitsPerRepeat": 6.7
    },
@@ -11389,7 +11390,7 @@
      "vertical": 0.581
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 13.6
    },
@@ -11570,7 +11571,8 @@
      "vertical": 0.57
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.848,
+     "solid": 0.152
     },
     "unitsPerRepeat": 26.2
    },
@@ -14096,7 +14098,8 @@
      "vertical": 0.323
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.002,
+     "solid": 0.998
     },
     "unitsPerRepeat": 61.1
    },
@@ -14449,7 +14452,7 @@
      "vertical": 0.594
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 116.0
    },
@@ -14836,7 +14839,7 @@
      "vertical": 0.546
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 6.2
    },
@@ -18466,7 +18469,8 @@
      "vertical": 0.177
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.215,
+     "solid": 0.785
     },
     "unitsPerRepeat": 32.7
    },
@@ -18848,6 +18852,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:beastdomain",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "beastdomain"
 }

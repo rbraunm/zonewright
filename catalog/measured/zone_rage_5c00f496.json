@@ -8253,7 +8253,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0003,
+    "areaShare": 0.0002,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.023,
@@ -8473,7 +8473,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0001,
+    "areaShare": 0.0,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.0,
@@ -8580,7 +8580,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0004,
+    "areaShare": 0.0003,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.454,
@@ -8721,19 +8721,19 @@
    "tiles": false,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0666,
-    "objectShare": 0.581,
+    "areaShare": 0.0673,
+    "objectShare": 0.443,
     "slopeShares": {
-     "flat": 0.015,
-     "overhang": 0.002,
-     "slope": 0.003,
-     "steep": 0.003,
-     "vertical": 0.977
+     "flat": 0.02,
+     "overhang": 0.003,
+     "slope": 0.004,
+     "steep": 0.004,
+     "vertical": 0.97
     },
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 21.8
+    "unitsPerRepeat": 25.0
    },
    "width": 256
   },
@@ -8830,7 +8830,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.3467,
+    "areaShare": 0.4659,
     "objectShare": 0.0,
     "slopeShares": {
      "flat": 1.0,
@@ -8842,7 +8842,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 45.2
+    "unitsPerRepeat": 59.7
    },
    "width": 256
   },
@@ -8999,19 +8999,19 @@
    "tiles": false,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0246,
-    "objectShare": 0.986,
+    "areaShare": 0.0192,
+    "objectShare": 0.976,
     "slopeShares": {
      "flat": 0.98,
      "overhang": 0.0,
-     "slope": 0.019,
+     "slope": 0.018,
      "steep": 0.0,
-     "vertical": 0.001
+     "vertical": 0.002
     },
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 24.5
+    "unitsPerRepeat": 24.6
    },
    "width": 256
   },
@@ -9116,7 +9116,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0147,
+    "areaShare": 0.0113,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.0,
@@ -9126,7 +9126,8 @@
      "vertical": 0.961
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.558,
+     "solid": 0.442
     },
     "unitsPerRepeat": 25.1
    },
@@ -9231,7 +9232,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0083,
+    "areaShare": 0.0064,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.006,
@@ -9346,7 +9347,7 @@
    "tiles": false,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.289,
+    "areaShare": 0.2226,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.025,
@@ -9356,7 +9357,8 @@
      "vertical": 0.807
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.15,
+     "solid": 0.85
     },
     "unitsPerRepeat": 25.5
    },
@@ -9559,7 +9561,7 @@
    "tiles": false,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0088,
+    "areaShare": 0.0068,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.002,
@@ -9765,19 +9767,20 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.1928,
-    "objectShare": 0.879,
+    "areaShare": 0.162,
+    "objectShare": 0.806,
     "slopeShares": {
      "flat": 0.211,
-     "overhang": 0.087,
-     "slope": 0.01,
-     "steep": 0.063,
-     "vertical": 0.63
+     "overhang": 0.088,
+     "slope": 0.009,
+     "steep": 0.059,
+     "vertical": 0.633
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.069,
+     "solid": 0.931
     },
-    "unitsPerRepeat": 24.1
+    "unitsPerRepeat": 25.2
    },
    "width": 256
   },
@@ -9882,18 +9885,18 @@
    "transparentShare": 0.0,
    "uses": {
     "areaShare": 0.0048,
-    "objectShare": 0.593,
+    "objectShare": 0.455,
     "slopeShares": {
-     "flat": 0.059,
-     "overhang": 0.145,
-     "slope": 0.284,
-     "steep": 0.376,
-     "vertical": 0.135
+     "flat": 0.057,
+     "overhang": 0.134,
+     "slope": 0.299,
+     "steep": 0.371,
+     "vertical": 0.137
     },
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 23.0
+    "unitsPerRepeat": 26.3
    },
    "width": 256
   },
@@ -10564,7 +10567,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0003,
+    "areaShare": 0.0002,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.076,
@@ -10805,7 +10808,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0043,
+    "areaShare": 0.0033,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.0,
@@ -11142,7 +11145,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0008,
+    "areaShare": 0.0006,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.071,
@@ -11385,7 +11388,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0008,
+    "areaShare": 0.0006,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.025,
@@ -11491,7 +11494,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0007,
+    "areaShare": 0.0005,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.845,
@@ -11735,7 +11738,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0004,
+    "areaShare": 0.0003,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.007,
@@ -11956,7 +11959,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0351,
+    "areaShare": 0.0271,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.053,
@@ -12494,7 +12497,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0007,
+    "areaShare": 0.0005,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.002,
@@ -12577,6 +12580,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:rage",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "rage"
 }

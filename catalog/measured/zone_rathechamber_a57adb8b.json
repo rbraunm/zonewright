@@ -16849,7 +16849,7 @@
      "vertical": 0.68
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 15.3
    },
@@ -17789,7 +17789,8 @@
      "vertical": 0.334
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.895,
+     "solid": 0.105
     },
     "unitsPerRepeat": 19.3
    },
@@ -19546,7 +19547,8 @@
      "vertical": 0.801
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.869,
+     "solid": 0.131
     },
     "unitsPerRepeat": 11.2
    },
@@ -21792,6 +21794,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:rathechamber",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "rathechamber"
 }

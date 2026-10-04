@@ -28308,7 +28308,8 @@
     },
     "surfaces": {
      "lava": 0.069,
-     "solid": 0.931
+     "passable": 0.808,
+     "solid": 0.123
     },
     "unitsPerRepeat": 20.5
    },
@@ -29815,7 +29816,8 @@
      "vertical": 0.544
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.002,
+     "solid": 0.998
     },
     "unitsPerRepeat": 16.2
    },
@@ -30707,7 +30709,8 @@
      "vertical": 0.515
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.044,
+     "solid": 0.956
     },
     "unitsPerRepeat": 31.3
    },
@@ -33403,6 +33406,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:steamfactory",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "steamfactory"
 }

@@ -84627,7 +84627,7 @@
      "vertical": 0.21
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 6.1
    },
@@ -90295,7 +90295,8 @@
      "vertical": 0.366
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.055,
+     "solid": 0.945
     },
     "unitsPerRepeat": 3.4
    },
@@ -90893,7 +90894,8 @@
      "vertical": 0.591
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.001,
+     "solid": 0.999
     },
     "unitsPerRepeat": 6.8
    },
@@ -93809,7 +93811,7 @@
      "vertical": 1.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 12.0
    },
@@ -94443,7 +94445,8 @@
      "vertical": 0.109
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.009,
+     "solid": 0.991
     },
     "unitsPerRepeat": 13.7
    },
@@ -94599,7 +94602,7 @@
      "vertical": 0.223
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 479.7
    },
@@ -94755,7 +94758,8 @@
      "vertical": 0.364
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.016,
+     "solid": 0.984
     },
     "unitsPerRepeat": 4.5
    },
@@ -95396,7 +95400,8 @@
      "vertical": 0.81
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.001,
+     "solid": 0.999
     },
     "unitsPerRepeat": 11.1
    },
@@ -96150,7 +96155,8 @@
      "vertical": 0.349
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.455,
+     "solid": 0.545
     },
     "unitsPerRepeat": 7.1
    },
@@ -96602,7 +96608,8 @@
      "vertical": 0.544
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.214,
+     "solid": 0.786
     },
     "unitsPerRepeat": 24.1
    },
@@ -96791,6 +96798,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:thulehouse2",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "thulehouse2"
 }

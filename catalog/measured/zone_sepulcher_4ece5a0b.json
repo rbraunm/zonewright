@@ -41638,7 +41638,7 @@
    "archive": "sepulcher.eqg",
    "kind": "texture",
    "name": "concrete_bump_n.dds",
-   "problem": "UnidentifiedImageError: cannot identify image file <_io.BytesIO object at 0x0000022C30EAB290>"
+   "problem": "UnidentifiedImageError: no image reader identifies it"
   },
   "texture/corpse_skin01.dds@0527f513": {
    "archives": [
@@ -42251,7 +42251,8 @@
      "vertical": 0.137
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.405,
+     "solid": 0.595
     },
     "unitsPerRepeat": 17.3
    },
@@ -42856,7 +42857,8 @@
      "vertical": 0.268
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.39,
+     "solid": 0.61
     },
     "unitsPerRepeat": 6.0
    },
@@ -47020,6 +47022,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:sepulcher",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "sepulcher"
 }

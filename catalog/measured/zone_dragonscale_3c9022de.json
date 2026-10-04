@@ -3730,7 +3730,7 @@
      "vertical": 0.676
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 2.8
    },
@@ -4121,7 +4121,8 @@
      "vertical": 0.779
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.999,
+     "solid": 0.001
     },
     "unitsPerRepeat": 71.0
    },
@@ -4751,7 +4752,8 @@
      "vertical": 0.338
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.999,
+     "solid": 0.001
     },
     "unitsPerRepeat": 17.9
    },
@@ -5180,7 +5182,8 @@
      "vertical": 0.113
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.881,
+     "solid": 0.119
     },
     "unitsPerRepeat": 77.3
    },
@@ -5858,7 +5861,7 @@
      "vertical": 0.755
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 29.9
    },
@@ -6421,7 +6424,7 @@
      "vertical": 0.005
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 6.7
    },
@@ -6907,7 +6910,8 @@
      "vertical": 0.312
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.038,
+     "solid": 0.962
     },
     "unitsPerRepeat": 13.2
    },
@@ -9168,7 +9172,8 @@
      "vertical": 0.72
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.006,
+     "solid": 0.994
     },
     "unitsPerRepeat": 18.5
    },
@@ -9445,7 +9450,7 @@
      "vertical": 0.897
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 9.5
    },
@@ -12634,7 +12639,8 @@
      "vertical": 0.334
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.037,
+     "solid": 0.963
     },
     "unitsPerRepeat": 12.0
    },
@@ -21341,7 +21347,7 @@
      "vertical": 0.336
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 2.9
    },
@@ -23572,7 +23578,7 @@
      "vertical": 0.195
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.0
    },
@@ -25615,7 +25621,8 @@
      "vertical": 0.833
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.881,
+     "solid": 0.119
     },
     "unitsPerRepeat": 2.1
    },
@@ -25695,6 +25702,6 @@
   "This EQ terrain zone's lights are not read"
  ],
  "source": "zone:dragonscale",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "dragonscale"
 }

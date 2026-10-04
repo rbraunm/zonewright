@@ -92017,7 +92017,8 @@
      "vertical": 0.779
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0,
+     "solid": 0.0
     },
     "unitsPerRepeat": 12.6
    },
@@ -92074,7 +92075,7 @@
      "vertical": 0.806
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 8.4
    },
@@ -92817,7 +92818,8 @@
      "vertical": 0.106
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.035,
+     "solid": 0.965
     },
     "unitsPerRepeat": 50.2
    },
@@ -94156,7 +94158,8 @@
      "vertical": 0.614
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.01,
+     "solid": 0.99
     },
     "unitsPerRepeat": 7.1
    },
@@ -97652,7 +97655,7 @@
      "vertical": 0.018
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 22.7
    },
@@ -98957,7 +98960,7 @@
      "vertical": 0.998
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 2.2
    },
@@ -99424,7 +99427,7 @@
      "vertical": 0.19
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 0.3
    },
@@ -103230,7 +103233,8 @@
      "vertical": 0.006
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.022,
+     "solid": 0.978
     },
     "unitsPerRepeat": 85.0
    },
@@ -104555,7 +104559,8 @@
      "vertical": 0.281
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.039,
+     "solid": 0.961
     },
     "unitsPerRepeat": 26.9
    },
@@ -106767,7 +106772,8 @@
      "vertical": 0.789
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.028,
+     "solid": 0.972
     },
     "unitsPerRepeat": 33.7
    },
@@ -106949,7 +106955,8 @@
      "vertical": 0.589
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.04,
+     "solid": 0.96
     },
     "unitsPerRepeat": 20.2
    },
@@ -107183,7 +107190,8 @@
      "vertical": 0.05
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.005,
+     "solid": 0.995
     },
     "unitsPerRepeat": 41.1
    },
@@ -107451,7 +107459,8 @@
      "vertical": 0.915
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.102,
+     "solid": 0.898
     },
     "unitsPerRepeat": 36.7
    },
@@ -107900,6 +107909,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:kattacastrum",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "kattacastrum"
 }

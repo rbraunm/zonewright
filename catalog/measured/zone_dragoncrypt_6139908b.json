@@ -3067,7 +3067,8 @@
      "vertical": 0.211
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.091,
+     "solid": 0.909
     },
     "unitsPerRepeat": 47.9
    },
@@ -4267,6 +4268,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:dragoncrypt",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "dragoncrypt"
 }

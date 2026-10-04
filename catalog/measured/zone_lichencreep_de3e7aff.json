@@ -11254,7 +11254,8 @@
      "vertical": 0.32
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.512,
+     "solid": 0.488
     },
     "unitsPerRepeat": 6.9
    },
@@ -14369,6 +14370,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:lichencreep",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "lichencreep"
 }

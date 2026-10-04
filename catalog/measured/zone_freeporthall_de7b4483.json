@@ -6334,7 +6334,7 @@
      "vertical": 0.942
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 4.9
    },
@@ -6447,7 +6447,7 @@
      "vertical": 0.879
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 5.9
    },
@@ -6678,7 +6678,8 @@
      "vertical": 0.003
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.239,
+     "solid": 0.761
     },
     "unitsPerRepeat": 8.7
    },
@@ -6855,7 +6856,7 @@
      "vertical": 0.998
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 6.3
    },
@@ -6920,7 +6921,7 @@
      "vertical": 0.834
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 2.0
    },
@@ -7880,8 +7881,8 @@
     "slopeShares": {
      "flat": 0.164,
      "overhang": 0.228,
-     "slope": 0.167,
-     "steep": 0.171,
+     "slope": 0.139,
+     "steep": 0.198,
      "vertical": 0.271
     },
     "surfaces": {
@@ -10774,6 +10775,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:freeporthall",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "freeporthall"
 }

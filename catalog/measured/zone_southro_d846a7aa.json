@@ -6218,7 +6218,8 @@
      "vertical": 0.461
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.999,
+     "solid": 0.001
     },
     "unitsPerRepeat": 7.1
    },
@@ -12140,6 +12141,6 @@
   "This EQ terrain zone's lights are not read"
  ],
  "source": "zone:southro",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "southro"
 }

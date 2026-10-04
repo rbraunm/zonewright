@@ -65939,7 +65939,7 @@
      "vertical": 0.685
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 10.3
    },
@@ -72191,7 +72191,7 @@
      "vertical": 0.008
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 2.3
    },
@@ -72665,7 +72665,8 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.008,
+     "solid": 0.992
     },
     "unitsPerRepeat": 19.6
    },
@@ -74012,6 +74013,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:chelsithreborn",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "chelsithreborn"
 }

@@ -64930,7 +64930,7 @@
      "vertical": 0.902
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 825.7
    },
@@ -64988,7 +64988,7 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 2275.5
    },
@@ -71001,7 +71001,8 @@
      "vertical": 0.033
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.075,
+     "solid": 0.925
     },
     "unitsPerRepeat": 24.7
    },
@@ -73475,7 +73476,8 @@
      "vertical": 0.173
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.991,
+     "solid": 0.009
     },
     "unitsPerRepeat": 301.2
    },
@@ -76284,6 +76286,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:shiningcity",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "shiningcity"
 }
