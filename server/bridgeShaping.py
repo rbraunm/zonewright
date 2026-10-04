@@ -210,6 +210,15 @@ def movedToProfile(positions, affected, strength, targets, mode):
   return updated
 
 
+def unslidWhereUnshaped(positions, snapped, updated):
+  """A vertex slid onto a break but left at its height by the stroke (ground already past the profile there) goes back where it was:
+  slid, it would stand at its old height in a new place, a tooth off the ledge line."""
+  unshaped = (updated[:, 2] == snapped[:, 2]) & (numpy.abs(snapped[:, :2] - positions[:, :2]).max(axis=1) > 0)
+  updated = updated.copy()
+  updated[unshaped] = positions[unshaped]
+  return updated, unshaped
+
+
 def meshEdgeEnds(sceneObject):
   edges = numpy.empty(len(sceneObject.data.edges) * 2, dtype=numpy.int64)
   sceneObject.data.edges.foreach_get("vertices", edges)
@@ -217,16 +226,20 @@ def meshEdgeEnds(sceneObject):
 
 
 def snapOntoBreaks(sceneObject, positions, affected, coordinate, breakCoordinates, directions, border):
-  """Slide each affected vertex within half an edge of a break sideways along its direction (the way coordinate grows) onto that
-  break, except where it would land almost on a neighbor snapping onto the same break from the other side. breakCoordinates holds
-  each vertex's breaks; returns the slid positions and their coordinates."""
+  """Slide each affected vertex within half an edge of a break, and the nearer end of every edge a break crosses (farther than that
+  on a stretched edge), sideways along its direction (the way coordinate grows) onto that break, so the break runs through vertices;
+  except where it would land almost on a neighbor snapping onto the same break from the other side. breakCoordinates holds each
+  vertex's breaks; returns the slid positions and their coordinates."""
   offsets = breakCoordinates - coordinate[:, None]
   closest = numpy.abs(offsets).argmin(axis=1)
   rows = numpy.arange(len(offsets))
   slide = offsets[rows, closest]
   edgeLength = medianEdgeLength(sceneObject, positions, affected)
-  snapping = affected & (numpy.abs(slide) <= 0.5 * edgeLength) & (numpy.linalg.norm(directions, axis=1) > 0.5) & ~border
   first, second = meshEdgeEnds(sceneObject)
+  crossing = affected[first] & affected[second] & (closest[first] == closest[second]) & (numpy.sign(slide[first]) != numpy.sign(slide[second]))
+  snapping = affected & (numpy.abs(slide) <= 0.5 * edgeLength)
+  snapping[numpy.where(numpy.abs(slide[first]) <= numpy.abs(slide[second]), first, second)[crossing]] = True
+  snapping &= (numpy.linalg.norm(directions, axis=1) > 0.5) & ~border
   pairs = snapping[first] & snapping[second] & (closest[first] == closest[second]) & (numpy.sign(slide[first]) != numpy.sign(slide[second]))
   first, second = first[pairs], second[pairs]
   apart = positions[second, :2] - positions[first, :2]
@@ -247,19 +260,21 @@ def profileAlongPath(sceneObject, positions, affected, strength, path, radii, pr
   conformRim (carve only), untouched vertices just outside the cut slide sideways onto the rim contour so the edge follows the profile
   instead of the grid. The mesh's open edge never slides, so a cut running off the terrain keeps its border."""
   fractions, floors, radiiHere, nearest = bridgeMeshAccess.strokeAlongPath(positions, path, radii, horizontal=True)
-  lateral = fractions * radiiHere
+  lateral = unslidLateral = fractions * radiiHere
   unsnapped = movedToProfile(positions, affected, strength, floors + numpy.interp(numpy.clip(fractions, 0, 1), profileArray[:, 0], profileArray[:, 1]), mode)
   border = bridgeMeshAccess.boundaryVertexMask(sceneObject)
   outwards = numpy.zeros((len(positions), 2))
   away = lateral > 0
   outwards[away] = (positions[away, :2] - nearest[away]) / lateral[away, None]
+  snapped = positions
   if conformBreaks:
     if len(profileArray) < 3:
       raise ValueError("conformBreaks needs a profile with breaks: points between its first and last")
-    positions, lateral = snapOntoBreaks(sceneObject, positions, affected, lateral, profileArray[1:-1, 0][None, :] * radiiHere[:, None], outwards, border)
+    snapped, lateral = snapOntoBreaks(sceneObject, positions, affected, lateral, profileArray[1:-1, 0][None, :] * radiiHere[:, None], outwards, border)
     fractions = lateral / radiiHere
   targets = floors + numpy.interp(numpy.clip(fractions, 0, 1), profileArray[:, 0], profileArray[:, 1])
-  updated = movedToProfile(positions, affected, strength, targets, mode)
+  updated, unslid = unslidWhereUnshaped(positions, snapped, movedToProfile(snapped, affected, strength, targets, mode))
+  lateral = numpy.where(unslid, unslidLateral, lateral)
   moving = updated[:, 2] != positions[:, 2]
   if conformRim:
     heightsAboveFloor = positions[:, 2] - floors
@@ -319,7 +334,7 @@ def sculptOutline(objectName, mode, outline, base, profile, strength, conformBre
   if conformBreaks:
     breaks = numpy.broadcast_to(profileArray[1:-1, 0][None, :], (len(positions), len(profileArray) - 2))
     snapped, distance = snapOntoBreaks(sceneObject, positions, affected, distance, breaks, directions, bridgeMeshAccess.boundaryVertexMask(sceneObject))
-  updated = movedToProfile(snapped, affected, strength, base + numpy.interp(distance, profileArray[:, 0], profileArray[:, 1]), mode)
+  updated, _ = unslidWhereUnshaped(positions, snapped, movedToProfile(snapped, affected, strength, base + numpy.interp(distance, profileArray[:, 0], profileArray[:, 1]), mode))
   return finishProfileStroke(sceneObject, positions, updated, unsnapped)
 
 

@@ -310,6 +310,40 @@ def testFillOnAWarpedGridLeavesNoFoldedTriangles(stageBlenderServer):
   assert sum(area < 0.1 * 8 * 8 / 2 for area in areas) == 0
 
 
+def testFillPutsEveryBreakItCrossesOnVerticesAndLeavesGroundAboveItInPlace(stageBlenderServer):
+  # An 8-unit grid with the rows past y = +-40 moved out 12, as where a warp stretched it: the break 49 from the path lies 9 from the
+  # nearest row (y = +-40), farther than half the grid's usual edge. East of x = 38 the rows from y = 40 out stand on a mound 25 high,
+  # above the fill there, so the fill leaves them alone.
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [160, 160], "spacing": 8, "location": [0, 0, 0]})
+    for side in (1, -1):
+      await session.expectSuccess("moveVertices", {"objectName": "ground", "selector": {"box": {"minimum": [-100, 43, -1] if side == 1 else [-100, -100, -1], "maximum": [100, 100, 1] if side == 1 else [100, -43, 1]}}, "offset": [0, 12 * side, 0]})
+    await session.expectSuccess("moveVertices", {"objectName": "ground", "selector": {"box": {"minimum": [38, 38, -1], "maximum": [100, 100, 1]}}, "offset": [0, 0, 25]})
+    stroke = await session.expectSuccess("sculptAlongPath", {
+      "objectName": "ground", "mode": "fill", "path": [[-100, 0, 0], [100, 0, 0]], "radius": 70, "strength": 1,
+      "profile": [[0, 30], [0.7, 20], [1, 0]], "conformBreaks": True,
+    })
+    return stroke, (await session.expectSuccess("runPython", {"code": "objectName = 'ground'" + readShapedMesh}))["result"]
+
+  stroke, shaped = stageBlenderServer.session(steps)
+  vertices = shaped["vertices"]
+  # Each edge from the row at 40 to the row at 60 crosses the break, and its nearer end (on the row at 40) slides onto it at the
+  # break's height, except on the grid's open edge (x = +-80) and on the mound.
+  onBreak = sorted((round(x), round(y)) for x, y, z in vertices if abs(abs(y) - 49) < 1e-3 and abs(z - 20) < 1e-3)
+  assert onBreak == sorted([(x, -49) for x in range(-72, 80, 8)] + [(x, 49) for x in range(-72, 38, 8)])
+  mound = sorted((round(x, 3), round(y, 3), round(z, 3)) for x, y, z in vertices if y > 38 and x > 38)
+  assert mound == [(float(x), float(y), 25.0) for x in range(40, 88, 8) for y in (40, 60, 68, 76, 84, 92)]
+  # Away from the mound and the open edge no face reaches across the break, so the ledge is one clean line.
+  straddling = [
+    face for face in shaped["faces"]
+    if -80 < min(vertices[index][0] for index in face) and max(vertices[index][0] for index in face) < 38
+    and min(abs(vertices[index][1]) for index in face) < 49 - 0.01 < 49 + 0.01 < max(abs(vertices[index][1]) for index in face)
+    and len({vertices[index][1] > 0 for index in face}) == 1
+  ]
+  assert straddling == [] and stroke["foldedFaces"] == 0
+
+
 def testCarveWhoseLastBreakMeetsTheGroundFoldsNothing(stageBlenderServer):
   # The break at 0.8 stands 20 above the floor, exactly at the ground: break snapping and rim sliding aim at one contour from either
   # side.
