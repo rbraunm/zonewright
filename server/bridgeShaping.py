@@ -38,6 +38,10 @@ diagonalSweeps = 4
 contourTolerance = 1e-6
 # Halvings that place a cut on a distance level along its edge: 2 to the -20th of the edge.
 contourBisections = 20
+# An edge whose ends lie on one side of a distance level is sampled at most this share of the level apart to find where the distance
+# passes the level between them; splitting there and triangulating repeats at most this many times.
+contourSampleShare = 0.25
+contourPeakRounds = 4
 # Two neighbors on either side of one break both snap onto it unless they would land closer than this share of an edge apart along
 # it (where a warp squeezed the grid); then only the nearer snaps, as both would fold the faces between them. A rim slide that would
 # land this close to a neighbor (one snapped onto a break lying on the rim) is not made either.
@@ -625,30 +629,34 @@ def followContours(objectName, selector):
 
 
 class HeightMeasure:
-  """Levels as heights: a level crosses an edge where its height does, evenly along it."""
+  """Levels as heights: a level crosses an edge where its height does, evenly along it, so never twice."""
 
   tolerance = contourTolerance
 
   def __init__(self, positions):
     self.values = positions[:, 2].tolist()
 
+  def crossesTwice(self, level):
+    return False
+
   def fractions(self, starts, ends, level, startValues, endValues):
     return (startValues - level) / (startValues - endValues)
 
 
 class BorderMeasure:
-  """Levels as distances from the border of the faces a selector picks, measured for the vertices of the faces being cut."""
+  """Levels as distances from the border of the faces a selector picks (with onlyAbove, from its stretches at a wall's foot), measured
+  for the vertices of the faces being cut."""
 
   tolerance = contourTolerance
 
-  def __init__(self, sceneObject, positions, distanceFrom, within, levels):
+  def __init__(self, sceneObject, positions, distanceFrom, onlyAbove, within, levels):
     if min(levels) <= 0:
       raise ValueError(f"Distances from a border are positive, got {levels!r}")
     picked = bridgeMeshAccess.evaluateSelector(distanceFrom, sceneObject, "faces")
     bridgeMeshAccess.requireSelection(picked, distanceFrom, sceneObject, "faces")
-    border = bridgeMeshAccess.faceBorderEdges(sceneObject, picked, ~picked)
+    border = (bridgeMeshAccess.footBorders(sceneObject, ~picked, picked) if onlyAbove else bridgeMeshAccess.faceBorders(sceneObject, picked, ~picked))[0]
     if not len(border):
-      raise ValueError(f"The faces {distanceFrom!r} picks have no border on '{sceneObject.name}'")
+      raise ValueError(f"The faces {distanceFrom!r} picks have no border{' below the faces beyond them' if onlyAbove else ''} on '{sceneObject.name}'")
     edges = bridgeMeshAccess.meshEdges(sceneObject.data)
     self.tree = bridgeMeshAccess.BorderDistance(positions[edges[border, 0]], positions[edges[border, 1]])
     loopTotals, loopVertices = bridgeMeshAccess.faceLoops(sceneObject)
@@ -657,8 +665,14 @@ class BorderMeasure:
     values[measured] = self.tree.distances(positions[measured])
     self.values = values.tolist()
 
+  def crossesTwice(self, level):
+    return True
+
+  def valuesAt(self, points):
+    return self.tree.distances(points)
+
   def fractions(self, starts, ends, level, startValues, endValues):
-    return bisectedFractions(self.tree.distances, starts, ends, level, startValues)
+    return bisectedFractions(self.valuesAt, starts, ends, level, startValues)
 
 
 class WaterlineMeasure:
@@ -692,7 +706,11 @@ class WaterlineMeasure:
     flat[:, :2] = points[:, :2]
     return self.border.distances(flat)
 
-  def signedDistances(self, points):
+  def crossesTwice(self, level):
+    # The waterline itself is where an edge crosses the surface; only a distance out from it can pass a level twice along an edge.
+    return level != 0
+
+  def valuesAt(self, points):
     return self.planDistances(points) * numpy.where(self.surface.rise(points) < 0, -1.0, 1.0)
 
   def fractions(self, starts, ends, level, startValues, endValues):
@@ -702,8 +720,8 @@ class WaterlineMeasure:
       crossings = starts + fractions[:, None] * (ends - starts)
       heights, apart = self.surface.heights(crossings)
       return numpy.where((apart <= self.tolerance) & (numpy.abs(crossings[:, 2] - heights) <= self.tolerance), fractions, numpy.nan)
-    fractions = bisectedFractions(self.signedDistances, starts, ends, level, startValues)
-    reached = numpy.abs(self.signedDistances(starts + fractions[:, None] * (ends - starts)) - level) <= self.tolerance
+    fractions = bisectedFractions(self.valuesAt, starts, ends, level, startValues)
+    reached = numpy.abs(self.valuesAt(starts + fractions[:, None] * (ends - starts)) - level) <= self.tolerance
     return numpy.where(reached, fractions, numpy.nan)
 
 
@@ -718,8 +736,53 @@ def bisectedFractions(measure, starts, ends, level, startValues):
   return (low + high) / 2
 
 
+def splitAtPeaks(meshEditor, cutting, values, points, measure, level):
+  """Split edges a distance level crosses twice where they lie farthest past it, and triangulate around; returns how many it split."""
+  splits = []
+  for edge in sorted({edge for face in cutting for edge in face.edges}, key=lambda edge: edge.index):
+    start, end = edge.verts
+    first, second = values[start.index] - level, values[end.index] - level
+    # An end on the level (an edge a cut made along it, or out from it) already has the crossing there.
+    if not (math.isfinite(first) and math.isfinite(second)) or first * second < 0 or min(abs(first), abs(second)) <= measure.tolerance:
+      continue
+    length = float(numpy.linalg.norm(points[end.index] - points[start.index]))
+    # Distance changes no faster than one moves along the edge, so it reaches the level only on an edge at least this long.
+    if abs(first) + abs(second) >= length:
+      continue
+    count = max(2, math.ceil(length / (contourSampleShare * level)))
+    fractions = numpy.arange(1, count) / count
+    past = measure.valuesAt(points[start.index] + fractions[:, None] * (points[end.index] - points[start.index])) - level
+    farthest = int(numpy.argmax(-numpy.sign(first) * past))
+    if numpy.sign(past[farthest]) != numpy.sign(first):
+      splits.append((edge, start, float(fractions[farthest]), float(past[farthest]) + level))
+  touched, inserted = set(), set()
+  for edge, start, fraction, distance in splits:
+    end = edge.other_vert(start)
+    _, vertex = bmesh.utils.edge_split(edge, start, fraction)
+    vertex.index = len(values)
+    values.append(distance)
+    points.append(points[start.index] + fraction * (points[end.index] - points[start.index]))
+    touched.update(vertex.link_faces)
+    inserted.add(vertex)
+  # An edge up a wall one cell wide, both ends on the border, passes a level below half the wall's height twice. A face that gained two
+  # new vertices is split between them first: both lie past the level, and a diagonal from one end of the wall to the other would pass
+  # it twice again.
+  for face in sorted(touched, key=lambda face: face.index):
+    peaks = [vertex for vertex in face.verts if vertex in inserted]
+    if len(peaks) >= 2 and not any(peaks[1] in edge.verts for edge in peaks[0].link_edges if edge in face.edges):
+      newFace, _ = bmesh.utils.face_split(face, peaks[0], peaks[1])
+      touched.add(newFace)
+  meshEditor.faces.index_update()
+  if touched:
+    triangulated = bmesh.ops.triangulate(meshEditor, faces=sorted(touched, key=lambda face: face.index), quad_method="BEAUTY", ngon_method="BEAUTY")
+    cutting.update(triangulated["faces"])
+    cutting.difference_update([face for face in cutting if not face.is_valid])
+  return len(splits)
+
+
 def cutAlongLevels(sceneObject, positions, measure, levels, within):
-  """Split the faces of a face mask along each level of a measure: each crossed edge where the level crosses it, then each face between two such splits."""
+  """Split the faces of a face mask along each level of a measure: each edge the level crosses twice where it lies farthest past it,
+  then each crossed edge where the level crosses it, then each face between two such splits."""
   values = list(measure.values)
   points = list(positions)
   meshEditor = bridgeMeshAccess.loadBMesh(sceneObject)
@@ -734,8 +797,20 @@ def cutAlongLevels(sceneObject, positions, measure, levels, within):
     triangles = bmesh.ops.triangulate(meshEditor, faces=crossed, quad_method="FIXED", ngon_method="EAR_CLIP")["faces"]
     cutting = (cutting - set(crossed)) | set(triangles)
     meshEditor.edges.index_update()
-  splitEdges = splitFaces = 0
+    meshEditor.faces.index_update()
+  splitEdges = splitFaces = doubleCrossings = 0
   for level in sorted(levels):
+    if measure.crossesTwice(level):
+      for _ in range(contourPeakRounds + 1):
+        split = splitAtPeaks(meshEditor, cutting, values, points, measure, level)
+        meshEditor.edges.index_update()
+        meshEditor.faces.index_update()
+        doubleCrossings += split
+        if not split:
+          break
+      else:
+        meshEditor.free()
+        raise ValueError(f"Edges the distance level {level} crosses twice remained after {contourPeakRounds} rounds of splitting them on '{sceneObject.name}'; nothing was changed")
     onLevel = set()
     crossing = []
     for edge in sorted({edge for face in cutting for edge in face.edges}, key=lambda edge: edge.index):
@@ -767,23 +842,27 @@ def cutAlongLevels(sceneObject, positions, measure, levels, within):
   polygons = [face for face in cutting if face.is_valid and len(face.verts) > 3]
   bmesh.ops.triangulate(meshEditor, faces=polygons, quad_method="BEAUTY", ngon_method="BEAUTY")
   bridgeMeshAccess.storeSplitBMesh(meshEditor, sceneObject)
-  return {"splitEdges": splitEdges, "splitFaces": splitFaces}
+  return {"splitEdges": splitEdges, "splitFaces": splitFaces, "doubleCrossings": doubleCrossings}
 
 
-def cutContours(objectName, levels, distanceFrom, waterline, selector):
-  """Cut the selected faces along level lines, as an artist adds an edge loop: of equal height, of equal distance from the border of the faces distanceFrom picks, or of equal distance out from a pool or river's waterline."""
+def cutContours(objectName, levels, distanceFrom, waterline, selector, onlyAbove):
+  """Cut the selected faces along level lines, as an artist adds an edge loop: of equal height, of equal distance from the border of
+  the faces distanceFrom picks (with onlyAbove, from its stretches at a wall's foot: footBorders), or of equal distance out from a pool
+  or river's waterline."""
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   if not levels or len(set(levels)) != len(levels):
     raise ValueError(f"levels is a list of different values, got {levels!r}")
   if distanceFrom is not None and waterline is not None:
     raise ValueError("distanceFrom and waterline each say what the levels measure from; give one of them")
+  if onlyAbove and distanceFrom is None:
+    raise ValueError("onlyAbove measures distance from where the faces beyond distanceFrom's rise above them; it needs distanceFrom")
   within = bridgeMeshAccess.evaluateSelector(selector, sceneObject, "faces")
   bridgeMeshAccess.requireSelection(within, selector, sceneObject, "faces")
   positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
   if waterline is not None:
     measure = WaterlineMeasure(sceneObject, positions, bridgeMeshAccess.WaterSurface(bridgeMeshAccess.requireWater(waterline)), levels)
   elif distanceFrom is not None:
-    measure = BorderMeasure(sceneObject, positions, distanceFrom, within, levels)
+    measure = BorderMeasure(sceneObject, positions, distanceFrom, onlyAbove, within, levels)
   else:
     measure = HeightMeasure(positions)
   return cutAlongLevels(sceneObject, positions, measure, levels, within) | bridgeMeshAccess.meshCounts(sceneObject)

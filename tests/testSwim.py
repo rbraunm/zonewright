@@ -204,14 +204,14 @@ def testPlanNamesEachSwimVolumeInsideItClearOfTheOthers(stageBlenderServer, tmp_
     await pondScene(session, tmp_path)
     await session.expectSuccess("buildSwimVolumes", {"body": "pool"})
     volumes = (await session.expectSuccess("getSwimVolumes", {}))["volumes"]
-    _, drawn = await session.expectImage("renderSketch", plan | {"layers": ["water", "swim"]})
+    _, drawn = await session.expectImage("renderSketch", plan | {"layers": ["water", "swim"], "spotHeights": False})
     return volumes, drawn
 
   volumes, drawn = stageBlenderServer.session(steps)
   frame = planDrawing.PlanFrame(plan["center"], plan["width"], (1440, 810))
   boxes = [{"name": volume["name"], "liquid": volume["liquid"], "corners": [volume["minimum"], volume["maximum"]]} for volume in volumes]
   draw = ImageDraw.Draw(Image.new("RGBA", frame.size))
-  labels, unnamed = planDrawing.swimLabels(draw, frame, boxes)
+  labels, unnamed = planDrawing.swimLabels(draw, frame, boxes, [])
   bounds = {name: planDrawing.labelBounds(draw, position, text, planDrawing.swimLabelSize) for name, text, position in labels}
   rectangles = {}
   for box in boxes:

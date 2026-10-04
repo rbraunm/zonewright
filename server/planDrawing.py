@@ -123,6 +123,48 @@ def drawSpots(draw, frame, spots):
     labelAt(draw, (x + 4, y + 3), f"{spot['height']:.0f}", (90, 30, 0), 12, "la")
 
 
+def labelBounds(draw, position, text, size, anchor="mm"):
+  """The pixel bounds of a label labelAt draws."""
+  return draw.textbbox(position, text, font=fontOf(size), anchor=anchor, stroke_width=3)
+
+
+def boxesOverlap(first, second):
+  return first[0] < second[2] and second[0] < first[2] and first[1] < second[3] and second[1] < first[3]
+
+
+def spotCovers(draw, frame, spots):
+  """The boxes each spot height's dot and number cover on the drawing."""
+  covered = []
+  for spot in spots:
+    x, y = frame.pixel(spot["at"])
+    numberBox = labelBounds(draw, (x + 4, y + 3), f"{spot['height']:.0f}", 12, "la")
+    covered.append((x - 3, y - 3, numberBox[2], numberBox[3]))
+  return covered
+
+
+def clearPlace(draw, frame, center, text, size, covered, within=None):
+  """The point nearest center, a quarter of a grid step apart, where text's box overlaps nothing covered (and lies within a box, given
+  one), with that box; None where there is none."""
+  quarter = frame.length(gridStepFor(frame.width)) / 4
+  offsets = sorted(((dx * quarter, dy * quarter) for dx in range(-4, 5) for dy in range(-4, 5)), key=lambda offset: math.hypot(*offset))
+  for dx, dy in offsets:
+    position = (center[0] + dx, center[1] + dy)
+    bounds = labelBounds(draw, position, text, size)
+    inside = within is None or (bounds[0] >= within[0] and bounds[1] >= within[1] and bounds[2] <= within[2] and bounds[3] <= within[3])
+    if inside and not any(boxesOverlap(bounds, other) for other in covered):
+      return position, bounds
+  return None
+
+
+def clearLabelAt(draw, frame, center, text, color, size, covered):
+  """Label text at the point nearest center whose box overlaps nothing covered, and cover it there."""
+  found = clearPlace(draw, frame, center, text, size, covered)
+  # Crowded all around (a tight zoom on a grid of spot heights): the label keeps its own place.
+  position, bounds = found if found is not None else (center, labelBounds(draw, center, text, size))
+  labelAt(draw, position, text, color, size)
+  covered.append(bounds)
+
+
 def drawWater(draw, frame, bodies):
   """Each body's water as players see it (row runs and edge loops, as planOverlays gives them), filled in its liquid's color."""
   for body in bodies:
@@ -133,13 +175,9 @@ def drawWater(draw, frame, bodies):
       draw.polygon([frame.pixel(point) for point in loop], fill=fill)
 
 
-def labelBounds(draw, position, text, size):
-  """The pixel bounds of a label labelAt draws."""
-  return draw.textbbox(position, text, font=fontOf(size), anchor="mm", stroke_width=3)
-
-
-def swimLabels(draw, frame, boxes):
-  """Where each swim volume in the drawing is named, inside its part of the drawing and clear of the other names, in full where that fits, else by its number: [(name, text, position)], and the boxes left unnamed."""
+def swimLabels(draw, frame, boxes, covered):
+  """Where each swim volume in the drawing is named, inside its part of the drawing and clear of what is covered (spot heights, the
+  other names), in full where that fits, else by its number: [(name, text, position)], and the boxes left unnamed. Covers each name."""
   shown = []
   for box in boxes:
     (low, high) = box["corners"]
@@ -148,46 +186,46 @@ def swimLabels(draw, frame, boxes):
     right, bottom = min(frame.size[0], max(x for x, _ in points)), min(frame.size[1], max(y for _, y in points))
     if right > left and bottom > top:
       shown.append((box["name"], (left, top, right, bottom)))
-  labels, taken = [], []
+  labels = []
   for name, (left, top, right, bottom) in sorted(shown, key=lambda pair: (pair[1][2] - pair[1][0]) * (pair[1][3] - pair[1][1]), reverse=True):
     middle = ((left + right) / 2, (top + bottom) / 2)
+    within = (left + swimLabelMargin, top + swimLabelMargin, right - swimLabelMargin, bottom - swimLabelMargin)
     number = name[len(name.rstrip("0123456789")):]
     for text in [name] + ([number] if number else []):
-      bounds = labelBounds(draw, middle, text, swimLabelSize)
-      inside = bounds[0] >= left + swimLabelMargin and bounds[2] <= right - swimLabelMargin and bounds[1] >= top + swimLabelMargin and bounds[3] <= bottom - swimLabelMargin
-      if inside and not any(bounds[0] < other[2] and other[0] < bounds[2] and bounds[1] < other[3] and other[1] < bounds[3] for other in taken):
-        labels.append((name, text, middle))
-        taken.append(bounds)
+      found = clearPlace(draw, frame, middle, text, swimLabelSize, covered, within)
+      if found is not None:
+        labels.append((name, text, found[0]))
+        covered.append(found[1])
         break
   named = {name for name, _, _ in labels}
   return labels, [name for name, _ in shown if name not in named]
 
 
-def drawSwim(draw, frame, boxes):
+def drawSwim(draw, frame, boxes, covered):
   """Swim volumes as dashed rectangles in plan, named where swimLabels places them; returns the boxes in the drawing left unnamed."""
   for box in boxes:
     (low, high) = box["corners"]
     points = [frame.pixel(point) for point in ((low[0], low[1]), (high[0], low[1]), (high[0], high[1]), (low[0], high[1]))]
     dashedLine(draw, points + points[:1], (*swimColors[box["liquid"]], 255), 2)
   liquids = {box["name"]: box["liquid"] for box in boxes}
-  labels, unnamed = swimLabels(draw, frame, boxes)
+  labels, unnamed = swimLabels(draw, frame, boxes, covered)
   for name, text, position in labels:
     labelAt(draw, position, text, swimColors[liquids[name]], swimLabelSize)
   return unnamed
 
 
-def drawRegions(draw, frame, regions):
+def drawRegions(draw, frame, regions, covered):
   for region in regions:
     points = [frame.pixel(point) for point in region["outline"]]
     dashedLine(draw, points + points[:1], (*regionColor, 230), 2)
-    labelAt(draw, centroidOf(points), region["name"], regionColor, 13)
+    clearLabelAt(draw, frame, centroidOf(points), region["name"], regionColor, 13, covered)
 
 
-def drawPlots(draw, frame, plots):
+def drawPlots(draw, frame, plots, covered):
   for plot in plots:
     points = [frame.pixel(point) for point in plot["corners"]]
     draw.polygon(points, outline=(*plotColor, 255), width=2)
-    labelAt(draw, centroidOf(points), plot["address"], plotColor, 12)
+    clearLabelAt(draw, frame, centroidOf(points), plot["address"], plotColor, 12, covered)
 
 
 def drawShape(draw, frame, shape, color):
@@ -240,9 +278,10 @@ def drawPlan(basePath, outputPath, center, width, overlays):
   draw = ImageDraw.Draw(layer)
   step = drawGrid(draw, frame)
   drawWater(draw, frame, overlays["water"])
-  unnamedSwimVolumes = drawSwim(draw, frame, overlays["swim"])
-  drawRegions(draw, frame, overlays["regions"])
-  drawPlots(draw, frame, overlays["plots"])
+  covered = spotCovers(draw, frame, overlays["spots"])
+  unnamedSwimVolumes = drawSwim(draw, frame, overlays["swim"], covered)
+  drawRegions(draw, frame, overlays["regions"], covered)
+  drawPlots(draw, frame, overlays["plots"], covered)
   drawSpots(draw, frame, overlays["spots"])
   legend = []
   for index, sheet in enumerate(overlays["sheets"]):

@@ -1,5 +1,6 @@
 """Authoring a zone the way an environment artist does: regions that say what an area is to become, surfacing layers painted by intent
 and edited at their boundaries, and broad strokes that take an area back to start it again. Runs under Blender's Python."""
+import collections
 import json
 import math
 
@@ -21,6 +22,15 @@ regionCollectionName = "regions"
 layerOrderProperty = bridgeMeshAccess.surfaceLayersProperty
 baseAttributeName = "zonewrightSurfaceBase"
 layerAttributePrefix = "zonewrightSurface:"
+# Once a layer maps a transition its own way, the mesh's own UVs are kept here per face corner and the UV map is composed from them
+# and the transition mappings, as materials are from the layers; each layer's transition mapping is kept under the prefix, not a
+# number where the layer maps nothing of its own. Three-component vectors, so Blender does not take them for UV maps.
+baseMappingName = "zonewrightSurfaceBaseUV"
+transitionMappingPrefix = "zonewrightTransitionUV:"
+# Each border edge a conform run put on its evened line keeps the smoothing it was evened at, so a later run at that smoothing or
+# less leaves it as it is: evening a line that is already even still moves it (a narrow stroke's ends round off further each time).
+# Paint changed beside an edge clears its record.
+conformedPrefix = "zonewrightConformed:"
 uncovered = -1
 surfaceOperations = ("grow", "shrink", "smooth", "clean")
 # Snapped vertices whose faces would turn over or shrink below this share of their area go back, over up to this many rounds.
@@ -29,8 +39,21 @@ conformRepairs = 4
 # A vertex where a face around it turns more than this from their mean stays put: it sits on a crease (a cliff's edge), which
 # sliding it would move, and a border there already runs on a modeled edge.
 conformCreaseDegrees = 20
+# A vertex this share of the mesh's edge length from an evened border already lies on it: it stays, and no edge crosses the border
+# there.
+conformOnLineShare = 0.1
+# Where the nearer end of a crossed edge cannot slide onto the line, the farther end may, unless that takes it more than this share
+# of the way along the edge, stretching the faces behind it.
+conformFarthestSlide = 0.75
+# Where two pieces touch at a corner, the chains run on through it the way they bend least (the bend of a pair is one plus the
+# cosine between the ways they leave); two ways bending within this much of each other leave it ambiguous, and the painted value
+# is taken to run on through it.
+conformPinchTie = 0.25
 # A transition strip takes faces reaching this fraction past its width, so a contour cut at the width counts as inside it.
 transitionTolerance = 1e-4
+# A strip face's middle may lie this share of the width nearer or farther than its corners' distances say. Beyond it the distance does
+# not run evenly across the face (it reaches over a wall's whole height with every corner on the border) and its mapping would smear.
+transitionLinearity = 0.25
 # Cleaning takes over small pieces, then pieces the first takeover left small, for up to this many rounds.
 cleanRounds = 4
 rebuildModes = ("surroundings", "height")
@@ -128,13 +151,12 @@ def materialSlot(sceneObject, materialName):
   return slot
 
 
-def shownSurface(sceneObject):
-  """The material each face shows (the topmost unmuted layer covering it, else the material it had when the first layer was added)
-  and the position in the layer order of the layer that decides it, -1 for the base."""
+def shownSurface(sceneObject, belowPosition=None):
+  """Each face's material from the topmost unmuted layer covering it (below belowPosition), else its base, and that layer's position (-1)."""
   mesh = sceneObject.data
   materialIndices = readFaceInts(mesh, baseAttributeName)
   deciders = numpy.full(len(materialIndices), -1)
-  for position, layer in enumerate(bridgeMeshAccess.surfaceLayers(sceneObject)):
+  for position, layer in enumerate(bridgeMeshAccess.surfaceLayers(sceneObject)[:belowPosition]):
     if not layer["muted"]:
       values = readFaceInts(mesh, layerAttributePrefix + layer["name"])
       covered = values != uncovered
@@ -143,11 +165,67 @@ def shownSurface(sceneObject):
   return materialIndices, deciders
 
 
+def readCornerVectors(mesh, attributeName):
+  vectors = numpy.empty(len(mesh.loops) * 3)
+  mesh.attributes[attributeName].data.foreach_get("vector", vectors)
+  return vectors.reshape(-1, 3)
+
+
+def writeCornerVectors(mesh, attributeName, vectors):
+  mesh.attributes[attributeName].data.foreach_set("vector", numpy.asarray(vectors, dtype=numpy.float64).ravel())
+
+
+def mappingAttributes(mesh):
+  """The names of the corner mappings a layered mesh keeps besides its UV maps: its base mapping and its layers' transition mappings."""
+  return [attribute.name for attribute in mesh.attributes if attribute.name == baseMappingName or attribute.name.startswith(transitionMappingPrefix)]
+
+
 def compose(sceneObject):
+  """Show each face's material, and once a layer maps a transition its own way, each face's mapping, as the layers decide them."""
   mesh = sceneObject.data
-  mesh.polygons.foreach_set("material_index", shownSurface(sceneObject)[0])
+  shown, deciders = shownSurface(sceneObject)
+  mesh.polygons.foreach_set("material_index", shown)
+  if baseMappingName in mesh.attributes:
+    loopTotals, _ = bridgeMeshAccess.faceLoops(sceneObject)
+    loopDeciders = numpy.repeat(deciders, loopTotals)
+    mapping = readCornerVectors(mesh, baseMappingName)
+    for position, layer in enumerate(bridgeMeshAccess.surfaceLayers(sceneObject)):
+      name = transitionMappingPrefix + layer["name"]
+      if name in mesh.attributes:
+        own = readCornerVectors(mesh, name)
+        showing = (loopDeciders == position) & ~numpy.isnan(own[:, 0])
+        mapping[showing] = own[showing]
+    mesh.uv_layers[bridgeSurfacing.uvLayerName].data.foreach_set("uv", mapping[:, :2].ravel())
   mesh.update()
   return describeLayers(sceneObject)
+
+
+def readEdgeFloats(mesh, attributeName):
+  values = numpy.empty(len(mesh.edges))
+  mesh.attributes[attributeName].data.foreach_get("value", values)
+  return values
+
+
+def writeLayerValues(sceneObject, layer, values, replaced):
+  """Write a layer's paint; replaced faces lose the layer's transition mapping, and their edges the record of being evened."""
+  mesh = sceneObject.data
+  writeFaceInts(mesh, layerAttributePrefix + layer, values)
+  if not replaced.any():
+    return
+  loopTotals, _ = bridgeMeshAccess.faceLoops(sceneObject)
+  replacedLoops = numpy.repeat(replaced, loopTotals)
+  name = transitionMappingPrefix + layer
+  if name in mesh.attributes:
+    mapping = readCornerVectors(mesh, name)
+    mapping[replacedLoops] = numpy.nan
+    writeCornerVectors(mesh, name, mapping)
+  markName = conformedPrefix + layer
+  if markName in mesh.attributes:
+    loopEdges = numpy.empty(len(mesh.loops), dtype=numpy.int64)
+    mesh.loops.foreach_get("edge_index", loopEdges)
+    marks = readEdgeFloats(mesh, markName)
+    marks[loopEdges[replacedLoops]] = 0
+    mesh.attributes[markName].data.foreach_set("value", marks)
 
 
 def describeLayers(sceneObject):
@@ -203,11 +281,15 @@ def removeSurfaceLayer(objectName, name):
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   layers = [layer for layer in requireLayer(sceneObject, name) if layer["name"] != name]
   mesh = sceneObject.data
-  mesh.attributes.remove(mesh.attributes[layerAttributePrefix + name])
+  for attributeName in (layerAttributePrefix + name, transitionMappingPrefix + name, conformedPrefix + name):
+    if attributeName in mesh.attributes:
+      mesh.attributes.remove(mesh.attributes[attributeName])
   sceneObject[layerOrderProperty] = json.dumps(layers)
   described = compose(sceneObject)
   if not layers:
-    mesh.attributes.remove(mesh.attributes[baseAttributeName])
+    for attributeName in (baseAttributeName, baseMappingName):
+      if attributeName in mesh.attributes:
+        mesh.attributes.remove(mesh.attributes[attributeName])
     del sceneObject[layerOrderProperty]
   return described
 
@@ -228,23 +310,107 @@ def nearestDistances(points, others):
 
 
 def roughenedSelection(sceneObject, mask, edgeNoise):
-  """The selection with its edge moved in and out by smooth noise up to about edgeNoise's amplitude, so a painted edge wanders as a
-  painted one does instead of following a circle, a line, or the grid."""
-  if edgeNoise is None or mask.all() or not mask.any():
+  """The selection with its border moved along the surface by smooth noise up to the amplitude, its pieces kept whole (wholePieces)."""
+  if edgeNoise is None:
     return mask
   unknown = sorted(set(edgeNoise) - {"featureSize", "amplitude", "seed"})
-  if unknown or edgeNoise.get("amplitude", 0) <= 0:
+  if unknown or "featureSize" not in edgeNoise or edgeNoise.get("amplitude", 0) <= 0:
     raise ValueError(f"edgeNoise is {{featureSize, amplitude (positive), seed}}, got {edgeNoise!r}")
-  centers = faceCenters(sceneObject)
+  if mask.all() or not mask.any():
+    return mask
+  centers, normals, _ = bridgeMeshAccess.readFaceArrays(sceneObject)
+  positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
   amplitude = edgeNoise["amplitude"]
-  # Only faces within twice the amplitude of the edge can cross it.
-  signed = numpy.full(len(centers), numpy.inf)
-  signed[mask] = nearestDistances(centers[mask], centers[~mask])
-  signed[~mask] = -nearestDistances(centers[~mask], centers[mask])
-  near = numpy.abs(signed) <= 2 * amplitude
-  noise = bridgeNoise.fractalNoise(bridgeNoise.noiseSamplePoints(centers[near], edgeNoise["featureSize"], edgeNoise.get("seed", 0)), 2, 0.5)
+  borderEdges, _, _ = bridgeMeshAccess.faceBorders(sceneObject, mask, ~mask)
+  ends = bridgeMeshAccess.meshEdges(sceneObject.data)[borderEdges]
+  border = bridgeMeshAccess.BorderDistance(positions[ends[:, 0]], positions[ends[:, 1]])
+  near = numpy.flatnonzero(noiseReach(sceneObject, mask, amplitude))
+  # The noise is sampled in plan, so the same edgeNoise on the same faces picks the same faces again; the move runs along each face.
+  plan = centers[near] * numpy.array([1.0, 1.0, 0.0])
+  vectors = bridgeNoise.noiseVectors(bridgeNoise.noiseSamplePoints(plan, edgeNoise["featureSize"], edgeNoise.get("seed", 0))) / bridgeNoise.noiseSpread
+  vectors -= (vectors * normals[near]).sum(axis=1, keepdims=True) * normals[near]
+  lengths = numpy.linalg.norm(vectors, axis=1)
+  moves = (amplitude * numpy.tanh(lengths) / numpy.maximum(lengths, 1e-12))[:, None] * vectors
   result = mask.copy()
-  result[near] = signed[near] + amplitude * noise > 0
+  # Each face near the border takes the side of the moved border its middle lies on: its signed distance from the border, less the
+  # move along that distance's slope.
+  for face, move in zip(near, moves):
+    distance, segment, along = border.nearest(centers[face])
+    side = 1.0 if mask[face] else -1.0
+    slope = side * (centers[face] - (border.starts[segment] + along * border.spans[segment])) / distance
+    result[face] = side * distance - slope @ move > 0
+  return wholePieces(sceneObject, mask, result)
+
+
+def noiseReach(sceneObject, mask, amplitude):
+  """The faces edge noise of this amplitude can move across: those whose middles lie within it and a border edge of the mask's border."""
+  centers, _, _ = bridgeMeshAccess.readFaceArrays(sceneObject)
+  positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
+  borderEdges, _, _ = bridgeMeshAccess.faceBorders(sceneObject, mask, ~mask)
+  if not len(borderEdges):
+    return numpy.zeros(len(mask), dtype=bool)
+  ends = bridgeMeshAccess.meshEdges(sceneObject.data)[borderEdges]
+  reach = amplitude + float(numpy.linalg.norm(positions[ends[:, 1]] - positions[ends[:, 0]], axis=1).max())
+  return nearestDistances(centers, positions[numpy.unique(ends)]) <= reach
+
+
+def wholePieces(sceneObject, mask, roughened):
+  """The roughened selection with each piece of the selection rejoined where the noise pinched it, and faces it stranded off them dropped."""
+  first, second = faceNeighbourPairs(sceneObject.data)
+  count = len(mask)
+  inside = mask[first] & mask[second]
+  pieces = faceComponents(first[inside], second[inside], count)
+  result = roughened.copy()
+
+  def parts():
+    joined = result[first] & result[second]
+    return faceComponents(first[joined], second[joined], count)
+
+  current = parts()
+  # Faces the noise added past a neck that touch the rest only at a corner are specks of their own.
+  anchored = numpy.zeros(count, dtype=bool)
+  anchored[current[result & mask]] = True
+  result &= anchored[current]
+  current = parts()
+  broken = [piece for piece in numpy.unique(pieces[mask]).tolist() if len(numpy.unique(current[(pieces == piece) & result])) > 1]
+  if not broken:
+    return result
+  neighbours = [[] for _ in range(count)]
+  for a, b in zip(first.tolist(), second.tolist()):
+    neighbours[a].append(b)
+    neighbours[b].append(a)
+  for piece in broken:
+    members = (pieces == piece) & mask
+    while True:
+      touching = numpy.unique(current[members & result])
+      if len(touching) < 2:
+        break
+      # The cheapest way through the piece's own faces from one part to another: the fewest faces the noise took to put back.
+      sources = numpy.flatnonzero(members & result & (current == touching[0])).tolist()
+      costs = {face: 0 for face in sources}
+      previous = {}
+      queue = collections.deque(sources)
+      reached = None
+      while queue:
+        face = queue.popleft()
+        if result[face] and current[face] != touching[0]:
+          reached = face
+          break
+        for neighbour in neighbours[face]:
+          if not members[neighbour]:
+            continue
+          cost = costs[face] + (0 if result[neighbour] else 1)
+          if cost < costs.get(neighbour, math.inf):
+            costs[neighbour] = cost
+            previous[neighbour] = face
+            if result[neighbour]:
+              queue.appendleft(neighbour)
+            else:
+              queue.append(neighbour)
+      while reached in previous:
+        reached = previous[reached]
+        result[reached] = True
+      current = parts()
   return result
 
 
@@ -257,7 +423,7 @@ def paintSurface(objectName, layer, material, selector, edgeNoise):
   slot = materialSlot(sceneObject, material)
   values = readFaceInts(sceneObject.data, layerAttributePrefix + layer)
   values[mask] = slot
-  writeFaceInts(sceneObject.data, layerAttributePrefix + layer, values)
+  writeLayerValues(sceneObject, layer, values, mask)
   return {"painted": int(mask.sum())} | compose(sceneObject)
 
 
@@ -270,26 +436,61 @@ def eraseSurface(objectName, layer, selector, edgeNoise):
   values = readFaceInts(sceneObject.data, layerAttributePrefix + layer)
   erased = int((mask & (values != uncovered)).sum())
   values[mask] = uncovered
-  writeFaceInts(sceneObject.data, layerAttributePrefix + layer, values)
+  writeLayerValues(sceneObject, layer, values, mask)
   return {"erased": erased} | compose(sceneObject)
 
 
 def faceNeighbourPairs(mesh):
   """Pairs of faces sharing an edge, each pair once."""
-  loopEdges = numpy.empty(len(mesh.loops), dtype=numpy.int64)
-  mesh.loops.foreach_get("edge_index", loopEdges)
-  loopTotals = numpy.empty(len(mesh.polygons), dtype=numpy.int64)
-  mesh.polygons.foreach_get("loop_total", loopTotals)
-  loopFaces = numpy.repeat(numpy.arange(len(mesh.polygons)), loopTotals)
-  order = numpy.argsort(loopEdges, kind="stable")
-  matching = numpy.flatnonzero(loopEdges[order][1:] == loopEdges[order][:-1])
-  return loopFaces[order[matching]], loopFaces[order[matching + 1]]
+  _, first, second = bridgeMeshAccess.sharedEdges(mesh)
+  return first, second
+
+
+def cornerNeighbourPairs(sceneObject):
+  """Every pair of faces sharing a corner, once for each corner they share and each face with itself once per corner: (face, other)."""
+  loopTotals, loopVertices = bridgeMeshAccess.faceLoops(sceneObject)
+  loopFaces = numpy.repeat(numpy.arange(len(loopTotals)), loopTotals)
+  order = numpy.argsort(loopVertices, kind="stable")
+  sortedVertices = loopVertices[order]
+  starts = numpy.flatnonzero(numpy.r_[True, sortedVertices[1:] != sortedVertices[:-1]])
+  sizes = numpy.diff(numpy.r_[starts, len(order)])
+  group = numpy.repeat(numpy.arange(len(starts)), sizes)
+  counts = sizes[group]
+  firsts = numpy.repeat(numpy.arange(len(order)), counts)
+  seconds = starts[group][firsts] + numpy.arange(counts.sum()) - numpy.repeat(numpy.cumsum(counts) - counts, counts)
+  return loopFaces[order[firsts]], loopFaces[order[seconds]]
+
+
+def cleanedLayer(sceneObject, layer, within, minimumArea):
+  """A layer's values with the specks and holes smaller than minimumArea that it or a layer beneath shows cleaned, from its own paint only."""
+  mesh = sceneObject.data
+  positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
+  layers = [entry["name"] for entry in bridgeMeshAccess.surfaceLayers(sceneObject)]
+  position = layers.index(layer)
+  shown, deciders = shownSurface(sceneObject)
+  beneath, _ = shownSurface(sceneObject, position)
+  # Where what lies beneath already shows the material taking over, this layer is lifted off; where its own paint takes over, reaching
+  # the face through faces it shows, its paint fills in; any other speck of its own is lifted off. It never takes copies of other
+  # layers' materials, so a speck one layer beneath paints amid another's is left for cleaning that layer.
+  cleaned = cleanedValues(mesh, shown, within & (deciders <= position), faceAreas(sceneObject, positions), minimumArea)
+  taken = cleaned != shown
+  reached = (deciders == position) & ~taken
+  first, second = faceNeighbourPairs(mesh)
+  while True:
+    arriving = numpy.zeros(len(reached), dtype=bool)
+    for source, target in ((first, second), (second, first)):
+      arriving[target[reached[source] & taken[target] & ~reached[target] & (cleaned[source] == cleaned[target])]] = True
+    if not arriving.any():
+      break
+    reached |= arriving
+  values = readFaceInts(mesh, layerAttributePrefix + layer)
+  lifted = taken & (deciders == position) & ((beneath == cleaned) | ~reached)
+  filled = taken & reached & (beneath != cleaned)
+  return numpy.where(lifted, uncovered, numpy.where(filled, cleaned, values)), values
 
 
 def editSurface(objectName, layer, operation, steps, selector, minimumArea):
-  """Grow a layer's covered faces outward, shrink them inward, or smooth them (each face takes the value most of itself and its
-  neighbours hold, which absorbs islands and evens ragged edges), within the selector; or clean it, every island and hole smaller
-  than minimumArea taken over by what surrounds it."""
+  """Grow, shrink, or smooth a layer's painted area within the selector, or clean it (cleanedLayer)."""
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   requireLayer(sceneObject, layer)
   if operation not in surfaceOperations:
@@ -303,17 +504,19 @@ def editSurface(objectName, layer, operation, steps, selector, minimumArea):
   within = bridgeMeshAccess.evaluateSelector(selector, sceneObject, "faces")
   bridgeMeshAccess.requireSelection(within, selector, sceneObject, "faces")
   mesh = sceneObject.data
+  if operation == "clean":
+    shownBefore, _ = shownSurface(sceneObject)
+    values, before = cleanedLayer(sceneObject, layer, within, minimumArea)
+    writeLayerValues(sceneObject, layer, values, values != before)
+    described = compose(sceneObject)
+    return {"changed": int((shownSurface(sceneObject)[0] != shownBefore).sum())} | described
   first, second = faceNeighbourPairs(mesh)
   values = readFaceInts(mesh, layerAttributePrefix + layer)
   before = values.copy()
-  if operation == "clean":
+  if operation == "smooth":
     positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
-    shown, deciders = shownSurface(sceneObject)
-    position = [entry["name"] for entry in bridgeMeshAccess.surfaceLayers(sceneObject)].index(layer)
-    cleaned = cleanedValues(mesh, shown, within & (deciders <= position), faceAreas(sceneObject, positions), minimumArea)
-    values = numpy.where(cleaned != shown, cleaned, values)
-    writeFaceInts(mesh, layerAttributePrefix + layer, values)
-    return {"changed": int((cleaned != shown).sum())} | compose(sceneObject)
+    areas = faceAreas(sceneObject, positions)
+    faces, others = cornerNeighbourPairs(sceneObject)
   for _ in range(steps):
     updated = values.copy()
     if operation == "grow":
@@ -324,15 +527,17 @@ def editSurface(objectName, layer, operation, steps, selector, minimumArea):
       for source, target in ((first, second), (second, first)):
         updated[target[(values[source] == uncovered) & (values[target] != uncovered)]] = uncovered
     else:
+      # Each face takes the value holding most of the surface around its corners, itself included: islands are absorbed and notches
+      # and teeth a face or two across rounded off.
       candidates = numpy.unique(values)
-      votes = numpy.zeros((len(values), len(candidates)))
       columns = numpy.searchsorted(candidates, values)
-      votes[numpy.arange(len(values)), columns] += 1.5
-      numpy.add.at(votes, (first, columns[second]), 1)
-      numpy.add.at(votes, (second, columns[first]), 1)
+      votes = numpy.zeros((len(values), len(candidates)))
+      numpy.add.at(votes, (faces, columns[others]), areas[others])
+      # A tie keeps the face as it is.
+      votes[numpy.arange(len(values)), columns] += 1e-6 * areas
       updated = candidates[votes.argmax(axis=1)]
     values = numpy.where(within, updated, values)
-  writeFaceInts(mesh, layerAttributePrefix + layer, values)
+  writeLayerValues(sceneObject, layer, values, values != before)
   return {"changed": int((values != before).sum())} | compose(sceneObject)
 
 
@@ -364,52 +569,283 @@ def movableVertices(sceneObject, within, positions):
   return (outside == 0) & ~bridgeMeshAccess.boundaryVertexMask(sceneObject) & (flattest >= math.cos(math.radians(conformCreaseDegrees)))
 
 
-def classField(sceneObject, values, smoothing, positions, edges, movable):
-  """For each vertex, how much of the surface around it holds each value of a layer (uncovered among them), evened out over about
-  `smoothing` world units by repeated averaging with its neighbours, only between vertices off creases, so a border on a crease (a
-  cliff's edge) does not spread onto the flat beside it."""
-  classes, faceClass = numpy.unique(values, return_inverse=True)
+def vectorArea(ring):
+  """A closed loop's area as a vector along the axis it winds counterclockwise around."""
+  return numpy.cross(ring, numpy.roll(ring, -1, axis=0)).sum(axis=0) / 2
+
+
+def keepingArea(original, evened):
+  """An evened loop pushed out or in evenly until it encloses the original's area (Steiner: out by d gains perimeter d + pi d^2)."""
+  held = vectorArea(original)
+  perimeter = float(numpy.linalg.norm(numpy.roll(evened, -1, axis=0) - evened, axis=1).sum())
+  # A loop that winds around nothing seen from any side (a band around a pillar) has no area to keep.
+  if numpy.linalg.norm(held) <= 1e-9 * perimeter * perimeter:
+    return evened
+  axis = held / numpy.linalg.norm(held)
+  outward = numpy.cross(numpy.roll(evened, -1, axis=0) - numpy.roll(evened, 1, axis=0), axis)
+  outward /= numpy.maximum(numpy.linalg.norm(outward, axis=1, keepdims=True), 1e-12)
+  missing = float(numpy.linalg.norm(held)) - float(vectorArea(evened) @ axis)
+  # A loop encloses at most a circle's area for its length and the original encloses some, so the root's argument is positive.
+  return evened + (2 * missing / (perimeter + math.sqrt(perimeter * perimeter + 4 * math.pi * missing))) * outward
+
+
+def resampledChain(points, closed, step):
+  """A chain's points (a closed one ending on its first) placed evenly along it, about `step` apart, keeping its ends."""
+  arcs = numpy.concatenate([[0.0], numpy.cumsum(numpy.linalg.norm(numpy.diff(points, axis=0), axis=1))])
+  count = max(math.ceil(arcs[-1] / step), 3 if closed else 1)
+  samples = numpy.linspace(0.0, arcs[-1], count + 1)
+  return numpy.column_stack([numpy.interp(samples, arcs, points[:, axis]) for axis in range(3)])
+
+
+def evenedChain(points, closed, spread):
+  """A border chain resampled evenly and Gaussian-evened over `spread` of arc, twice the mean less the mean of the mean (keepingArea)."""
+  original = points[:-1] if closed else points
+  points = resampledChain(points, closed, min(spread, float(numpy.median(numpy.linalg.norm(numpy.diff(points, axis=0), axis=1)))) / 4)
+  ring = points[:-1] if closed else points
+  spacing = float(numpy.linalg.norm(points[1] - points[0]))
+  half = math.ceil(4 * spread / spacing)
+  taps = numpy.exp(-0.5 * (numpy.arange(-half, half + 1) * spacing / spread) ** 2)
+  taps /= taps.sum()
+
+  def blurred(source):
+    padded = numpy.pad(source, ((half, half), (0, 0)), mode="wrap") if closed else numpy.pad(source, ((half, half), (0, 0)), mode="reflect", reflect_type="odd")
+    return numpy.column_stack([numpy.convolve(padded[:, axis], taps, mode="valid") for axis in range(3)])
+
+  # Adding the mean's own shortfall back once takes saw teeth out while bends much wider than the spread stay where they are; an
+  # open chain runs on past each end as its own reflection through it, so it keeps its ends and runs straight into them.
+  once = blurred(ring)
+  evened = 2 * once - blurred(once)
+  if closed:
+    evened = keepingArea(original, evened)
+    return numpy.vstack([evened, evened[:1]])
+  return evened
+
+
+def chainPieces(chain, positions, movable, settled, closed, spread, shortestLoop):
+  """A chain as (points, evened) stretches: evened where its edges join movable vertices and are not settled, else kept as they are."""
+  vertices = numpy.array(chain)
+  points = positions[vertices]
+  conformable = movable[vertices[:-1]] & movable[vertices[1:]] & ~settled
+  # A closed piece whose outline is shorter than shortestLoop is a speck too small for the smoothing to even.
+  if closed and conformable.all():
+    if numpy.linalg.norm(numpy.diff(points, axis=0), axis=1).sum() < shortestLoop:
+      return [(points, False)]
+    return [(evenedChain(points, True, spread), True)]
+  if closed:
+    shift = int(numpy.flatnonzero(~conformable)[0])
+    vertices = numpy.concatenate([vertices[shift:-1], vertices[:shift + 1]])
+    points = positions[vertices]
+    conformable = numpy.roll(conformable, -shift)
+  breaks = numpy.flatnonzero(conformable[1:] != conformable[:-1]) + 1
+  pieces = []
+  for first, last in zip(numpy.r_[0, breaks], numpy.r_[breaks, len(conformable)]):
+    stretch = points[first:last + 1]
+    pieces.append((evenedChain(stretch, False, spread) if conformable[first] else stretch, bool(conformable[first])))
+  return pieces
+
+
+def pinchJoins(segments, values, leftFaces, positions, normals, reach):
+  """Where four border edges meet at a pinch, the pairs a chain runs on through: those running straightest over `reach`, values allowing."""
+  touching = {}
+  for index, (start, end) in enumerate(segments.tolist()):
+    touching.setdefault(start, []).append(index)
+    touching.setdefault(end, []).append(index)
+
+  def across(vertex, index):
+    start, end = segments[index]
+    return int(end if start == vertex else start)
+
+  def farPoint(vertex, index):
+    previous, current = vertex, across(vertex, index)
+    travelled = float(numpy.linalg.norm(positions[current] - positions[previous]))
+    while travelled < reach and current != vertex and len(touching[current]) == 2:
+      index = next(other for other in touching[current] if other != index)
+      previous, current = current, across(current, index)
+      travelled += float(numpy.linalg.norm(positions[current] - positions[previous]))
+    return positions[current]
+
+  joins = {}
+  for vertex, indices in touching.items():
+    if len(indices) != 4:
+      continue
+    normal = normals[vertex]
+    directions = numpy.array([positions[across(vertex, index)] - positions[vertex] for index in indices])
+    directions -= (directions @ normal)[:, None] * normal
+    first = directions[0] / numpy.linalg.norm(directions[0])
+    order = numpy.argsort(numpy.arctan2(directions @ numpy.cross(normal, first), directions @ first))
+    ordered = [indices[position] for position in order]
+    # Around the vertex counterclockwise, sector i lies between edge i and edge i + 1: the face left of the edge leaving along edge i.
+    sectors = [values[leftFaces[(vertex, across(vertex, index))]] for index in ordered]
+    far = [farPoint(vertex, index) - positions[vertex] for index in ordered]
+    far = [direction / max(float(numpy.linalg.norm(direction)), 1e-12) for direction in far]
+    options = []
+    for shift in (0, 1):
+      joined = sectors[1 - shift]
+      if joined == sectors[3 - shift]:
+        pairs = [(ordered[shift], ordered[shift + 1]), (ordered[shift + 2], ordered[(shift + 3) % 4])]
+        bend = sum(1 + float(far[ordered.index(a)] @ far[ordered.index(b)]) for a, b in pairs)
+        options.append((bend, joined == uncovered, pairs))
+    if not options:
+      continue
+    options.sort(key=lambda option: option[0])
+    if len(options) == 2 and options[1][0] - options[0][0] < conformPinchTie:
+      options.sort(key=lambda option: option[1])
+    joins[vertex] = {a: b for pair in options[0][2] for a, b in (pair, pair[::-1])}
+  return joins
+
+
+class BorderCurves:
+  """A layer's borders as polylines (chains of edges between faces of different value, evened by chainPieces) with each segment's sides."""
+
+  def __init__(self, sceneObject, values, positions, normals, movable, settled, spread, shortestLoop):
+    mesh = sceneObject.data
+    edgeIndices, firstFaces, secondFaces = bridgeMeshAccess.sharedEdges(mesh)
+    borderEdges = edgeIndices[values[firstFaces] != values[secondFaces]]
+    segments = bridgeMeshAccess.meshEdges(mesh)[borderEdges]
+    loopTotals, loopVertices = bridgeMeshAccess.faceLoops(sceneObject)
+    nextLoops, _ = loopNeighbours(sceneObject)
+    leftFaces = dict(zip(zip(loopVertices.tolist(), loopVertices[nextLoops].tolist()), numpy.repeat(numpy.arange(len(loopTotals)), loopTotals).tolist()))
+    for start, end in segments.tolist():
+      if (start, end) not in leftFaces or (end, start) not in leftFaces:
+        raise ValueError(f"The faces of '{sceneObject.name}' on either side of the edge between vertices {start} and {end} wind the same way; recalculate its normals (cleanupMesh)")
+    joins = pinchJoins(segments, values, leftFaces, positions, normals, spread)
+    starts, ends, startTangents, endTangents, sides, evened, curves = [], [], [], [], [], [], []
+    for chain, indices, closed in bridgeMeshAccess.tracedChains(segments, joins):
+      faces = leftFaces[(chain[0], chain[1])], leftFaces[(chain[1], chain[0])]
+      for points, isEvened in chainPieces(chain, positions, movable, settled[borderEdges[indices]], closed, spread, shortestLoop):
+        tangents = numpy.gradient(points, axis=0)
+        tangents /= numpy.maximum(numpy.linalg.norm(tangents, axis=1, keepdims=True), 1e-12)
+        starts.append(points[:-1])
+        ends.append(points[1:])
+        startTangents.append(tangents[:-1])
+        endTangents.append(tangents[1:])
+        count = len(points) - 1
+        sides.append(numpy.tile([values[faces[0]], values[faces[1]]], (count, 1)))
+        evened.append(numpy.full(count, isEvened))
+        curves.append(numpy.full(count, len(curves)))
+    self.starts, self.ends = numpy.concatenate(starts), numpy.concatenate(ends)
+    self.startTangents, self.endTangents = numpy.concatenate(startTangents), numpy.concatenate(endTangents)
+    self.sides, self.evened, self.curves = numpy.concatenate(sides), numpy.concatenate(evened), numpy.concatenate(curves)
+    self.distance = bridgeMeshAccess.BorderDistance(self.starts, self.ends)
+    evenedPoints = numpy.concatenate([self.starts[self.evened], self.ends[self.evened]]) if self.evened.any() else numpy.zeros((0, 3))
+    self.evenedTree = mathutils.kdtree.KDTree(len(evenedPoints))
+    for index, point in enumerate(evenedPoints):
+      self.evenedTree.insert(point, index)
+    self.evenedTree.balance()
+    self.hasEvened = bool(len(evenedPoints))
+
+  def nearEvened(self, points, reach):
+    """Which points lie within reach of an evened curve's points."""
+    if not self.hasEvened:
+      return numpy.zeros(len(points), dtype=bool)
+    return numpy.array([self.evenedTree.find(point)[2] <= reach for point in points], dtype=bool)
+
+  def signedNearest(self, point, normal):
+    """The distance from a point to the nearest border curve, positive on its left, and that curve's segment."""
+    distance, segment, along = self.distance.nearest(point)
+    nearest = self.starts[segment] + along * (self.ends[segment] - self.starts[segment])
+    tangent = (1 - along) * self.startTangents[segment] + along * self.endTangents[segment]
+    return (distance if (point - nearest) @ numpy.cross(normal, tangent) > 0 else -distance), segment
+
+  def signedTo(self, points, normal, curve):
+    """The distances from points to one curve, positive on its left."""
+    chosen = numpy.flatnonzero(self.curves == curve)
+    starts, spans = self.starts[chosen], self.ends[chosen] - self.starts[chosen]
+    along = numpy.clip(((points[:, None] - starts[None]) * spans[None]).sum(axis=2) / numpy.maximum((spans * spans).sum(axis=1), 1e-12)[None], 0, 1)
+    nearest = starts[None] + along[..., None] * spans[None]
+    distances = numpy.linalg.norm(nearest - points[:, None], axis=2)
+    best = distances.argmin(axis=1)
+    rows = numpy.arange(len(points))
+    fractions, segments = along[rows, best], chosen[best]
+    tangents = (1 - fractions)[:, None] * self.startTangents[segments] + fractions[:, None] * self.endTangents[segments]
+    left = ((points - nearest[rows, best]) * numpy.cross(normal, tangents)).sum(axis=1) > 0
+    return numpy.where(left, distances[rows, best], -distances[rows, best])
+
+
+def crossings(curves, positions, normals, candidates, nearestCurves, edges, onLine):
+  """The mesh edges an evened curve crosses between two vertices off it, one of them nearest that curve, and how far along each."""
+  first, second = edges[:, 0], edges[:, 1]
+  both = candidates[first] & candidates[second]
+  firsts, seconds, balances = [], [], []
+  # An edge across a stroke one face wide runs from a vertex nearest one side's curve to a vertex nearest the other's: each end is
+  # measured from both curves, so the edge is found crossing both.
+  for curve in numpy.unique(nearestCurves[numpy.r_[first[both], second[both]]]).tolist():
+    if not curves.evened[curves.curves == curve][0]:
+      continue
+    touching = both & ((nearestCurves[first] == curve) | (nearestCurves[second] == curve))
+    ends = numpy.unique(numpy.r_[first[touching], second[touching]])
+    signed = numpy.zeros(len(positions))
+    signed[ends] = curves.signedTo(positions[ends], normals[ends], curve)
+    crossing = touching & (numpy.abs(signed[first]) > onLine) & (numpy.abs(signed[second]) > onLine) & (numpy.sign(signed[first]) != numpy.sign(signed[second]))
+    firsts.append(first[crossing])
+    seconds.append(second[crossing])
+    balances.append(signed[first[crossing]] / (signed[first[crossing]] - signed[second[crossing]]))
+  if not firsts:
+    return numpy.zeros(0, dtype=numpy.int64), numpy.zeros(0, dtype=numpy.int64), numpy.zeros(0)
+  return numpy.concatenate(firsts), numpy.concatenate(seconds), numpy.concatenate(balances)
+
+
+def assignedSlides(first, second, balance, lengths):
+  """Shortest slides first, a vertex for each crossing and a crossing for each vertex: its nearer end, else its farther end."""
+  options = sorted(
+    (fraction * length, crossing, mover, partner, fraction)
+    for crossing, (start, end, along, length) in enumerate(zip(first.tolist(), second.tolist(), balance.tolist(), lengths.tolist()))
+    for mover, partner, fraction in ((start, end, along), (end, start, 1 - along)) if fraction <= conformFarthestSlide
+  )
+  served, taken, movers, partners, fractions = set(), set(), [], [], []
+  for _, crossing, mover, partner, fraction in options:
+    if crossing not in served and mover not in taken:
+      served.add(crossing)
+      taken.add(mover)
+      movers.append(mover)
+      partners.append(partner)
+      fractions.append(fraction)
+  return numpy.array(movers, dtype=numpy.int64), numpy.array(partners, dtype=numpy.int64), numpy.array(fractions, dtype=numpy.float64)
+
+
+def unspoiledSlides(sceneObject, positions, movers, partners, fractions):
+  """The slides less those folding a face or making a sliver (the longest on each handed once to its edge's other end), and how many failed."""
+  areasBefore = faceAreas(sceneObject, positions)
+  normalsBefore = bridgeMeshAccess.faceNormals(sceneObject, positions)
   loopTotals, loopVertices = bridgeMeshAccess.faceLoops(sceneObject)
   loopFaces = numpy.repeat(numpy.arange(len(loopTotals)), loopTotals)
-  field = numpy.zeros((len(positions), len(classes)))
-  numpy.add.at(field, (loopVertices, faceClass[loopFaces]), faceAreas(sceneObject, positions)[loopFaces])
-  field /= numpy.maximum(field.sum(axis=1, keepdims=True), 1e-12)
-  edgeLength = float(numpy.median(numpy.linalg.norm(positions[edges[:, 0]] - positions[edges[:, 1]], axis=1)))
-  # Each half-and-half averaging step spreads a value about a third of an edge length squared along each axis.
-  steps = math.ceil(3 * (smoothing / edgeLength) ** 2)
-  edges = edges[movable[edges[:, 0]] & movable[edges[:, 1]]]
-  degree = numpy.bincount(edges.ravel(), minlength=len(positions))[:, None]
-  for _ in range(steps):
-    neighbours = numpy.zeros_like(field)
-    numpy.add.at(neighbours, edges[:, 0], field[edges[:, 1]])
-    numpy.add.at(neighbours, edges[:, 1], field[edges[:, 0]])
-    field = numpy.where(degree > 0, 0.5 * field + 0.5 * neighbours / numpy.maximum(degree, 1), field)
-  return classes, faceClass, field
-
-
-def borderSlides(field, edges, positions, movable):
-  """Where the field's leading value changes along an edge, the point between its ends where the two values balance; the nearer end
-  slides onto it. Each vertex takes the nearest such point; returned with its partner along that edge and how far toward it it slides."""
-  labels = field.argmax(axis=1)
-  crossing = (labels[edges[:, 0]] != labels[edges[:, 1]]) & movable[edges[:, 0]] & movable[edges[:, 1]]
-  first, second = edges[crossing, 0], edges[crossing, 1]
-  firstClass, secondClass = labels[first], labels[second]
-  atFirst = field[first, firstClass] - field[first, secondClass]
-  atSecond = field[second, firstClass] - field[second, secondClass]
-  balance = atFirst / (atFirst - atSecond)
-  nearFirst = balance <= 0.5
-  movers = numpy.where(nearFirst, first, second)
-  partners = numpy.where(nearFirst, second, first)
-  fractions = numpy.where(nearFirst, balance, 1 - balance)
-  distances = fractions * numpy.linalg.norm(positions[first] - positions[second], axis=1)
-  order = numpy.lexsort((distances, movers))
-  nearest = order[numpy.r_[True, movers[order][1:] != movers[order][:-1]]] if len(order) else order
-  return movers[nearest], partners[nearest], fractions[nearest]
+  retried = numpy.zeros(len(movers), dtype=bool)
+  # A farther end only takes a crossing whose nearer end serves another; dropping it leaves that crossing no worse off.
+  nearer = fractions <= 0.5
+  dropped = 0
+  for repair in range(conformRepairs + 1):
+    updated = positions.copy()
+    updated[movers] += fractions[:, None] * (positions[partners] - positions[movers])
+    normalsAfter = bridgeMeshAccess.faceNormals(sceneObject, updated)
+    spoiled = ((normalsBefore * normalsAfter).sum(axis=1) <= 0) | (numpy.linalg.norm(normalsAfter, axis=1) < conformSliverShare * areasBefore)
+    if not spoiled.any():
+      break
+    slideOf = numpy.full(len(positions), -1)
+    slideOf[movers] = numpy.arange(len(movers))
+    slideLengths = numpy.linalg.norm(updated - positions, axis=1)
+    spoiledLoops = numpy.flatnonzero(spoiled[loopFaces] & (slideOf[loopVertices] >= 0))
+    # Of the slides spoiling a face, the longest is taken back; the others may be fine once it is.
+    order = numpy.lexsort((-slideLengths[loopVertices[spoiledLoops]], loopFaces[spoiledLoops]))
+    firstOfFace = order[numpy.r_[True, loopFaces[spoiledLoops][order][1:] != loopFaces[spoiledLoops][order][:-1]]] if len(order) else order
+    blamed = numpy.unique(slideOf[loopVertices[spoiledLoops[firstOfFace]]])
+    keep = numpy.ones(len(movers), dtype=bool)
+    moving = set(movers.tolist())
+    for slide in blamed.tolist():
+      partner = int(partners[slide])
+      if repair < conformRepairs and not retried[slide] and partner not in moving and 1 - fractions[slide] <= conformFarthestSlide:
+        moving.discard(int(movers[slide]))
+        moving.add(partner)
+        movers[slide], partners[slide], fractions[slide] = partner, movers[slide], 1 - fractions[slide]
+        retried[slide] = True
+      else:
+        keep[slide] = False
+    dropped += int((~keep & nearer).sum())
+    movers, partners, fractions, retried, nearer = movers[keep], partners[keep], fractions[keep], retried[keep], nearer[keep]
+  return movers, partners, fractions, dropped
 
 
 def slideAlongEdges(sceneObject, movers, partners, fractions):
-  """Move each vertex the given fraction toward its partner in the mesh and in every shaping pass alike, so the passes stay as they
-  were relative to each other, and carry each face's UVs along with the move."""
+  """Move each vertex the fraction toward its partner alike in the mesh and every shaping pass, carrying each face's mappings along."""
   mesh = sceneObject.data
   _, loopVertices = bridgeMeshAccess.faceLoops(sceneObject)
   with bridgeMeshAccess.shapedMesh(sceneObject) as shown:
@@ -431,21 +867,23 @@ def slideAlongEdges(sceneObject, movers, partners, fractions):
   spans = numpy.stack([before[loopVertices[nextLoops[moved]]] - here, before[loopVertices[previousLoops[moved]]] - here], axis=2)
   # The move in each face's own two spans, by least squares, carries that face's UVs as its mapping runs across it.
   weights = numpy.linalg.solve(numpy.einsum("lji,ljk->lik", spans, spans), numpy.einsum("lji,lj->li", spans, moves[loopVertices[moved]])[..., None])[..., 0]
+
+  def carried(mapping):
+    mappingSpans = numpy.stack([mapping[nextLoops[moved]] - mapping[moved], mapping[previousLoops[moved]] - mapping[moved]], axis=2)
+    mapping[moved] += numpy.einsum("lik,lk->li", mappingSpans, weights)
+    return mapping
+
   for uvLayer in mesh.uv_layers:
     uvs = numpy.empty(len(mesh.loops) * 2)
     uvLayer.data.foreach_get("uv", uvs)
-    uvs = uvs.reshape(-1, 2)
-    uvSpans = numpy.stack([uvs[nextLoops[moved]] - uvs[moved], uvs[previousLoops[moved]] - uvs[moved]], axis=2)
-    uvs[moved] += numpy.einsum("lik,lk->li", uvSpans, weights)
-    uvLayer.data.foreach_set("uv", uvs.ravel())
+    uvLayer.data.foreach_set("uv", carried(uvs.reshape(-1, 2)).ravel())
+  for name in mappingAttributes(mesh):
+    writeCornerVectors(mesh, name, carried(readCornerVectors(mesh, name)))
   mesh.update()
 
 
 def conformSurfaceEdges(objectName, layer, smoothing, selector):
-  """Bring a surfacing layer's edges onto the mesh's own edges along a smooth line: the layer's coverage is evened out over
-  `smoothing` units, the vertex nearest where each edge of the mesh crosses the evened line slides along that edge onto it (in every
-  shaping pass alike, carrying UVs), and the faces take the side they now lie on, so the border runs on modeled edges without saw
-  teeth or one-face islands."""
+  """Bring a layer's borders onto the mesh's own edges along evened lines; borders evened at this smoothing or more stay as they are."""
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   requireLayer(sceneObject, layer)
   if smoothing <= 0:
@@ -454,46 +892,77 @@ def conformSurfaceEdges(objectName, layer, smoothing, selector):
   bridgeMeshAccess.requireSelection(within, selector, sceneObject, "faces")
   mesh = sceneObject.data
   values = readFaceInts(mesh, layerAttributePrefix + layer)
-  positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
+  if len(numpy.unique(values[within])) < 2:
+    raise ValueError(f"Layer '{layer}' of '{objectName}' holds one value everywhere {selector!r} picks, so it has no edge to conform there")
+  markName = conformedPrefix + layer
+  settled = (readEdgeFloats(mesh, markName) if markName in mesh.attributes else numpy.zeros(len(mesh.edges))) >= smoothing
+  positions, normals = bridgeMeshAccess.readVertexArrays(sceneObject)
   edges = bridgeMeshAccess.meshEdges(mesh)
+  edgeLength = float(numpy.median(numpy.linalg.norm(positions[edges[:, 0]] - positions[edges[:, 1]], axis=1)))
+  onLine = conformOnLineShare * edgeLength
   movable = movableVertices(sceneObject, within, positions)
-  classes, faceClass, field = classField(sceneObject, values, smoothing, positions, edges, movable)
-  if len(classes) < 2:
-    raise ValueError(f"Layer '{layer}' of '{objectName}' holds one value everywhere, so it has no edge to conform")
-  movers, partners, fractions = borderSlides(field, edges, positions, movable)
-  areasBefore = faceAreas(sceneObject, positions)
-  normalsBefore = bridgeMeshAccess.faceNormals(sceneObject, positions)
-  loopTotals, loopVertices = bridgeMeshAccess.faceLoops(sceneObject)
-  loopFaces = numpy.repeat(numpy.arange(len(loopTotals)), loopTotals)
-  kept = numpy.zeros(len(positions), dtype=bool)
-  for _ in range(conformRepairs):
-    active = ~kept[movers]
-    updated = positions.copy()
-    updated[movers[active]] += fractions[active, None] * (positions[partners[active]] - positions[movers[active]])
-    normalsAfter = bridgeMeshAccess.faceNormals(sceneObject, updated)
-    spoiled = ((normalsBefore * normalsAfter).sum(axis=1) <= 0) | (numpy.linalg.norm(normalsAfter, axis=1) < conformSliverShare * areasBefore)
-    newlyKept = numpy.intersect1d(numpy.unique(loopVertices[spoiled[loopFaces]]), movers[active])
-    if not len(newlyKept):
-      break
-    kept[newlyKept] = True
-  active = ~kept[movers]
-  movers, partners, fractions = movers[active], partners[active], fractions[active]
+  edgeIndices, firstFaces, secondFaces = bridgeMeshAccess.sharedEdges(mesh)
+  inside = within[firstFaces] & within[secondFaces]
+  alreadyEvened = int(settled[edgeIndices[(values[firstFaces] != values[secondFaces]) & inside]].sum())
+  curves = BorderCurves(sceneObject, values, positions, normals, movable, settled, smoothing, math.pi * smoothing)
+  reach = 2 * (smoothing + edgeLength)
+  candidates = movable & curves.nearEvened(positions, reach)
+  nearestCurves = numpy.full(len(positions), -1)
+  for vertex in numpy.flatnonzero(candidates).tolist():
+    nearestCurves[vertex] = curves.curves[curves.signedNearest(positions[vertex], normals[vertex])[1]]
+  first, second, balance = crossings(curves, positions, normals, candidates, nearestCurves, edges, onLine)
+  movers, partners, fractions = assignedSlides(first, second, balance, numpy.linalg.norm(positions[first] - positions[second], axis=1))
+  movers, partners, fractions, dropped = unspoiledSlides(sceneObject, positions, movers, partners, fractions)
+  moved = positions.copy()
+  moved[movers] += fractions[:, None] * (positions[partners] - positions[movers])
   if len(movers):
     slideAlongEdges(sceneObject, movers, partners, fractions)
-  onLine = numpy.zeros(len(positions), dtype=bool)
-  onLine[movers] = True
-  votes = numpy.zeros((len(loopTotals), len(classes)))
-  counted = movable[loopVertices] & ~onLine[loopVertices]
-  numpy.add.at(votes, loopFaces[counted], field[loopVertices[counted]])
-  newClass = numpy.where(votes.sum(axis=1) > 0, votes.argmax(axis=1), faceClass)
-  # A face on a crease keeps its value unless a corner of it moved: the evened field runs across the crease, the material should not.
-  touchesMove = numpy.bincount(loopFaces, weights=onLine[loopVertices], minlength=len(loopTotals)) > 0
-  allMovable = numpy.bincount(loopFaces, weights=~movable[loopVertices], minlength=len(loopTotals)) == 0
-  updatedValues = numpy.where(within & (touchesMove | allMovable), classes[newClass], values)
-  writeFaceInts(mesh, layerAttributePrefix + layer, updatedValues)
+  updatedValues = decidedFaces(sceneObject, curves, values, within, movable, moved, movers, reach)
+  writeLayerValues(sceneObject, layer, updatedValues, updatedValues != values)
+  marks = readEdgeFloats(mesh, markName) if markName in mesh.attributes else numpy.zeros(len(mesh.edges))
+  bordersAfter = edgeIndices[(updatedValues[firstFaces] != updatedValues[secondFaces]) & inside]
+  onEvened = movable & curves.nearEvened(moved, edgeLength)
+  marks[bordersAfter[onEvened[edges[bordersAfter, 0]] & onEvened[edges[bordersAfter, 1]]]] = smoothing
+  if markName not in mesh.attributes:
+    mesh.attributes.new(markName, "FLOAT", "EDGE")
+  mesh.attributes[markName].data.foreach_set("value", marks)
   return {
-    "movedVertices": int(len(movers)), "keptInPlace": int(kept.sum()), "changedFaces": int((updatedValues != values).sum()),
+    "movedVertices": int(len(movers)), "keptInPlace": dropped, "changedFaces": int((updatedValues != values).sum()), "alreadyEvened": alreadyEvened,
   } | compose(sceneObject)
+
+
+def decidedFaces(sceneObject, curves, values, within, movable, moved, movers, reach):
+  """Each face near an evened curve takes the side of the curve nearest its middle that holds most of it."""
+  loopTotals, loopVertices = bridgeMeshAccess.faceLoops(sceneObject)
+  loopFaces = numpy.repeat(numpy.arange(len(loopTotals)), loopTotals)
+  slid = numpy.zeros(len(moved), dtype=bool)
+  slid[movers] = True
+  # A face on a crease keeps its value unless a corner of it moved: an evened line passing near the crease should not carry the
+  # material across it.
+  touchesMove = numpy.bincount(loopFaces, weights=slid[loopVertices], minlength=len(loopTotals)) > 0
+  allMovable = numpy.bincount(loopFaces, weights=~movable[loopVertices], minlength=len(loopTotals)) == 0
+  centers = numpy.zeros((len(loopTotals), 3))
+  numpy.add.at(centers, loopFaces, moved[loopVertices])
+  centers /= loopTotals[:, None]
+  faceDirections = bridgeMeshAccess.faceNormals(sceneObject, moved)
+  faceDirections /= numpy.maximum(numpy.linalg.norm(faceDirections, axis=1, keepdims=True), 1e-12)
+  deciding = within & (touchesMove | allMovable)
+  deciding[deciding] = curves.nearEvened(centers[deciding], reach)
+  loopStarts = numpy.cumsum(loopTotals) - loopTotals
+  updatedValues = values.copy()
+  for face in numpy.flatnonzero(deciding).tolist():
+    _, segment = curves.signedNearest(centers[face], faceDirections[face])
+    left, right = curves.sides[segment]
+    if not curves.evened[segment] or values[face] not in (left, right):
+      continue
+    # Its middle alone can lie across a curving line from most of the face (two corners on the line, the third off it beyond a
+    # bulge), and its corners can all lie on the line: points between its middle and each corner say which side holds most of it.
+    corners = moved[loopVertices[loopStarts[face]:loopStarts[face] + loopTotals[face]]]
+    samples = numpy.vstack([centers[face], (corners + centers[face]) / 2])
+    side = float(curves.signedTo(samples, faceDirections[face], curves.curves[segment]).sum())
+    if abs(side) > 1e-9:
+      updatedValues[face] = left if side > 0 else right
+  return updatedValues
 
 
 def faceComponents(first, second, count):
@@ -536,42 +1005,8 @@ def cleanedValues(mesh, values, within, areas, minimumArea):
   return values
 
 
-def borderChains(segments):
-  """Border edges [vertex, vertex] joined end to end into chains, each a list of vertex indices."""
-  touching = {}
-  for index, (start, end) in enumerate(segments):
-    touching.setdefault(int(start), []).append(index)
-    touching.setdefault(int(end), []).append(index)
-  used = numpy.zeros(len(segments), dtype=bool)
-  chains = []
-  for seed in range(len(segments)):
-    if used[seed]:
-      continue
-    used[seed] = True
-    chain = [int(segments[seed][0]), int(segments[seed][1])]
-    for forward in (True, False):
-      while True:
-        tip = chain[-1] if forward else chain[0]
-        onward = [index for index in touching[tip] if not used[index]] if len(touching[tip]) == 2 else []
-        if not onward:
-          break
-        used[onward[0]] = True
-        start, end = (int(vertex) for vertex in segments[onward[0]])
-        following = end if start == tip else start
-        if forward:
-          chain.append(following)
-        else:
-          chain.insert(0, following)
-    chains.append(chain)
-  return chains
-
-
 def paintTransition(objectName, layer, material, selector, toward, width, worldUnitsPerRepeat, onlyAbove):
-  """Paint the faces lying wholly within `width` of where the faces picked by `selector` meet those picked by `toward`, on the
-  selector's side, and map them so the texture's bottom edge lies on that border and its top `width` away, repeating along the border
-  every worldUnitsPerRepeat units: how a transition texture blends one ground into the next. Faces straddling `width` are left and
-  counted; cut a contour there first (cutContours with distanceFrom) so the strip ends on a modeled edge. With onlyAbove, only faces
-  lying above the nearest point of the border are painted: a wall's foot, not the lip where ground ends above rock falling away."""
+  """Paint the faces wholly within `width` of where selector's faces meet toward's, mapped up from that border and along it (stripAlong)."""
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   requireLayer(sceneObject, layer)
   if width <= 0 or worldUnitsPerRepeat <= 0:
@@ -579,17 +1014,23 @@ def paintTransition(objectName, layer, material, selector, toward, width, worldU
   mesh = sceneObject.data
   side = bridgeMeshAccess.evaluateSelector(selector, sceneObject, "faces")
   other = bridgeMeshAccess.evaluateSelector(toward, sceneObject, "faces") & ~side
-  borderEdges = bridgeMeshAccess.faceBorderEdges(sceneObject, side, other)
+  borderEdges, _, _ = (bridgeMeshAccess.footBorders if onlyAbove else bridgeMeshAccess.faceBorders)(sceneObject, side, other)
   if not len(borderEdges):
-    raise ValueError(f"The faces {selector!r} picks never meet the faces {toward!r} picks on '{objectName}'")
+    raise ValueError(f"The faces {selector!r} picks never {'rise above' if onlyAbove else 'meet'} the faces {toward!r} picks on '{objectName}'")
   positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
   edges = bridgeMeshAccess.meshEdges(mesh)
-  chains = borderChains(edges[borderEdges])
-  segments = numpy.array([[start, end] for chain in chains for start, end in zip(chain, chain[1:])])
+  chains = bridgeMeshAccess.tracedChains(edges[borderEdges], {})
+  segments = numpy.array([[start, end] for chain, _, _ in chains for start, end in zip(chain, chain[1:])])
   lengths = numpy.linalg.norm(positions[segments[:, 1]] - positions[segments[:, 0]], axis=1)
-  chainStarts = numpy.cumsum([0] + [len(chain) - 1 for chain in chains])[:-1]
+  chainSizes = [len(chain) - 1 for chain, _, _ in chains]
+  chainStarts = numpy.cumsum([0] + chainSizes)[:-1]
   travelled = numpy.cumsum(lengths) - lengths
-  segmentArcs = travelled - numpy.repeat(travelled[chainStarts], [len(chain) - 1 for chain in chains])
+  segmentArcs = travelled - numpy.repeat(travelled[chainStarts], chainSizes)
+  segmentChains = numpy.repeat(numpy.arange(len(chains)), chainSizes)
+  chainLengths = numpy.bincount(segmentChains, weights=lengths)
+  closedChains = numpy.array([closed for _, _, closed in chains])
+  # A closed border takes a whole number of repeats, so its strip runs on without a seam where the border starts.
+  repeats = numpy.where(closedChains, chainLengths / numpy.maximum(numpy.round(chainLengths / worldUnitsPerRepeat), 1), worldUnitsPerRepeat)
   border = bridgeMeshAccess.BorderDistance(positions[segments[:, 0]], positions[segments[:, 1]])
   loopTotals, loopVertices = bridgeMeshAccess.faceLoops(sceneObject)
   loopFaces = numpy.repeat(numpy.arange(len(loopTotals)), loopTotals)
@@ -604,39 +1045,113 @@ def paintTransition(objectName, layer, material, selector, toward, width, worldU
   numpy.minimum.at(closest, loopFaces, distances[loopVertices])
   reach = width * (1 + transitionTolerance)
   near = side & (closest < width * (1 - transitionTolerance))
-  # A face between two stretches of border has every corner near one, yet its middle lies far from both: no strip runs across it.
-  centered = numpy.zeros(len(loopTotals), dtype=bool)
+  even = numpy.zeros(len(loopTotals), dtype=bool)
   centers = faceCenters(sceneObject)
   above = numpy.ones(len(loopTotals), dtype=bool)
+  cornerMeans = numpy.bincount(loopFaces, weights=numpy.where(numpy.isfinite(distances[loopVertices]), distances[loopVertices], 0), minlength=len(loopTotals)) / loopTotals
   for face in numpy.flatnonzero(near):
     distance, segment, along = border.nearest(centers[face])
-    centered[face] = distance <= reach
+    even[face] = abs(distance - cornerMeans[face]) <= transitionLinearity * width
     above[face] = centers[face][2] > (border.starts[segment] + along * border.spans[segment])[2]
-  strip = near & centered & (farthest <= reach) & (above | (not onlyAbove))
-  straddling = near & ~strip
+  # A face whose corners measure along different stretches of border (where they meet at a corner) has no one way along to map.
+  loopChains = segmentChains[owner[loopVertices]]
+  lowest = numpy.full(len(loopTotals), len(chains))
+  highest = numpy.full(len(loopTotals), -1)
+  numpy.minimum.at(lowest, loopFaces, loopChains)
+  numpy.maximum.at(highest, loopFaces, loopChains)
+  wanted = near & (above | (not onlyAbove))
+  strip = wanted & even & (lowest == highest) & (farthest <= reach)
+  nearestAlong = segmentArcs[owner] + fraction * lengths[owner]
+  alongLoops = numpy.zeros(len(loopVertices))
+  for chain, (chainVertices, _, closed) in enumerate(chains):
+    faces = strip & (lowest == chain)
+    if faces.any():
+      chainLoops = faces[loopFaces]
+      alongLoops[chainLoops] = stripAlong(sceneObject, positions, faces, chainVertices, nearestAlong, chainLengths[chain] if closed else None)[loopVertices[chainLoops]]
+  firstAlong = alongLoops[numpy.cumsum(loopTotals) - loopTotals][loopFaces]
+  loopSpans = chainLengths[loopChains]
+  alongLoops = numpy.where(closedChains[loopChains], firstAlong + numpy.mod(alongLoops - firstAlong + loopSpans / 2, loopSpans) - loopSpans / 2, alongLoops)
   stripLoops = numpy.flatnonzero(strip[loopFaces])
   stripVertices = loopVertices[stripLoops]
-  along = segmentArcs[owner[stripVertices]] + fraction[stripVertices] * lengths[owner[stripVertices]]
+  along = alongLoops[stripLoops] / repeats[loopChains[stripLoops]]
   if bridgeSurfacing.uvLayerName not in mesh.uv_layers:
     mesh.uv_layers.new(name=bridgeSurfacing.uvLayerName)
-  uvLayer = mesh.uv_layers[bridgeSurfacing.uvLayerName]
-  uvs = numpy.empty(len(mesh.loops) * 2)
-  uvLayer.data.foreach_get("uv", uvs)
-  uvs = uvs.reshape(-1, 2)
-  uvs[stripLoops, 0] = along / worldUnitsPerRepeat
-  uvs[stripLoops, 1] = numpy.minimum(distances[stripVertices] / width, 1.0)
-  uvLayer.data.foreach_set("uv", uvs.ravel())
+  if baseMappingName not in mesh.attributes:
+    uvs = numpy.empty(len(mesh.loops) * 2)
+    mesh.uv_layers[bridgeSurfacing.uvLayerName].data.foreach_get("uv", uvs)
+    mesh.attributes.new(baseMappingName, "FLOAT_VECTOR", "CORNER")
+    writeCornerVectors(mesh, baseMappingName, numpy.column_stack([uvs.reshape(-1, 2), numpy.zeros(len(mesh.loops))]))
   values = readFaceInts(mesh, layerAttributePrefix + layer)
   values[strip] = materialSlot(sceneObject, material)
-  writeFaceInts(mesh, layerAttributePrefix + layer, values)
-  return {"painted": int(strip.sum()), "straddlingFaces": int(straddling.sum()), "borderLength": round(float(lengths.sum()), 1)} | compose(sceneObject)
+  writeLayerValues(sceneObject, layer, values, strip)
+  mappingName = transitionMappingPrefix + layer
+  if mappingName not in mesh.attributes:
+    mesh.attributes.new(mappingName, "FLOAT_VECTOR", "CORNER")
+    writeCornerVectors(mesh, mappingName, numpy.full((len(mesh.loops), 3), numpy.nan))
+  mapping = readCornerVectors(mesh, mappingName)
+  mapping[stripLoops] = numpy.column_stack([along, numpy.minimum(distances[stripVertices] / width, 1.0), numpy.zeros(len(stripLoops))])
+  writeCornerVectors(mesh, mappingName, mapping)
+  return {"painted": int(strip.sum()), "straddlingFaces": int((wanted & ~strip).sum()), "borderLength": round(float(lengths.sum()), 1)} | compose(sceneObject)
+
+
+def stripAlong(sceneObject, positions, faces, chainVertices, nearestAlong, loopLength):
+  """How far along its border each vertex of a strip lies: the border's own vertices where they are, the rest spanned smoothly between."""
+  # Taken from the nearest point of the border, a fan of faces above a corner the border turns around (a notch of ground poking up a
+  # wall) would all measure from that one point and smear the texture's one column across them; spanned harmonically from the
+  # border, they share out the turn. Pieces of strip out of touch with the border keep their nearest points.
+  first, second, weights = cotangentWeights(sceneObject, positions, faces)
+  stripVertices = numpy.unique(numpy.r_[first, second])
+  onBorder = numpy.zeros(len(positions), dtype=bool)
+  onBorder[chainVertices] = True
+  inStrip = numpy.zeros(len(positions), dtype=bool)
+  inStrip[stripVertices] = True
+  reached = onBorder & inStrip
+  while True:
+    spreading = numpy.zeros(len(positions), dtype=bool)
+    spreading[second[reached[first] & ~reached[second]]] = True
+    spreading[first[reached[second] & ~reached[first]]] = True
+    if not spreading.any():
+      break
+    reached |= spreading
+  degrees = numpy.bincount(first, weights=weights, minlength=len(positions)) + numpy.bincount(second, weights=weights, minlength=len(positions))
+  free = inStrip & reached & ~onBorder & (degrees > 0)
+  failure = "The transition's mapping along its border did not settle"
+  if loopLength is None:
+    return harmonicValues(first, second, weights, nearestAlong, free, failure)
+  turns = 2 * math.pi * nearestAlong / loopLength
+  across = harmonicValues(first, second, weights, numpy.cos(turns), free, failure)
+  upward = harmonicValues(first, second, weights, numpy.sin(turns), free, failure)
+  return numpy.mod(numpy.arctan2(upward, across), 2 * math.pi) * loopLength / (2 * math.pi)
+
+
+def projectUVs(objectName, method, worldUnitsPerRepeat, selector, direction):
+  """Project UVs onto the selector's faces; on a mesh whose layers map transitions, into its base mapping (compose)."""
+  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  faceMask, selectedLoops, projected = bridgeSurfacing.projectedUVs(sceneObject, method, worldUnitsPerRepeat, selector, direction)
+  mesh = sceneObject.data
+  if baseMappingName in mesh.attributes:
+    mapping = readCornerVectors(mesh, baseMappingName)
+    mapping[selectedLoops, :2] = projected[selectedLoops]
+    writeCornerVectors(mesh, baseMappingName, mapping)
+    compose(sceneObject)
+  else:
+    if bridgeSurfacing.uvLayerName not in mesh.uv_layers:
+      mesh.uv_layers.new(name=bridgeSurfacing.uvLayerName)
+    uvLayer = mesh.uv_layers[bridgeSurfacing.uvLayerName]
+    mesh.uv_layers.active = uvLayer
+    uvs = numpy.empty(len(mesh.loops) * 2)
+    uvLayer.data.foreach_get("uv", uvs)
+    uvs = uvs.reshape(-1, 2)
+    uvs[selectedLoops] = projected[selectedLoops]
+    uvLayer.data.foreach_set("uv", uvs.ravel())
+    mesh.update()
+  return {"object": objectName, "method": method, "faces": int(faceMask.sum()), "worldUnitsPerRepeat": worldUnitsPerRepeat}
 
 
 # Broad strokes: taking an area back
 
 def resetRegion(objectName, selector, passes, fadeDistance):
-  """Take shaping back inside the selection: each named pass (every pass when none are named) loses what it moved there, faded out
-  over fadeDistance from the selection's edge so the area rejoins its surroundings."""
+  """Take the named shaping passes (or all) back inside the selection, faded over fadeDistance; names the kept passes still shaping it."""
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   available = [entry["name"] for entry in bridgePasses.passList(sceneObject)]
   if not available:
@@ -654,44 +1169,66 @@ def resetRegion(objectName, selector, passes, fadeDistance):
     coordinates = bridgePasses.keyCoordinates(key)
     key.data.foreach_set("co", (base + (coordinates - base) * (1 - weights)[:, None]).ravel())
   sceneObject.data.update()
-  return {"object": objectName, "passes": names, "affectedVertices": int((weights > 0).sum())}
+  inside = weights > 0
+  # Passes hold moves, not shapes: a kept pass that also moved the area keeps its moves, so a level it raised the ground to (a fill's
+  # plateau) now stands off where it was by what the passes taken back lifted under it.
+  kept = [name for name in available if name not in names and numpy.abs(bridgePasses.keyCoordinates(keys.key_blocks[name])[inside] - base[inside]).max() > 1e-6]
+  return {"object": objectName, "passes": names, "affectedVertices": int(inside.sum()), "stillShapedBy": kept}
 
 
-def relaxedHeights(sceneObject, positions, free):
-  """Heights for the free vertices that span smoothly between the fixed ones around them, each the mean of its neighbours: the
-  discrete Laplace equation over the mesh's edges, solved by conjugate gradients."""
-  edges = numpy.empty(len(sceneObject.data.edges) * 2, dtype=numpy.int64)
-  sceneObject.data.edges.foreach_get("vertices", edges)
-  first, second = edges[0::2], edges[1::2]
-  heights = positions[:, 2].copy()
+def cotangentWeights(sceneObject, points, faces):
+  """Edges of the given faces' triangles, once per triangle, weighted by half the cotangent of the angle facing them: a discrete Laplacian."""
+  mesh = sceneObject.data
+  mesh.calc_loop_triangles()
+  corners = numpy.empty(len(mesh.loop_triangles) * 3, dtype=numpy.int64)
+  mesh.loop_triangles.foreach_get("vertices", corners)
+  owners = numpy.empty(len(mesh.loop_triangles), dtype=numpy.int64)
+  mesh.loop_triangles.foreach_get("polygon_index", owners)
+  triangles = corners.reshape(-1, 3)[faces[owners]]
+  firsts, seconds, weights = [], [], []
+  for corner in range(3):
+    at, after, before = triangles[:, corner], triangles[:, (corner + 1) % 3], triangles[:, (corner + 2) % 3]
+    toAfter, toBefore = points[after] - points[at], points[before] - points[at]
+    cross = numpy.linalg.norm(numpy.cross(toAfter, toBefore), axis=1)
+    upright = cross <= 1e-6 * numpy.linalg.norm(toAfter, axis=1) * numpy.linalg.norm(toBefore, axis=1)
+    # A triangle with no area (one standing upright, laid out in plan) spans nothing, and an obtuse angle's negative cotangent could
+    # leave the values without a solution: neither weighs.
+    cotangents = numpy.where(upright, 0.0, (toAfter * toBefore).sum(axis=1) / numpy.maximum(cross, 1e-300))
+    firsts.append(after)
+    seconds.append(before)
+    weights.append(numpy.maximum(cotangents, 0.0) / 2)
+  return numpy.concatenate(firsts), numpy.concatenate(seconds), numpy.concatenate(weights)
+
+
+def harmonicValues(first, second, weights, values, free, failure):
+  """Values for the free vertices spanning smoothly between the fixed ones (the discrete Laplace equation), by conjugate gradients."""
+  values = values.copy()
   freeIndices = numpy.flatnonzero(free)
-  local = numpy.full(len(heights), -1)
+  local = numpy.full(len(values), -1)
   local[freeIndices] = numpy.arange(len(freeIndices))
-  degrees = numpy.bincount(edges, minlength=len(heights))[freeIndices].astype(numpy.float64)
-  if (degrees == 0).any():
-    raise ValueError("The selection holds loose vertices with no neighbours to take a height from")
+  degrees = (numpy.bincount(first, weights=weights, minlength=len(values)) + numpy.bincount(second, weights=weights, minlength=len(values)))[freeIndices]
   knowns = numpy.zeros(len(freeIndices))
   for this, other in ((first, second), (second, first)):
     toFixed = free[this] & ~free[other]
-    numpy.add.at(knowns, local[this[toFixed]], heights[other[toFixed]])
+    numpy.add.at(knowns, local[this[toFixed]], weights[toFixed] * values[other[toFixed]])
   inner = free[first] & free[second]
-  innerFirst, innerSecond = local[first[inner]], local[second[inner]]
+  innerFirst, innerSecond, innerWeights = local[first[inner]], local[second[inner]], weights[inner]
 
-  def laplacian(values):
-    result = degrees * values
-    numpy.subtract.at(result, innerFirst, values[innerSecond])
-    numpy.subtract.at(result, innerSecond, values[innerFirst])
+  def laplacian(unknowns):
+    result = degrees * unknowns
+    numpy.subtract.at(result, innerFirst, innerWeights * unknowns[innerSecond])
+    numpy.subtract.at(result, innerSecond, innerWeights * unknowns[innerFirst])
     return result
 
-  solution = heights[freeIndices]
+  solution = values[freeIndices]
   residual = knowns - laplacian(solution)
   direction = residual.copy()
   squared = float(residual @ residual)
   target = relaxTolerance * max(float(knowns @ knowns), 1.0)
   for _ in range(4 * len(freeIndices) + 100):
     if squared <= target:
-      heights[freeIndices] = solution
-      return heights
+      values[freeIndices] = solution
+      return values
     stepped = laplacian(direction)
     step = squared / float(direction @ stepped)
     solution = solution + step * direction
@@ -699,12 +1236,20 @@ def relaxedHeights(sceneObject, positions, free):
     nextSquared = float(residual @ residual)
     direction = residual + (nextSquared / squared) * direction
     squared = nextSquared
-  raise ValueError("The rebuilt heights did not settle; every part of the selection must touch ground outside it to take heights from")
+  raise ValueError(failure)
+
+
+def relaxedHeights(sceneObject, plan, heights, free):
+  """Heights for the free vertices spanning smoothly between the fixed ones over the mesh's triangles laid out in plan."""
+  first, second, weights = cotangentWeights(sceneObject, numpy.column_stack([plan, numpy.zeros(len(plan))]), numpy.ones(len(sceneObject.data.polygons), dtype=bool))
+  degrees = numpy.bincount(first, weights=weights, minlength=len(heights)) + numpy.bincount(second, weights=weights, minlength=len(heights))
+  if (degrees[free] <= 0).any():
+    raise ValueError("The selection holds vertices with no ground around them in plan to take a height from")
+  return harmonicValues(first, second, weights, heights, free, "The rebuilt heights did not settle; every part of the selection must touch ground outside it to take heights from")
 
 
 def rebuildRegion(objectName, selector, mode, height, fadeDistance):
-  """Give the selection a fresh start: heights spanned smoothly from its surroundings (surroundings), or one level (height), faded in
-  over fadeDistance from its edge. With shaping passes, the change goes into the active pass."""
+  """Span the selection's heights from its surroundings or level it, laid out again in plan where passes record it, diagonals turned."""
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   if mode not in rebuildModes:
     raise ValueError(f"mode is one of {list(rebuildModes)}, got '{mode}'")
@@ -713,16 +1258,26 @@ def rebuildRegion(objectName, selector, mode, height, fadeDistance):
   positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
   weights = bridgeShaping.maskWeights(sceneObject, selector, fadeDistance, positions)
   free = weights > 0
+  updated = positions.copy()
+  # With shaping passes the base records where each vertex lay in plan, so sideways moves (a roughened or faceted wall, contours a fill
+  # snapped onto) are taken back and leave no creases; without them nothing records it.
+  if bridgeMeshAccess.hasShapingPasses(sceneObject):
+    laidOut = bridgeMeshAccess.worldPositions(sceneObject, bridgePasses.keyCoordinates(sceneObject.data.shape_keys.reference_key))
+    updated[:, :2] += weights[:, None] * (laidOut[:, :2] - positions[:, :2])
   if mode == "surroundings":
     if free.all():
       raise ValueError("The selection covers the whole mesh, so there are no surroundings to span from")
-    targets = relaxedHeights(sceneObject, positions, free)
+    targets = relaxedHeights(sceneObject, updated[:, :2], positions[:, 2], free)
   else:
     targets = numpy.full(len(positions), float(height))
-  updated = positions.copy()
   updated[:, 2] += weights * (targets - positions[:, 2])
   bridgeShaping.writeWorldPositions(sceneObject, updated)
-  return {"object": objectName, "mode": mode, "affectedVertices": int(free.sum()), "largestMove": round(float(numpy.abs(updated[:, 2] - positions[:, 2]).max()), 3)}
+  # Diagonals turned for the old shape would crease the new one.
+  turned = bridgeShaping.triangulateAlongContours(sceneObject, updated, free)["turnedDiagonals"]
+  return {
+    "object": objectName, "mode": mode, "affectedVertices": int(free.sum()), "largestMove": round(float(numpy.linalg.norm(updated - positions, axis=1).max()), 3),
+    "turnedDiagonals": turned,
+  }
 
 
 def objectsInRegion(regionName, terrainNames):
@@ -738,34 +1293,46 @@ def objectsInRegion(regionName, terrainNames):
   return [sceneObject.name for sceneObject, isInside in zip(candidates, inside) if isInside]
 
 
-def clearRegion(region, terrainObject, shaping, surfacing, objects, fadeDistance):
-  """Take a region back to start it again: its shaping kept, reset (passes taken back), or rebuilt (spanned from its surroundings);
-  its surfacing erased from every layer of the terrain; and the objects placed in it deleted."""
+def clearRegion(region, terrainObject, shaping, surfacing, objects, fadeDistance, edgeNoise):
+  """Take a region back: its surfacing erased (edgeNoise moving the edge as roughenedSelection does), its shaping kept, reset, or rebuilt."""
   if shaping not in shapingChoices:
     raise ValueError(f"shaping is one of {list(shapingChoices)}, got '{shaping}'")
   if not isinstance(surfacing, bool) or not isinstance(objects, bool):
     raise ValueError("surfacing and objects are true or false")
+  if edgeNoise is not None and not surfacing:
+    raise ValueError("edgeNoise moves the edge of the surfacing clearRegion erases; it needs surfacing")
   bridgeMeshAccess.requireRegion(region)
   selector = {"region": region}
   outcome = {"region": region}
-  if shaping == "reset":
-    outcome["shaping"] = resetRegion(terrainObject, selector, None, fadeDistance)
-  elif shaping == "rebuild":
-    outcome["shaping"] = rebuildRegion(terrainObject, selector, "surroundings", None, fadeDistance)
+  # Surfacing goes first, while the faces lie where they were painted.
   if surfacing:
     sceneObject = bridgeMeshAccess.requireMeshObject(terrainObject)
     layers = bridgeMeshAccess.surfaceLayers(sceneObject)
     if not layers:
       raise ValueError(f"'{terrainObject}' has no surfacing layers to erase from")
-    mask = bridgeMeshAccess.evaluateSelector(selector, sceneObject, "faces")
+    regionFaces = bridgeMeshAccess.evaluateSelector(selector, sceneObject, "faces")
+    bridgeMeshAccess.requireSelection(regionFaces, selector, sceneObject, "faces")
+    mask = roughenedSelection(sceneObject, regionFaces, edgeNoise)
+    # The same edgeNoise picks the same faces only on ground as it was painted; reshaped since, a face of the spill can fall outside.
+    # Paint lying wholly within the noise's reach of the region, cut off from paint beyond it, is spill however the ground moved.
+    within = (mask | regionFaces | noiseReach(sceneObject, regionFaces, edgeNoise["amplitude"])) if edgeNoise is not None else mask
+    first, second = faceNeighbourPairs(sceneObject.data)
     erased = 0
     for layer in layers:
       values = readFaceInts(sceneObject.data, layerAttributePrefix + layer["name"])
-      erased += int((mask & (values != uncovered)).sum())
-      values[mask] = uncovered
-      writeFaceInts(sceneObject.data, layerAttributePrefix + layer["name"], values)
+      same = values[first] == values[second]
+      pieces = faceComponents(first[same], second[same], len(values))
+      beyond = numpy.bincount(pieces, weights=(~within).astype(numpy.float64), minlength=len(values))[pieces] > 0
+      erasing = mask | (within & ~beyond & (values != uncovered))
+      erased += int((erasing & (values != uncovered)).sum())
+      values[erasing] = uncovered
+      writeLayerValues(sceneObject, layer["name"], values, erasing)
     compose(sceneObject)
     outcome["surfacing"] = {"erasedFaces": erased}
+  if shaping == "reset":
+    outcome["shaping"] = resetRegion(terrainObject, selector, None, fadeDistance)
+  elif shaping == "rebuild":
+    outcome["shaping"] = rebuildRegion(terrainObject, selector, "surroundings", None, fadeDistance)
   if objects:
     terrainCollection = bpy.data.collections.get(bridgeExport.terrainCollectionName)
     terrainNames = {member.name for member in terrainCollection.all_objects} if terrainCollection else set()
@@ -788,6 +1355,7 @@ commands = {
   "editSurface": (editSurface, True),
   "conformSurfaceEdges": (conformSurfaceEdges, True),
   "paintTransition": (paintTransition, True),
+  "projectUVs": (projectUVs, True),
   "resetRegion": (resetRegion, True),
   "rebuildRegion": (rebuildRegion, True),
   "clearRegion": (clearRegion, True),

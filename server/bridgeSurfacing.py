@@ -261,48 +261,35 @@ def planarAxes(direction):
   return across, numpy.cross(normal, across)
 
 
-def projectUVs(objectName, method, worldUnitsPerRepeat, selector, direction):
+def projectedUVs(sceneObject, method, worldUnitsPerRepeat, selector, direction):
+  """UVs projected in world units onto the corners of the selector's faces: which faces, which corners, and every corner's projection."""
   if method not in projectionMethods:
     raise ValueError(f"method must be one of {list(projectionMethods)}, got '{method}'")
   if worldUnitsPerRepeat <= 0:
     raise ValueError(f"worldUnitsPerRepeat must be positive, got {worldUnitsPerRepeat}")
   if (method == "planar") != (direction is not None):
     raise ValueError("planar projection needs a direction, and only planar takes one")
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   mesh = sceneObject.data
   faceMask = bridgeMeshAccess.evaluateSelector(selector, sceneObject, "faces")
   bridgeMeshAccess.requireSelection(faceMask, selector, sceneObject, "faces")
-  if uvLayerName not in mesh.uv_layers:
-    mesh.uv_layers.new(name=uvLayerName)
-  uvLayer = mesh.uv_layers[uvLayerName]
-  mesh.uv_layers.active = uvLayer
   vertexPositions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
   _, faceNormals, _ = bridgeMeshAccess.readFaceArrays(sceneObject)
-  uvs = numpy.empty(len(mesh.loops) * 2)
-  uvLayer.data.foreach_get("uv", uvs)
-  uvs = uvs.reshape(-1, 2)
   loopVertices = numpy.empty(len(mesh.loops), dtype=numpy.int64)
   mesh.loops.foreach_get("vertex_index", loopVertices)
   loopTotals = numpy.empty(len(mesh.polygons), dtype=numpy.int64)
   mesh.polygons.foreach_get("loop_total", loopTotals)
   loopFaces = numpy.repeat(numpy.arange(len(mesh.polygons)), loopTotals)
-  selectedLoops = faceMask[loopFaces]
   if method == "planar":
     loopAxes = numpy.broadcast_to(numpy.array(planarAxes(direction)), (len(mesh.loops), 2, 3))
   else:
     boxAxes = numpy.array([planarAxes(numpy.eye(3)[axis]) for axis in range(3)])
     loopAxes = boxAxes[numpy.abs(faceNormals).argmax(axis=1)[loopFaces]]
   points = vertexPositions[loopVertices]
-  projected = numpy.einsum("lj,laj->la", points, loopAxes) / worldUnitsPerRepeat
-  uvs[selectedLoops] = projected[selectedLoops]
-  uvLayer.data.foreach_set("uv", uvs.ravel())
-  mesh.update()
-  return {"object": objectName, "method": method, "faces": int(faceMask.sum()), "worldUnitsPerRepeat": worldUnitsPerRepeat}
+  return faceMask, faceMask[loopFaces], numpy.einsum("lj,laj->la", points, loopAxes) / worldUnitsPerRepeat
 
 
 commands = {
   "createMaterial": (createMaterial, True),
   "createLiquidMaterial": (createLiquidMaterial, True),
   "assignMaterial": (assignMaterial, True),
-  "projectUVs": (projectUVs, True),
 }

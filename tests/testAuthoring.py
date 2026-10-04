@@ -152,6 +152,7 @@ mesh.update()
   # Spanning from the surroundings restores the tilted plane the raised patch was cut from.
   assert rebuilt["affectedVertices"] == len(inside) and max(abs(afterRebuild[index][2] - 0.5 * afterRebuild[index][0]) for index in inside) < 0.05
   assert all(leveled[index][2] == 10 for index in inside)
-  # The 8 by 8 faces whose centers lie inside the patch lose their paint; the light inside it goes, the one outside stays.
-  assert cleared["objects"] == {"deleted": ["inside"]} and cleared["surfacing"]["erasedFaces"] == 64
-  assert materialFaces(detail) == {"sand": 64, "rock": 256 - 64}
+  # The rebuild split the patch's 8 by 8 cells into triangles along the new ground; the 128 triangles, whose centers all lie inside the
+  # patch, lose their paint; the light inside it goes, the one outside stays.
+  assert rebuilt["turnedDiagonals"] == 0 and cleared["objects"] == {"deleted": ["inside"]} and cleared["surfacing"]["erasedFaces"] == 128
+  assert materialFaces(detail) == {"sand": 128, "rock": 256 - 64}
