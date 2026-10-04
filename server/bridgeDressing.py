@@ -13,10 +13,7 @@ densityArea = 10000.0
 scatterAttemptsPerTarget = 30
 castLift = 1.0
 maximumCastDistance = 100000.0
-
-
-def castDown(start, surfaceObjects):
-  return bridgeMeshAccess.rayCast(start, (0, 0, -1), maximumCastDistance, surfaceObjects)
+up = mathutils.Vector((0.0, 0.0, 1.0))
 
 
 def alignedRotation(normal, yawRadians):
@@ -28,27 +25,60 @@ def slopeDegrees(normal):
   return math.degrees(math.acos(max(-1.0, min(1.0, normal[2]))))
 
 
+def withDescendants(sceneObject):
+  return [sceneObject] + list(sceneObject.children_recursive)
+
+
+def landingSurfaces(surfaceObjects, carried):
+  """What dressing lands on: the named objects, or what players stand on (water, guides, regions, spawns, and doors left out), never
+  the objects being placed and what they carry."""
+  excluding = {sceneObject.name for sceneObject in carried}
+  if surfaceObjects is None:
+    return bridgeMeshAccess.PlayerSurfaces(excluding)
+  return bridgeMeshAccess.PlayerSurfaces(excluding, [bridgeMeshAccess.requireObject(name) for name in surfaceObjects])
+
+
+def topOf(carried):
+  """The highest point of the meshes and collection instances among objects, in world space."""
+  depsgraph = bpy.context.evaluated_depsgraph_get()
+  heights = [
+    corner.z for sceneObject in carried if sceneObject.type == "MESH" or bridgeMeshAccess.isCollectionInstance(sceneObject)
+    for corner in bridgeMeshAccess.worldBoundsCorners(sceneObject, depsgraph)
+  ]
+  if not heights:
+    raise ValueError(f"'{carried[0].name}' and its children have no meshes to cast from above; pass at")
+  return max(heights)
+
+
+def worldHeading(rotation):
+  """The turn about the vertical left once a world rotation's lean is taken off (a swing-twist split)."""
+  swing = mathutils.Vector((0.0, 0.0, 1.0)).rotation_difference(rotation @ mathutils.Vector((0.0, 0.0, 1.0)))
+  return (swing.inverted() @ rotation).to_euler("XYZ").z
+
+
 def placeOnSurface(objectNames, at, alignToNormal, surfaceObjects, offset):
   if at is not None and len(at) != len(objectNames):
     raise ValueError(f"at has {len(at)} points for {len(objectNames)} objects")
+  placing = [bridgeMeshAccess.requireObject(name) for name in objectNames]
+  surfaces = landingSurfaces(surfaceObjects, [carried for sceneObject in placing for carried in withDescendants(sceneObject)])
   placements = []
-  for index, name in enumerate(objectNames):
-    sceneObject = bridgeMeshAccess.requireObject(name)
-    start = mathutils.Vector(at[index]) if at is not None else sceneObject.matrix_world.translation.copy()
-    with bridgeMeshAccess.hiddenObjects([name]):
-      hit = castDown(start + mathutils.Vector((0, 0, castLift)), surfaceObjects)
+  for index, sceneObject in enumerate(placing):
+    bpy.context.view_layer.update()
+    origin = sceneObject.matrix_world.translation
+    start = mathutils.Vector(at[index]) + up * castLift if at is not None else mathutils.Vector((origin.x, origin.y, topOf(withDescendants(sceneObject)) + castLift))
+    hit = surfaces.footingOn(start, maximumCastDistance)
     if hit is None:
-      raise ValueError(f"No surface below {list(start)} for '{name}'")
-    location, normal, _, hitObject = hit
-    sceneObject.location = location + normal * offset if alignToNormal else location + mathutils.Vector((0, 0, offset))
+      raise ValueError(f"No surface below {bridgeObjects.roundVector(start)} for '{sceneObject.name}'" + ("" if at is not None else ", cast from just above its top"))
+    location, normal, surfaceName = hit
+    _, rotation, scale = sceneObject.matrix_world.decompose()
     if alignToNormal:
-      if sceneObject.rotation_mode not in bridgeObjects.eulerModes:
-        raise ValueError(f"'{name}' rotates by {sceneObject.rotation_mode}; aligning to the surface keeps its heading and needs an Euler rotation mode")
-      heading = sceneObject.rotation_euler.to_matrix().to_euler("XYZ").z
-      sceneObject.rotation_mode = "XYZ"
-      sceneObject.rotation_euler = alignedRotation(normal, heading).to_euler("XYZ")
-    placements.append({"object": name, "location": bridgeObjects.roundVector(sceneObject.location), "surface": hitObject.name, "normal": bridgeObjects.roundVector(normal), "slopeDegrees": round(slopeDegrees(normal), 2)})
-  bpy.context.view_layer.update()
+      rotation = alignedRotation(normal, worldHeading(rotation))
+    sceneObject.matrix_world = mathutils.Matrix.LocRotScale(location + (normal if alignToNormal else up) * offset, rotation, scale)
+    bpy.context.view_layer.update()
+    placements.append({
+      "object": sceneObject.name, "location": bridgeObjects.roundVector(sceneObject.matrix_world.translation), "surface": surfaceName,
+      "normal": bridgeObjects.roundVector(normal), "slopeDegrees": round(slopeDegrees(normal), 2),
+    })
   return {"placements": placements}
 
 
@@ -112,20 +142,20 @@ def scatterInRegion(sourceObject, region, density, minimumSpacing, yawRangeDegre
   candidates = spacedPoints(region, targetCount, minimumSpacing, generator)
   destination = bridgeObjects.targetCollection(collection)
   castHeight = castFromHeight if castFromHeight is not None else bridgeMeshAccess.sceneTopHeight() + castLift
+  surfaces = landingSurfaces(surfaceObjects, withDescendants(source))
   rejected = {"noSurface": 0, "tooSteep": 0, "nearAvoidedObject": 0}
   landings = []
   depsgraph = bpy.context.evaluated_depsgraph_get()
-  with bridgeMeshAccess.hiddenObjects([source.name]):
-    for point in candidates:
-      hit = castDown((point[0], point[1], castHeight), surfaceObjects)
-      if hit is None:
-        rejected["noSurface"] += 1
-      elif slopeDegrees(hit[1]) > maximumSlopeDegrees:
-        rejected["tooSteep"] += 1
-      elif any(distance <= avoidClearance or inside for distance, inside in (bridgeMeshAccess.closestOnObject(container, hit[0], depsgraph) for container in avoided)):
-        rejected["nearAvoidedObject"] += 1
-      else:
-        landings.append(hit[:2])
+  for point in candidates:
+    hit = surfaces.footingOn(mathutils.Vector((point[0], point[1], castHeight)), maximumCastDistance)
+    if hit is None:
+      rejected["noSurface"] += 1
+    elif slopeDegrees(hit[1]) > maximumSlopeDegrees:
+      rejected["tooSteep"] += 1
+    elif any(distance <= avoidClearance or inside for distance, inside in (bridgeMeshAccess.closestOnObject(container, hit[0], depsgraph) for container in avoided)):
+      rejected["nearAvoidedObject"] += 1
+    else:
+      landings.append(hit[:2])
   placed = []
   for location, normal in landings:
     instance = source.copy()
@@ -133,7 +163,8 @@ def scatterInRegion(sourceObject, region, density, minimumSpacing, yawRangeDegre
     yaw = math.radians(generator.uniform(*yawRangeDegrees))
     instance.rotation_mode = "XYZ"
     instance.rotation_euler = (alignedRotation(normal, yaw) if alignToNormal else mathutils.Quaternion((0, 0, 1), yaw)).to_euler("XYZ")
-    instance.scale = [generator.uniform(*scaleRange)] * 3
+    factor = generator.uniform(*scaleRange)
+    instance.scale = [component * factor for component in source.scale]
     destination.objects.link(instance)
     placed.append(instance.name)
   bpy.context.view_layer.update()
@@ -163,6 +194,7 @@ def linkKitAsset(kitPath, assetName, instanceName, location, rotationDegrees, sc
   instance.rotation_euler = [math.radians(angle) for angle in rotationDegrees]
   instance.scale = scale
   bridgeObjects.targetCollection(collection).objects.link(instance)
+  bpy.context.view_layer.update()
   return bridgeObjects.describeTransform(instance) | {"asset": assetName, "library": linked.library.filepath}
 
 

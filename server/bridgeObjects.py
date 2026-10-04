@@ -41,13 +41,24 @@ def requireNewName(name):
     raise ValueError(f"An object named '{name}' already exists")
 
 
+def objectDimensions(sceneObject):
+  """The object's size along its own axes, scaled: its mesh's, or a collection instance's instanced meshes' together."""
+  if not bridgeMeshAccess.isCollectionInstance(sceneObject):
+    return sceneObject.dimensions
+  inverse = sceneObject.matrix_world.inverted()
+  corners = numpy.array([list(inverse @ corner) for corner in bridgeMeshAccess.worldBoundsCorners(sceneObject, bpy.context.evaluated_depsgraph_get())])
+  if len(corners) == 0:
+    return [0.0, 0.0, 0.0]
+  return (corners.max(0) - corners.min(0)) * numpy.abs(numpy.array(sceneObject.scale))
+
+
 def describeTransform(sceneObject):
   return {
     "name": sceneObject.name,
     "location": roundVector(sceneObject.location),
     "rotationDegrees": roundVector([math.degrees(angle) for angle in sceneObject.rotation_euler], 2),
     "scale": roundVector(sceneObject.scale),
-    "dimensions": roundVector(sceneObject.dimensions),
+    "dimensions": roundVector(objectDimensions(sceneObject)),
   }
 
 
@@ -301,18 +312,43 @@ def transformObjects(names, translate, rotateDegrees, scale, location, rotationD
 
 
 def duplicateObjects(names, offset, linkData):
-  duplicates = {}
-  for name in names:
-    source = bridgeMeshAccess.requireObject(name)
-    duplicate = source.copy()
-    if source.data is not None and not linkData:
-      duplicate.data = source.data.copy()
-    duplicate.location = source.location + mathutils.Vector(offset)
-    for collection in source.users_collection:
-      collection.objects.link(duplicate)
-    duplicates[name] = duplicate.name
+  """Copy objects with everything parented under them, each copy's children under the copy as the originals' are under the original;
+  a named object under another named one comes along with it rather than twice."""
+  sources = [bridgeMeshAccess.requireObject(name) for name in names]
+  roots = [source for source in sources if not any(ancestor in sources for ancestor in ancestorsOf(source))]
+  copies = {}
+  for root in roots:
+    carried = [root] + list(root.children_recursive)
+    for source in carried:
+      duplicate = source.copy()
+      if source.data is not None and not linkData:
+        duplicate.data = source.data.copy()
+      for collection in source.users_collection:
+        collection.objects.link(duplicate)
+      copies[source] = duplicate
+    for source in carried[1:]:
+      copies[source].parent = copies[source.parent]
+    copies[root].matrix_world = mathutils.Matrix.Translation(offset) @ root.matrix_world
   bpy.context.view_layer.update()
-  return duplicates
+  if not linkData:
+    for duplicate in copies.values():
+      nameOwnMesh(duplicate)
+  return {source.name: duplicate.name for source, duplicate in copies.items()}
+
+
+def nameOwnMesh(sceneObject):
+  """A mesh only one object uses carries that object's name, which zone export writes as its model's name; a mesh linked copies share
+  keeps its own."""
+  if isinstance(sceneObject.data, bpy.types.Mesh) and sceneObject.data.users == 1:
+    sceneObject.data.name = sceneObject.name
+
+
+def ancestorsOf(sceneObject):
+  ancestors = []
+  while sceneObject.parent is not None:
+    sceneObject = sceneObject.parent
+    ancestors.append(sceneObject)
+  return ancestors
 
 
 def joinObjects(names, into):
@@ -332,6 +368,7 @@ def joinObjects(names, into):
     result = bpy.ops.object.join()
   if result != {"FINISHED"}:
     raise RuntimeError(f"join returned {result}")
+  nameOwnMesh(target)
   bpy.context.view_layer.update()
   return describeTransform(target) | bridgeMeshAccess.meshCounts(target) | {"materials": [slot.material.name if slot.material else None for slot in target.material_slots]}
 
@@ -355,6 +392,7 @@ def organize(renames, parents, collections):
     sceneObject = bridgeMeshAccess.requireObject(oldName)
     requireNewName(newName)
     sceneObject.name = newName
+    nameOwnMesh(sceneObject)
   bpy.context.view_layer.update()
   for childName, parentName in (parents or {}).items():
     child = bridgeMeshAccess.requireObject(childName)
@@ -386,7 +424,10 @@ def uvDensity(sceneObject):
 
 def getObjectDetail(name):
   sceneObject = bridgeMeshAccess.requireObject(name)
-  corners = [sceneObject.matrix_world @ mathutils.Vector(corner) for corner in sceneObject.bound_box]
+  if sceneObject.type == "MESH" or bridgeMeshAccess.isCollectionInstance(sceneObject):
+    corners = bridgeMeshAccess.worldBoundsCorners(sceneObject, bpy.context.evaluated_depsgraph_get()) or [sceneObject.matrix_world.translation]
+  else:
+    corners = [sceneObject.matrix_world @ mathutils.Vector(corner) for corner in sceneObject.bound_box]
   detail = describeTransform(sceneObject) | {
     "type": sceneObject.type,
     "parent": sceneObject.parent.name if sceneObject.parent else None,
@@ -400,6 +441,7 @@ def getObjectDetail(name):
     faceMaterials = numpy.empty(len(mesh.polygons), dtype=numpy.int32)
     mesh.polygons.foreach_get("material_index", faceMaterials)
     detail |= bridgeMeshAccess.meshCounts(sceneObject) | {
+      "mesh": mesh.name,
       "edges": len(mesh.edges),
       "materials": [{"material": slot.material.name if slot.material else None, "faces": int((faceMaterials == index).sum())} for index, slot in enumerate(sceneObject.material_slots)],
       "uvLayers": [layer.name for layer in mesh.uv_layers],
@@ -418,13 +460,13 @@ def measure(points, snapToSurface):
   if not points:
     raise ValueError("measure needs at least one point")
   measured = []
-  rendered = [sceneObject.name for sceneObject in bpy.context.scene.objects if sceneObject.type == "MESH" and not sceneObject.hide_render]
+  surfaces = bridgeMeshAccess.PlayerSurfaces() if snapToSurface else None
   for point in points:
     if snapToSurface:
-      hit = bridgeMeshAccess.rayCast(point, (0, 0, -1), measureCastDistance, rendered)
+      hit = surfaces.footingBelow(mathutils.Vector(point), measureCastDistance)
       if hit is None:
-        raise ValueError(f"No surface below {point}")
-      measured.append(hit[0])
+        raise ValueError(f"No surface players stand on below {point}")
+      measured.append(hit)
     else:
       measured.append(mathutils.Vector(point))
   segments = []

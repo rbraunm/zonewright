@@ -71,6 +71,44 @@ def testPreviewLightsAndFogsAsTheClientDoes(stageBlenderServer, tmp_path):
 
 
 
+flipCode = """
+import bmesh
+plane = bpy.data.objects['flipped']
+editor = bmesh.new()
+editor.from_mesh(plane.data)
+bmesh.ops.reverse_faces(editor, faces=list(editor.faces))
+editor.to_mesh(plane.data)
+editor.free()
+plane.data.update()
+result = [list(polygon.normal) for polygon in plane.data.polygons]
+"""
+
+
+def testAFaceSeenFromBehindIsLitByItsOwnNormal(stageBlenderServer, tmp_path):
+  texturePath = writePNG(tmp_path / "stone.png", 8, 8, texture)
+
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    await session.expectSuccess("createMaterial", {"name": "stone", "diffuseTexture": str(texturePath)})
+    for name, x in (("floor", 0), ("flipped", 100)):
+      await session.expectSuccess("createPrimitive", {"kind": "plane", "name": name, "size": [64, 64, 0], "location": [x, 0, 0]})
+      await session.expectSuccess("assignMaterial", {"objectName": name, "materialName": "stone"})
+    normals = (await session.expectSuccess("runPython", {"code": flipCode}))["result"]
+    await session.expectSuccess("setZoneProperties", environment)
+    floor = await renderedPixel(session, {"eye": [0, 0, 20], "target": [0, 0.001, 0]})
+    flipped = await renderedPixel(session, {"eye": [100, 0, 20], "target": [100, 0.001, 0]})
+    return normals, floor, flipped
+
+  normals, floor, flipped = stageBlenderServer.session(steps)
+  # The flipped plane faces down and is seen from above, from behind: the client's vertex shader lights it by its own normal, turned
+  # from the sun, so only bounce light reaches it, where a front face there takes the sun.
+  assert normals == [[0.0, 0.0, -1.0]]
+  for measured, expected in zip(floor, clientPixel((0, 0, 1))):
+    assert abs(measured - expected) <= 1.5 / 255
+  for measured, expected in zip(flipped, clientPixel((0, 0, -1))):
+    assert abs(measured - expected) <= 1.5 / 255
+
+
 def testFogIsOffWithTheZonesFogSwitchAndPulledInShortOfTheFarClip(stageBlenderServer, tmp_path):
   texturePath = writePNG(tmp_path / "stone.png", 8, 8, texture)
   view = {"eye": [0, 0, 20], "target": [0, 0.001, 0]}

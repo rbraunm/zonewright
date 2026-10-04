@@ -1152,13 +1152,15 @@ async def transformObjects(
 
 @guardedTool()
 async def duplicateObjects(context: Context, names: list[str], offset: list[float], linkData: bool = False):
-  """Copy objects, offset from the originals; linkData shares the mesh instead of copying it. Returns original to copy names."""
+  """Copy objects, with everything parented under them, offset from the originals; linkData shares the meshes instead of copying them
+  (a copied mesh takes its copy's name). Returns original to copy names, children included."""
   return await callBridge(context, "duplicateObjects", {"names": names, "offset": offset, "linkData": linkData})
 
 
 @guardedTool()
 async def joinObjects(context: Context, names: list[str], into: str):
-  """Merge meshes into one object, for example a trunk and canopy into one tree; `into` keeps its name, origin, and transform, and the others are removed."""
+  """Merge meshes into one object, for example a trunk and canopy into one tree; `into` keeps its name, origin, and transform, its mesh
+  takes its name (the model name zone export writes), and the others are removed."""
   return await callBridge(context, "joinObjects", {"names": names, "into": into})
 
 
@@ -1170,19 +1172,26 @@ async def deleteObjects(context: Context, names: list[str]):
 
 @guardedTool()
 async def organize(context: Context, renames: dict[str, str] | None = None, parents: dict[str, str | None] | None = None, collections: dict[str, str] | None = None):
-  """Rename objects (old to new, applied first), then set parents (child to parent, or null to clear; world transform kept) and move objects into collections (created if missing), using the new names."""
+  """Rename objects (old to new, applied first; a mesh only that object uses takes the new name too, as zone export names models by
+  their mesh), then set parents (child to parent, or null to clear; world transform kept) and move objects into collections (created
+  if missing), using the new names."""
   return await callBridge(context, "organize", {"renames": renames, "parents": parents, "collections": collections})
 
 
 @guardedTool()
 async def getObjectDetail(context: Context, name: str):
-  """One object in depth: transform, world bounds, parent, collections, modifiers; for meshes the vertex, face, and triangle counts, faces per material, UV layers, world units per texture repeat, vertex groups."""
+  """One object in depth: transform, size, world bounds (for a collection instance, its instanced meshes'), parent, collections,
+  modifiers; for meshes the mesh's name, the vertex, face, and triangle counts, faces per material, UV layers, world units per texture
+  repeat, vertex groups."""
   return await callBridge(context, "getObjectDetail", {"name": name})
 
 
 @guardedTool()
 async def measure(context: Context, points: list[list[float]], snapToSurface: bool = False):
-  """Points and the distances, horizontal distances, height changes, and slopes between consecutive ones; snapToSurface drops each point onto the rendered surface below it first, passing through regions and other helpers (one point gives a surface height)."""
+  """Points and the distances, horizontal distances, height changes, and slopes between consecutive ones; snapToSurface drops each
+  point first onto the surface players stand on below it, as walkRoute does (rendered meshes and collection instances; not water,
+  guides, regions, spawns, or doors; an underside met first means the point is inside rock, and the drop goes on through it). One
+  point gives a surface height."""
   return await callBridge(context, "measure", {"points": points, "snapToSurface": snapToSurface})
 
 
@@ -1272,7 +1281,8 @@ async def collapseShapingPasses(context: Context, objectName: str):
 @guardedTool(description=(
   "Roughen the selected vertices of a mesh with fractal noise: bumps about `featureSize` units across, moving vertices `amplitude` units"
   " as a typical (root mean square) move, the largest about three times that, along each vertex's normal (`direction` normal: sideways on a wall, so cliffs break up too) or straight up. `octaves` (1-8) add finer"
-  " noise, each twice as fine and `roughness` times as strong. The same `seed` gives the same noise. `fadeDistance` ramps the effect"
+  " noise, each twice as fine and `roughness` times as strong; the result warns when the finest octave is finer than the mesh's edges,"
+  " which cannot hold it (it reads as a grain along the triangles). The same `seed` gives the same noise. `fadeDistance` ramps the effect"
   " in from the selection's edge so a mask leaves no step. Use it in its own shaping pass, confined to a region at that region's own scale"
   " rather than over the whole zone, coarse first (large featureSize, few octaves), then finer, turning each pass up or down after looking."
   + selectorHelp))
@@ -1750,13 +1760,17 @@ async def settleObjects(context: Context, names: list[str], depth: float = 0.0, 
   onto a named object, resting on it with no vertex below its surface (a crate on a table, or tilted on a ramp); then `depth` lower. tiltShare (0 to 1) turns each
   that share of the way toward the slope of the ground under it, keeping its heading (and replacing any tilt it had). Settling again after
   the ground changes puts everything back on it. Each result gives the ground's lowest and highest under the footprint and the object's own
-  bottom and top. For a spot under an overhang or in a cave, use placeOnSurface, which casts from just above the object."""
+  bottom and top. For a spot under an overhang or in a cave, use placeOnSurface, which casts from just above the object's top."""
   return await callBridge(context, "settleObjects", {"names": names, "depth": depth, "tiltShare": tiltShare, "onto": onto})
 
 
 @guardedTool()
 async def placeOnSurface(context: Context, objectNames: list[str], at: list[list[float]] | None = None, alignToNormal: bool = False, surfaceObjects: list[str] | None = None, offset: float = 0.0):
-  """Drop objects onto the surface below `at` points (or below their own origins, cast from just above), optionally tilted to the surface normal and restricted to surfaceObjects."""
+  """Drop objects, with what is parented to them, onto the surface below `at` points, or below their own origins cast from just above
+  their tops, so one sunk into the ground, under an overhang, or in a cave lands on the ground beneath it. They land on what players
+  stand on (not water, guides, regions, spawns, or doors), or only on surfaceObjects, never on themselves, what they carry, or each
+  other; optionally tilted to the surface normal keeping their heading, then lifted `offset`. To set props on open ground by their
+  footprint, settleObjects casts from above the whole scene."""
   return await callBridge(context, "placeOnSurface", {"objectNames": objectNames, "at": at, "alignToNormal": alignToNormal, "surfaceObjects": surfaceObjects, "offset": offset})
 
 
@@ -1767,7 +1781,11 @@ async def scatterInRegion(
   maximumSlopeDegrees: float = 90, surfaceObjects: list[str] | None = None, castFromHeight: float | None = None, seed: int = 0,
   avoidObjects: list[str] | None = None, avoidClearance: float = 0.0,
 ):
-  """Scatter linked copies of an object over a region ({"circle": {center, radius}} or {"polygon": [[x,y], ...]}): `density` per 10,000 square units, at least `minimumSpacing` apart, random yaw and scale within ranges, dropped onto surfaces from `castFromHeight` (default just above the scene), skipped where steeper than maximumSlopeDegrees or inside or within avoidClearance of any avoidObjects. Deterministic for a seed."""
+  """Scatter linked copies of an object over a region ({"circle": {center, radius}} or {"polygon": [[x,y], ...]}): `density` per 10,000
+  square units, at least `minimumSpacing` apart, random yaw within yawRangeDegrees, each copy's scale the source's times a factor from
+  scaleRange, dropped from `castFromHeight` (default just above the scene) onto what players stand on (not water, guides, regions,
+  spawns, or doors; never the source) or only onto surfaceObjects, skipped where steeper than maximumSlopeDegrees or inside or within
+  avoidClearance of any avoidObjects. Deterministic for a seed."""
   return await callBridge(context, "scatterInRegion", {
     "sourceObject": sourceObject, "region": region, "density": density, "minimumSpacing": minimumSpacing, "yawRangeDegrees": yawRangeDegrees,
     "scaleRange": scaleRange, "alignToNormal": alignToNormal, "maximumSlopeDegrees": maximumSlopeDegrees, "surfaceObjects": surfaceObjects,
@@ -1786,7 +1804,8 @@ async def linkKitAsset(
   context: Context, kitPath: str, assetName: str, instanceName: str, location: list[float],
   rotationDegrees: list[float] = [0, 0, 0], scale: list[float] = [1, 1, 1], collection: str | None = None,
 ):
-  """Link a collection marked as an asset in a kit .blend (absolute path) and place an instance of it."""
+  """Link a collection marked as an asset in a kit .blend (absolute path) and place an instance of it; the result gives its size. Its
+  materials draw in the preview lit as the open file's own are."""
   return await callBridge(context, "linkKitAsset", {"kitPath": kitPath, "assetName": assetName, "instanceName": instanceName, "location": location, "rotationDegrees": rotationDegrees, "scale": scale, "collection": collection})
 
 

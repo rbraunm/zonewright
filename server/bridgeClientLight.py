@@ -8,7 +8,7 @@ import bpy
 
 groupName = "eqClientLight"
 # Raised whenever buildGroup changes, so a group saved in an older .blend is rebuilt in place.
-groupVersion = 6
+groupVersion = 7
 bakedAttribute = "eqColor"
 normalAttribute = "eqNormal"
 tintAttribute = "eqTint"
@@ -78,7 +78,10 @@ def buildGroup(tree):
   tree.nodes.clear()
   tree["eqVersion"] = groupVersion
   sockets = {(item.in_out, item.name) for item in tree.interface.items_tree if item.item_type == "SOCKET"}
-  for socketName, socketType in (("Base", "NodeSocketColor"), ("Baked", "NodeSocketColor"), ("Share", "NodeSocketFloat"), ("Normal", "NodeSocketVector"), ("Added", "NodeSocketColor")):
+  for socketName, socketType in (
+    ("Base", "NodeSocketColor"), ("Baked", "NodeSocketColor"), ("Share", "NodeSocketFloat"), ("Normal", "NodeSocketVector"), ("Added", "NodeSocketColor"),
+    ("Stored", "NodeSocketFloat"),
+  ):
     if ("INPUT", socketName) not in sockets:
       socket = tree.interface.new_socket(socketName, in_out="INPUT", socket_type=socketType)
       if socketName == "Added":
@@ -87,8 +90,13 @@ def buildGroup(tree):
     tree.interface.new_socket("Color", in_out="OUTPUT", socket_type="NodeSocketColor")
   build = GroupBuilder(tree)
   inputs = build.node("NodeGroupInput").outputs
+  # Blender turns a surface's shading normal toward the camera on a face seen from behind, where the client's vertex shader lights a
+  # face by its own normal whichever side is seen; a normal that is not a mesh's stored one (Stored 0) is turned back.
+  backfacing = build.node("ShaderNodeNewGeometry").outputs["Backfacing"]
+  turn = build.math("SUBTRACT", 1.0, build.math("MULTIPLY", build.math("MULTIPLY", backfacing, 2.0), build.math("SUBTRACT", 1.0, inputs["Stored"])))
+  normal = build.scale(inputs["Normal"], turn)
   toSun = build.node("ShaderNodeCombineXYZ", name="towardSun").outputs["Vector"]
-  facing = build.vectorMath("DOT_PRODUCT", inputs["Normal"], toSun)
+  facing = build.vectorMath("DOT_PRODUCT", normal, toSun)
   sunTerm = build.scale(build.color("sunColor"), build.math("MAXIMUM", facing, 0.0))
   bounceTerm = build.scale(build.color("bounceColor"), build.math("MAXIMUM", build.math("MULTIPLY", facing, -1.0), 0.0))
   sceneLight = build.vectorMath("ADD", build.vectorMath("ADD", build.color("ambientColor"), bounceTerm), sunTerm)
@@ -118,7 +126,7 @@ def buildGroup(tree):
   halves = build.node("ShaderNodeCombineXYZ")
   for axis in "XYZ":
     halves.inputs[axis].default_value = 0.5
-  encodedNormal = build.vectorMath("ADD", build.scale(inputs["Normal"], build.math("ADD", 0.5, 0.0)), halves.outputs["Vector"])
+  encodedNormal = build.vectorMath("ADD", build.scale(normal, build.math("ADD", 0.5, 0.0)), halves.outputs["Vector"])
   distanceColor = build.node("ShaderNodeCombineXYZ")
   for axis in "XYZ":
     tree.links.new(distance, distanceColor.inputs[axis])
@@ -134,16 +142,29 @@ def buildGroup(tree):
 
 
 def selectPass(name):
-  group().nodes["passSelect"].outputs["Value"].default_value = float(passes.index(name))
+  for tree in groups():
+    tree.nodes["passSelect"].outputs["Value"].default_value = float(passes.index(name))
 
 
 def group():
-  tree = bpy.data.node_groups.get(groupName)
+  """The open file's own group, which its materials use."""
+  tree = next((tree for tree in bpy.data.node_groups if tree.name == groupName and tree.library is None), None)
   if tree is None:
     tree = bpy.data.node_groups.new(groupName, "ShaderNodeTree")
   if tree.get("eqVersion") != groupVersion:
     buildGroup(tree)
   return tree
+
+
+def groups():
+  """The file's own group and each kit library's copy, which that kit's linked materials use. A kit's copy is drawn as the file's own:
+  rebuilt when its kit saved an older one and given the zone's environment. Linked data is never saved back, so this holds for the
+  session only and is redone for every render."""
+  linked = [tree for tree in bpy.data.node_groups if tree.name == groupName and tree.library is not None]
+  for tree in linked:
+    if tree.get("eqVersion") != groupVersion:
+      buildGroup(tree)
+  return [group()] + linked
 
 
 def effectiveFog(zone):
@@ -156,17 +177,18 @@ def effectiveFog(zone):
 
 
 def applyEnvironment(zone):
-  """Set the group's environment from the zone's properties."""
-  nodes = group().nodes
-  for key in environmentColors:
-    nodes[key].outputs["Color"].default_value = (*zone[key], 1.0)
+  """Set every copy of the group's environment (groups) from the zone's properties."""
   sun = towardSun(zone["sunAzimuthDegrees"], zone["sunElevationDegrees"])
-  for axis, component in zip("XYZ", sun):
-    nodes["towardSun"].inputs[axis].default_value = component
   start, end, density = effectiveFog(zone)
-  nodes["fogStart"].outputs["Value"].default_value = start
-  nodes["fogRampScale"].outputs["Value"].default_value = fogRange / (end - start)
-  nodes["fogDensity"].outputs["Value"].default_value = density
+  for tree in groups():
+    nodes = tree.nodes
+    for key in environmentColors:
+      nodes[key].outputs["Color"].default_value = (*zone[key], 1.0)
+    for axis, component in zip("XYZ", sun):
+      nodes["towardSun"].inputs[axis].default_value = component
+    nodes["fogStart"].outputs["Value"].default_value = start
+    nodes["fogRampScale"].outputs["Value"].default_value = fogRange / (end - start)
+    nodes["fogDensity"].outputs["Value"].default_value = density
 
 
 def surfaceOutput(material, baseColor, alpha, alphaMode, lit, threshold, normal=None, added=None):
@@ -202,6 +224,7 @@ def surfaceOutput(material, baseColor, alpha, alphaMode, lit, threshold, normal=
     unit.operation = "NORMALIZE"
     links.new(toWorld.outputs["Vector"], unit.inputs[0])
     links.new(unit.outputs["Vector"], lighting.inputs["Normal"])
+    lighting.inputs["Stored"].default_value = 1.0
   else:
     lighting.inputs["Baked"].default_value = (0.0, 0.0, 0.0, 1.0)
     lighting.inputs["Share"].default_value = 1.0

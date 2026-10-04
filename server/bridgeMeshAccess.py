@@ -127,22 +127,36 @@ def worldBoundsCorners(sceneObject, depsgraph):
   return [matrix @ mathutils.Vector(corner) for part, matrix in objectParts(sceneObject) for corner in part.evaluated_get(depsgraph).bound_box]
 
 
-def playerSolidParts(excluding=()):
-  """Each mesh players stand on and are blocked by, with its world matrix (objectParts), leaving out the objects named in excluding."""
+def playerSolidObjects(excluding=()):
+  """The objects players stand on and are blocked by, leaving out the objects named in excluding."""
   # An object moved or made since the last evaluation still holds its old world matrix until the scene is evaluated.
   bpy.context.view_layer.update()
-  parts = [part for sceneObject in bpy.context.scene.objects if isPlayerSolid(sceneObject) and sceneObject.name not in excluding for part in objectParts(sceneObject)]
+  return [sceneObject for sceneObject in bpy.context.scene.objects if isPlayerSolid(sceneObject) and sceneObject.name not in excluding]
+
+
+def playerSolidParts(excluding=()):
+  """Each mesh players stand on and are blocked by, with its world matrix (objectParts), leaving out the objects named in excluding."""
+  parts = [part for sceneObject in playerSolidObjects(excluding) for part in objectParts(sceneObject)]
   if not parts:
     raise ValueError("The scene has nothing players stand on: no rendered meshes or collection instances besides water, guides, regions, spawns, and doors")
   return parts
 
 
 class PlayerSurfaces:
-  """Ray casts against what players stand on and are blocked by (playerSolidParts)."""
+  """Ray casts against what players stand on and are blocked by (playerSolidObjects), leaving out the objects named in excluding; or,
+  given objects, against those alone."""
 
-  def __init__(self):
+  def __init__(self, excluding=(), objects=None):
+    owners = playerSolidObjects(excluding) if objects is None else [sceneObject for sceneObject in objects if sceneObject.name not in excluding]
+    bpy.context.view_layer.update()
     depsgraph = bpy.context.evaluated_depsgraph_get()
-    self.members = [(matrix, matrix.inverted(), mathutils.bvhtree.BVHTree.FromObject(part, depsgraph)) for part, matrix in playerSolidParts()]
+    self.members = [
+      (owner.name, matrix, matrix.inverted(), mathutils.bvhtree.BVHTree.FromObject(part, depsgraph))
+      for owner in owners for part, matrix in objectParts(owner)
+    ]
+    if not self.members:
+      what = "the named objects have no meshes" if objects is not None else "the scene has nothing players stand on besides water, guides, regions, spawns, and doors"
+      raise ValueError(f"Nothing to cast against: {what}" + (f" once {sorted(excluding)} are left out" if excluding else ""))
 
   def cast(self, origin, direction, distance):
     """The nearest world hit point within distance, or None."""
@@ -152,27 +166,37 @@ class PlayerSurfaces:
   def footingBelow(self, origin, distance):
     """The first surface below origin within distance that faces up; an underside met first means origin lies inside rock, and the
     search goes on through it."""
+    hit = self.footingOn(origin, distance)
+    return hit[0] if hit else None
+
+  def footingOn(self, origin, distance):
+    """footingBelow's surface with the normal of the face there and the name of the object it belongs to, or None."""
     down = mathutils.Vector((0, 0, -1))
     while True:
-      hit = self.castWithNormal(origin, down, distance)
+      hit = self.castOn(origin, down, distance)
       if hit is None:
         return None
       if hit[1].z > 0:
-        return hit[0]
+        return hit
       distance -= origin.z - hit[0].z + 0.01
       origin = hit[0] + down * 0.01
 
   def castWithNormal(self, origin, direction, distance):
     """The nearest world hit point within distance and the normal of the face hit there, or None."""
+    hit = self.castOn(origin, direction, distance)
+    return hit[:2] if hit else None
+
+  def castOn(self, origin, direction, distance):
+    """castWithNormal's hit with the name of the object it belongs to, or None."""
     nearest = None
-    for matrix, inverse, tree in self.members:
+    for name, matrix, inverse, tree in self.members:
       location, normal, _, _ = tree.ray_cast(inverse @ origin, (inverse.to_3x3() @ direction).normalized())
       if location is None:
         continue
       hit = matrix @ location
       along = (hit - origin).length
       if along <= distance and (nearest is None or along < nearest[0]):
-        nearest = (along, hit, (matrix.to_3x3().inverted().transposed() @ normal).normalized())
+        nearest = (along, hit, (matrix.to_3x3().inverted().transposed() @ normal).normalized(), name)
     return nearest[1:] if nearest else None
 
 
@@ -604,41 +628,11 @@ def meshCounts(sceneObject):
   return {"vertices": len(mesh.vertices), "faces": len(mesh.polygons), "triangles": triangleCount(sceneObject)}
 
 
-def rayCast(origin, direction, distance, onlyObjects=None):
-  """Nearest hit along a ray in the open scene, or only on the named objects; None when nothing is hit within distance."""
+def rayCast(origin, direction, distance):
+  """Nearest hit along a ray in the open scene; None when nothing is hit within distance."""
   depsgraph = bpy.context.evaluated_depsgraph_get()
-  origin = mathutils.Vector(origin)
-  direction = mathutils.Vector(direction).normalized()
-  if onlyObjects is None:
-    hit, location, normal, faceIndex, hitObject, _ = bpy.context.scene.ray_cast(depsgraph, origin, direction, distance=distance)
-    return (location, normal, faceIndex, hitObject) if hit else None
-  nearest = None
-  for name in onlyObjects:
-    sceneObject = requireMeshObject(name)
-    inverse = sceneObject.matrix_world.inverted()
-    hit, location, normal, faceIndex = sceneObject.ray_cast(inverse @ origin, (inverse.to_3x3() @ direction).normalized(), depsgraph=depsgraph)
-    if not hit:
-      continue
-    worldLocation = sceneObject.matrix_world @ location
-    hitDistance = (worldLocation - origin).length
-    if hitDistance <= distance and (nearest is None or hitDistance < nearest[0]):
-      worldNormal = (sceneObject.matrix_world.to_3x3().inverted().transposed() @ normal).normalized()
-      nearest = (hitDistance, worldLocation, worldNormal, faceIndex, sceneObject)
-  return nearest[1:] if nearest else None
-
-
-@contextlib.contextmanager
-def hiddenObjects(names):
-  """Hide objects from ray casts for the duration, restoring their visibility after."""
-  hidden = [requireObject(name) for name in names]
-  previous = [sceneObject.hide_viewport for sceneObject in hidden]
-  for sceneObject in hidden:
-    sceneObject.hide_viewport = True
-  try:
-    yield
-  finally:
-    for sceneObject, wasHidden in zip(hidden, previous):
-      sceneObject.hide_viewport = wasHidden
+  hit, location, normal, faceIndex, hitObject, _ = bpy.context.scene.ray_cast(depsgraph, mathutils.Vector(origin), mathutils.Vector(direction).normalized(), distance=distance)
+  return (location, normal, faceIndex, hitObject) if hit else None
 
 
 def closestOnObject(container, worldPoint, depsgraph):

@@ -67,9 +67,9 @@ Edits address parts of a mesh with selectors instead of an interactive selection
 | | `createTerrainGrid` | Flat grid with a vertex every `spacing` units, ready to sculpt |
 | | `createRockFromOutline` | Rock with an underside (a natural arch or bridge, an overhanging lip, a ledge off a wall) drawn as the rock around it is: an outline in plan with straight runs and jogs, sheer faces from a flat top, an underside drawn along an axis and flared up toward the faces, its top tucked under the ground it runs into so no lip or gap shows; meshed on a world grid, in the terrain collection |
 | | `transformObjects` | Relative or absolute location, rotation, and scale |
-| | `duplicateObjects` / `deleteObjects` | Copies (optionally sharing the mesh) and deletions |
-| | `organize` | Renames, parents (world transform kept), collections |
-| | `joinObjects` | Merges meshes into one object, such as a trunk and canopy into one tree |
+| | `duplicateObjects` / `deleteObjects` | Copies with everything parented under them (optionally sharing the meshes) and deletions |
+| | `organize` | Renames (an unshared mesh takes its object's new name), parents (world transform kept), collections |
+| | `joinObjects` | Merges meshes into one object named and with its mesh named for the result, such as a trunk and canopy into one tree |
 | Shaping | `moveVertices` | Moves selected vertices, optionally fading with distance from a center: the fine-detail edit |
 | | `sculptAtPoint` / `sculptAlongPath` | Raise, lower, crease, smooth, flatten around a point or along a path, whose width can change from point to point (`radii`); fill raises ground to a cross-section profile (mesas, buttes; a one-point path makes a round one); carve cuts down to a path's heights through a cross-section profile, sliding the vertices just outside the cut onto the rim contour (`conformRim`) and the vertices nearest each break of a stepped profile onto that break's contour (`conformBreaks`), so ledges and strata run as clean lines; carve and fill triangulate the cells they shape along the contours |
 | | `sculptOutline` | Carves or fills ground by distance from a closed outline drawn in plan, with a stepped profile: cliff lines with straight runs and sharp jogs, jointed slots, angular mesas and terraces, every ledge parallel to the outline and snapped onto it, the shaped cells triangulated along the contours |
@@ -80,7 +80,7 @@ Edits address parts of a mesh with selectors instead of an interactive selection
 | | `followContours` | Triangulates selected terrain along its contours (each cell's diagonal the one with the smaller height step; never making a sliver, and turning away slivers and folds left by snapping), so ledges and cliff edges crossing the grid don't notch where they step to the next row; keeps shaping passes |
 | Breaking up | `warp` | Moves vertices by smooth noise (sideways, along the surface, or freely) so round and straight shapes stop being regular; seeded, masked, with a fade from the mask's edge |
 | | `facet` | Presses patches about a chosen size onto their best-fit planes, so rock reads as broad faces meeting at sharp edges rather than noise; seeded, masked, faded |
-| | `roughen` | Fractal noise of a chosen feature size and amplitude (the typical move) along each vertex's normal (sideways on walls) or straight up; seeded, masked, faded; used coarse first, then finer, each in its own pass |
+| | `roughen` | Fractal noise of a chosen feature size and amplitude (the typical move) along each vertex's normal (sideways on walls) or straight up; seeded, masked, faded; used coarse first, then finer, each in its own pass; warns when its finest octave is finer than the mesh's edges |
 | Iterating | `addShapingPass` / `setShapingPass` | Shaping goes into a named pass on the mesh (a shape key) that can be turned up or down (-1 to 2), muted, or made active later, so one step is revised without redoing the others; export writes the passes combined |
 | | `removeShapingPass` / `collapseShapingPasses` | Take a pass out, or fold the passes into the base so faces can change again (tools that change faces refuse while passes exist) |
 | Planning | `createRegion` / `editRegion` / `getRegions` | Regions: vertical prisms over an outline marking what an area is to become, with its written intent; never rendered or exported; the `region` selector confines any tool to one |
@@ -98,12 +98,12 @@ Edits address parts of a mesh with selectors instead of an interactive selection
 | Dressing | `placeCopies` | Many linked copies of a model or kit asset in one call, each with its own location, rotation, and uniform scale (what an EQ placement holds); optionally settled |
 | | `generateCopies` | A set laid out along a row, grid, ring, or route, facing along it or out of or into the ring, with seeded jitter for heading, tilt, scale, and position; returned copy by copy |
 | | `settleObjects` | Drops objects by footprint from above the whole scene: sunk to the lowest ground under them, or resting on a named object; optionally leaned toward the slope, keeping heading; again after the ground changes |
-| | `placeOnSurface` | Drops objects onto the surface below, optionally aligned to its normal |
-| | `scatterInRegion` | Spaced, linked copies over a circle or polygon by density, with yaw and scale ranges, a slope limit, and objects to keep clear of; deterministic per seed |
+| | `placeOnSurface` | Drops objects and what they carry onto what players stand on below a point or below their own tops (under overhangs and in caves too), optionally aligned to its normal |
+| | `scatterInRegion` | Spaced, linked copies over a circle or polygon by density onto what players stand on, with a yaw range and a scale range times the source's own scale, a slope limit, and objects to keep clear of; deterministic per seed |
 | | `placeSpawn` | An EverQuest character drawn at the client's scale for its height in the zone with the client's appearance rules, posed at any frame of the animations the client gives it, its origin `avatarHeight` above the ground; see the `render-spawn` skill |
 | | `placeDoor` | An EverQuest door (any server-placed model: doors, lifts, teleport pads, books, furniture) at its position and scale; see the `render-door` skill |
 | | `placeObject` | An EverQuest ground object (kilns, looms, dropped items, housing pieces) at its position and scale; see the `render-object` skill |
-| | `markAsset` / `linkKitAsset` | Marks kit collections as assets; links and places them from a kit .blend |
+| | `markAsset` / `linkKitAsset` | Marks kit collections as assets; links and places them from a kit .blend, drawn in the preview as the file's own materials are |
 | Water | `floodWater` | A pool: floods from a seed point over the ground below a level, within an optional outline, its surface reaching just under its banks; a flood that spreads without filling is refused |
 | | `runWater` | A river along a path of levels falling with it, over the ground below its level within reach of the path, cut square at its ends, mapped so its texture flows downstream; it may start or end at the edge of the ground |
 | | `pourWaterfall` | A fall hung from a lip: turns over the edge and drops to a bottom, carried out by `throw` and widened by `spread`; reports rows passing inside the rock |
@@ -121,8 +121,8 @@ Edits address parts of a mesh with selectors instead of an interactive selection
 | | `assessPlot` | The ground under a plot, what rises and falls past each side, water, height over its surroundings, enclosure, neighbours, and how much of the main routes see it; suggests features for pricing |
 | Lighting | `placeLights` | Zone point lights with the EQ color and radius; `exportZone` writes them into the .zon |
 | | `placeEmitters` | Particle emitters (empties holding a client emitter definition); `exportZone` writes them to `<zone>_EnvironmentEmitters.txt` |
-| Inspecting | `getObjectDetail` | Transform, bounds, counts, faces per material, UV density, modifiers, vertex groups |
-| | `measure` | Surface heights, distances, height changes, and slopes between points |
+| Inspecting | `getObjectDetail` | Transform, size and bounds (a collection instance's from its instanced meshes), mesh name, counts, faces per material, UV density, modifiers, vertex groups |
+| | `measure` | Heights of what players stand on, distances, height changes, and slopes between points |
 | Sketching | `sketch` | Shapes on a named sheet for thinking a layout through (areas, footprints with heights and facings, paths with widths, points, notes), added or redrawn by name, each measured against the ground under it: size, ground heights and steepest slope, cut and fill to its floor, water, overlaps, and the nearest shape; a footprint with a height stands in views as a plain block. Aids, not a plan: nothing holds the zone to them, export leaves them out, players do not stand on them |
 | | `eraseSketch` | Erases sketch shapes by name, or a whole sheet |
 | | `getSketch` | A sheet's shapes (or every sheet's), measured against the ground now |

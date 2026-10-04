@@ -2,6 +2,7 @@ import itertools
 import math
 
 from conftest import writePNG
+from testClientRendering import renderedPixel
 
 upFacing = {"facing": {"direction": [0, 0, 1], "withinDegrees": 10}}
 
@@ -95,6 +96,58 @@ def testSculptRaiseCarveSmoothAndCrease(stageBlenderServer):
   assert creased[0] == -4.0
   assert "carve and fill need a profile" in carveWithoutProfile
   assert "flatten strength is a fraction in (0, 1]" in fractionTooBig
+
+
+def testLowerFlattenAndEveryFalloffCurveShapeAsTheyPromise(stageBlenderServer):
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "field", "size": [200, 200], "spacing": 10, "location": [0, 0, 0]})
+    await session.expectSuccess("sculptAtPoint", {"objectName": "field", "mode": "lower", "center": [-60, -60, 0], "radius": 30, "strength": 10, "falloff": "linear"})
+    lowered = await heightsAt(session, [(-60, -60), (-50, -60), (-40, -60), (-30, -60)])
+    curves = {}
+    for curve, (x, y) in (("constant", (50, 50)), ("smooth", (50, -50)), ("sharp", (-50, 50))):
+      await session.expectSuccess("moveVertices", {
+        "objectName": "field", "selector": {"sphere": {"center": [x, y, 0], "radius": 30}}, "offset": [0, 0, 20],
+        "falloff": {"center": [x, y, 0], "radius": 30, "curve": curve},
+      })
+      curves[curve] = await heightsAt(session, [(x + distance, y) for distance in (0, 10, 20, 40)])
+    await session.expectSuccess("createTerrainGrid", {"name": "hill", "size": [200, 200], "spacing": 10, "location": [300, 0, 0]})
+    await session.expectSuccess("sculptAtPoint", {"objectName": "hill", "mode": "raise", "center": [300, 0, 0], "radius": 40, "strength": 30, "falloff": "sharp"})
+    await session.expectSuccess("sculptAtPoint", {"objectName": "hill", "mode": "flatten", "center": [300, 0, 30], "radius": 20, "strength": 1, "falloff": "constant"})
+    flattened = await heightsAt(session, [(300, 0), (310, 0), (300, 10), (290, 0), (300, -10), (320, 0)])
+    return lowered, curves, flattened
+
+  lowered, curves, flattened = stageBlenderServer.session(steps)
+  # Lower with a linear falloff: a cone 10 deep, a third shallower every 10 units out.
+  assert [round(height, 3) for height in lowered] == [-10.0, -6.667, -3.333, 0.0]
+  # 20 up within 30, by curve, at 0, 10, 20, and 40 units out: constant holds full height to the edge; smooth eases out (smoothstep);
+  # sharp falls off as the square of the closeness.
+  assert [round(height, 3) for height in curves["constant"]] == [20.0, 20.0, 20.0, 0.0]
+  assert [round(height, 3) for height in curves["smooth"]] == [20.0, round(20 * 20 / 27, 3), round(20 * 7 / 27, 3), 0.0]
+  assert [round(height, 3) for height in curves["sharp"]] == [20.0, round(20 * 4 / 9, 3), round(20 * 1 / 9, 3), 0.0]
+  # The hill's peak, 30, and its four neighbors, 16.875, lie within 20 of the brush: pressed fully flat at their mean, 19.5; the
+  # ground 20 out, 7.5 high, lies beyond it and keeps its height.
+  assert all(abs(height - 19.5) < 1e-3 for height in flattened[:5]) and abs(flattened[5] - 7.5) < 1e-3
+
+
+def testDeleteObjectsRemovesTheirOwnMeshesAndKeepsSharedOnes(stageBlenderServer):
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "pillar", "size": [6, 6, 20], "location": [0, 0, 0]})
+    linked = await session.expectSuccess("duplicateObjects", {"names": ["pillar"], "offset": [15, 0, 0], "linkData": True})
+    owned = await session.expectSuccess("duplicateObjects", {"names": ["pillar"], "offset": [30, 0, 0]})
+    deleted = await session.expectSuccess("deleteObjects", {"names": [linked["pillar"], owned["pillar"]]})
+    pillar = await session.expectSuccess("getObjectDetail", {"name": "pillar"})
+    gone = await session.expectError("getObjectDetail", {"name": linked["pillar"]})
+    meshes = (await session.expectSuccess("runPython", {"code": "result = sorted(mesh.name for mesh in bpy.data.meshes)"}))["result"]
+    return linked, owned, deleted, pillar, gone, meshes
+
+  linked, owned, deleted, pillar, gone, meshes = stageBlenderServer.session(steps)
+  # The linked copy shared the pillar's mesh, which stays with the pillar; the full copy's own mesh goes with it.
+  assert deleted == {"deleted": [linked["pillar"], owned["pillar"]], "removedMeshes": [owned["pillar"]]}
+  assert pillar["mesh"] == "pillar" and pillar["sharedMeshUsers"] == 1
+  assert f"No object named '{linked['pillar']}'" in gone
+  assert meshes == ["pillar"]
 
 
 def testTopologyEdits(stageBlenderServer):
@@ -397,6 +450,140 @@ def testKitAssetsLinkAsRelativeLibraries(stageBlenderServer, tmp_path):
   assert summary["libraries"] == [{"name": "rocks.blend", "filePath": "//..\\kits\\rocks.blend"}]
   linkedImages = [image for image in summary["images"] if image["name"] == "rock.png"]
   assert [image["filePath"] for image in linkedImages] == ["//..\\textures\\rock.png"]
+
+
+def testPlaceOnSurfaceCastsFromAboveTheObjectAndNeverLandsOnWhatItCarries(stageBlenderServer):
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [200, 200], "spacing": 10, "location": [0, 0, 0]})
+    await session.expectSuccess("sculptAtPoint", {"objectName": "ground", "mode": "raise", "center": [0, 0, 0], "radius": 40, "strength": 20, "falloff": "linear"})
+    await session.expectSuccess("createPrimitive", {"kind": "cylinder", "name": "barrel", "size": [4, 4, 16], "location": [20, 0, 0], "segments": 8})
+    await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "crate", "size": [8, 8, 8], "location": [-60, 60, 30]})
+    await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "lid", "size": [9, 9, 1], "location": [-60, 60, 38]})
+    await session.expectSuccess("organize", {"parents": {"lid": "crate"}})
+    await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "overhang", "size": [30, 30, 2], "location": [60, -60, 20]})
+    await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "chest", "size": [4, 4, 4], "location": [60, -60, 8]})
+    await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "pebble", "size": [2, 2, 2], "location": [0, 0, 0]})
+    placed = await session.expectSuccess("placeOnSurface", {"objectNames": ["barrel", "chest"]})
+    carried = await session.expectSuccess("placeOnSurface", {"objectNames": ["crate"], "at": [[-60, 60, 100]]})
+    lid = await session.expectSuccess("getObjectDetail", {"name": "lid"})
+    buried = await session.expectError("placeOnSurface", {"objectNames": ["pebble"]})
+    return placed, carried, lid, buried
+
+  placed, carried, lid, buried = stageBlenderServer.session(steps)
+  # The barrel's origin is 10 under the hillside, its top 6 above it: cast from just over its top, it lands on the ground there.
+  barrel, chest = placed["placements"]
+  assert barrel["surface"] == "ground" and barrel["location"] == [20.0, 0.0, 10.0]
+  # Under the overhang the cast starts below it, so the chest lands on the ground, not on the overhang's top.
+  assert chest["surface"] == "ground" and chest["location"] == [60.0, -60.0, 0.0]
+  # Dropped from above, the crate lands on the ground, not on its own lid, and carries the lid down with it.
+  assert carried["placements"][0]["surface"] == "ground" and carried["placements"][0]["location"] == [-60.0, 60.0, 0.0]
+  assert lid["worldMinimum"][2] == 8.0 and lid["worldMaximum"][2] == 9.0
+  # A pebble wholly under the hilltop has no ground below its top.
+  assert "No surface below" in buried and "cast from just above its top" in buried
+
+
+def testScatteredCopiesScaleFromTheSourcesOwnScale(stageBlenderServer):
+  scatter = {"sourceObject": "shrub", "region": {"circle": {"center": [0, 0], "radius": 30}}, "density": 20, "minimumSpacing": 6, "seed": 3}
+
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [100, 100], "spacing": 10, "location": [0, 0, 0]})
+    await session.expectSuccess("createPrimitive", {"kind": "cone", "name": "shrub", "size": [2, 2, 4], "location": [0, 0, -50], "segments": 6})
+    await session.expectSuccess("transformObjects", {"names": ["shrub"], "scale": [2, 2, 3]})
+    await session.expectSuccess("scatterInRegion", scatter | {"collection": "kept", "scaleRange": [1, 1]})
+    await session.expectSuccess("scatterInRegion", scatter | {"collection": "halved", "scaleRange": [0.5, 0.5]})
+    return await session.expectSuccess("getSceneSummary", {"objectLimit": 100})
+
+  summary = stageBlenderServer.session(steps)
+  byCollection = {}
+  for sceneObject in summary["objects"]:
+    for collection in sceneObject["collections"]:
+      byCollection.setdefault(collection, []).append(sceneObject)
+  # The shrub, 2 x 2 x 4, stands scaled to 4 x 4 x 12: copies at scale 1 keep that, and copies at a half are half of it.
+  assert len(byCollection["kept"]) == len(byCollection["halved"]) > 1
+  assert all(sceneObject["dimensions"] == [4.0, 4.0, 12.0] for sceneObject in byCollection["kept"])
+  assert all(sceneObject["dimensions"] == [2.0, 2.0, 6.0] for sceneObject in byCollection["halved"])
+
+
+def testCopiesCarryTheirChildrenAndMeshesTakeTheirObjectsNames(stageBlenderServer):
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "crate", "size": [8, 8, 8], "location": [0, 0, 0]})
+    await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "lid", "size": [9, 9, 1], "location": [0, 0, 8]})
+    await session.expectSuccess("organize", {"parents": {"lid": "crate"}})
+    copies = await session.expectSuccess("duplicateObjects", {"names": ["crate"], "offset": [20, 0, 0]})
+    lidCopy = await session.expectSuccess("getObjectDetail", {"name": copies["lid"]})
+    linkedCopies = await session.expectSuccess("duplicateObjects", {"names": ["crate", "lid"], "offset": [40, 0, 0], "linkData": True})
+    linkedLid = await session.expectSuccess("getObjectDetail", {"name": linkedCopies["lid"]})
+    await session.expectSuccess("createPrimitive", {"kind": "cylinder", "name": "trunk", "size": [3, 3, 16], "location": [0, 40, 0], "segments": 8})
+    await session.expectSuccess("createPrimitive", {"kind": "cone", "name": "canopy", "size": [16, 16, 26], "location": [0, 40, 10], "segments": 8})
+    await session.expectSuccess("runPython", {"code": "bpy.data.objects['trunk'].data.name = 'Cylinder'\nresult = bpy.data.objects['trunk'].data.name"})
+    await session.expectSuccess("joinObjects", {"names": ["trunk", "canopy"], "into": "trunk"})
+    joined = await session.expectSuccess("getObjectDetail", {"name": "trunk"})
+    sharing = await session.expectSuccess("duplicateObjects", {"names": ["trunk"], "offset": [20, 0, 0], "linkData": True})
+    await session.expectSuccess("organize", {"renames": {"trunk": "tree", sharing["trunk"]: "treeCopy"}})
+    tree = await session.expectSuccess("getObjectDetail", {"name": "tree"})
+    await session.expectSuccess("deleteObjects", {"names": ["treeCopy"]})
+    await session.expectSuccess("organize", {"renames": {"tree": "pine"}})
+    pine = await session.expectSuccess("getObjectDetail", {"name": "pine"})
+    return copies, lidCopy, linkedCopies, linkedLid, joined, tree, pine
+
+  copies, lidCopy, linkedCopies, linkedLid, joined, tree, pine = stageBlenderServer.session(steps)
+  # A copy of the crate brings its lid, parented to the copy where the original lid sits on the original, and named meshes of its own.
+  assert copies == {"crate": "crate.001", "lid": "lid.001"}
+  assert lidCopy["parent"] == "crate.001" and lidCopy["mesh"] == "lid.001"
+  assert lidCopy["worldMinimum"] == [15.5, -4.5, 8.0] and lidCopy["worldMaximum"] == [24.5, 4.5, 9.0]
+  # Naming the lid alongside the crate copies it once, with the crate; linked copies share the originals' meshes.
+  assert linkedCopies == {"crate": "crate.002", "lid": "lid.002"}
+  assert linkedLid["parent"] == "crate.002" and linkedLid["mesh"] == "lid" and linkedLid["sharedMeshUsers"] == 2
+  assert linkedLid["worldMinimum"] == [35.5, -4.5, 8.0]
+  # The joined tree's mesh takes the tree's name, which export writes as its model; a mesh linked copies share keeps its own name
+  # through a rename, and takes the new one once it is the object's alone.
+  assert joined["mesh"] == "trunk"
+  assert tree["mesh"] == "trunk" and tree["sharedMeshUsers"] == 2
+  assert pine["mesh"] == "pine" and pine["sharedMeshUsers"] == 1
+
+
+def testKitInstancesAreMeasuredSizedAndLitAsTheFilesOwnMeshes(stageBlenderServer, tmp_path):
+  kitPath = tmp_path / "kits" / "rocks.blend"
+  kitPath.parent.mkdir()
+  rockTexture = writePNG(tmp_path / "rock.png", 8, 8, (150, 120, 90, 255))
+  environment = {
+    "ambientColor": [0.2, 0.2, 0.25], "specialAmbientColor": [0, 0, 0], "bounceColor": [0.1, 0.1, 0.1], "sunColor": [0.6, 0.5, 0.4],
+    "sunAzimuthDegrees": 180, "sunElevationDegrees": 30, "fogColor": [0.4, 0.5, 0.6], "fogStart": 0, "fogEnd": 1000, "fogDensity": 0, "fogOn": False,
+    "maxClip": 2000, "newEngineZone": False,
+  }
+
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createMaterial", {"name": "rock", "diffuseTexture": str(rockTexture)})
+    await texturedBlock(session, "boulder", [8, 8, 6], [0, 0, 0], "rock", 8)
+    await session.expectSuccess("organize", {"collections": {"boulder": "boulderKit"}})
+    await session.expectSuccess("markAsset", {"collectionName": "boulderKit"})
+    await session.expectSuccess("saveFile", {"path": str(kitPath)})
+    await session.expectSuccess("newFile")
+    await session.expectSuccess("createMaterial", {"name": "rockHere", "diffuseTexture": str(rockTexture)})
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [100, 100], "spacing": 10, "location": [0, 0, 0]})
+    await session.expectSuccess("assignMaterial", {"objectName": "ground", "materialName": "rockHere"})
+    linked = await session.expectSuccess("linkKitAsset", {"kitPath": str(kitPath), "assetName": "boulderKit", "instanceName": "boulderA", "location": [-10, 0, 0], "scale": [1, 1, 1.5]})
+    await texturedBlock(session, "boulderLocal", [8, 8, 6], [10, 0, 0], "rockHere", 8)
+    instance = await session.expectSuccess("getObjectDetail", {"name": "boulderA"})
+    await session.expectSuccess("setZoneProperties", environment)
+    await session.expectSuccess("placeSpawn", {"zone": None, "model": "DAF", "name": "darkElf", "height": 5, "location": [0, 25, 0], "headingDegrees": 0})
+    measured = await session.expectSuccess("measure", {"points": [[-10, 0, 100], [10, 0, 100], [0, 25, 100]], "snapToSurface": True})
+    kitFace = await renderedPixel(session, {"eye": [-10, -20, 4], "target": [-10, 0, 4]})
+    localFace = await renderedPixel(session, {"eye": [10, -20, 4], "target": [10, 0, 4]})
+    return linked, instance, measured, kitFace, localFace
+
+  linked, instance, measured, kitFace, localFace = stageBlenderServer.session(steps)
+  # The instance's size is its boulder's, scaled, where an empty's own size reads 0.
+  assert linked["dimensions"] == [8.0, 8.0, 9.0] and instance["dimensions"] == [8.0, 8.0, 9.0]
+  assert instance["worldMinimum"] == [-14.0, -4.0, 0.0] and instance["worldMaximum"] == [-6.0, 4.0, 9.0]
+  # Players stand on the instance, as walkRoute has them, and pass through the spawn to the ground.
+  assert [point[2] for point in measured["points"]] == [9.0, 6.0, 0.0]
+  # The kit's boulder face toward the sun draws as the file's own boulder's does, lit by the zone, not by the kit's saved light.
+  assert all(abs(kit - local) <= 1.5 / 255 for kit, local in zip(kitFace, localFace)), (kitFace, localFace)
 
 
 def testRunPythonCallsAreCounted(stageBlenderServer):

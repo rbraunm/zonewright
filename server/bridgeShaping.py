@@ -832,7 +832,16 @@ def roughen(objectName, featureSize, amplitude, octaves, roughness, seed, direct
   pushDirections = normals if direction == "normal" else numpy.broadcast_to((0.0, 0.0, 1.0), normals.shape)
   updated = positions + (amplitude * values * weights)[:, None] * pushDirections
   writeWorldPositions(sceneObject, updated)
-  return moveSummary(sceneObject, positions, updated)
+  summary = moveSummary(sceneObject, positions, updated)
+  edgeLength = medianEdgeLength(sceneObject, positions, weights > 0)
+  finest = featureSize / 2 ** (octaves - 1)
+  if finest < edgeLength:
+    usable = math.floor(math.log2(featureSize / edgeLength)) + 1 if featureSize >= edgeLength else 0
+    summary["warning"] = (
+      f"The finest of {octaves} octaves is {finest:g} units across, finer than the mesh's {edgeLength:.3g}-unit edges: the mesh cannot hold it,"
+      " so it reads as a grain along the triangles. " + (f"Use at most {usable} octaves at this featureSize, or a finer mesh." if usable else "featureSize itself is finer than the edges; use a larger one or a finer mesh.")
+    )
+  return summary
 
 
 def warp(objectName, featureSize, amplitude, seed, plane, selector, fadeDistance):

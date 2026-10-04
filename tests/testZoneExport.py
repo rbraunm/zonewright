@@ -93,6 +93,48 @@ def testExportedZoneComesBackAsItWasBuilt(stageBlenderServer, tmp_path):
   assert numpy.percentile(difference.max(axis=-1), 99) <= 2, numpy.percentile(difference.max(axis=-1), 99)
 
 
+flipCode = """
+import bmesh
+crate = bpy.data.objects['crate']
+editor = bmesh.new()
+editor.from_mesh(crate.data)
+flipped = [face for face in editor.faces if face.normal.y < -0.5 or face.normal.z > 0.5]
+bmesh.ops.reverse_faces(editor, faces=flipped)
+editor.to_mesh(crate.data)
+editor.free()
+crate.data.update()
+result = len(flipped)
+"""
+
+
+def testFacesTurnedInsideOutDrawAlikeBuiltAndExported(stageBlenderServer, tmp_path):
+  groundTexture = tmp_path / "ground.dds"
+  groundTexture.write_bytes(eqgWriter.ddsBytes(patternedRGBA(16, 1)))
+  crateTexture = tmp_path / "crate.png"
+  Image.fromarray(patternedRGBA(8, 2)).save(crateTexture)
+  archivePath = tmp_path / "testplot.eqg"
+
+  async def steps(session):
+    await buildPlot(session, groundTexture, crateTexture)
+    flipped = (await session.expectSuccess("runPython", {"code": flipCode}))["result"]
+    built, _ = await session.expectImage("renderView", {"view": crateView})
+    await session.expectSuccess("exportZone", {"path": str(archivePath)})
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    await session.expectSuccess("importZoneFile", {"path": str(archivePath)})
+    await session.expectSuccess("setZoneProperties", environment)
+    again, _ = await session.expectImage("renderView", {"view": crateView})
+    return flipped, built, again
+
+  crateView = {"eye": [-20, -12, 12], "target": [-20, 10, 4]}
+  flipped, built, again = stageBlenderServer.session(steps)
+  # The crate's faces toward the camera and the sky, which fill most of the view, are turned inside out. Seen from behind, each is lit
+  # by its own normal, built as the zone file's stored normal lights it once exported, so the two draw alike.
+  assert flipped == 2
+  difference = numpy.abs(numpy.asarray(Image.open(io.BytesIO(built)).convert("RGB"), dtype=numpy.int64) - numpy.asarray(Image.open(io.BytesIO(again)).convert("RGB"), dtype=numpy.int64))
+  assert difference.mean() < 0.5, difference.mean()
+  assert numpy.percentile(difference.max(axis=-1), 99) <= 2, numpy.percentile(difference.max(axis=-1), 99)
+
+
 def testExportRefusesWhatAZoneFileCannotHold(stageBlenderServer, tmp_path):
   groundTexture = tmp_path / "ground.png"
   Image.fromarray(patternedRGBA(16, 3)).save(groundTexture)
