@@ -612,7 +612,7 @@ def wldMeshPart(mesh, materialSwaps, lit):
     colors = mesh["colors"] if mesh["colors"] is not None else numpy.tile(numpy.array(colorlessMeshColor, dtype=numpy.uint8), (vertexCount, 1))
     lighting = {"normals": mesh["normals"] if mesh["normals"] is not None else numpy.zeros((vertexCount, 3)), "colors": colors}
   uvs = mesh["uvs"] if mesh["uvs"] is not None else numpy.zeros((vertexCount, 2))
-  return meshPart(mesh["vertices"], mesh["triangles"], uvs, textures, alphaModes, lighting)
+  return meshPart(mesh["vertices"], mesh["triangles"], uvs, textures, alphaModes, lighting) | {"colored": mesh["colors"] is not None}
 
 
 def wldActor(archive, definition):
@@ -878,6 +878,9 @@ def writePartsCache(modelFolder, parts, textureHolders, label):
   litParts = sum(part["lighting"] is not None for part in parts)
   if litParts not in (0, len(parts)):
     raise ValueError(f"{label}: {litParts} of {len(parts)} parts carry lighting; how the client lights them together is not known")
+  choosingParts = sum("takesAllLights" in part for part in parts)
+  if choosingParts not in (0, len(parts)):
+    raise ValueError(f"{label}: {choosingParts} of {len(parts)} parts say which point lights they take")
   # Only drawn geometry is kept, so the cached mesh measures what the client shows.
   used = numpy.unique(triangles)
   vertices, uvs, triangles = numpy.concatenate(vertexChunks)[used], numpy.concatenate(uvChunks)[used], numpy.searchsorted(used, triangles)
@@ -886,6 +889,9 @@ def writePartsCache(modelFolder, parts, textureHolders, label):
     lighting = {key: numpy.concatenate([part["lighting"][key] for part in parts])[used] for key in ("normals", "colors")}
   # Terrain tiles carry a detail texture coordinate and a tint per vertex; only terrain materials read them, so other parts' vertices
   # hold zeros.
+  lightChoice = {}
+  if choosingParts:
+    lightChoice = {"vertexTakesAllLights": numpy.concatenate([numpy.full(len(part["vertices"]), part["takesAllLights"]) for part in parts])[used]}
   terrainAttributes = {}
   if any("detailUVs" in part for part in parts):
     terrainAttributes = {
@@ -928,6 +934,7 @@ def writePartsCache(modelFolder, parts, textureHolders, label):
     materialTints=numpy.array([tint for _, _, tint, _ in palette], dtype=numpy.uint32), materialLiquids=numpy.array([liquid for _, _, _, liquid in palette], dtype=str),
     triangleMaterials=triangleMaterials, missingTextures=numpy.array(missingTextures, dtype=str),
     **{key: value.astype(numpy.float32) if value.dtype == numpy.float64 else value for key, value in (lighting | terrainAttributes).items()},
+    **lightChoice,
     **({"trianglePassable": passable} if passable.any() else {}),
   )
   return {

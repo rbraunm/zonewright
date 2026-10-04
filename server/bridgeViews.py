@@ -10,9 +10,11 @@ import numpy
 
 import bridgeBoundaries
 import bridgeClientLight
+import bridgeEmitterDrawing
 import bridgeExportChecks
 import bridgeMeshAccess
 import bridgeModels
+import bridgePointLights
 import bridgeReviewGuides
 import bridgeShadings
 import bridgeSwim
@@ -92,6 +94,7 @@ class PreviewScene:
     self.skyImage = None
     self.createdObjects = []
     self.createdMaterials = []
+    self.loadedImages = []
     self.scene = bpy.data.scenes.new(previewName)
     for sourceObject in sourceScene.objects:
       if sourceObject.type not in ("LIGHT", "CAMERA") and not sourceObject.hide_render and (guides or bridgeMeshAccess.guideProperty not in sourceObject):
@@ -278,6 +281,9 @@ class PreviewScene:
   def remove(self):
     for material in self.createdMaterials:
       bpy.data.materials.remove(material)
+    for image in self.loadedImages:
+      if image.users == 0:
+        bpy.data.images.remove(image)
     for createdObject in self.createdObjects:
       data = createdObject.data
       bpy.data.objects.remove(createdObject)
@@ -587,7 +593,9 @@ def requireFrame(frame):
   return frame
 
 
-def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes, labels, frame=None):
+def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes, labels, emitters, frame=None):
+  """Render a view; in client shading the zone's point lights and emitters are drawn too (emitters: the server's prepared emitter
+  assets, or None without a client)."""
   if shading not in viewShadings:
     raise ValueError(f"shading must be one of {list(viewShadings)}, got '{shading}'")
   if frame is not None and ("map" in view or "camera" in view):
@@ -604,6 +612,9 @@ def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, b
       preview.camera.data.clip_end = max((corner - preview.camera.location).length for corner in sceneCorners(preview)) + mapClearance
     if labels is not None or shading in valueShadings:
       description |= bridgeShadings.prepareView(preview, shading, labels, os.path.splitext(outputPath)[0] + "_pass.exr")
+    if shading == "client":
+      description["pointLights"] = bridgePointLights.applyPointLights(preview, sourceScene)
+      description["emitters"] = bridgeEmitterDrawing.drawEmitters(preview, sourceScene, emitters)
     if shading == "coverage":
       description["coverage"] = bridgeExportChecks.drawCoverage(preview)
     elif shading in ("layout", "relief"):

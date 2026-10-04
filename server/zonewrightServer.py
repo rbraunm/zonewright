@@ -23,6 +23,7 @@ import assetSurvey
 import blenderBridge
 import checkpoints
 import conceptComparison
+import emitterAssets
 import eqCalibration
 import eqEmitters
 import eqgExport
@@ -210,6 +211,17 @@ async def resolveSky(sky):
 async def zoneSky(zone):
   """The open zone's sky state for a preview, or None when it draws none."""
   return await resolveSky(zone["sky"]) if zone.get("sky", skyDrawing.noSky) != skyDrawing.noSky else None
+
+
+async def previewEmitterAssets():
+  """The client's environment emitter definitions and textures, prepared for previews to draw emitters from, or None without a client
+  (a preview of a scene holding emitters then refuses)."""
+  if not os.environ.get("EVERQUEST_CLIENT"):
+    return None
+  try:
+    return str(await anyio.to_thread.run_sync(emitterAssets.prepareAssets, zoneSources.resolveClientRoot(), toolingRoot))
+  except (OSError, ValueError) as error:
+    raise ToolError(str(error)) from error
 
 
 def newRenderPath():
@@ -758,7 +770,7 @@ async def renderView(
   zone = await callBridge(context, "getZoneProperties", {})
   description = await callBridge(context, "renderView", {
     "view": view, "outputPath": str(outputPath), "figureModel": await scaleFigureModel(zone, view), "shading": shading, "bandHeight": bandHeight,
-    "guides": guides, "sky": await zoneSky(zone), "swimVolumes": swimVolumes, "labels": labels,
+    "guides": guides, "sky": await zoneSky(zone), "swimVolumes": swimVolumes, "labels": labels, "emitters": await previewEmitterAssets(),
   })
   if labels is not None:
     await anyio.to_thread.run_sync(viewSheets.writeNames, outputPath, description["labels"]["shown"])
@@ -1841,7 +1853,7 @@ async def renderSketch(
   basePath = newRenderPath()
   base = await callBridge(context, "renderView", {
     "view": {"map": {"center": center, "width": width}}, "outputPath": str(basePath), "figureModel": None, "shading": "relief",
-    "bandHeight": bandHeight, "guides": False, "sky": await zoneSky(zone), "swimVolumes": False, "labels": None,
+    "bandHeight": bandHeight, "guides": False, "sky": await zoneSky(zone), "swimVolumes": False, "labels": None, "emitters": None,
   })
   spots = planDrawing.gridCrossings(center, width, base["height"] / base["width"]) if spotHeights else []
   overlays = await callBridge(context, "planOverlays", {"sheets": sheets, "layers": layers, "spots": spots})
@@ -1880,6 +1892,7 @@ async def renderOrbit(
     raise ToolError(f"views is 2 to 12, got {views}")
   zone = await callBridge(context, "getZoneProperties", {})
   sky = await zoneSky(zone)
+  emitters = await previewEmitterAssets()
   cells = []
   for index in range(views):
     heading = 360 * index / views
@@ -1887,6 +1900,7 @@ async def renderOrbit(
     await callBridge(context, "renderView", {
       "view": {"frame": {"objects": objects, "headingDegrees": heading, "pitchDegrees": pitchDegrees}}, "outputPath": str(outputPath),
       "figureModel": None, "shading": shading, "bandHeight": 50.0, "guides": guides, "sky": sky, "swimVolumes": False, "labels": None,
+      "emitters": emitters,
     })
     cells.append((viewSheets.openRender(outputPath), f"looking {heading:g} degrees"))
   sheetPath = newRenderPath().with_suffix(".jpg")
@@ -1902,13 +1916,14 @@ sheetColumns = 4
 async def renderSheet(context, zone, views, labels, shading, figureModel):
   """Render each view (with progress), lay them out on one sheet labeled under each, and return the sheet and the renders' paths."""
   sky = await zoneSky(zone)
+  emitters = await previewEmitterAssets()
   cells, paths = [], []
   for index, (view, label) in enumerate(zip(views, labels)):
     await context.report_progress(index, len(views), f"rendering {index + 1} of {len(views)}")
     outputPath = newRenderPath()
     await callBridge(context, "renderView", {
       "view": view, "outputPath": str(outputPath), "figureModel": figureModel, "shading": shading, "bandHeight": 50.0, "guides": True, "sky": sky,
-      "swimVolumes": False, "labels": None,
+      "swimVolumes": False, "labels": None, "emitters": emitters,
     })
     cells.append((viewSheets.openRender(outputPath), label))
     paths.append(str(outputPath))
@@ -2001,7 +2016,7 @@ async def compareToConcept(
   renderPath = newRenderPath()
   described = await callBridge(context, "renderView", {
     "view": renderedView, "outputPath": str(renderPath), "figureModel": None, "shading": "client", "bandHeight": 50.0, "guides": guides,
-    "sky": sky, "swimVolumes": False, "labels": None, "frame": frame,
+    "sky": sky, "swimVolumes": False, "labels": None, "emitters": await previewEmitterAssets(), "frame": frame,
   })
   sheetPath = newRenderPath().with_suffix(".jpg")
   try:

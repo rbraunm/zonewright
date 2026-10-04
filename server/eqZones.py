@@ -20,7 +20,7 @@ import eqTextures
 import eqWorldFile
 import zoneSources
 
-zoneCacheFormat = 6
+zoneCacheFormat = 7
 readFormats = ("wld", "eqtzp", "eqgz")
 # A model's vertex light where its file gives none: no baked light and the full share of scene light, an assumption until the client's
 # lighting of EQG objects is traced.
@@ -128,7 +128,9 @@ def buildClassicZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
   """A classic zone's region meshes and the objects its objects.wld places."""
   archive = eqArchive.EQArchive(source["archive"])
   worldFile = eqWorldFile.WorldFile(archive.read(f"{zoneName}.wld"), f"{source['archive'].name}:{zoneName}.wld")
-  parts = [eqModels.wldMeshPart(mesh, {}, True) for mesh in worldFile.meshes()]
+  # A zone's regions take only the lights marked for baked geometry, which lights.wld never marks; a placed model takes every light
+  # unless it carries baked light (EQGraphicsDX9.dll 0x1000e45e).
+  parts = [eqModels.wldMeshPart(mesh, {}, True) | {"takesAllLights": False} for mesh in worldFile.meshes()]
   regionMeshCount = len(parts)
   placements = objectPlacements(eqWorldFile.WorldFile(archive.read("objects.wld"), f"{source['archive'].name}:objects.wld")) if "objects.wld" in archive.entries else []
   objectParts, missingModels, objectArchives, placedCounts, particleClouds = {}, set(), [], {}, 0
@@ -153,7 +155,7 @@ def buildClassicZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
         objectArchives.append(definition["archive"])
     if objectParts[actor] is None:
       continue
-    parts += [placedPart(part, placement) for part in objectParts[actor]]
+    parts += [placedPart(part, placement) | {"takesAllLights": not part.get("colored", False)} for part in objectParts[actor]]
     placedCounts[actor] = placedCounts.get(actor, 0) + 1
   textureHolders = [archive] + [eqArchive.EQArchive(clientRoot / name) for name in objectArchives]
   written = eqModels.writePartsCache(zoneFolder, parts, textureHolders, f"Zone '{zoneName}'")
@@ -340,7 +342,7 @@ def buildTerrainZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
         covers[layer["coverMap"]] = eqTerrainTextures.coverImage(readEntry(archive, layer["coverMap"]), eqTerrainTextures.textureSide, layer["coverMap"])
   textures = eqTerrainTextures.tileTextures(terrain, ecosystems, covers)
   combos = sorted({tuple(layer["ecosystem"] for layer in tile["layers"]) for tile in terrain["tiles"]})
-  parts = terrainTileParts(terrain, {combo: index for index, combo in enumerate(combos)})
+  parts = [part | {"takesAllLights": False} for part in terrainTileParts(terrain, {combo: index for index, combo in enumerate(combos)})]
   tileCount = len(parts)
   objects = TerrainObjects(clientRoot, cacheRoot, zoneName)
   tilesByOrigin = {(tile["x"], tile["y"]): tile for tile in terrain["tiles"]}
@@ -351,7 +353,7 @@ def buildTerrainZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
       continue
     transform = eqgTerrain.placementMatrix(placement["rotationDegrees"], placement["scale"])
     colors = numpy.tile(numpy.array(unlitColor, dtype=numpy.uint8), (len(model["vertices"]), 1))
-    parts.append(placedEQGPart(model, transform, eqgTerrain.placedPosition(terrain, tilesByOrigin, placement), colors))
+    parts.append(placedEQGPart(model, transform, eqgTerrain.placedPosition(terrain, tilesByOrigin, placement), colors) | {"takesAllLights": True})
     placedCounts[placement["model"]] = placedCounts.get(placement["model"], 0) + 1
   missingGroups, litMismatches = set(), set()
   for group in terrain["groups"]:
@@ -366,11 +368,12 @@ def buildTerrainZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
       if model is None:
         continue
       colors = litColors(readEntry(archive, member["lit"]), len(model["vertices"]), member["lit"])
+      baked = colors is not None
       if colors is None:
         litMismatches.add(member["lit"])
         colors = numpy.tile(numpy.array(unlitColor, dtype=numpy.uint8), (len(model["vertices"]), 1))
       transform = groupTransform @ eqgTerrain.placementMatrix(member["rotationDegrees"], member["scale"])
-      parts.append(placedEQGPart(model, transform, groupPosition + groupTransform @ numpy.array(member["position"]), colors))
+      parts.append(placedEQGPart(model, transform, groupPosition + groupTransform @ numpy.array(member["position"]), colors) | {"takesAllLights": not baked})
       placedCounts[member["model"]] = placedCounts.get(member["model"], 0) + 1
   textureHolders = [archive] + [eqArchive.EQArchive(clientRoot / name) for name in objects.archives if name != source["archive"].name.lower()]
   written = eqModels.writePartsCache(zoneFolder, parts, textureHolders, f"Zone '{zoneName}'")
@@ -414,8 +417,10 @@ def eqgZoneParts(library, zone, zoneArchive, label):
     if colors is not None and len(colors) and len(colors) != vertexCount:
       notFitting.append(placement["name"])
       colors = None
-    rgba = bytesRGBA(colors) if colors is not None and len(colors) else numpy.tile(numpy.array(unlitColor, dtype=numpy.uint8), (vertexCount, 1))
-    parts.append(placedEQGPart(model, *eqgFiles.drawnTransform(placement), rgba))
+    baked = colors is not None and len(colors) > 0
+    rgba = bytesRGBA(colors) if baked else numpy.tile(numpy.array(unlitColor, dtype=numpy.uint8), (vertexCount, 1))
+    # The terrain is drawn as the zone's regions, which take only the lights marked for baked geometry (0x1000db20).
+    parts.append(placedEQGPart(model, *eqgFiles.drawnTransform(placement), rgba) | {"takesAllLights": not baked and not placement["model"].endswith(".ter")})
     placedCounts[placement["model"]] = placedCounts.get(placement["model"], 0) + 1
   if not parts:
     raise ValueError(f"{label}: none of its {len(zone['placements'])} placements has a model in {[archive.archivePath.name for archive in library.archives]}")

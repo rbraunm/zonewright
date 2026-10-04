@@ -8,10 +8,14 @@ import bpy
 
 groupName = "eqClientLight"
 # Raised whenever buildGroup changes, so a group saved in an older .blend is rebuilt in place.
-groupVersion = 8
+groupVersion = 9
 bakedAttribute = "eqColor"
 normalAttribute = "eqNormal"
 tintAttribute = "eqTint"
+# The point lights' light per corner, which a preview puts on the copies it draws lit meshes from (bridgePointLights).
+pointLightAttribute = "eqPointLight"
+# Which vertices of an imported client zone take every point light, rather than only those marked for baked geometry.
+takesAllLightsAttribute = "eqTakesAllLights"
 detailUVMap = "eqDetailUV"
 # RegionOldA.fxo's fFogRange: the fog ramp spans ten units of density between fog start and end.
 fogRange = 10.0
@@ -102,6 +106,9 @@ def buildGroup(tree):
   bounceTerm = build.scale(build.color("bounceColor"), build.math("MAXIMUM", build.math("MULTIPLY", facing, -1.0), 0.0))
   sceneLight = build.vectorMath("ADD", build.vectorMath("ADD", build.color("ambientColor"), bounceTerm), sunTerm)
   light = build.vectorMath("ADD", build.vectorMath("ADD", inputs["Baked"], build.scale(sceneLight, inputs["Share"])), build.color("specialAmbientColor"))
+  # The client adds its point lights unscaled by the share of scene light; a surface without the attribute reads none.
+  pointLight = build.node("ShaderNodeAttribute", attribute_type="GEOMETRY", attribute_name=pointLightAttribute)
+  light = build.vectorMath("ADD", light, pointLight.outputs["Color"])
   ones = build.node("ShaderNodeCombineXYZ")
   for axis in "XYZ":
     ones.inputs[axis].default_value = 1.0

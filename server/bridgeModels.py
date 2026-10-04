@@ -161,6 +161,9 @@ def buildModelMesh(folder, meshName):
     normals.data.foreach_set("vector", data["normals"].astype(numpy.float32).ravel())
     baked = mesh.color_attributes.new(bridgeClientLight.bakedAttribute, "FLOAT_COLOR", "POINT")
     baked.data.foreach_set("color", (data["colors"].astype(numpy.float32) / 255).ravel())
+  if "vertexTakesAllLights" in data:
+    takesAll = mesh.attributes.new(bridgeClientLight.takesAllLightsAttribute, "BOOLEAN", "POINT")
+    takesAll.data.foreach_set("value", data["vertexTakesAllLights"].astype(bool))
   if "trianglePassable" in data:
     passable = mesh.attributes.new(bridgeMeshAccess.passableAttribute, "BOOLEAN", "FACE")
     passable.data.foreach_set("value", data["trianglePassable"].astype(bool))

@@ -1,7 +1,8 @@
 """A zone's lights and particle emitters as Blender objects, so they are placed, moved, and exported like everything else. A light is a
 point light whose eqRadius property holds the EQ radius (its reach in world units) and whose color is the EQ RGB, 0-1. An emitter is an
 empty whose eqEmitterDefinition and eqEmitterLifespan properties hold the client emitter definition it shows and the list's lifespan
-field, and eqEmitterAlwaysVisible the field some lists add. The preview draws neither yet. Runs under Blender's Python."""
+field, and eqEmitterAlwaysVisible the field some lists add. A client-shaded preview draws both, as the client does: the lights' light on
+what they reach (bridgePointLights) and the emitters' particles (bridgeEmitterDrawing). Runs under Blender's Python."""
 import bpy
 
 import bridgeMeshAccess
