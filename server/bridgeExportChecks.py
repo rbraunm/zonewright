@@ -1,8 +1,9 @@
 """Checks before a zone export, writing nothing and changing nothing. Failures stop an export: what no zone file can hold, and for a
-game export what it must have decided. Findings are for an artist to look at: texture coverage (the base material showing where no
-surfacing layer covers a face, ground borders without a transition strip, stretched or collapsed texture coordinates, faces wound
-against the rest of their surface), and for a test export what a game export would still refuse. Each names the object, material,
-image, and face count, with where the faces lie. The coverage view draws the same face statuses. Runs under Blender's Python."""
+game export what it must have decided (blockout, swimming, the zone row's values, zone line targets, containment). Findings are for an
+artist to look at: texture coverage (the base material showing where no surfacing layer covers a face, ground borders without a
+transition strip, stretched or collapsed texture coordinates, faces wound against the rest of their surface), and for a test export
+what a game export would still refuse. Each names the object, material, image, and face count, with where the faces lie. The coverage
+view draws the same face statuses. Runs under Blender's Python."""
 import os
 
 import bpy
@@ -10,6 +11,7 @@ import mathutils
 import numpy
 
 import bridgeAuthoring
+import bridgeBoundaries
 import bridgeCommands
 import bridgeExport
 import bridgeHousing
@@ -32,6 +34,7 @@ degenerateArea = 1e-9
 locationsShown = 8
 gameViewKeys = ("fogOn", "minClip", "maxClip", "sky")
 gameFogKeys = ("fogStart", "fogEnd", "fogDensity")
+gamePlayerKeys = ("safePoint", "underworld")
 textureNodeNames = (bridgeSurfacing.diffuseNodeName, bridgeSurfacing.normalNodeName, bridgeSurfacing.environmentNodeName, bridgeSurfacing.secondDiffuseNodeName)
 # Coverage statuses, most pressing first: a face draws in the first that holds for it.
 coverageColors = {
@@ -512,7 +515,7 @@ def placementFailures(shipped):
       if others:
         failures.append({"failure": "collection holds more than meshes", "object": sceneObject.name, "at": objectLocation(sceneObject), "collection": sceneObject.instance_collection.name, "members": others})
     key = bridgeExport.modelKey(sceneObject, role)
-    stems.setdefault(bridgeExport.fileStem(key[1]), set()).add(key[1])
+    stems.setdefault(bridgeExport.modelStem(key), set()).add(key[1])
   for stem, names in sorted(stems.items()):
     if len(names) > 1 or not stem:
       failures.append({"failure": "model names collide", "models": sorted(names), "message": f"Models {sorted(names)} are named '{stem}' once lowercased to letters, digits, and underscores; give them distinct names"})
@@ -535,25 +538,44 @@ def checkZoneExport(purpose):
   failures += faceFailures
   findings += faceFindings
   failures += [{"failure": "swim volume", "message": error} for error in bridgeSwim.structuralErrors()]
+  failures += [{"failure": "boundary", "message": error} for error in bridgeBoundaries.boundaryErrors()]
+  failures += [{"failure": "zone line", "message": error} for error in bridgeBoundaries.zoneLineErrors()]
   decisions = bridgeSwim.swimDecisions()
-  undecided = [{("failure" if purpose == "game" else "finding"): f"swim {swimState}", "body": body.name, "at": bodyCenter(body)} for swimState, bodies in decisions.items() for body in bodies]
   try:
     bridgeHousing.collectHousing()
   except ValueError as error:
     failures.append({"failure": "housing", "message": str(error)})
+  gapKey = "failure" if purpose == "game" else "finding"
+  gaps = blockouts.listed(gapKey) + [{gapKey: f"swim {swimState}", "body": body.name, "at": bodyCenter(body)} for swimState, bodies in decisions.items() for body in bodies]
+  gaps += [{gapKey: gap["gap"]} | {key: value for key, value in gap.items() if key != "gap"} for gap in zoneRowGaps() + bridgeBoundaries.zoneLineGaps()]
   if purpose == "game":
-    failures += blockouts.listed("failure") + undecided
-    zone = bridgeCommands.readZoneProperties(bpy.context.scene)
-    missing = [key for key in gameViewKeys if key not in zone] + ([key for key in gameFogKeys if key not in zone] if zone.get("fogOn") else [])
-    if missing:
-      failures.append({"failure": "view values missing", "missing": missing, "message": f"A game export writes the zone row's view values; set {missing} with setZoneProperties"})
-    failures.append({"failure": "containment not checked", "message": "A game export must prove players cannot leave the play area except through zone lines; that needs reach mapping, which is not built yet, so no game export can be made"})
+    failures += gaps + [{"failure": "containment not checked", "message": "A game export must prove players cannot leave the play area except through zone lines; that needs reach mapping, which is not built yet, so no game export can be made"}]
   else:
-    findings += blockouts.listed("finding") + undecided
+    findings += gaps
   return {
     "purpose": purpose, "failures": failures, "findings": findings, "coverage": coverage, "excluded": excluded,
     "toConfirm": bridgeExport.decisionsToConfirm(shipped), "swim": {swimState: [body.name for body in bodies] for swimState, bodies in decisions.items()},
+    "boundaries": sorted(sceneObject.name for sceneObject, role in shipped if role == "boundary"), "zoneLines": [region["name"] for region in bridgeBoundaries.zoneLineRegions()],
   }
+
+
+def zoneRowGaps():
+  """What the zone row a game export writes still lacks: its view values, the safe point and underworld, and ground under the safe
+  point above the underworld, where players arrive."""
+  zone = bridgeCommands.readZoneProperties(bpy.context.scene)
+  gaps = []
+  missing = [key for key in gameViewKeys if key not in zone] + ([key for key in gameFogKeys if key not in zone] if zone.get("fogOn") else [])
+  if missing:
+    gaps.append({"gap": "view values missing", "missing": missing, "message": f"A game export writes the zone row's view values; set {missing} with setZoneProperties"})
+  missing = [key for key in gamePlayerKeys if key not in zone]
+  if missing:
+    gaps.append({"gap": "safe point or underworld missing", "missing": missing, "message": f"A game export writes where players arrive and how far they may fall; set {missing} with setZoneProperties"})
+  if "safePoint" in zone:
+    x, y, z = zone["safePoint"][:3]
+    floor = zone["underworld"] if "underworld" in zone else bridgeBoundaries.sceneHeightSpan()[0]
+    if bridgeBoundaries.collisionSurfaces(boundaries=False).footingBelow(mathutils.Vector((x, y, z + 1)), z + 1 - floor) is None:
+      gaps.append({"gap": "safe point over no ground", "at": [x, y, z], "message": f"No ground players stand on lies under the safe point {[x, y, z]} above {floor}; players arriving there would fall"})
+  return gaps
 
 
 def collectZoneExport(outputFolder, zoneName, purpose):

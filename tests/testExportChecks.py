@@ -82,7 +82,7 @@ def testCoverageFindingsNameWhatThePicturesShowAndClearAsEachIsFixed(stageBlende
     fixed = await session.expectSuccess("checkExport", target | {"purpose": "test"})
     fixedGame = await session.expectSuccess("checkExport", target | {"purpose": "game"})
     after, _ = await session.expectImage("renderView", coverageMap)
-    await session.expectSuccess("setZoneProperties", {"minClip": 100, "sky": {"type": "coverplot", "hour": 12, "minute": 0}})
+    await session.expectSuccess("setZoneProperties", {"minClip": 100, "sky": {"type": "coverplot", "hour": 12, "minute": 0}, "safePoint": [8, 8, 2, 0], "underworld": -50})
     await session.expectSuccess("saveFile", {})
     viewed = await session.expectSuccess("checkExport", target | {"purpose": "game"})
     refused = await session.expectError("exportZone", target | {"purpose": "game"})
@@ -91,9 +91,10 @@ def testCoverageFindingsNameWhatThePicturesShowAndClearAsEachIsFixed(stageBlende
 
   test, game, before, beforeView, transition, fixed, fixedGame, after, viewed, refused, written = stageBlenderServer.session(steps)
   assert test["failures"] == []
-  assert [(finding["finding"], finding["object"]) for finding in test["findings"]] == [
+  assert [(finding["finding"], finding.get("object")) for finding in test["findings"]] == [
     ("back faces", "slab"), ("base material showing", "ground"), ("border without a transition", "ground"),
     ("texture stretched or squeezed", "slab"), ("zero texture area", "post"), ("blockout", "ground"),
+    ("view values missing", None), ("safe point or underworld missing", None),
   ]
   findings = {finding["finding"]: finding for finding in test["findings"]}
   assert findings["back faces"]["at"] == [{"center": [0.0, -24.0, 8.0], "faces": 1}]
@@ -105,8 +106,10 @@ def testCoverageFindingsNameWhatThePicturesShowAndClearAsEachIsFixed(stageBlende
   assert findings["zero texture area"]["faces"] == 4 and findings["zero texture area"]["at"] == [{"center": [24.0, -24.0, 4.0], "faces": 4}]
   assert findings["blockout"]["material"] == "grey" and findings["blockout"]["faces"] == 4
   assert test["coverage"] == {"error": 0, "zeroTexture": 4, "blockout": 4, "stretch": 6, "base": 4, "border": 7, "ok": 51, "back": 1}
-  # A game export refuses the blockout, the view values the zone row needs, and, until reach mapping exists, any zone.
-  assert [(failure["failure"], failure.get("missing")) for failure in game["failures"]] == [("blockout", None), ("view values missing", ["minClip", "sky"]), ("containment not checked", None)]
+  # A game export refuses the blockout, the zone row's values it lacks, and, until reach mapping exists, any zone.
+  assert [(failure["failure"], failure.get("missing")) for failure in game["failures"]] == [
+    ("blockout", None), ("view values missing", ["minClip", "sky"]), ("safe point or underworld missing", ["safePoint", "underworld"]), ("containment not checked", None),
+  ]
   assert "blockout" not in [finding["finding"] for finding in game["findings"]]
   # The coverage map shows each finding where the list puts it.
   assert beforeView["coverage"]["faces"] == test["coverage"]
@@ -116,9 +119,9 @@ def testCoverageFindingsNameWhatThePicturesShowAndClearAsEachIsFixed(stageBlende
   assert blue > 2 * green and green > 2 * red, (red, green, blue)
   # Fixed one by one, every finding clears, and the map turns grey where each was.
   assert transition["painted"] == 4 and transition["straddlingFaces"] == 1
-  assert fixed["failures"] == [] and fixed["findings"] == []
+  assert fixed["failures"] == [] and [finding["finding"] for finding in fixed["findings"]] == ["view values missing", "safe point or underworld missing"]
   assert fixed["coverage"] == {"error": 0, "zeroTexture": 0, "blockout": 0, "stretch": 0, "base": 0, "border": 0, "ok": 76, "back": 0}
-  assert [failure["failure"] for failure in fixedGame["failures"]] == ["view values missing", "containment not checked"]
+  assert [failure["failure"] for failure in fixedGame["failures"]] == ["view values missing", "safe point or underworld missing", "containment not checked"]
   for name in ("base", "blockout", "border", "slabTop"):
     assert numpy.abs(colorAt(after, name) - shaded("grey")).max() <= 2, (name, colorAt(after, name))
   assert [failure["failure"] for failure in viewed["failures"]] == ["containment not checked"]

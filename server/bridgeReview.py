@@ -10,6 +10,7 @@ import mathutils
 import mathutils.bvhtree
 import numpy
 
+import bridgeBoundaries
 import bridgeExport
 import bridgeMeshAccess
 from playerScale import playerHeight, walkableNormalZ
@@ -103,7 +104,8 @@ def walkRoute(path, sampleSpacing):
     raise ValueError(f"A route is at least two [x, y, z] points, got {path!r}")
   if sampleSpacing <= 0:
     raise ValueError(f"sampleSpacing must be positive, got {sampleSpacing}")
-  surfaces = bridgeMeshAccess.PlayerSurfaces()
+  surfaces = bridgeBoundaries.collisionSurfaces()
+  boundaries = bridgeBoundaries.boundarySurfaces()
   water = bridgeMeshAccess.swimSurfaces()
   steepestWalkable = math.degrees(math.acos(walkableNormalZ))
   climb = sampleSpacing * math.tan(math.radians(steepestWalkable)) + 0.5
@@ -125,6 +127,10 @@ def walkRoute(path, sampleSpacing):
           problems.append(f"drop: no footing within {routeFootingReach:g} below {roundVector(footing)} going on to [{point.x:.1f}, {point.y:.1f}]")
         break
       run = math.hypot(hit.x - footing.x, hit.y - footing.y)
+      across = None if boundaries is None else boundaries.cast(footing + up * playerHeight / 2, mathutils.Vector((hit.x - footing.x, hit.y - footing.y, 0)).normalized(), run)
+      if across is not None:
+        problems.append(f"blocked: a boundary stands across the way at {roundVector(across)}, past {roundVector(footing)}")
+        break
       slope = math.degrees(math.atan2(abs(hit.z - footing.z), run))
       travelled += run
       footing = hit

@@ -36,6 +36,14 @@ plotBorderProperty = "zonewrightPlotBorder"
 # export yet, and imported zones are reference.
 clientContentProperty = "zonewrightClientContent"
 clientContentKinds = ("spawn", "door", "object", "zone", "zoneFile")
+# A boundary (bridgeBoundaries) is a designed invisible wall, lid, or floor: never drawn, it blocks players and exports as the terrain's
+# material -1 triangles. A zone line is an ATP_ box keeping its target in its property.
+boundaryProperty = "zonewrightBoundary"
+zoneLineProperty = "zonewrightZoneLine"
+# Players pass through an object marked passable, as through liquid surfaces and cutout cards: export flags its triangles 0x1. An
+# imported zone file marks the faces it flags so with the face attribute of the same name.
+passableProperty = "zonewrightPassable"
+passableAttribute = "zonewrightPassable"
 waterReach = 100000.0
 
 
@@ -101,9 +109,14 @@ def isCollectionInstance(sceneObject):
   return sceneObject.type == "EMPTY" and sceneObject.instance_type == "COLLECTION" and sceneObject.instance_collection is not None
 
 
-def isPlayerSolid(sceneObject):
+def isPlayerSolid(sceneObject, collision=False):
   """Whether players stand on and are blocked by an object: rendered meshes and collection instances, but not guides, plot borders,
-  regions, water bodies (swum, not stood on), spawns (players pass through them), or doors (taken as open)."""
+  regions, water bodies (swum, not stood on), spawns (players pass through them), or doors (taken as open). With collision, as the
+  client collides: boundaries, never drawn, block too, and objects marked passable do not."""
+  if collision and boundaryProperty in sceneObject:
+    return sceneObject.type == "MESH"
+  if collision and passableProperty in sceneObject:
+    return False
   if sceneObject.hide_render or isDesignAid(sceneObject) or regionIntentProperty in sceneObject or waterProperty in sceneObject:
     return False
   if sceneObject.get(clientContentProperty) in ("spawn", "door"):
@@ -127,22 +140,28 @@ def worldBoundsCorners(sceneObject, depsgraph):
   return [matrix @ mathutils.Vector(corner) for part, matrix in objectParts(sceneObject) for corner in part.evaluated_get(depsgraph).bound_box]
 
 
-def playerSolidParts(excluding=()):
-  """Each mesh players stand on and are blocked by, with its world matrix (objectParts), leaving out the objects named in excluding."""
+def playerSolidParts(excluding=(), collision=False):
+  """Each mesh players stand on and are blocked by, with its world matrix (objectParts), leaving out the objects named in excluding; with
+  collision, boundaries count and members marked passable do not (isPlayerSolid)."""
   # An object moved or made since the last evaluation still holds its old world matrix until the scene is evaluated.
   bpy.context.view_layer.update()
-  parts = [part for sceneObject in bpy.context.scene.objects if isPlayerSolid(sceneObject) and sceneObject.name not in excluding for part in objectParts(sceneObject)]
+  parts = [
+    part for sceneObject in bpy.context.scene.objects if isPlayerSolid(sceneObject, collision) and sceneObject.name not in excluding
+    for part in objectParts(sceneObject) if not (collision and passableProperty in part[0])
+  ]
   if not parts:
     raise ValueError("The scene has nothing players stand on: no rendered meshes or collection instances besides water, guides, regions, spawns, and doors")
   return parts
 
 
 class PlayerSurfaces:
-  """Ray casts against what players stand on and are blocked by (playerSolidParts)."""
+  """Ray casts against what players stand on and are blocked by (playerSolidParts), or against given (world matrix, BVH tree) pairs."""
 
-  def __init__(self):
-    depsgraph = bpy.context.evaluated_depsgraph_get()
-    self.members = [(matrix, matrix.inverted(), mathutils.bvhtree.BVHTree.FromObject(part, depsgraph)) for part, matrix in playerSolidParts()]
+  def __init__(self, trees=None):
+    if trees is None:
+      depsgraph = bpy.context.evaluated_depsgraph_get()
+      trees = [(matrix, mathutils.bvhtree.BVHTree.FromObject(part, depsgraph)) for part, matrix in playerSolidParts()]
+    self.members = [(matrix, matrix.inverted(), tree) for matrix, tree in trees]
 
   def cast(self, origin, direction, distance):
     """The nearest world hit point within distance, or None."""

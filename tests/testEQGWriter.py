@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
 import eqArchive
 import eqgFiles
 import eqgWriter
+import zoneGeometry
 
 repositoryRoot = Path(__file__).resolve().parent.parent
 everquestClient = Path(json.loads((repositoryRoot / ".mcp.json").read_text(encoding="utf-8"))["mcpServers"]["zonewright"]["env"]["EVERQUEST_CLIENT"])
@@ -59,7 +60,7 @@ def triangleModel(kind):
   normals = numpy.array([[0, 0, 1]] * 4, dtype=numpy.float32)
   uvs = numpy.array([[0, 1], [1, 1], [0, 0], [1, 0.25]], dtype=numpy.float32)
   triangles = numpy.array([[0, 1, 2], [1, 3, 2]])
-  return eqgWriter.modelBytes(kind, materials, positions, normals, uvs, triangles, [0, 1]), positions, normals, uvs, triangles
+  return eqgWriter.modelBytes(kind, materials, positions, normals, uvs, triangles, [0, 1], [0, 0]), positions, normals, uvs, triangles
 
 
 @pytest.mark.parametrize("kind", ["mod", "ter"])
@@ -83,7 +84,7 @@ def testLiquidMaterialsCarryTheClientsShaderProperties():
     {"name": "falls", "diffuseTexture": "fall_c.dds", "normalTexture": None, "cutout": False, "liquid": {"liquid": "waterfall", "values": {"slides": [0, 0.3, 0, 0.2]}}},
     {"name": "magma", "diffuseTexture": "lava_c.dds", "normalTexture": "lava_n.dds", "cutout": False, "liquid": {"liquid": "lava", "values": {"slides": [0.01, 0, 0, 0.03]}, "secondDiffuseTexture": "lava2_c.dds"}},
   ]
-  data = eqgWriter.modelBytes("mod", materials, [[0, 0, 0]] * 3, [[0, 0, 1]] * 3, [[0, 0]] * 3, [[0, 1, 2]], [0])
+  data = eqgWriter.modelBytes("mod", materials, [[0, 0, 0]] * 3, [[0, 0, 1]] * 3, [[0, 0]] * 3, [[0, 1, 2]], [0], [0])
   pond, falls, magma = eqgFiles.parseModel(data, "liquids.mod")["materials"]
   assert pond["shader"] == "Opaque_MaxWater.fx" and falls["shader"] == "Opaque_MaxWaterFall.fx" and magma["shader"] == "Opaque_MaxLava.fx"
   # Colors are 0xAARRGGBB, as the client's water materials hold them (its most common first color is 0xFF00191C).
@@ -105,7 +106,55 @@ def testARegionWithoutExtentIsRefused():
 def testACutoutWithANormalMapIsRefused():
   material = {"name": "card", "diffuseTexture": "card_c.dds", "normalTexture": "card_n.dds", "cutout": True}
   with pytest.raises(ValueError, match="cutout with a normal map"):
-    eqgWriter.modelBytes("mod", [material], [[0, 0, 0]] * 3, [[0, 0, 1]] * 3, [[0, 0]] * 3, [[0, 1, 2]], [0])
+    eqgWriter.modelBytes("mod", [material], [[0, 0, 0]] * 3, [[0, 0, 1]] * 3, [[0, 0]] * 3, [[0, 1, 2]], [0], [0])
+
+
+def wallAndCardModel():
+  """A terrain with a stone floor, a cutout card players pass through, and an invisible wall: materials 0, 1, and none."""
+  materials = [
+    {"name": "stone", "diffuseTexture": "stone_c.dds", "normalTexture": None, "cutout": False},
+    {"name": "leaves", "diffuseTexture": "leaves_c.dds", "normalTexture": None, "cutout": True},
+  ]
+  positions = [[0, 0, 0], [10, 0, 0], [0, 10, 0], [0, 0, 10]]
+  return materials, positions, [[0, 0, 1]] * 4, [[0, 0]] * 4, [[0, 1, 2], [0, 2, 3], [0, 3, 1]]
+
+
+def testInvisibleWallsAndPassableTrianglesReadBack():
+  materials, positions, normals, uvs, triangles = wallAndCardModel()
+  model = eqgFiles.parseModel(eqgWriter.modelBytes("ter", materials, positions, normals, uvs, triangles, [0, 1, -1], [0, eqgFiles.passableFlag, 0]), "walls.ter")
+  assert model["triangleMaterials"].tolist() == [0, 1, -1] and model["triangleFlags"].tolist() == [0, 1, 0]
+  # The survey reads the stone as solid, the card as cutout, and the wall as invisible; a solid triangle flagged passable is passable.
+  builder = zoneGeometry.GeometryBuilder()
+  zoneGeometry.addEQGModel(builder, model, {"model": "walls.ter", "position": (0, 0, 0), "rotation": (0, 0, 0), "scale": 1.0}, False)
+  flaggedStone = eqgFiles.parseModel(eqgWriter.modelBytes("ter", materials, positions, normals, uvs, triangles, [0, 1, -1], [1, 1, 0]), "flagged.ter")
+  zoneGeometry.addEQGModel(builder, flaggedStone, {"model": "flagged.ter", "position": (0, 0, 0), "rotation": (0, 0, 0), "scale": 1.0}, False)
+  kinds = [zoneGeometry.surfaceKinds[code] for code in builder.build()["triangleSurfaces"]]
+  assert kinds == ["solid", "cutout", "invisible", "passable", "cutout", "invisible"]
+
+
+def testAWallPlayersPassThroughAndUnknownFlagsAreRefused():
+  materials, positions, normals, uvs, triangles = wallAndCardModel()
+  with pytest.raises(ValueError, match="invisible wall"):
+    eqgWriter.modelBytes("ter", materials, positions, normals, uvs, triangles, [0, 1, -1], [0, 0, eqgFiles.passableFlag])
+  with pytest.raises(ValueError, match="flags 0 or 1"):
+    eqgWriter.modelBytes("ter", materials, positions, normals, uvs, triangles, [0, 1, 0], [0, 2, 0])
+  with pytest.raises(ValueError, match="or -1 for none"):
+    eqgWriter.modelBytes("ter", materials, positions, normals, uvs, triangles, [0, 1, -2], [0, 0, 0])
+
+
+def testACollisionModelWithoutMaterialsReadsAsInvisible():
+  _, positions, normals, uvs, triangles = wallAndCardModel()
+  data = bytearray(eqgWriter.modelBytes("mod", [], positions, normals, uvs, triangles, [-1, -1, -1], [0, 0, 0]))
+  # Collision models the client ships without materials name material 0 on every triangle; the client draws none of them.
+  records = numpy.frombuffer(data, dtype=eqgFiles.modelTriangleType, count=3, offset=len(data) - 3 * eqgFiles.modelTriangleType.itemsize).copy()
+  records["material"] = 0
+  data[len(data) - records.nbytes:] = records.tobytes()
+  model = eqgFiles.parseModel(bytes(data), "shell_col.mod")
+  assert model["materials"] == [] and model["triangleMaterials"].tolist() == [-1, -1, -1]
+  records["material"] = 1
+  data[len(data) - records.nbytes:] = records.tobytes()
+  with pytest.raises(ValueError, match="with 0 materials"):
+    eqgFiles.parseModel(bytes(data), "shell_col.mod")
 
 
 def testZoneReadsBackThroughTheZoneReader():

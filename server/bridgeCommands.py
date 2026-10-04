@@ -2,12 +2,14 @@
 import contextlib
 import io
 import json
+import math
 import os
 
 import bpy
 
 import bridgeArrangement
 import bridgeAuthoring
+import bridgeBoundaries
 import bridgeDressing
 import bridgeEnvironment
 import bridgeExportChecks
@@ -28,7 +30,7 @@ from bridgeState import requireNoUnsavedChanges, state
 zonePropertyName = "zonewrightZone"
 zonePropertyKeys = (
   "ambientColor", "specialAmbientColor", "bounceColor", "sunColor", "sunAzimuthDegrees", "sunElevationDegrees", "fogColor", "fogStart", "fogEnd",
-  "fogDensity", "fogOn", "minClip", "maxClip", "newEngineZone", "sky",
+  "fogDensity", "fogOn", "minClip", "maxClip", "newEngineZone", "sky", "safePoint", "underworld",
 )
 # The client raises a lower minimum clip to this (eqgame 0x4c9ee6).
 clientMinimumClip = 50.0
@@ -204,6 +206,25 @@ def validateSky(sky):
     raise ValueError(f"sky hour must be 0-23 and minute 0-59, got {sky['hour']}:{sky['minute']}")
 
 
+def isFiniteNumber(value):
+  return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def validatePlayerValues(zone):
+  """The safe point [x, y, z, headingDegrees] where players arrive (heading 0 = +Y, clockwise) and the underworld height below it,
+  under which the client puts a falling player back."""
+  if "safePoint" in zone:
+    point = zone["safePoint"]
+    if not isinstance(point, list) or len(point) != 4 or not all(isFiniteNumber(value) for value in point):
+      raise ValueError(f"safePoint is [x, y, z, headingDegrees], got {point!r}")
+    if not 0 <= point[3] < 360:
+      raise ValueError(f"safePoint's headingDegrees runs from 0 up to 360, got {point[3]}")
+  if "underworld" in zone and not isFiniteNumber(zone["underworld"]):
+    raise ValueError(f"underworld is a height, got {zone['underworld']!r}")
+  if "safePoint" in zone and "underworld" in zone and zone["underworld"] >= zone["safePoint"][2]:
+    raise ValueError(f"underworld {zone['underworld']} must lie below the safe point's height {zone['safePoint'][2]}")
+
+
 def setZoneProperties(updates):
   """Store zone properties; a sky None removes the sky. A sky supplies the light and the fog color, so setting one drops those that
   were set by hand, and they cannot be set while it stays."""
@@ -243,6 +264,7 @@ def setZoneProperties(updates):
     raise ValueError(f"maxClip {zone['maxClip']} must be greater than fogStart {zone['fogStart']}: nothing would be drawn far enough to fog")
   if "newEngineZone" in zone and not isinstance(zone["newEngineZone"], bool):
     raise ValueError(f"newEngineZone must be true or false, got {zone['newEngineZone']!r}")
+  validatePlayerValues(zone)
   bpy.context.scene[zonePropertyName] = zone
   return {"zone": readZoneProperties(bpy.context.scene), "replacedBySky": replaced}
 
@@ -285,7 +307,7 @@ commands = {
   "pick": (pick, False),
   "renderPasses": (renderPasses, False),
   "renderModelThumbnails": (bridgeViews.renderModelThumbnails, False),
-} | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands | bridgeModels.commands | bridgeExportChecks.commands | bridgePasses.commands | bridgeEnvironment.commands | bridgeReview.commands | bridgeAuthoring.commands | bridgeWater.commands | bridgeHousing.commands | bridgeSketch.commands | bridgeSwim.commands | bridgeArrangement.commands
+} | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands | bridgeModels.commands | bridgeExportChecks.commands | bridgePasses.commands | bridgeEnvironment.commands | bridgeReview.commands | bridgeAuthoring.commands | bridgeWater.commands | bridgeHousing.commands | bridgeSketch.commands | bridgeSwim.commands | bridgeArrangement.commands | bridgeBoundaries.commands
 
 
 def dispatch(command, arguments):

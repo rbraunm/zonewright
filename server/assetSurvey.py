@@ -26,7 +26,7 @@ import surveyFields
 import zoneGeometry
 import zoneSources
 
-surveyVersion = 4
+surveyVersion = 5
 thumbnailSide = 128
 imageExtensions = (".dds", ".bmp", ".tga", ".png", ".jpg")
 looseFolders = ("Resources/Sky", "Resources/WaterSwap", "Resources/Precipitation", "EnvEmitterEffects")

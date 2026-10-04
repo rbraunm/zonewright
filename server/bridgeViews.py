@@ -8,6 +8,7 @@ import bpy
 import mathutils
 import numpy
 
+import bridgeBoundaries
 import bridgeClientLight
 import bridgeExportChecks
 import bridgeMeshAccess
@@ -51,6 +52,12 @@ layoutAmbient = 0.3
 # Swim volumes drawn in a view: see-through blocks, cyan for water and orange for lava.
 swimColors = {"water": (0.1, 0.85, 1.0), "lava": (1.0, 0.45, 0.05)}
 swimAlpha = 0.3
+# Guides drawn with the boundaries: see-through red slabs, thick enough to show a wall from above, and green zone-line blocks.
+boundaryColor = (1.0, 0.12, 0.08)
+zoneLineColor = (0.2, 1.0, 0.25)
+guideAlpha = 0.4
+boundaryThickness = 1.0
+mapBoundaryPixels = 3
 layoutHeightColors = ((0.0, (0.22, 0.36, 0.26)), (0.35, (0.58, 0.56, 0.36)), (0.7, (0.62, 0.45, 0.32)), (1.0, (0.92, 0.9, 0.87)))
 # Relief shading is the layout drawing in quiet greys, for a plan's lines and labels to stand out over.
 reliefHeightColors = ((0.0, (0.5, 0.5, 0.48)), (1.0, (0.93, 0.93, 0.91)))
@@ -163,25 +170,49 @@ class PreviewScene:
     """Each swim volume as a see-through block in its liquid's color, to look at against the water and the bed."""
     for box in bridgeSwim.swimBoxes():
       liquid = bridgeSwim.readBox(box)["liquid"]
-      (low, high) = bridgeSwim.boxCorners(box)
-      corners = [(x, y, z) for z in (low[2], high[2]) for y in (low[1], high[1]) for x in (low[0], high[0])]
-      faces = [(0, 2, 3, 1), (4, 5, 7, 6), (0, 1, 5, 4), (2, 6, 7, 3), (0, 4, 6, 2), (1, 3, 7, 5)]
-      mesh = bpy.data.meshes.new(previewName + "Swim")
-      mesh.from_pydata(corners, [], faces)
-      mesh.materials.append(self.swimMaterial(liquid))
-      self.addObject(bpy.data.objects.new(previewName + "Swim", mesh))
+      self.addBlock("Swim", bridgeSwim.boxCorners(box), self.seeThroughMaterial("Swim" + liquid, swimColors[liquid], swimAlpha))
 
-  def swimMaterial(self, liquid):
-    material = bpy.data.materials.new(previewName + "Swim" + liquid)
+  def drawBoundaries(self, thickness):
+    """The boundaries (bridgeBoundaries) as see-through red slabs `thickness` thick, so a wall shows from above too, and the zone lines
+    as see-through green blocks: guides to design with, never what the client draws."""
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    wallMaterial = self.seeThroughMaterial("Boundary", boundaryColor, guideAlpha)
+    for boundary in bridgeBoundaries.boundaryObjects():
+      if boundary.type != "MESH":
+        continue
+      mesh = bpy.data.meshes.new_from_object(boundary.evaluated_get(depsgraph))
+      mesh.materials.clear()
+      mesh.materials.append(wallMaterial)
+      slab = self.addObject(bpy.data.objects.new(previewName + "Boundary", mesh))
+      slab.matrix_world = boundary.matrix_world
+      solidify = slab.modifiers.new("thickness", "SOLIDIFY")
+      solidify.thickness = thickness
+      solidify.offset = 0.0
+    lineMaterial = self.seeThroughMaterial("ZoneLine", zoneLineColor, guideAlpha)
+    for line in bridgeBoundaries.zoneLineObjects():
+      center, half = bridgeBoundaries.boxBounds(line)
+      self.addBlock("ZoneLine", ([c - h for c, h in zip(center, half)], [c + h for c, h in zip(center, half)]), lineMaterial)
+
+  def addBlock(self, label, corners, material):
+    low, high = corners
+    points = [(x, y, z) for z in (low[2], high[2]) for y in (low[1], high[1]) for x in (low[0], high[0])]
+    faces = [(0, 2, 3, 1), (4, 5, 7, 6), (0, 1, 5, 4), (2, 6, 7, 3), (0, 4, 6, 2), (1, 3, 7, 5)]
+    mesh = bpy.data.meshes.new(previewName + label)
+    mesh.from_pydata(points, [], faces)
+    mesh.materials.append(material)
+    self.addObject(bpy.data.objects.new(previewName + label, mesh))
+
+  def seeThroughMaterial(self, label, color, alpha):
+    material = bpy.data.materials.new(previewName + label)
     material.use_nodes = True
     material.surface_render_method = "BLENDED"
     nodes, links = material.node_tree.nodes, material.node_tree.links
     nodes.clear()
     emission = nodes.new("ShaderNodeEmission")
-    emission.inputs["Color"].default_value = (*swimColors[liquid], 1.0)
+    emission.inputs["Color"].default_value = (*color, 1.0)
     clear = nodes.new("ShaderNodeBsdfTransparent")
     mix = nodes.new("ShaderNodeMixShader")
-    mix.inputs["Fac"].default_value = swimAlpha
+    mix.inputs["Fac"].default_value = alpha
     links.new(clear.outputs[0], mix.inputs[1])
     links.new(emission.outputs[0], mix.inputs[2])
     output = nodes.new("ShaderNodeOutputMaterial")
@@ -379,10 +410,20 @@ def placeFrameCamera(preview, frame):
   return {"eye": list(camera.location), "target": list(center), "forward": list(forward), "framedRadius": radius, "figure": None}
 
 
-def placeMapCamera(preview, mapView):
-  """Straight down from above everything, orthographic, north (+Y) up and east (+X) right."""
+def requireMapView(mapView):
   if not isinstance(mapView, dict) or set(mapView) != {"center", "width"} or len(mapView["center"]) != 2 or mapView["width"] <= 0:
     raise ValueError(f"A map view is {{\"map\": {{\"center\": [x, y], \"width\": w}}}} with a positive width, got {mapView!r}")
+  return mapView
+
+
+def guideThickness(view):
+  """How thick boundary guides draw: a few pixels across in a map, so a wall shows from straight above, else a unit."""
+  return requireMapView(view["map"])["width"] / renderWidth * mapBoundaryPixels if "map" in view else boundaryThickness
+
+
+def placeMapCamera(preview, mapView):
+  """Straight down from above everything, orthographic, north (+Y) up and east (+X) right."""
+  requireMapView(mapView)
   bottom, top = sceneHeightRange(preview)
   camera = preview.camera
   camera.data.type = "ORTHO"
@@ -432,6 +473,10 @@ def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, b
   shapeOnly = "map" in view or shading != "client"
   preview = PreviewScene(sourceScene, zone | {"fogOn": False} if shapeOnly else zone, guides, None if shapeOnly else sky)
   try:
+    # Layout and relief shading override every material, so a see-through guide would draw as solid ground there. Drawn before the
+    # camera is placed, so a map camera stands above the tallest wall.
+    if guides and shading in ("client", "coverage"):
+      preview.drawBoundaries(guideThickness(view))
     description = placeCamera(preview, view, figureModel)
     preview.drawSky()
     if swimVolumes:

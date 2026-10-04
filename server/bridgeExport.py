@@ -1,15 +1,17 @@
 """What an EQG zone export takes from the open scene. The `terrain` collection's meshes become the zone's terrain, merged in world
-coordinates; every other rendered mesh becomes a model placed at its object's transform (copies sharing a mesh and without modifiers
-share one model), and every collection instance a model of its collection's meshes. What is not the zone's own geometry (guides, plot
-borders, regions, placed client content, anything hidden from renders) is left out and listed with why. Collecting assumes the scene
-passed bridgeExportChecks; it writes the meshes to modelArrays.npz and returns the models, materials, placements, swim volumes, and
-the zone's housing. Runs under Blender's Python."""
+coordinates with the boundaries (bridgeBoundaries) as triangles without a material; every other rendered mesh becomes a model placed
+at its object's transform (copies sharing a mesh and without modifiers share one model), and every collection instance a model of its
+collection's meshes. Each triangle carries whether players pass through it (a liquid or cutout material, or an object marked
+passable). What is not the zone's own geometry (guides, plot borders, regions, placed client content, anything hidden from renders) is
+left out and listed with why. Collecting assumes the scene passed bridgeExportChecks; it writes the meshes to modelArrays.npz and
+returns the models, materials, placements, swim volumes and zone lines as regions, and the zone's housing. Runs under Blender's Python."""
 import os
 import re
 
 import bpy
 import numpy
 
+import bridgeBoundaries
 import bridgeEnvironment
 import bridgeHousing
 import bridgeMeshAccess
@@ -43,6 +45,10 @@ def exclusionReason(sceneObject):
     return "a region: the plan"
   if bridgeSwim.swimProperty in sceneObject:
     return "a swim volume: written as a .zon region"
+  if bridgeMeshAccess.zoneLineProperty in sceneObject:
+    return "a zone line: written as a .zon region"
+  if bridgeMeshAccess.boundaryProperty in sceneObject:
+    return None
   if sceneObject.hide_render:
     return "hidden from renders"
   if sceneObject.type == "EMPTY" and not bridgeEnvironment.isEmitter(sceneObject) and not bridgeMeshAccess.isCollectionInstance(sceneObject):
@@ -51,8 +57,8 @@ def exclusionReason(sceneObject):
 
 
 def classifyObjects():
-  """What a zone export ships, each object with its role (terrain, mesh, instance, light, or emitter); what it leaves out, each with
-  why; and what it cannot take, each a failure with why. Nothing is unhidden, retagged, or removed."""
+  """What a zone export ships, each object with its role (terrain, boundary, mesh, instance, light, or emitter); what it leaves out,
+  each with why; and what it cannot take, each a failure with why. Nothing is unhidden, retagged, or removed."""
   terrainCollection = bpy.data.collections.get(terrainCollectionName)
   terrainNames = {member.name for member in terrainCollection.all_objects} if terrainCollection is not None else set()
   shipped, excluded, failures = [], [], []
@@ -60,6 +66,11 @@ def classifyObjects():
     reason = exclusionReason(sceneObject)
     if reason is not None:
       excluded.append({"object": sceneObject.name, "reason": reason})
+    elif bridgeMeshAccess.boundaryProperty in sceneObject:
+      if sceneObject.type == "MESH":
+        shipped.append((sceneObject, "boundary"))
+      else:
+        failures.append({"failure": "not a mesh", "object": sceneObject.name, "message": f"'{sceneObject.name}' is a boundary but a {sceneObject.type}; boundaries are meshes"})
     elif sceneObject.name in terrainNames:
       if sceneObject.type == "MESH":
         shipped.append((sceneObject, "terrain"))
@@ -126,9 +137,10 @@ def materialRecord(material):
   }}
 
 
-def meshArrays(sceneObject, depsgraph, matrix, materialNames):
+def meshArrays(sceneObject, depsgraph, matrix, materialNames, marked):
   """An object's evaluated mesh as the file keeps it: one vertex per distinct position, corner normal, and texture coordinate (v up
-  from the texture's top, as static EQG models store it), transformed by matrix, and each triangle's material name."""
+  from the texture's top, as static EQG models store it), transformed by matrix, and each triangle's material name and whether players
+  pass through it (its material's, or every triangle when marked)."""
   evaluated = sceneObject.evaluated_get(depsgraph)
   mesh = evaluated.to_mesh()
   try:
@@ -161,6 +173,7 @@ def meshArrays(sceneObject, depsgraph, matrix, materialNames):
     "positions": positions[loopVertices[firstLoop]], "normals": normals[firstLoop], "uvs": uvs[firstLoop],
     "triangles": loopToVertex[triangleLoops].reshape(-1, 3),
     "materials": [materialNames(slotMaterials[slot]) for slot in triangleSlots],
+    "passable": marked | numpy.array([bridgeBoundaries.isPassableMaterial(slotMaterials[slot]) for slot in triangleSlots], dtype=bool),
   }
 
 
@@ -170,7 +183,7 @@ def mergeArrays(parts):
     "positions": numpy.concatenate([part["positions"] for part in parts]), "normals": numpy.concatenate([part["normals"] for part in parts]),
     "uvs": numpy.concatenate([part["uvs"] for part in parts]),
     "triangles": numpy.concatenate([part["triangles"] + offset for part, offset in zip(parts, offsets)]),
-    "materials": [name for part in parts for name in part["materials"]],
+    "materials": [name for part in parts for name in part["materials"]], "passable": numpy.concatenate([part["passable"] for part in parts]),
   }
 
 
@@ -192,11 +205,17 @@ def fileStem(text):
 
 
 def modelKey(sceneObject, role):
-  """The model a shipped mesh or collection instance places: copies sharing a mesh and without modifiers share one."""
+  """The model a shipped mesh or collection instance places: copies sharing a mesh and without modifiers share one, unless one is
+  marked passable and the other not; the name is the key's second entry, whether it is marked its last."""
+  marked = bridgeMeshAccess.passableProperty in sceneObject
   if role == "mesh":
-    return ("mesh", sceneObject.data.name) if not sceneObject.modifiers else ("object", sceneObject.name)
+    return ("mesh", sceneObject.data.name, marked) if not sceneObject.modifiers else ("object", sceneObject.name, marked)
   collection = sceneObject.instance_collection
-  return ("collection", collection.name, collection.library.filepath if collection.library else "")
+  return ("collection", collection.name, collection.library.filepath if collection.library else "", marked)
+
+
+def modelStem(key):
+  return fileStem(key[1]) + ("_passable" if key[-1] else "")
 
 
 def collectionMembers(collection):
@@ -214,7 +233,7 @@ def collectZoneExport(outputFolder, zoneName):
     return material.name
 
   shipped, _ = exportedObjects()
-  regions = bridgeSwim.swimRegions()
+  regions = bridgeSwim.swimRegions() + bridgeBoundaries.zoneLineRegions()
   terrainParts, models, placements, lights, emitters = [], {}, [], [], []
   for sceneObject, role in shipped:
     if role == "light":
@@ -224,26 +243,29 @@ def collectZoneExport(outputFolder, zoneName):
       emitters.append(bridgeEnvironment.emitterRecord(sceneObject))
       continue
     if role == "terrain":
-      terrainParts.append(meshArrays(sceneObject, depsgraph, numpy.array(sceneObject.matrix_world), materialName))
+      terrainParts.append(meshArrays(sceneObject, depsgraph, numpy.array(sceneObject.matrix_world), materialName, bridgeMeshAccess.passableProperty in sceneObject))
+      continue
+    if role == "boundary":
+      terrainParts.append(bridgeBoundaries.boundaryArrays(sceneObject, depsgraph))
       continue
     key = modelKey(sceneObject, role)
     if key not in models and role == "mesh":
-      models[key] = {"stem": fileStem(key[1]), "arrays": meshArrays(sceneObject, depsgraph, numpy.identity(4), materialName)}
+      models[key] = {"stem": modelStem(key), "arrays": meshArrays(sceneObject, depsgraph, numpy.identity(4), materialName, key[-1])}
     elif key not in models:
       collection = sceneObject.instance_collection
       offset = numpy.identity(4)
       offset[:3, 3] = -numpy.array(collection.instance_offset)
-      parts = [meshArrays(member, depsgraph, offset @ numpy.array(member.matrix_world), materialName) for member in collectionMembers(collection)]
-      models[key] = {"stem": fileStem(collection.name), "arrays": mergeArrays(parts)}
+      parts = [meshArrays(member, depsgraph, offset @ numpy.array(member.matrix_world), materialName, key[-1] or bridgeMeshAccess.passableProperty in member) for member in collectionMembers(collection)]
+      models[key] = {"stem": modelStem(key), "arrays": mergeArrays(parts)}
     placements.append({"key": key, "object": sceneObject.name} | placementTransform(sceneObject))
   arrays, modelList = {}, []
   for index, (key, model) in enumerate(models.items()):
     modelList.append({"file": f"obj_{model['stem']}.mod", "materials": model["arrays"]["materials"], "arrays": f"model{index}"})
     model["file"] = modelList[-1]["file"]
-    for field in ("positions", "normals", "uvs", "triangles"):
+    for field in ("positions", "normals", "uvs", "triangles", "passable"):
       arrays[f"model{index}_{field}"] = model["arrays"][field]
   terrain = mergeArrays(terrainParts)
-  for field in ("positions", "normals", "uvs", "triangles"):
+  for field in ("positions", "normals", "uvs", "triangles", "passable"):
     arrays[f"terrain_{field}"] = terrain[field]
   os.makedirs(outputFolder, exist_ok=True)
   numpy.savez(os.path.join(outputFolder, modelArraysFileName), **arrays)
