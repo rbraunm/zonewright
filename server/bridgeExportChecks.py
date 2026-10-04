@@ -92,10 +92,11 @@ class ImageChecks:
     return self.records[image.name]
 
   def inspect(self, image):
+    named = bridgeExport.imagePath(image) if image.filepath else image.name
     if image.packed_file is not None:
-      return {"path": None, "problem": "image packed into the .blend", "ddsName": None}
+      return {"path": named, "problem": "image packed into the .blend", "ddsName": None}
     if image.source != "FILE":
-      return {"path": None, "problem": f"image not a file on disk (its source is {image.source.lower()})", "ddsName": None}
+      return {"path": named, "problem": f"image not a file on disk (its source is {image.source.lower()})", "ddsName": None}
     path = bridgeExport.imagePath(image)
     record = {"path": path, "problem": None, "ddsName": None}
     if not os.path.isfile(path):
@@ -537,9 +538,8 @@ def checkZoneExport(purpose):
   _, faceFailures, faceFindings, blockouts, coverage = surveyFaces(shipped)
   failures += faceFailures
   findings += faceFindings
-  failures += [{"failure": "swim volume", "message": error} for error in bridgeSwim.structuralErrors()]
-  failures += [{"failure": "boundary", "message": error} for error in bridgeBoundaries.boundaryErrors()]
-  failures += [{"failure": "zone line", "message": error} for error in bridgeBoundaries.zoneLineErrors()]
+  for label, errors in (("swim volume", bridgeSwim.structuralErrors()), ("boundary", bridgeBoundaries.boundaryErrors()), ("zone line", bridgeBoundaries.zoneLineErrors())):
+    failures += [{"failure": label} | error for error in errors]
   decisions = bridgeSwim.swimDecisions()
   try:
     bridgeHousing.collectHousing()
@@ -566,7 +566,8 @@ def zoneRowGaps():
   gaps = []
   missing = [key for key in gameViewKeys if key not in zone] + ([key for key in gameFogKeys if key not in zone] if zone.get("fogOn") else [])
   if missing:
-    gaps.append({"gap": "view values missing", "missing": missing, "message": f"A game export writes the zone row's view values; set {missing} with setZoneProperties"})
+    stating = "; sky \"none\" states that the zone draws none" if "sky" in missing else ""
+    gaps.append({"gap": "view values missing", "missing": missing, "message": f"A game export writes the zone row's view values; set {missing} with setZoneProperties{stating}"})
   missing = [key for key in gamePlayerKeys if key not in zone]
   if missing:
     gaps.append({"gap": "safe point or underworld missing", "missing": missing, "message": f"A game export writes where players arrive and how far they may fall; set {missing} with setZoneProperties"})
@@ -637,7 +638,7 @@ def coverageMaterial():
 
 def drawCoverage(preview):
   """Replace the preview's linked objects with the exported faces in their coverage colors (what the preview made itself, such as the
-  scale figure and swim volumes, stays); returns the zone's faces by status and the legend."""
+  scale figure, stays); returns the zone's faces by status and the legend."""
   shipped, _, _ = bridgeExport.classifyObjects()
   placed, _, _, _, counts = surveyFaces(shipped)
   for linked in list(preview.scene.collection.objects):

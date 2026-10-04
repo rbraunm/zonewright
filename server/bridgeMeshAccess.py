@@ -39,12 +39,8 @@ plotBorderProperty = "zonewrightPlotBorder"
 # export yet, and imported zones are reference.
 clientContentProperty = "zonewrightClientContent"
 clientContentKinds = ("spawn", "door", "object", "zone", "zoneFile")
-# A boundary (bridgeBoundaries) is a designed invisible wall, lid, or floor: never drawn, it blocks players and exports as the terrain's
-# material -1 triangles. A zone line is an ATP_ box keeping its target in its property.
 boundaryProperty = "zonewrightBoundary"
 zoneLineProperty = "zonewrightZoneLine"
-# Players pass through an object marked passable, as through liquid surfaces and cutout cards: export flags its triangles 0x1. An
-# imported zone file marks the faces it flags so with the face attribute of the same name.
 passableProperty = "zonewrightPassable"
 passableAttribute = "zonewrightPassable"
 waterReach = 100000.0

@@ -196,6 +196,10 @@ def validateColor(name, color):
     raise ValueError(f"{name} must be three numbers from 0 to 1, got {color!r}")
 
 
+def drawsSky(zone):
+  return zone.get("sky", skyDrawing.noSky) != skyDrawing.noSky
+
+
 def validateSky(sky):
   if not isinstance(sky, dict) or sorted(set(sky) - set(skyKeys)) or not {"type", "hour", "minute"} <= set(sky):
     raise ValueError(f"sky must be {{type, weather (optional), hour, minute}}, got {sky!r}")
@@ -226,20 +230,18 @@ def validatePlayerValues(zone):
 
 
 def setZoneProperties(updates):
-  """Store zone properties; a sky None removes the sky. A sky supplies the light and the fog color, so setting one drops those that
-  were set by hand, and they cannot be set while it stays."""
+  """Store zone properties. A sky supplies the light and the fog color, so setting one drops those that were set by hand, and they
+  cannot be set while it stays; sky "none" (skyDrawing.noSky) states the zone draws none."""
   unknownKeys = sorted(set(updates) - set(zonePropertyKeys))
   if unknownKeys:
     raise ValueError(f"Unknown zone properties {unknownKeys}; known: {list(zonePropertyKeys)}")
   zone = readZoneProperties(bpy.context.scene) | updates
-  if zone.get("sky", "") is None:
-    del zone["sky"]
   replaced = []
-  if "sky" in zone:
+  if drawsSky(zone):
     validateSky(zone["sky"])
     supplied = sorted(set(updates) & set(skyDrawing.suppliedZoneKeys))
     if supplied:
-      raise ValueError(f"The zone's sky supplies {supplied}; remove the sky (sky \"none\") to set them by hand")
+      raise ValueError(f"The zone's sky supplies {supplied}; state that it draws none (sky \"none\") to set them by hand")
     replaced = sorted(set(zone) & set(skyDrawing.suppliedZoneKeys))
     for key in replaced:
       del zone[key]
@@ -277,7 +279,7 @@ def previewZone(sky):
   """The zone's properties for a preview, with what its sky supplies: the server resolves the stored sky against the client's files
   and passes its state (eqSky.skyState)."""
   zone = readZoneProperties(bpy.context.scene)
-  if ("sky" in zone) != (sky is not None):
+  if drawsSky(zone) != (sky is not None):
     raise ValueError("The zone's sky and the sky state passed for it disagree")
   return zone | sky["environment"] if sky is not None else zone
 

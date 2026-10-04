@@ -30,6 +30,7 @@ import eqZones
 import extensionCatalog
 import machineProfile
 import planDrawing
+import skyDrawing
 import toolingLog
 import viewSheets
 import toolingManifest
@@ -200,8 +201,8 @@ async def resolveSky(sky):
 
 
 async def zoneSky(zone):
-  """The open zone's sky state for a preview, or None when it has no sky."""
-  return await resolveSky(zone["sky"]) if "sky" in zone else None
+  """The open zone's sky state for a preview, or None when it draws none."""
+  return await resolveSky(zone["sky"]) if zone.get("sky", skyDrawing.noSky) != skyDrawing.noSky else None
 
 
 def newRenderPath():
@@ -626,7 +627,8 @@ async def setZoneProperties(
   every zone without its own does. weather defaults to the type's DefaultWeather. hour and minute place the sun, at its highest at
   12:00 (a midday screenshot after the server's '#set time 12' matches 13:00). Previews draw the sky behind the zone and take the
   ambient, bounce, sun color and direction, and fog color from it, so those cannot be set by hand while it is set, and setting it
-  drops any set before; sky "none" removes it. safePoint [x, y, z, headingDegrees] is where players arrive in the zone (the zone
+  drops any set before; sky "none" states that the zone draws no sky (its zone row's sky 0, as about a third of the client's EQG
+  zones have), so previews show the fog color where nothing is drawn and the light and fog color are set by hand. safePoint [x, y, z, headingDegrees] is where players arrive in the zone (the zone
   row's safe point; heading 0 = +Y, clockwise) and underworld the height below it under which the client puts a falling player back;
   a game export needs both, with ground under the safe point above the underworld. The result gives how the client resolves the sky
   and the light it supplies."""
@@ -639,10 +641,8 @@ async def setZoneProperties(
   given = {key: value for key, value in updates.items() if value is not None}
   if not given:
     raise ToolError(f"setZoneProperties needs at least one of {list(updates)}")
-  if isinstance(sky, str):
-    if sky != "none":
-      raise ToolError(f"sky is {{type, weather, hour, minute}} or \"none\", got '{sky}'")
-    given["sky"] = None
+  if isinstance(sky, str) and sky != skyDrawing.noSky:
+    raise ToolError(f"sky is {{type, weather, hour, minute}} or \"{skyDrawing.noSky}\", got '{sky}'")
   stored = await callBridge(context, "setZoneProperties", {"updates": given})
   resolved = await zoneSky(stored["zone"])
   return stored | {"sky": None if resolved is None else {key: resolved[key] for key in ("chain", "dayFraction", "lightFrom", "environment")}}
@@ -650,7 +650,7 @@ async def setZoneProperties(
 
 @guardedTool()
 async def renderView(context: Context, view: dict, shading: str = "client", bandHeight: float = 50.0, guides: bool = True, swimVolumes: bool = False):
-  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], or with z on the ground within 50 units below it, for caves and under overhangs; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog. {"frame": {"objects": [names], "headingDegrees": h, "pitchDegrees": p}} looks at the named meshes or collection instances from that heading and pitch, standing back so they fit (its result's eye and target reproduce that camera). shading "client" draws the zone as the client does; "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout; "coverage" draws only what exportZone would export, each face in the color of its export check status (checkExport): black where it cannot export, red for zero texture area, brown for a blockout material, yellow for texture stretched or squeezed, orange where the base material shows, magenta along a ground border without a transition strip, grey when fine, and blue wherever a face is seen from its back, lit from the northwest as layout is, softer so no shaded face reads as black, and without fog; the result counts the exported faces by status. Guides (plot outlines, sketch massing) draw unless guides is false, and with them, in client and coverage shading, the boundaries (walls, lids, floors), which the client never draws, as see-through red slabs thick enough to show from above, and the zone lines as see-through green blocks; with swimVolumes, the view is tinted where the swim volumes stand (cyan water, magenta lava), each box seen through the water, so its top shows evenly under a surface it meets or lies just below, but hidden behind and under the ground."""
+  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], or with z on the ground within 50 units below it, for caves and under overhangs; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog. {"frame": {"objects": [names], "headingDegrees": h, "pitchDegrees": p}} looks at the named meshes or collection instances from that heading and pitch, standing back so they fit (its result's eye and target reproduce that camera). shading "client" draws the zone as the client does; "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout; "coverage" draws only what exportZone would export, each face in the color of its export check status (checkExport): black where it cannot export, red for zero texture area, brown for a blockout material, yellow for texture stretched or squeezed, orange where the base material shows, magenta along a ground border without a transition strip, grey when fine, and blue wherever a face is seen from its back, lit from the northwest as layout is, softer so no shaded face reads as black, and without fog; the result counts the exported faces by status. Guides (plot outlines, sketch massing) draw unless guides is false, and with them, in every shading, the view is tinted red where the boundaries (walls, lids, floors) stand, which the client never draws, a wall as a slab thick enough to show from above, and green where the zone lines stand, seen through the water but hidden behind and under the ground; with swimVolumes, the view is tinted where the swim volumes stand (cyan water, magenta lava), each box seen through the water, so its top shows evenly under a surface it meets or lies just below, but hidden behind and under the ground."""
   outputPath = newRenderPath()
   figureModel = None
   zone = await callBridge(context, "getZoneProperties", {})
@@ -890,8 +890,8 @@ exportChecksHelp = (
   " cannot hold (as getSwimVolumes lists them); boundaries that are not meshes or have no faces; zone lines a zone file cannot hold (a name not ATP_<number>_<label>,"
   " a turned box, a box without size, region names that clash once lowercased); housing the server would refuse. A game export also"
   " refuses blockout materials (createMaterial blockout) on exported faces, pools and rivers whose swimming is undecided or changed"
-  " since their boxes were accepted, missing view values (fogOn, minClip, maxClip, sky, and the fog's start, end, and density when it is"
-  " on), a missing safe point or underworld, a safe point over no ground above the underworld, zone lines without a target or sharing a"
+  " since their boxes were accepted, missing view values (fogOn, minClip, maxClip, sky or sky \"none\" stated, and the fog's start, end, and density"
+  " when it is on), a missing safe point or underworld, a safe point over no ground above the underworld, zone lines without a target or sharing a"
   " number, and, until reach mapping exists, any zone: containment cannot be checked yet. A test export lists all of these but"
   " containment as findings. Findings, never refusals, for both: texture coverage, each with where it lies: the base material showing where no unmuted"
   " surfacing layer covers a face; ground borders on the terrain where two ground materials meet, walkable ground on at least one side,"
@@ -917,6 +917,37 @@ def exportTarget(path):
   return archivePath, zone
 
 
+def replaceExportFiles(archivePath, archiveBytes, sideContents):
+  """Put an export's files in the last export's places: each written whole under a temporary name, then the side files (removed where
+  the content is None) and the archive last. A failure at any point puts every file back as it was and leaves no temporary one."""
+  contents = sideContents | {archivePath: archiveBytes}
+  temporaries = {target: target.with_name(target.name + ".partial") for target, content in contents.items() if content is not None}
+  previous, placed = {}, []
+  try:
+    for target, temporary in temporaries.items():
+      temporary.write_bytes(contents[target])
+    for target in sideContents:
+      if target.exists():
+        previous[target] = target.with_name(target.name + ".previous")
+        target.replace(previous[target])
+    for target in sideContents:
+      if target in temporaries:
+        temporaries[target].replace(target)
+        placed.append(target)
+    temporaries[archivePath].replace(archivePath)
+  except OSError:
+    for target in placed:
+      target.unlink()
+    for target, kept in previous.items():
+      kept.replace(target)
+    raise
+  finally:
+    for temporary in temporaries.values():
+      temporary.unlink(missing_ok=True)
+  for kept in previous.values():
+    kept.unlink()
+
+
 def exportReport(report):
   return {key: report[key] for key in ("purpose", "failures", "findings", "coverage")} | {
     "excluded": groupedExclusions(report["excluded"]), "toConfirm": report["toConfirm"], "swim": report["swim"],
@@ -938,15 +969,17 @@ async def checkExport(context: Context, path: str, purpose: str):
 @guardedTool(description=(
   "Write the saved scene as an EQG zone archive at `path`, an absolute path ending in <zone>.eqg, the zone's short name in lowercase"
   " letters and digits, after the checks for its purpose (checkExport): any failure refuses the export and lists them all, and nothing is"
-  " written. Every file is written under a temporary name and renamed into place only once all are written, so a refused or failed"
-  " export never replaces the last good archive or leaves partial files. The `terrain` collection's meshes become the zone's terrain;"
+  " written. Every file is written whole under a temporary name first; then the side files take the last export's places and the"
+  " archive goes in last, and a failure at any point puts every file back as it was, so a refused or failed export never replaces the"
+  " last good archive or its side files and leaves no partial file. The `terrain` collection's meshes become the zone's terrain;"
   " every other rendered mesh becomes a model placed at its object's transform (copies sharing a mesh and without modifiers share one"
   " model) and every collection instance a model of its collection's meshes. createMaterial materials export as the client's shaders:"
   " diffuse and normal map as Opaque_MaxCB1.fx, diffuse only as Opaque_MaxC1.fx, a cutout (diffuse only) as Chroma_MPLBasicAT.fx;"
   " createLiquidMaterial materials as its water, waterfall, and lava shaders with their values. DDS textures are stored unchanged, others"
   " as uncompressed DDS. The swim volumes go into the .zon as AWT_ (water) and ALV_ (lava) regions as they stand (export derives none)"
   " and the zone lines as ATP_ regions, unturned. The boundaries (placeBoundaryWall, placeBoundaryPlane) go into the terrain as"
-  " triangles without a material, which the client never draws but collides with (flag 0); triangles of liquid materials, cutout"
+  " triangles without a material, which the client never draws but collides with (flag 0), a wall's facing both ways and a lid's down"
+  " and a floor's up, as they face in the scene; triangles of liquid materials, cutout"
   " materials, and objects marked passable (markPassable) are flagged 0x1, which the client lets players through."
   " Point lights placed with placeLights go into the .zon; emitters placed with placeEmitters go into <zone>_EnvironmentEmitters.txt"
   " beside the archive (the client reads that list loose from its own folder). A zone with housing (setZoneHousing) also gets"
@@ -975,30 +1008,17 @@ async def exportZone(context: Context, path: str, purpose: str):
   housingPath = archivePath.parent / f"{zone}_housing.json"
   assetListPath = archivePath.parent / f"{zone}_assets.txt"
   # A list left from an earlier export would place emitters or plots this scene no longer has, so a list with nothing to say is removed.
-  contents = {
-    archivePath: data,
+  sideContents = {
     emitterListPath: eqEmitters.emitterListText(collected["emitters"]).encode("latin1") if collected["emitters"] else None,
     housingPath: json.dumps({"zone": zone} | housing, indent=1).encode("ascii") if hasPlots else None,
     assetListPath: "".join(f"{archive}\r\n" for archive in housing["assets"]).encode("latin1") if hasPlots else None,
   }
-  temporaries = {}
   try:
-    for target, content in contents.items():
-      if content is not None:
-        temporaries[target] = target.with_name(target.name + ".partial")
-        temporaries[target].write_bytes(content)
-    for target, temporary in temporaries.items():
-      temporary.replace(target)
-    for target, content in contents.items():
-      if content is None:
-        target.unlink(missing_ok=True)
+    await anyio.to_thread.run_sync(replaceExportFiles, archivePath, data, sideContents)
   except OSError as error:
     raise ToolError(f"{type(error).__name__}: {error}") from error
-  finally:
-    for temporary in temporaries.values():
-      temporary.unlink(missing_ok=True)
   return summary | {"path": str(archivePath)} | exportReport(report) | {
-    "emitterList": str(emitterListPath) if contents[emitterListPath] is not None else None,
+    "emitterList": str(emitterListPath) if sideContents[emitterListPath] is not None else None,
     "housing": None if housing is None else {"role": housing["housing"]["role"], "plots": len(housing["plots"]), "file": str(housingPath) if hasPlots else None, "assetList": str(assetListPath) if hasPlots else None},
   }
 
@@ -1547,7 +1567,7 @@ async def getSketch(context: Context, sheet: str | None = None):
 
 @guardedTool()
 async def renderSketch(
-  context: Context, center: list[float], width: float, sheets: list[str] | None = None, layers: list[str] = ["regions", "plots", "water"],
+  context: Context, center: list[float], width: float, sheets: list[str] | None = None, layers: list[str] = ["regions", "plots", "water", "boundaries", "zoneLines"],
   bandHeight: float = 25.0, spotHeights: bool = True,
 ):
   """Draw a plan: the zone from straight above in quiet grey relief (lighter higher, a step every bandHeight units, slopes shaded
@@ -1556,10 +1576,11 @@ async def renderSketch(
   those named) in their own colors (areas dashed and faintly filled, footprints filled with their facing arrows and heights, paths at
   their widths, points, notes; every shape shows, inside an area or under another sheet's), and the plan's own layers: regions
   (dashed, named), plots (outlined, by address, with a mark pointing out of the entrance side), water (as players see it, not where a
-  surface runs on tucked under its banks: blue, lava orange), and swim (the swim volumes, dashed, cyan water and magenta lava, each
+  surface runs on tucked under its banks: blue, lava orange), swim (the swim volumes, dashed, cyan water and magenta lava, each
   named inside itself where its name fits clear of the other labels, else by its number; `unnamedSwimVolumes` lists those in the
-  drawing left unnamed, to see closer). Labels are placed clear of one another, and beside the spot heights rather than over them
-  where they can be; an area is named only where it reaches into the drawing."""
+  drawing left unnamed, to see closer), boundaries (red, named: walls as lines along their foot, lids and floors faintly filled), and
+  zoneLines (their boxes faintly green, named). Labels are placed clear of one another, and beside the spot heights rather than over
+  them where they can be; an area is named only where it reaches into the drawing."""
   if len(center) != 2 or width <= 0:
     raise ToolError(f"center is [x, y] and width positive, got {center} and {width}")
   zone = await callBridge(context, "getZoneProperties", {})
@@ -1622,17 +1643,18 @@ async def renderOrbit(
 @guardedTool()
 async def renderSection(
   context: Context, start: list[float], end: list[float], bottom: float, top: float,
-  layers: list[str] = ["ground", "water", "swim", "massing", "sketch", "plots"],
+  layers: list[str] = ["ground", "water", "swim", "massing", "sketch", "plots", "boundaries", "zoneLines"],
 ):
   """Draw a section: where the vertical plane through the line from start [x, y] to end [x, y] cuts the zone, seen from the line's right
   so start is on the left, from bottom to top at one scale across and up, clipped to that frame: the ground players stand on (brown;
   caves, overhangs, and arches show as the shapes they are), water surfaces where players see them (blue; not where they run on
   tucked under the banks), swim volumes (dashed boxes, cyan water and magenta lava), sketch massing (grey), sketch areas' floors
   (dashed) and paths in their sheets' colors (a path's rise and fall where it runs along the line, level across its width where it
-  crosses it), and plot pads (orange, level at the plot's height across its footprint, with a mark on its entrance side pointing out),
-  each named just above, with a height grid and the distance along the line. For judging what plans cannot show: swim volumes against
-  the surface and the bed, a cave's headroom, a plot's pad against the slope, stacked floors and the stairs between them, an arch's
-  span. The result also gives the cuts as numbers (s along the line, z height)."""
+  crosses it), plot pads (orange, level at the plot's height across its footprint, with a mark on its entrance side pointing out),
+  boundaries (red: a wall from under the ground to its top, a lid or a floor at its height), and zone lines (green boxes), each named
+  just above, with a height grid and the distance along the line. For judging what plans cannot show: swim volumes against the
+  surface and the bed, a cave's headroom, a plot's pad against the slope, stacked floors and the stairs between them, an arch's span,
+  a wall's height over the ground and a lid's over a path. The result also gives the cuts as numbers (s along the line, z height)."""
   if len(start) != 2 or len(end) != 2:
     raise ToolError(f"start and end are [x, y], got {start} and {end}")
   cuts = await callBridge(context, "sectionCuts", {"start": start, "end": end, "bottom": bottom, "top": top, "layers": layers})
@@ -1646,6 +1668,8 @@ async def renderSection(
     "massing": [{"name": entry["name"], "label": entry["label"]} for entry in cuts["massing"]],
     "sketch": [{"sheet": entry["sheet"], "shape": entry["shape"], "pieces": entry["pieces"]} for entry in cuts["sketch"]],
     "plots": [{key: entry[key] for key in ("name", "s", "z", "entrance")} for entry in cuts["plots"]],
+    "boundaries": [{"name": entry["name"], "kind": entry["kind"], "segments": entry["segments"]} for entry in cuts["boundaries"]],
+    "zoneLines": cuts["zoneLines"],
   }
   return [Image(data=outputPath.read_bytes(), format="png"), summary]
 
@@ -1692,9 +1716,10 @@ async def getSwimVolumes(context: Context, name: str | None = None):
 async def placeBoundaryWall(context: Context, name: str, path: list[list[float]], height: float):
   """Place an invisible wall players cannot pass, as the client's own walls run: a ribbon along `path` [[x, y], ...] from 5 under the
   ground players stand on to `height` above it, following the ground every 4 units; a path ending where it began closes into a ring.
-  It faces to the left of the path's direction (inward for a ring drawn counterclockwise). Boundaries are never drawn in the client's
-  view, block walkRoute, draw as see-through red slabs in views with guides, and export as triangles without a material in the terrain,
-  which the client collides with but never draws. Place it again by name to redraw it against the ground as it is now; deleteObjects
+  It faces to the left of the path's direction (inward for a ring drawn counterclockwise), and export writes it facing both ways, so it
+  blocks from either side whichever way it faces. Boundaries are never drawn in the client's view, block walkRoute, tint views with
+  guides red in every shading and draw red in plans and sections, and export as triangles without a material in the terrain, which the
+  client collides with but never draws. Place it again by name to redraw it against the ground as it is now; deleteObjects
   removes it. Walls go at the foot of a rim players should not climb, along an open edge, across a gap beside a zone line."""
   return await callBridge(context, "placeBoundaryWall", {"name": name, "path": path, "height": height})
 
@@ -1703,7 +1728,8 @@ async def placeBoundaryWall(context: Context, name: str, path: list[list[float]]
 async def placeBoundaryPlane(context: Context, name: str, kind: str, outline: list[list[float]], height: float):
   """Place a flat invisible boundary over a closed `outline` [[x, y], ...] at `height`: kind "lid" (facing down: over a canyon path or a
   gap, so players cannot climb or float out over the rim) or "floor" (facing up: under a drop players must not fall out of the world
-  through). Like a wall it is never drawn, blocks walkRoute, shows red with guides, and exports into the terrain without a material.
+  through). Like a wall it is never drawn, blocks walkRoute, shows red with guides and in plans and sections, and exports into the
+  terrain without a material, facing as it faces in the scene.
   Place it again by name to redraw it."""
   return await callBridge(context, "placeBoundaryPlane", {"name": name, "kind": kind, "outline": outline, "height": height})
 
@@ -1730,8 +1756,8 @@ async def placeZoneLine(context: Context, number: int, label: str, minimum: list
   client zones players through when they enter it (it reads the number right after ATP_; the server's zone_points row for it is
   number x 10). target is where it leads: {zone, x, y, z, headingDegrees}, zone a short name (this zone's own for a same-zone teleport
   or a fall catcher), x, y, z in the zone file's axes (as /loc prints them, y, x, z of the server's), headingDegrees 0 = +Y,
-  clockwise; each coordinate and the heading may be "keep" (the player's own). Zone lines sit in gaps of the boundary walls, show as
-  see-through green blocks in views with guides, and export as ATP_ regions; the server's rows are not written yet. A line placed
+  clockwise; each coordinate and the heading may be "keep" (the player's own). Zone lines sit in gaps of the boundary walls, tint
+  views with guides green in every shading, draw green in plans and sections, and export as ATP_ regions; the server's rows are not written yet. A line placed
   with a number already in use replaces that line; adjust a box with transformObjects, remove it with deleteObjects."""
   if not isinstance(target, dict) or not isinstance(target.get("zone"), str) or not eqgExport.zoneNamePattern.match(target["zone"]):
     raise ToolError(f"target zone is a zone short name, lowercase letters and digits, got {target.get('zone') if isinstance(target, dict) else target!r}")

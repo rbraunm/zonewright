@@ -6,6 +6,7 @@ import numpy
 
 # The zone properties a sky supplies: eqgame.exe takes the light and the fog color from the sky when the zone draws one.
 suppliedZoneKeys = ("ambientColor", "fogColor", "sunColor", "bounceColor", "sunAzimuthDegrees", "sunElevationDegrees")
+noSky = "none"
 # The dome's rings by angle from its pole (0x1002f110): the pole and a ring at 0.01 radians take row 0, ring r (0-28) at
 # 0.1 + r * (pi - 0.2) / 29 takes row r + 1, and the bottom row 29; colors run smoothly between rings.
 domeRingAngles = numpy.array([0.0, 0.01] + [0.1 + ring * (math.pi - 0.2) / 29 for ring in range(29)] + [math.pi])

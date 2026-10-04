@@ -307,6 +307,18 @@ def boxBounds(box):
   return [round(float(value), 4) for value in location], [round(float(value), 4) for value in scale]
 
 
+def boxCorners(box):
+  """A zone line's lowest and highest corners."""
+  center, half = boxBounds(box)
+  return [middle - extent for middle, extent in zip(center, half)], [middle + extent for middle, extent in zip(center, half)]
+
+
+def guideCorners():
+  """The world corners of the boundaries' meshes and of the zone lines' boxes, which views draw as guides."""
+  corners = [list(found.matrix_world @ mathutils.Vector(corner)) for found in boundaryObjects() if found.type == "MESH" for corner in found.bound_box]
+  return corners + [corner for line in zoneLineObjects() for corner in boxCorners(line)]
+
+
 def placeZoneLine(number, label, minimum, maximum, target):
   """A zone line: an axis-aligned box named ATP_<number>_<label>, the .zon region the client zones players through, with where it
   leads. A line placed with a number already in use replaces that line."""
@@ -350,23 +362,30 @@ def describeZoneLine(box):
 
 
 def zoneLineErrors():
-  """What no zone file can hold among the zone's own zone lines: a name the client cannot read a number from, a turned box (export
-  writes rotation 0), a box without size, and region names that clash once lowercased, swim volumes included."""
+  """What no zone file can hold among the zone's own zone lines, each with its object and where it stands: a name the client cannot
+  read a number from, a turned box (export writes rotation 0), a box without size, and region names that clash once lowercased, swim
+  volumes included."""
   errors = []
+
+  def add(box, message):
+    errors.append({"object": box.name, "at": boxBounds(box)[0], "message": message})
+
   lines = [line for line in zoneLineObjects() if isAuthored(line)]
   for line in lines:
     match = zoneLinePattern.match(line.name)
     if match is None or int(match.group(1)) < 1:
-      errors.append(f"'{line.name}' is not named ATP_<number>_<label> with a number from 1; placeZoneLine names it")
+      add(line, f"'{line.name}' is not named ATP_<number>_<label> with a number from 1; placeZoneLine names it")
     if any(abs(angle) > turnTolerance for angle in line.matrix_world.to_euler()):
-      errors.append(f"'{line.name}' is turned; zone lines stay square to the axes")
+      add(line, f"'{line.name}' is turned; zone lines stay square to the axes")
     if min(line.matrix_world.to_scale()) <= 0:
-      errors.append(f"'{line.name}' has a half extent of 0 or less: {[round(value, 3) for value in line.matrix_world.to_scale()]}")
-  lineNames = {line.name for line in lines}
+      add(line, f"'{line.name}' has a half extent of 0 or less: {[round(value, 3) for value in line.matrix_world.to_scale()]}")
   seen = {}
   for box in lines + bridgeSwim.swimBoxes():
-    seen.setdefault(box.name.lower(), []).append(box.name)
-  errors += [f".zon regions {names} share a name once lowercased" for names in seen.values() if len(names) > 1 and lineNames & set(names)]
+    seen.setdefault(box.name.lower(), []).append(box)
+  for boxes in seen.values():
+    if len(boxes) > 1 and any(box in lines for box in boxes):
+      for box in boxes:
+        add(box, f".zon regions {[shared.name for shared in boxes]} share a name once lowercased")
   return errors
 
 
@@ -395,21 +414,30 @@ def zoneLineRegions():
 
 
 def boundaryErrors():
-  """What export cannot merge into the terrain: a boundary that is not a mesh, or has no faces."""
+  """What export cannot merge into the terrain, each with its object and where it stands: a boundary that is not a mesh, or has no
+  faces."""
   errors = []
   for boundary in boundaryObjects():
     if not isAuthored(boundary):
       continue
+    at = [round(float(value), 2) for value in boundary.matrix_world.translation]
     if boundary.type != "MESH":
-      errors.append(f"'{boundary.name}' is a boundary but a {boundary.type}; boundaries are meshes")
+      errors.append({"object": boundary.name, "at": at, "message": f"'{boundary.name}' is a boundary but a {boundary.type}; boundaries are meshes"})
     elif not len(boundary.data.polygons):
-      errors.append(f"Boundary '{boundary.name}' has no faces")
+      errors.append({"object": boundary.name, "at": at, "message": f"Boundary '{boundary.name}' has no faces"})
   return errors
 
 
 def boundaryArrays(boundary, depsgraph):
-  """A boundary's evaluated triangles in world space as the terrain takes them: no material, no texture coordinates, not passable."""
+  """A boundary's evaluated triangles in world space as the terrain takes them: no material, no texture coordinates, not passable; a
+  wall's twice, facing each way."""
   positions, triangles, _, _, _, _ = evaluatedTriangles(boundary, depsgraph)
+  if readSpec(boundary, bridgeMeshAccess.boundaryProperty)["kind"] == "wall":
+    # The client's own walls are single triangles facing the play area (Highpass Hold's, and over 99% of the vertical ones in its EQG
+    # zones), and whether its collision lets a player through a wall met from behind is untraced. A wall here faces left of its path,
+    # which on an open path can be away from the play area, so it goes in facing both ways and blocks from either side.
+    triangles = numpy.concatenate([triangles, triangles[:, ::-1] + len(positions)])
+    positions = numpy.concatenate([positions, positions])
   matrix = numpy.array(boundary.matrix_world)
   world = positions @ matrix[:3, :3].T + matrix[:3, 3]
   corners = world[triangles]
@@ -431,13 +459,13 @@ def getBoundaries():
   return {
     "boundaries": [describeBoundary(boundary) for boundary in boundaryObjects()],
     "passable": [describePassable(sceneObject) for sceneObject in sorted(marked, key=lambda found: found.name)],
-    "errors": boundaryErrors(),
+    "errors": [error["message"] for error in boundaryErrors()],
   }
 
 
 def getZoneLines():
   bpy.context.view_layer.update()
-  return {"zoneLines": [describeZoneLine(line) for line in zoneLineObjects()], "errors": zoneLineErrors(), "gaps": zoneLineGaps()}
+  return {"zoneLines": [describeZoneLine(line) for line in zoneLineObjects()], "errors": [error["message"] for error in zoneLineErrors()], "gaps": zoneLineGaps()}
 
 
 def placeImportedBoundaries(zone, walls, zoneLines):

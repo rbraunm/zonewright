@@ -67,10 +67,9 @@ def classifyObjects():
     if reason is not None:
       excluded.append({"object": sceneObject.name, "reason": reason})
     elif bridgeMeshAccess.boundaryProperty in sceneObject:
+      # A boundary that is not a mesh is bridgeBoundaries.boundaryErrors' failure, so it is not listed twice.
       if sceneObject.type == "MESH":
         shipped.append((sceneObject, "boundary"))
-      else:
-        failures.append({"failure": "not a mesh", "object": sceneObject.name, "message": f"'{sceneObject.name}' is a boundary but a {sceneObject.type}; boundaries are meshes"})
     elif sceneObject.name in terrainNames:
       if sceneObject.type == "MESH":
         shipped.append((sceneObject, "terrain"))

@@ -314,30 +314,38 @@ def getSwimVolumes(name):
   return {
     "volumes": [describeBox(box) for box in boxes],
     "bodies": [{"body": body.name} | describeBody(body, ground) for body in bodies] if name is None else [],
-    "errors": structuralErrors(),
+    "errors": [error["message"] for error in structuralErrors()],
   }
 
 
 def structuralErrors():
-  """What no zone file can hold: boxes turned or without size, names the client mixes up, prefixes against their liquid, bodies gone, boxes of a body no one swims in."""
+  """What no zone file can hold, each with its box and where it stands: boxes turned or without size, names the client mixes up,
+  prefixes against their liquid, bodies gone, boxes of a body no one swims in."""
   errors = []
+
+  def add(box, message):
+    errors.append({"object": box.name, "at": boxBounds(box)[0], "message": message})
+
   swimmable = {body.name: bridgeWater.readDefinition(body).get("swimmable") is not False for body in swimBodies()}
   bodies = set(swimmable)
   seen = {}
   for box in swimBoxes():
     spec = readBox(box)
     if any(abs(angle) > 1e-9 for angle in box.matrix_world.to_euler()):
-      errors.append(f"'{box.name}' is turned; swim volumes stay square to the axes")
+      add(box, f"'{box.name}' is turned; swim volumes stay square to the axes")
     if min(box.scale) <= 0:
-      errors.append(f"'{box.name}' has a half extent of 0 or less: {[round(value, 3) for value in box.scale]}")
+      add(box, f"'{box.name}' has a half extent of 0 or less: {[round(value, 3) for value in box.scale]}")
     if not box.name.startswith(volumePrefixes[spec["liquid"]]):
-      errors.append(f"'{box.name}' holds {spec['liquid']} but its name does not start with {volumePrefixes[spec['liquid']]}")
+      add(box, f"'{box.name}' holds {spec['liquid']} but its name does not start with {volumePrefixes[spec['liquid']]}")
     if spec["body"] is not None and spec["body"] not in bodies:
-      errors.append(f"'{box.name}' belongs to '{spec['body']}', which is not a rendered pool or river")
+      add(box, f"'{box.name}' belongs to '{spec['body']}', which is not a rendered pool or river")
     elif spec["body"] is not None and not swimmable[spec["body"]]:
-      errors.append(f"'{box.name}' belongs to '{spec['body']}', which is marked not swimmable; delete the box or mark the body swimmable (editWater swimmable true)")
-    seen.setdefault(box.name.lower(), []).append(box.name)
-  errors += [f"Swim volumes {names} share a name once lowercased" for names in seen.values() if len(names) > 1]
+      add(box, f"'{box.name}' belongs to '{spec['body']}', which is marked not swimmable; delete the box or mark the body swimmable (editWater swimmable true)")
+    seen.setdefault(box.name.lower(), []).append(box)
+  for boxes in seen.values():
+    if len(boxes) > 1:
+      for box in boxes:
+        add(box, f"Swim volumes {[shared.name for shared in boxes]} share a name once lowercased")
   return errors
 
 
@@ -346,7 +354,7 @@ def swimRegions():
   bpy.context.view_layer.update()
   errors = structuralErrors()
   if errors:
-    raise ValueError("Swim volumes a zone file cannot hold: " + "; ".join(errors))
+    raise ValueError("Swim volumes a zone file cannot hold: " + "; ".join(error["message"] for error in errors))
   regions = []
   for box in swimBoxes():
     center, halfExtents = boxBounds(box)

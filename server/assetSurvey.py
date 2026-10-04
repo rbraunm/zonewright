@@ -11,7 +11,7 @@ import re
 import struct
 
 import numpy
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 import eqArchive
 import eqEmitters
@@ -335,6 +335,10 @@ def storeTextures(store, archives, uses, materialUses, wldMaterials, layerUses):
       raw = archive.read(name)
       try:
         assetID, facts = store.store(name, raw)
+      # Pillow's message for an image no reader identifies names the buffer's memory address, which would change the catalog every run.
+      except UnidentifiedImageError:
+        assets[f"texture/{name}@unreadable"] = {"kind": "texture", "name": name, "archive": archive.archivePath.name.lower(), "problem": "UnidentifiedImageError: no image reader identifies it"}
+        continue
       # Pillow raises NotImplementedError for DDS pixel formats it cannot decode.
       except (OSError, ValueError, struct.error, NotImplementedError) as error:
         assets[f"texture/{name}@unreadable"] = {"kind": "texture", "name": name, "archive": archive.archivePath.name.lower(), "problem": f"{type(error).__name__}: {error}"}

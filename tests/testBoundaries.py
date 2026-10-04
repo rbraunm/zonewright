@@ -62,27 +62,21 @@ def testBoundariesBlockPlayersFollowTheGroundAndDrawOnlyAsGuides(stageBlenderSer
     return wall, lid, floor, normals, blocked, around, under, wading, guided, clean, mapped, redrawn, listed, taken, offGround
 
   wall, lid, floor, normals, blocked, around, under, wading, guided, clean, mapped, redrawn, listed, taken, offGround = stageBlenderServer.session(steps)
-  # The wall runs 200 along flat ground, sampled every 4: 51 columns from 5 under the ground to 40 over it.
   assert wall["samples"] == 51 and wall["triangles"] == 100 and wall["ground"] == [0.0, 0.0] and wall["length"] == 200.0
   assert wall["minimum"] == [150.0, -100.0, -5.0] and wall["maximum"] == [150.0, 100.0, 40.0] and wall["replaced"] is False
-  # It faces left of its path (-x, walking north); a lid faces down and a floor up.
   assert normals["eastWall"] == [[-1.0, 0.0, 0.0]] * 3 and normals["lid"] == [[0.0, 0.0, -1.0]] * 2 and normals["floor"] == [[0.0, 0.0, 1.0]] * 2
   assert lid["area"] == 3600.0 and floor["minimum"][2] == -50.0
-  # Players are stopped by the wall, walk round its end, are too tall to pass under the lid, and wade into the pool to its bed.
   assert not blocked["walkable"] and [(problem["kind"], problem["boundary"]) for problem in blocked["problems"]] == [("blocked", [150.0, 0.0, 3.0])]
   assert 149 <= blocked["problems"][0]["at"][0] < 150 and 150 < blocked["problems"][0]["resumesAt"][0] <= 151
   assert around["walkable"] and around["length"] == 90.0
   assert [(problem["kind"], problem["lowest"]) for problem in under["problems"]] == [("headroom", 4.0)]
   assert wading["walkable"] and wading["deepestWater"]["depth"] >= 14
-  # With guides the wall shows as a red see-through slab over the fog; without them nothing is drawn there, as in the client.
   red, green, _ = pixel(guided, 480, 270)
   assert red - green > 40, (red, green)
   assert numpy.abs(pixel(clean, 480, 270) - [128, 140, 153]).max() <= 1
-  # From above the wall is a red line at x 150 (pixel 840) on the grass, which is green just beside it.
   wallRed, wallGreen, _ = pixel(mapped, 840, 270)
   besideRed, besideGreen, _ = pixel(mapped, 820, 270)
   assert wallRed - wallGreen > 40 and besideGreen > besideRed, (pixel(mapped, 840, 270), pixel(mapped, 820, 270))
-  # Placed again after the ground rose under it, the wall follows the ground as it now is.
   assert redrawn["replaced"] is True and redrawn["ground"][0] == 0.0 and 5 < redrawn["ground"][1] <= 12 and abs(redrawn["maximum"][2] - redrawn["ground"][1] - 40) <= 0.011
   assert [(entry["name"], entry["kind"], entry["triangles"]) for entry in listed["boundaries"]] == [("eastWall", "wall", 100), ("floor", "floor", 2), ("lid", "lid", 2)]
   assert listed["errors"] == [] and listed["passable"] == []
@@ -133,29 +127,32 @@ def testExportWritesWallsFlagsAndZoneLinesAndTheArchiveBringsThemBack(stageBlend
 
   checked, exported, builtBoundaries, imported, lines, blocked, through, wading, reference = stageBlenderServer.session(steps)
   assert checked["failures"] == [] and checked["boundaries"] == ["eastNorth", "eastSouth", "westLid"] and checked["zoneLines"] == ["ATP_1_east"]
-  # A test export needs no zone row values, and lists what a game export would still refuse.
   assert [(finding["finding"], finding["missing"]) for finding in checked["findings"] if "missing" in finding] == [("view values missing", ["minClip", "sky"]), ("safe point or underworld missing", ["safePoint", "underworld"])]
-  wallTriangles = sum(entry["triangles"] for entry in builtBoundaries["boundaries"])
-  assert wallTriangles == 2 * 33 + 2 * 33 + 2 and exported["boundaryTriangles"] == wallTriangles
+  assert sum(entry["triangles"] for entry in builtBoundaries["boundaries"]) == 2 * 33 + 2 * 33 + 2
+  assert exported["boundaryTriangles"] == 2 * (2 * 33 + 2 * 33) + 2
   archive = eqArchive.EQArchive(archivePath)
   terrain = eqgFiles.parseModel(archive.read("ter_boundplot.ter"), "ter_boundplot.ter")
   walls = terrain["triangleMaterials"] == eqgFiles.noMaterial
-  # The walls are the terrain's triangles without a material, which block (flag 0) like the rest of the ground.
-  assert int(walls.sum()) == wallTriangles and terrain["triangleFlags"].tolist() == [0] * len(walls)
+  assert int(walls.sum()) == exported["boundaryTriangles"] and terrain["triangleFlags"].tolist() == [0] * len(walls)
+  corners = terrain["vertices"][terrain["triangles"][walls]]
+  normals = numpy.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0])
+  facings = {}
+  for triangle, normal in zip(numpy.round(corners, 3), normals / numpy.linalg.norm(normals, axis=1)[:, None]):
+    facings.setdefault(tuple(sorted(map(tuple, triangle))), []).append(normal)
+  upright = [twins for twins in facings.values() if abs(twins[0][2]) < 1e-6]
+  level = [twins for twins in facings.values() if abs(twins[0][2]) >= 1e-6]
+  assert len(upright) == 2 * 33 + 2 * 33 and all(len(twins) == 2 and twins[0] @ twins[1] < -0.999 for twins in upright)
+  assert len(level) == 2 and all(len(twins) == 1 and twins[0][2] < -0.999 for twins in level)
   flags = {name: eqgFiles.parseModel(archive.read(name), name)["triangleFlags"] for name in ("obj_pool.mod", "obj_fall.mod", "obj_card.mod", "obj_crate.mod", "obj_moss_passable.mod")}
-  # Liquid surfaces, the cutout card, and the crate marked passable let players through; the plain crate does not.
   assert {name: sorted(set(values.tolist())) for name, values in flags.items()} == {"obj_pool.mod": [1], "obj_fall.mod": [1], "obj_card.mod": [1], "obj_crate.mod": [0], "obj_moss_passable.mod": [1]}
   assert exported["passableTriangles"] == {name: len(values) for name, values in flags.items() if name != "obj_crate.mod"}
   zone = eqgFiles.parseZone(archive.read("boundplot.zon"), "boundplot.zon")
   line = next(region for region in zone["regions"] if region["name"] == "ATP_1_east")
   assert line == {"name": "ATP_1_east", "center": (154.0, 0.0, 27.5), "rotation": (0.0, 0.0, 0.0), "halfExtents": (6.0, 20.0, 32.5)}
-  # The archive brings the walls back as one boundary and the region as a zone line, both reference, the target not in the file.
-  assert imported["boundary"]["triangles"] == wallTriangles and imported["boundary"]["kind"] == "imported" and imported["boundary"]["clientContent"] == "zoneFile"
+  assert imported["boundary"]["triangles"] == exported["boundaryTriangles"] and imported["boundary"]["kind"] == "imported" and imported["boundary"]["clientContent"] == "zoneFile"
   assert imported["boundary"]["minimum"][0] == -190.0 and imported["boundary"]["maximum"] == [150.0, 150.0, 70.0]
   assert lines["zoneLines"] == [{"name": "ATP_1_east", "number": 1, "label": "east", "minimum": [148.0, -20.0, -5.0], "maximum": [160.0, 20.0, 60.0], "target": None, "clientContent": "zoneFile"}]
   assert lines["errors"] == [] and lines["gaps"] == [] and imported["zoneLinesTurned"] == [] and imported["passableTriangles"] == exported["passableTriangles"]
-  # Walked over the archive as read back: the wall stops players, the zone line's gap lets them through, and the pool's surface,
-  # flagged passable, lets them wade in to its bed.
   assert blocked["problems"][0]["kind"] == "blocked" and blocked["problems"][0]["boundary"][:2] == [150.0, 80.0]
   assert through["walkable"] and wading["walkable"] and wading["deepestWater"] is None and min(row["at"][2] for row in wading["profile"]) <= -15
   reasons = {group["reason"]: group["objects"] for group in reference["excluded"]}
@@ -195,18 +192,69 @@ def testGameExportNeedsTheZoneRowAndZoneLineTargets(stageBlenderServer, tmp_path
     await session.expectSuccess("setZoneProperties", {"minClip": 100, "sky": {"type": "gameplot", "hour": 12, "minute": 0}, "safePoint": [0, 150, 2, 90]})
     await session.expectSuccess("saveFile", {})
     ready = await session.expectSuccess("checkExport", check)
-    return refusals, first, replacing, gaps, tested, copied, ready
+    stating = await session.expectSuccess("setZoneProperties", {"sky": "none"})
+    await session.expectSuccess("saveFile", {})
+    skyless = await session.expectSuccess("checkExport", check)
+    return refusals, first, replacing, gaps, tested, copied, ready, stating, skyless
 
-  refusals, first, replacing, gaps, tested, copied, ready = stageBlenderServer.session(steps)
+  refusals, first, replacing, gaps, tested, copied, ready, stating, skyless = stageBlenderServer.session(steps)
   assert "underworld 10.0 must lie below the safe point's height 2.0" in refusals[0] and "headingDegrees runs from 0 up to 360" in refusals[1]
   assert "whole number from 1" in refusals[2] and "letters, digits, and underscores" in refusals[3] and "maximum must lie above" in refusals[4]
   assert "zone short name" in refusals[5] and "target is {zone, x, y, z, headingDegrees}" in refusals[6]
   assert first["name"] == "ATP_2_gate" and first["target"] == target and first["minimum"] == [180.0, -20.0, -5.0]
   assert replacing["replaced"] == ["ATP_2_gate"] and replacing["name"] == "ATP_2_eastGate" and replacing["target"]["x"] == "keep"
-  # A game export refuses the view values and a safe point over no ground, and a number two lines share; a test export lists them.
   assert [failure["failure"] for failure in gaps["failures"]] == ["view values missing", "safe point over no ground", "zone line number used twice", "containment not checked"]
   assert gaps["failures"][1]["at"] == [500, 500, 10] and gaps["failures"][2] == {"failure": "zone line number used twice", "number": 2, "zoneLines": ["ATP_2_eastGate", "ATP_2_north"]}
   assert tested["failures"] == [] and [finding["finding"] for finding in tested["findings"] if "object" not in finding] == ["view values missing", "safe point over no ground", "zone line number used twice"]
-  # A copy keeps the name with a suffix the client cannot read; no zone file can hold it.
   assert [failure["message"] for failure in copied["failures"]] == ["'ATP_2_eastGate.001' is not named ATP_<number>_<label> with a number from 1; placeZoneLine names it"]
   assert [failure["failure"] for failure in ready["failures"]] == ["containment not checked"] and ready["zoneLines"] == ["ATP_2_eastGate", "ATP_3_north"]
+  assert 'sky "none" states that the zone draws none' in gaps["failures"][0]["message"] and "sky" in gaps["failures"][0]["missing"]
+  assert stating["zone"]["sky"] == "none" and stating["sky"] is None
+  assert [failure["failure"] for failure in skyless["failures"]] == ["containment not checked"]
+
+
+def guidePixel(image, x, y):
+  return numpy.asarray(Image.open(io.BytesIO(image)).convert("RGB"), dtype=numpy.int64)[y, x]
+
+
+def testBoundariesAndZoneLinesDrawInEveryShadingPlanAndSection(stageBlenderServer, tmp_path):
+  overhead = {"map": {"center": [0, 0], "width": 400}}
+
+  async def steps(session):
+    await groundedBasin(session, tmp_path)
+    await session.expectSuccess("setZoneProperties", environment)
+    await session.expectSuccess("placeBoundaryWall", {"name": "eastWall", "path": [[150, -100], [150, 100]], "height": 40})
+    await session.expectSuccess("placeBoundaryPlane", {"name": "westLid", "kind": "lid", "outline": [[-180, -40], [-120, -40], [-120, 40], [-180, 40]], "height": 30})
+    await session.expectSuccess("placeZoneLine", {"number": 1, "label": "mid", "minimum": [-100, -10, -5], "maximum": [-90, 10, 30], "target": target})
+    views = {}
+    for shading in ("layout", "relief"):
+      for guides in (True, False):
+        views[(shading, guides)], _ = await session.expectImage("renderView", {"view": overhead, "shading": shading, "guides": guides})
+    plan, _ = await session.expectImage("renderSketch", {"center": [0, 0], "width": 400})
+    barePlan, _ = await session.expectImage("renderSketch", {"center": [0, 0], "width": 400, "layers": ["regions", "plots", "water"]})
+    section, cuts = await session.expectImage("renderSection", {"start": [-200, 2], "end": [200, 2], "bottom": -30, "top": 60})
+    return views, plan, barePlan, section, cuts
+
+  views, plan, barePlan, section, cuts = stageBlenderServer.session(steps)
+  wall, lid, line, open = (840, 200), (120, 270), (252, 270), (480, 100)
+  for shading in ("layout", "relief"):
+    guided, bare = views[(shading, True)], views[(shading, False)]
+    wallRed, wallGreen, _ = guidePixel(guided, *wall) - guidePixel(bare, *wall)
+    lidRed, lidGreen, _ = guidePixel(guided, *lid) - guidePixel(bare, *lid)
+    lineRed, lineGreen, _ = guidePixel(guided, *line) - guidePixel(bare, *line)
+    assert wallRed - wallGreen > 50 and lidRed - lidGreen > 50, (shading, guidePixel(guided, *wall), guidePixel(bare, *wall), guidePixel(guided, *lid), guidePixel(bare, *lid))
+    assert lineGreen - lineRed > 50, (shading, guidePixel(guided, *line), guidePixel(bare, *line))
+    assert numpy.array_equal(guidePixel(guided, *open), guidePixel(bare, *open))
+  assert numpy.abs(guidePixel(plan, 1260, 189) - [215, 30, 25]).max() <= 2
+  planLidRed, planLidGreen, _ = guidePixel(plan, 180, 333) - guidePixel(barePlan, 180, 333)
+  planLineRed, planLineGreen, _ = guidePixel(plan, 378, 376) - guidePixel(barePlan, 378, 376)
+  assert planLidRed - planLidGreen > 30 and planLineGreen - planLineRed > 30
+  [cutWall, cutLid] = cuts["boundaries"]
+  assert cutWall["name"] == "eastWall" and cutWall["kind"] == "wall" and {(s0, s1) for s0, _, s1, _ in cutWall["segments"]} == {(350.0, 350.0)}
+  assert min(min(z0, z1) for _, z0, _, z1 in cutWall["segments"]) == -5.0 and max(max(z0, z1) for _, z0, _, z1 in cutWall["segments"]) == 40.0
+  assert cutLid["name"] == "westLid" and {(z0, z1) for _, z0, _, z1 in cutLid["segments"]} == {(30.0, 30.0)}
+  assert min(min(s0, s1) for s0, _, s1, _ in cutLid["segments"]) == 20.0 and max(max(s0, s1) for s0, _, s1, _ in cutLid["segments"]) == 80.0
+  assert cuts["zoneLines"] == [{"name": "ATP_1_mid", "s": [100.0, 110.0], "z": [-5.0, 30.0]}]
+  assert numpy.abs(guidePixel(section, 1215, 389) - [215, 30, 25]).max() <= 2 and numpy.abs(guidePixel(section, 225, 355) - [215, 30, 25]).max() <= 2
+  sectionRed, sectionGreen, _ = guidePixel(section, 406, 400)
+  assert sectionGreen - sectionRed > 20

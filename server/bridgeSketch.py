@@ -10,6 +10,7 @@ import mathutils
 import numpy
 
 import bridgeAuthoring
+import bridgeBoundaries
 import bridgeHousing
 import bridgeMeshAccess
 import bridgeObjects
@@ -26,6 +27,9 @@ massingVersion = 2
 massingColor = (0.82, 0.8, 0.76)
 # Massing shades each face by the way it faces, the same from every view: tops lightest, then east and west, then north and south.
 massingShade = {"base": 0.45, "up": 0.4, "eastWest": 0.25, "northSouth": 0.1}
+# A boundary face whose plan covers less than this share of its own area stands upright: a wall, drawn in plan as a line.
+uprightPlanShare = 0.01
+planLayers = ("regions", "plots", "water", "swim", "boundaries", "zoneLines")
 # Ground under a shape is sampled on a grid at least this fine, and no finer than this many samples.
 groundSampleSpacing = 4.0
 groundSampleLimit = 2500
@@ -463,19 +467,19 @@ def getSketch(sheet):
 
 
 def planOverlays(sheets, layers, spots):
-  """What a plan drawing lays over the base: the sheets' shapes, the plan's own regions, plots, and water, and the ground's height at
-  each of spots ([x, y]; those over no ground are left out), in plan coordinates."""
+  """What a plan drawing lays over the base: the sheets' shapes, the plan's own regions, plots, water, swim volumes, boundaries, and
+  zone lines, and the ground's height at each of spots ([x, y]; those over no ground are left out), in plan coordinates."""
   known = {readSpec(shape)["sheet"] for shape in sketchObjects()}
   if sheets is not None:
     missing = sorted(set(sheets) - known)
     if missing:
       raise ValueError(f"No sketch sheets {missing}; sheets: {sorted(known)}")
   chosen = sorted(known) if sheets is None else sheets
-  unknownLayers = sorted(set(layers) - {"regions", "plots", "water", "swim"})
+  unknownLayers = sorted(set(layers) - set(planLayers))
   if unknownLayers:
-    raise ValueError(f"layers are regions, plots, water, and swim; got {unknownLayers}")
+    raise ValueError(f"layers are {list(planLayers)}; got {unknownLayers}")
   bpy.context.view_layer.update()
-  overlays = {"sheets": [], "regions": [], "plots": [], "water": [], "swim": [], "spots": []}
+  overlays = {"sheets": [], "regions": [], "plots": [], "water": [], "swim": [], "boundaries": [], "zoneLines": [], "spots": []}
   if spots:
     probe = GroundProbe()
     for x, y in spots:
@@ -497,6 +501,10 @@ def planOverlays(sheets, layers, spots):
     ]
   if "swim" in layers:
     overlays["swim"] = [{"name": box.name, "liquid": bridgeSwim.readBox(box)["liquid"], "corners": bridgeSwim.boxCorners(box)} for box in bridgeSwim.swimBoxes()]
+  if "boundaries" in layers:
+    overlays["boundaries"] = [boundaryPlan(boundary) for boundary in bridgeBoundaries.boundaryObjects() if boundary.type == "MESH"]
+  if "zoneLines" in layers:
+    overlays["zoneLines"] = [{"name": line.name, "corners": [corner[:2] for corner in bridgeBoundaries.boxCorners(line)]} for line in bridgeBoundaries.zoneLineObjects()]
   if "water" in layers:
     bodies = renderedWater()
     ground = bridgeWater.Ground() if bodies else None
@@ -511,11 +519,27 @@ def planOverlays(sheets, layers, spots):
   return overlays
 
 
+def boundaryPlan(boundary):
+  """A boundary in plan: the faces seen from above as areas (a lid, a floor) and the upright ones as lines along their foot (a wall)."""
+  positions, triangles = bridgeMeshAccess.worldTriangles([boundary])
+  corners = positions[triangles]
+  firstEdge, secondEdge = corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0]
+  planArea = numpy.abs(firstEdge[:, 0] * secondEdge[:, 1] - firstEdge[:, 1] * secondEdge[:, 0]) / 2
+  upright = planArea <= uprightPlanShare * numpy.linalg.norm(numpy.cross(firstEdge, secondEdge), axis=1) / 2
+  lines = []
+  for triangle in corners[upright][:, :, :2]:
+    pairs = [(triangle[a], triangle[b]) for a, b in ((0, 1), (1, 2), (2, 0))]
+    start, end = max(pairs, key=lambda pair: numpy.linalg.norm(pair[1] - pair[0]))
+    lines.append([roundPoint(start), roundPoint(end)])
+  areas = [[roundPoint(point) for point in triangle] for triangle in corners[~upright][:, :, :2]]
+  return {"name": boundary.name, "kind": bridgeBoundaries.readSpec(boundary, bridgeMeshAccess.boundaryProperty)["kind"], "lines": lines, "areas": areas}
+
+
 def renderedWater():
   return [body for body in bpy.context.scene.objects if bridgeMeshAccess.waterProperty in body and not body.hide_render]
 
 
-sectionLayers = ("ground", "water", "swim", "massing", "sketch", "plots")
+sectionLayers = ("ground", "water", "swim", "massing", "sketch", "plots", "boundaries", "zoneLines")
 # Cuts reaching past the drawing by this share of its size are dropped; the drawing clips the rest.
 sectionMargin = 0.1
 waterSectionStep = 0.5
@@ -654,10 +678,23 @@ def keptSegments(segments, length, bottom, top):
   return numpy.round(segments[inside], 2).tolist()
 
 
+def boxCrossing(low, high, start, along):
+  """Where a section's line runs through an axis-aligned box in plan, [enter, leave] as distances along it, or None."""
+  enter, leave = -math.inf, math.inf
+  for axis in (0, 1):
+    if abs(along[axis]) < 1e-12:
+      if not low[axis] <= start[axis] <= high[axis]:
+        return None
+      continue
+    first, second = (low[axis] - start[axis]) / along[axis], (high[axis] - start[axis]) / along[axis]
+    enter, leave = max(enter, min(first, second)), min(leave, max(first, second))
+  return [round(enter, 2), round(leave, 2)] if leave > enter else None
+
+
 def sectionCuts(start, end, bottom, top, layers):
   """What the zone holds where the vertical plane through the line from start to end cuts it, in the plane's own terms (s along the line
-  from start, z height): the ground players stand on, water surfaces, swim volumes, sketch massing, sketch area floors and paths, and
-  plot pads."""
+  from start, z height): the ground players stand on, water surfaces, swim volumes, sketch massing, sketch area floors and paths, plot
+  pads, boundaries, and zone lines."""
   unknown = sorted(set(layers) - set(sectionLayers))
   if unknown:
     raise ValueError(f"Section layers are {list(sectionLayers)}; got {unknown}")
@@ -671,7 +708,7 @@ def sectionCuts(start, end, bottom, top, layers):
   normal = numpy.array([-along[1], along[0]])
   bpy.context.view_layer.update()
   cuts = {
-    "length": round(length, 2), "ground": [], "water": [], "swim": [], "massing": [], "sketch": [], "plots": [],
+    "length": round(length, 2), "ground": [], "water": [], "swim": [], "massing": [], "sketch": [], "plots": [], "boundaries": [], "zoneLines": [],
     "sheets": sorted({readSpec(shape)["sheet"] for shape in sketchObjects()}),
   }
 
@@ -705,16 +742,18 @@ def sectionCuts(start, end, bottom, top, layers):
   if "swim" in layers:
     for box in bridgeSwim.swimBoxes():
       (low, high) = bridgeSwim.boxCorners(box)
-      enter, leave = -math.inf, math.inf
-      for axis in (0, 1):
-        if abs(along[axis]) < 1e-12:
-          if not low[axis] <= start[axis] <= high[axis]:
-            enter, leave = 1.0, 0.0
-          continue
-        first, second = (low[axis] - start[axis]) / along[axis], (high[axis] - start[axis]) / along[axis]
-        enter, leave = max(enter, min(first, second)), min(leave, max(first, second))
-      if leave > enter:
-        cuts["swim"].append({"name": box.name, "liquid": bridgeSwim.readBox(box)["liquid"], "s": [round(enter, 2), round(leave, 2)], "z": [low[2], high[2]]})
+      crossing = boxCrossing(low, high, start, along)
+      if crossing is not None:
+        cuts["swim"].append({"name": box.name, "liquid": bridgeSwim.readBox(box)["liquid"], "s": crossing, "z": [low[2], high[2]]})
+  if "boundaries" in layers:
+    boundaries = [boundary for boundary in bridgeBoundaries.boundaryObjects() if boundary.type == "MESH"]
+    cuts["boundaries"] = [entry | {"kind": bridgeBoundaries.readSpec(bpy.data.objects[entry["name"]], bridgeMeshAccess.boundaryProperty)["kind"]} for entry in cutObjects(boundaries)]
+  if "zoneLines" in layers:
+    for line in bridgeBoundaries.zoneLineObjects():
+      low, high = bridgeBoundaries.boxCorners(line)
+      crossing = boxCrossing(low, high, start, along)
+      if crossing is not None:
+        cuts["zoneLines"].append({"name": line.name, "s": crossing, "z": [low[2], high[2]]})
   return cuts
 
 

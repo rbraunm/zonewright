@@ -20,9 +20,7 @@ transitionMappingPrefix = "zonewrightTransitionUV:"
 diffuseNodeName = "zonewrightDiffuse"
 normalNodeName = "zonewrightNormal"
 cutoutPropertyName = "zonewrightCutout"
-# A blockout material is a layout stand-in: a game export refuses it on exported faces.
 blockoutPropertyName = "zonewrightBlockout"
-# A material paintTransition laid as a strip: a border it lies along is bridged.
 transitionPropertyName = "zonewrightTransition"
 environmentNodeName = "zonewrightEnvironment"
 secondDiffuseNodeName = "zonewrightDiffuse1"
