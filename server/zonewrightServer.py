@@ -733,19 +733,28 @@ async def setZoneProperties(
   return stored | {"sky": None if resolved is None else {key: resolved[key] for key in ("chain", "dayFraction", "lightFrom", "environment")}}
 
 
+async def zoneFigureModel(zone):
+  """The scale figure's model as the zone draws her."""
+  # Without newEngineZone the preview's own check fails, naming it with any other missing zone property.
+  if "newEngineZone" not in zone:
+    return None
+  figure = await anyio.to_thread.run_sync(spawnModel, None, figureModelCode, figureHeight, bool(zone["newEngineZone"]))
+  return {key: figure[key] for key in ("folder", "scale", "avatarHeight")}
+
+
+async def scaleFigureModel(zone, view):
+  """The scale figure's model for a view that may stand her (standAt, or a review camera saved from such a view), else None."""
+  return await zoneFigureModel(zone) if {"standAt", "camera"} & set(view) else None
+
+
 @guardedTool()
 async def renderView(context: Context, view: dict, shading: str = "client", bandHeight: float = 50.0, guides: bool = True, swimVolumes: bool = False):
-  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], or with z on the ground found from 3 above z down to 50 below it, for caves, under overhangs, and on ledges; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera, or stood by hand facing the camera with "figureAt": [x,y] or [x,y,z] in the view, its ground found as standAt's is, on a ledge or ramp too narrow to walk her ahead on), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog. {"frame": {"objects": [names], "headingDegrees": h, "pitchDegrees": p}} looks at the named meshes or collection instances from that heading and pitch, standing back so they fit (its result's eye and target reproduce that camera). shading "client" draws the zone as the client does; "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout; "coverage" draws only what exportZone would export, each face in the color of its export check status (checkExport): black where it cannot export, red for zero texture area, brown for a blockout material, yellow for texture stretched or squeezed, orange where the base material shows, magenta along a ground border without a transition strip, grey when fine, and blue wherever a face is seen from its back, lit from the northwest as layout is, softer so no shaded face reads as black, and without fog; the result counts the exported faces by status. Guides (plot outlines, sketch massing) draw unless guides is false, and with them, in every shading, the view is tinted red where the boundaries (walls, lids, floors) stand, which the client never draws, a wall as a slab thick enough to show from above, and green where the zone lines stand, seen through the water but hidden behind and under the ground; with swimVolumes, the view is tinted where the swim volumes stand (cyan water, magenta lava), each box seen through the water, so its top shows evenly under a surface it meets or lies just below, but hidden behind and under the ground."""
+  """Render the EQ preview of a view: {"camera": name} (a review camera saved from a standAt view stands the scale figure again where she stood, her ground found as figureAt's is), {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], or with z on the ground found from 3 above z down to 50 below it, for caves, under overhangs, and on ledges; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera, or stood by hand facing the camera with "figureAt": [x,y] or [x,y,z] in the view, its ground found as standAt's is, on a ledge or ramp too narrow to walk her ahead on), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog. {"frame": {"objects": [names], "headingDegrees": h, "pitchDegrees": p}} looks at the named meshes or collection instances from that heading and pitch, standing back so they fit (its result's eye and target reproduce that camera). shading "client" draws the zone as the client does; "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout; "coverage" draws only what exportZone would export, each face in the color of its export check status (checkExport): black where it cannot export, red for zero texture area, brown for a blockout material, yellow for texture stretched or squeezed, orange where the base material shows, magenta along a ground border without a transition strip, grey when fine, and blue wherever a face is seen from its back, lit from the northwest as layout is, softer so no shaded face reads as black, and without fog; the result counts the exported faces by status. Guides (plot outlines, sketch massing) draw unless guides is false, and with them, in every shading, the view is tinted red where the boundaries (walls, lids, floors) stand, which the client never draws, a wall as a slab thick enough to show from above, and green where the zone lines stand, seen through the water but hidden behind and under the ground; with swimVolumes, the view is tinted where the swim volumes stand (cyan water, magenta lava), each box seen through the water, so its top shows evenly under a surface it meets or lies just below, but hidden behind and under the ground."""
   outputPath = newRenderPath()
-  figureModel = None
   zone = await callBridge(context, "getZoneProperties", {})
-  # Without newEngineZone the preview's own check fails, naming it with any other missing zone property.
-  if "standAt" in view and "newEngineZone" in zone:
-    figure = await anyio.to_thread.run_sync(spawnModel, None, figureModelCode, figureHeight, bool(zone["newEngineZone"]))
-    figureModel = {key: figure[key] for key in ("folder", "scale", "avatarHeight")}
   description = await callBridge(context, "renderView", {
-    "view": view, "outputPath": str(outputPath), "figureModel": figureModel, "shading": shading, "bandHeight": bandHeight, "guides": guides,
-    "sky": await zoneSky(zone), "swimVolumes": swimVolumes,
+    "view": view, "outputPath": str(outputPath), "figureModel": await scaleFigureModel(zone, view), "shading": shading, "bandHeight": bandHeight,
+    "guides": guides, "sky": await zoneSky(zone), "swimVolumes": swimVolumes,
   })
   return [Image(data=outputPath.read_bytes(), format="png"), description]
 
@@ -1875,6 +1884,68 @@ async def renderOrbit(
   sheetPath = newRenderPath().with_suffix(".jpg")
   size = viewSheets.writeGrid(cells, 4 if views > 4 else views, sheetPath)
   return [Image(data=sheetPath.read_bytes(), format="jpeg"), {"outputPath": str(sheetPath), "views": views} | size]
+
+
+# A sheet holds at most this many views, so it stays well inside what a tool result can carry.
+sheetViews = 16
+sheetColumns = 4
+
+
+async def renderSheet(context, zone, views, labels, shading, figureModel):
+  """Render each view (with progress), lay them out on one sheet labeled under each, and return the sheet and the renders' paths."""
+  sky = await zoneSky(zone)
+  cells, paths = [], []
+  for index, (view, label) in enumerate(zip(views, labels)):
+    await context.report_progress(index, len(views), f"rendering {index + 1} of {len(views)}")
+    outputPath = newRenderPath()
+    await callBridge(context, "renderView", {
+      "view": view, "outputPath": str(outputPath), "figureModel": figureModel, "shading": shading, "bandHeight": 50.0, "guides": True, "sky": sky,
+      "swimVolumes": False,
+    })
+    cells.append((viewSheets.openRender(outputPath), label))
+    paths.append(str(outputPath))
+  await context.report_progress(len(views), len(views), "laying out the sheet")
+  sheetPath = newRenderPath().with_suffix(".jpg")
+  size = viewSheets.writeGrid(cells, min(sheetColumns, len(cells)), sheetPath)
+  return Image(data=sheetPath.read_bytes(), format="jpeg"), {"outputPath": str(sheetPath)} | size, paths
+
+
+@guardedTool()
+async def saveReviewCamera(context: Context, name: str, view: dict, note: str):
+  """Keep a named review camera to look at the zone the same way again: the pose of a renderView view, {"eye", "target"},
+  {"standAt", "headingDegrees", "pitchDegrees"} (figureAt optional; where the scale figure stood is kept with it), or {"frame"}, with
+  `note`, what to judge from there. It is a camera guide in the reviewCameras collection, kept in the .blend, never drawn in views and
+  never exported; saved again under its name it moves to the new view. renderView {"camera": name} and renderReviewSet render it."""
+  zone = await callBridge(context, "getZoneProperties", {})
+  return await callBridge(context, "saveReviewCamera", {"name": name, "view": view, "note": note, "sky": await zoneSky(zone), "figureModel": await scaleFigureModel(zone, view)})
+
+
+@guardedTool()
+async def getReviewCameras(context: Context):
+  """The review cameras by name: each one's note, the view it was saved from, its eye, heading, and pitch, and where its scale figure stands."""
+  return await callBridge(context, "getReviewCameras", {})
+
+
+@guardedTool()
+async def deleteReviewCameras(context: Context, names: list[str]):
+  """Delete the named review cameras; refuses, deleting none, when a name is not a review camera."""
+  return await callBridge(context, "deleteReviewCameras", {"names": names})
+
+
+@guardedTool()
+async def renderReviewSet(context: Context, names: list[str] | None = None, shading: str = "client"):
+  """Render review cameras (all of them by name, or those named, in that order; up to 16) as renderView {"camera": name} does, in any
+  renderView shading, and lay them out on one sheet, each labeled with its name and note; the result gives each render's path."""
+  cameras = {camera["name"]: camera for camera in (await callBridge(context, "getReviewCameras", {}))["cameras"]}
+  chosen = list(cameras) if names is None else names
+  unknown = sorted(set(chosen) - set(cameras))
+  if unknown or not chosen or len(chosen) > sheetViews:
+    raise ToolError(f"Name up to {sheetViews} review cameras to render, each one saved (saved: {sorted(cameras)}); got {chosen}")
+  zone = await callBridge(context, "getZoneProperties", {})
+  sheet, size, paths = await renderSheet(
+    context, zone, [{"camera": name} for name in chosen], [f"{name}: {cameras[name]['note']}" for name in chosen], shading, await zoneFigureModel(zone),
+  )
+  return [sheet, size | {"cameras": [{"name": name, "note": cameras[name]["note"], "outputPath": path} for name, path in zip(chosen, paths)]}]
 
 
 @guardedTool()

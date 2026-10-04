@@ -13,6 +13,7 @@ import bridgeClientLight
 import bridgeExportChecks
 import bridgeMeshAccess
 import bridgeModels
+import bridgeReviewGuides
 import bridgeSwim
 import skyDrawing
 from playerScale import swimEyeAboveSurface
@@ -323,9 +324,17 @@ def placeCamera(preview, view, figureModel):
     source = bpy.data.objects.get(view["camera"])
     if source is None or source.type != "CAMERA":
       raise ValueError(f"No camera object named '{view['camera']}'")
-    location, rotation, _ = source.matrix_world.decompose()
+    # A review camera keeps its pose as its own location and rotation, which reproduce its view exactly; its world matrix decomposed
+    # again differs in the last bits and moves the picture by a fraction of a pixel.
+    location, rotation = bridgeReviewGuides.reviewPose(source) or source.matrix_world.decompose()[:2]
     camera.location, camera.rotation_quaternion = location, rotation
-    return {"eye": list(location), "forward": list(rotation @ mathutils.Vector((0, 0, -1))), "figure": None}
+    description = {"eye": list(location), "forward": list(rotation @ mathutils.Vector((0, 0, -1))), "figure": None}
+    saved = bridgeReviewGuides.savedFigure(source)
+    if figureModel is not None and saved is not None:
+      footing = standingGround(preview, bridgeMeshAccess.PlayerSurfaces(), saved["at"], "the review camera's scale figure")
+      preview.addFigure(footing, figureModel, saved["facingDegrees"])
+      description |= {"figure": list(footing), "figureFacingDegrees": saved["facingDegrees"]}
+    return description
   if viewKeys == {"eye", "target"}:
     eye, target = mathutils.Vector(view["eye"]), mathutils.Vector(view["target"])
     camera.location, camera.rotation_quaternion = eye, lookRotation(target - eye)
@@ -352,9 +361,9 @@ def placeCamera(preview, view, figureModel):
       toEye = eye - footing
       facing = view["headingDegrees"] + 180 if toEye.xy.length < 1e-6 else math.degrees(math.atan2(toEye.x, toEye.y))
       preview.addFigure(footing, figureModel, facing)
-      description["figure"] = list(footing)
+      description |= {"figure": list(footing), "figureFacingDegrees": facing}
     elif figureModel is not None:
-      description["figure"] = list(placeScaleFigure(preview, surfaces, ground, view["headingDegrees"], figureModel))
+      description |= {"figure": list(placeScaleFigure(preview, surfaces, ground, view["headingDegrees"], figureModel)), "figureFacingDegrees": view["headingDegrees"] + 180}
     return description
   raise ValueError(f"A view is {{camera}}, {{eye, target}}, {{map}}, {{frame}}, or {{standAt, headingDegrees, pitchDegrees}} with an optional figureAt; got keys {sorted(viewKeys)}")
 

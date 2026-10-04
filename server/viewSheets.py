@@ -1,4 +1,5 @@
-"""Sheets of preview renders: the same view before and after a change with what changed between them, and views around a subject."""
+"""Sheets of preview renders: the same view before and after a change with what changed between them, views around a subject, and
+review cameras."""
 from pathlib import Path
 
 import numpy
@@ -8,6 +9,7 @@ cellSize = (640, 360)
 jpegQuality = 90
 gap = 8
 labelHeight = 20
+lineHeight = 17
 backgroundColor = (40, 40, 40)
 labelColor = (235, 235, 235)
 # A pixel counts as changed when a channel moved more than this (of 255); identical input renders byte-identical, so anything above
@@ -25,18 +27,34 @@ def openRender(path):
     return image.convert("RGB")
 
 
+def wrappedLines(draw, text, font, width):
+  """Text broken at spaces into lines no wider than width (a word wider than that keeps a line of its own)."""
+  lines = []
+  for word in text.split(" "):
+    if lines and draw.textlength(f"{lines[-1]} {word}", font=font) <= width:
+      lines[-1] = f"{lines[-1]} {word}"
+    else:
+      lines.append(word)
+  return lines
+
+
 def writeGrid(cells, columns, outputPath):
-  """cells: [(image, label)] laid out in rows of `columns`, each scaled to cellSize, labeled under it; written as JPEG."""
+  """cells: [(image, label)] laid out in rows of `columns`, each scaled to cellSize, labeled under it (wrapped to its width, every row
+  as tall as the longest label needs); written as JPEG."""
   rows = -(-len(cells) // columns)
   width, height = cellSize
-  sheet = Image.new("RGB", (gap + columns * (width + gap), gap + rows * (height + labelHeight + gap)), backgroundColor)
-  draw = ImageDraw.Draw(sheet)
   font = ImageFont.load_default(size=14)
-  for index, (image, label) in enumerate(cells):
+  measure = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+  labels = [wrappedLines(measure, label, font, width) for _, label in cells]
+  labelArea = labelHeight + lineHeight * (max(len(lines) for lines in labels) - 1)
+  sheet = Image.new("RGB", (gap + columns * (width + gap), gap + rows * (height + labelArea + gap)), backgroundColor)
+  draw = ImageDraw.Draw(sheet)
+  for index, ((image, _), lines) in enumerate(zip(cells, labels)):
     left = gap + index % columns * (width + gap)
-    top = gap + index // columns * (height + labelHeight + gap)
+    top = gap + index // columns * (height + labelArea + gap)
     sheet.paste(image.resize(cellSize, Image.Resampling.LANCZOS), (left, top))
-    draw.text((left, top + height + 2), label, fill=labelColor, font=font)
+    for line, text in enumerate(lines):
+      draw.text((left, top + height + 2 + line * lineHeight), text, fill=labelColor, font=font)
   sheet.save(outputPath, "JPEG", quality=jpegQuality)
   return {"width": sheet.width, "height": sheet.height}
 
