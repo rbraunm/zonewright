@@ -4,6 +4,8 @@ import os
 import time
 from pathlib import Path
 
+import pytest
+
 from conftest import everquestClient, pinnedBlender
 
 
@@ -97,6 +99,7 @@ def testBridgeCodeChangeWithUnsavedChangesWaitsForSave(freshBlenderServer, tmp_p
   assert after["filePath"] == str(blendPath)
 
 
+@pytest.mark.clientData("survey")
 def testSurveyReusesHashesAndDiscoveryUntilFilesChange(stageServer):
   server = stageServer({"blender": pinnedBlender, "extensions": {}})
   befallenArchive = Path(everquestClient) / "befallen.s3d"

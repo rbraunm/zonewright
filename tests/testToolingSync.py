@@ -8,7 +8,11 @@ import threading
 import urllib.request
 import zipfile
 
+import pytest
+
 from conftest import pinnedBlender
+
+pytestmark = pytest.mark.install
 
 
 def blenderAction(action, version):

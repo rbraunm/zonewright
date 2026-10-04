@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 
 from PIL import Image
+import pytest
 
 from conftest import writePNG
 
@@ -134,6 +135,7 @@ def testFogIsOffWithTheZonesFogSwitchAndPulledInShortOfTheFarClip(stageBlenderSe
     assert abs(measured - expected) <= 1.5 / 255
   assert "minClip must be at least 50" in refused
 
+@pytest.mark.clientData("clientFiles")
 def testImportZoneBringsTheClientsZone(stageBlenderServer):
   async def steps(session):
     await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
@@ -147,6 +149,7 @@ def testImportZoneBringsTheClientsZone(stageBlenderServer):
   assert imported["dimensions"] == [1968.0, 1968.0, 1011.931]
 
 
+@pytest.mark.clientData("calibration")
 def testCalibrationRecoversTheLightOfAKnownShot(stageBlenderServer, tmp_path):
   shotName = "poknowledge,396.22,-192.08,-156.87,73.44,12.48"
   known = environment | {"ambientColor": [0.35, 0.4, 0.6], "specialAmbientColor": [0, 0, 0], "bounceColor": [0, 0, 0], "sunColor": [0.3, 0.25, 0.1], "sunAzimuthDegrees": 120, "sunElevationDegrees": 40}
@@ -176,6 +179,7 @@ def testCalibrationRecoversTheLightOfAKnownShot(stageBlenderServer, tmp_path):
   assert [(entry["screenshot"], entry["runs"], entry["meanPixelDifference"]) for entry in status["calibration"]] == [(f"{shotName}.jpg", 1, result["meanPixelDifference"])]
 
 
+@pytest.mark.clientData("calibration")
 def testCalibrationFitsTheFogOfAShotWithoutAZoneHeader(stageBlenderServer, tmp_path):
   shotName = "poknowledge,396.22,-192.08,-156.87,73.44,12.48"
   known = environment | {
@@ -206,6 +210,7 @@ def testCalibrationFitsTheFogOfAShotWithoutAZoneHeader(stageBlenderServer, tmp_p
   assert result["meanPixelDifference"] < 4
 
 
+@pytest.mark.clientData("clientFiles")
 def testImportZoneBringsATerrainZone(stageBlenderServer):
   async def steps(session):
     await session.expectSuccess("newFile", {"discardUnsavedChanges": True})

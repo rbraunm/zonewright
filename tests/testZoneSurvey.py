@@ -1,6 +1,10 @@
 import json
 
+import pytest
+
 from conftest import pinnedBlender
+
+pytestmark = pytest.mark.clientData("survey")
 
 
 def stageSurveyServer(stageServer):

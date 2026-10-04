@@ -28,6 +28,20 @@ everquestClient = json.loads((repositoryRoot / ".mcp.json").read_text(encoding="
 # One install of each pinned Blender in the user's profile, shared by every test session in every worktree.
 sharedLocalAppDataPath = Path(os.environ["LOCALAPPDATA"]) / "zonewrightTests" / pinnedBlender["sha256"][:16]
 sharedInstallLockSeconds = 900
+readerFiles = {f"server/{name}.py" for name in (
+  "eqAnimations", "eqArchive", "eqEmitters", "eqLinks", "eqLooks", "eqModels", "eqRaces", "eqSkeletons", "eqTerrainTextures", "eqTextures",
+  "eqWorldFile", "eqZones", "eqgFiles", "eqgSkeletons", "eqgTerrain", "zoneGeometry", "zoneSources", "bridgeModels",
+)}
+# The slow tiers, in groups by the code their tests check. A run of the whole suite takes a group only when that code changed since the
+# branch left the last pushed claude, or is uncommitted; -m clientData or -m install runs a whole tier, and naming a test file runs it.
+heavyGroups = {
+  "survey": {f"server/{name}.py" for name in ("assetSurvey", "assetCatalog", "assetVocabulary", "assetSheets", "zoneSurvey", "surveyFields")},
+  "clientFiles": readerFiles,
+  "calibration": {"server/eqCalibration.py", "server/bridgeClientLight.py"},
+  "install": {f"server/{name}.py" for name in (
+    "toolingSync", "toolingManifest", "toolingStatus", "extensionCatalog", "machineProfile", "machineBenchmark", "blenderProcess",
+  )} | {"toolingManifest.json"},
+}
 
 
 class ToolSession:
@@ -287,3 +301,46 @@ def writePNG(path, width, height, rgba):
   header = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
   path.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(row * height)) + chunk(b"IEND", b""))
   return path
+
+
+def gitOutput(*arguments):
+  return subprocess.run(["git", "-C", str(repositoryRoot), *arguments], check=True, capture_output=True, encoding="utf-8").stdout
+
+
+def heavyGroupOf(item):
+  if item.get_closest_marker("install"):
+    return "install"
+  marker = item.get_closest_marker("clientData")
+  if marker is None:
+    return None
+  if len(marker.args) != 1 or marker.args[0] not in heavyGroups or marker.args[0] == "install":
+    raise pytest.UsageError(f"{item.nodeid}: clientData takes one of {sorted(set(heavyGroups) - {'install'})}, got {marker.args!r}")
+  return marker.args[0]
+
+
+def pytest_addoption(parser):
+  parser.addoption("--everyTier", action="store_true", help="run the client data and install tiers whatever changed")
+
+
+def pytest_collection_modifyitems(config, items):
+  groups = {item.nodeid: heavyGroupOf(item) for item in items}
+  wholeSuite = all((config.invocation_params.dir / argument.split("::")[0]).is_dir() for argument in config.args)
+  if config.option.markexpr or config.option.everyTier or not wholeSuite:
+    return
+  base = gitOutput("merge-base", "HEAD", "origin/claude").strip()
+  changed = set(gitOutput("diff", "--name-only", base).splitlines()) | set(gitOutput("ls-files", "--others", "--exclude-standard").splitlines())
+  config.heavyGroupReport = []
+  for group, files in heavyGroups.items():
+    touched = sorted(changed & files)
+    count = sum(1 for value in groups.values() if value == group)
+    config.heavyGroupReport.append(f"{group} ({count} tests): " + (f"run, its code changed: {', '.join(touched)}" if touched else f"left out, its code is as at {base[:8]} (origin/claude)"))
+  leftOut = {group for group, files in heavyGroups.items() if not changed & files}
+  deselected = [item for item in items if groups[item.nodeid] in leftOut]
+  if deselected:
+    config.hook.pytest_deselected(items=deselected)
+    items[:] = [item for item in items if groups[item.nodeid] not in leftOut]
+
+
+def pytest_terminal_summary(terminalreporter, config):
+  for line in getattr(config, "heavyGroupReport", []):
+    terminalreporter.write_line(f"heavy tests, {line}")

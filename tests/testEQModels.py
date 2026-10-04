@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 
 import numpy
+import pytest
 
 from conftest import everquestClient, pinnedBlender
 
@@ -20,6 +21,7 @@ def linkedArchives(found, tier):
   return [(definition["archive"], definition["via"]) for definition in found["linked"] if definition["tier"] == tier]
 
 
+@pytest.mark.clientData("clientFiles")
 def testFindModelFollowsTheClientsLoadOrder(stageServer):
   server = stageServer({"blender": pinnedBlender, "extensions": {}})
   # guka_chr.txt loads only SPI and WIL from gfaydark_chr.s3d; BAT is in that archive too but not loaded for guka.
@@ -98,6 +100,7 @@ def testPlaceSpawnDrawsTheClientsScaleForTheZone(stageBlenderServer):
   assert abs(newEngineGnoll["avatarHeight"] - 2.08333) < 0.0001
 
 
+@pytest.mark.clientData("clientFiles")
 def testSpawnsPlayTheAnimationsTheClientGivesThem(stageBlenderServer):
   async def steps(session):
     await freshScene(session)
@@ -190,6 +193,7 @@ def testDoorsAndObjectsComeFromTheZonesArchives(stageBlenderServer):
   assert chosen["source"]["archive"] == "gequip.s3d"
 
 
+@pytest.mark.clientData("clientFiles")
 def testLuclinHeadsTakeTheClientsFaceHairAndBeard(stageBlenderServer):
   async def steps(session):
     await freshScene(session)
