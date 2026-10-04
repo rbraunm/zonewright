@@ -1384,8 +1384,8 @@ async def editRegion(context: Context, name: str, outline: list[list[float]] | N
 sketchShapeHelp = (
   " A shape is {name, kind, ...}: an area or a footprint takes an outline [[x, y], ...] or a rectangle {center: [x, y], size: [across,"
   " along], headingDegrees} (its facing; along runs that way), and may take floor (the height it is graded to) and facingDegrees;"
-  " a footprint may take height, and then stands in views (with guides on) as a plain block on its floor or the lowest ground under"
-  " it; a path takes points [[x, y] or [x, y, z], ...] and may take width; a point takes at [x, y] and may take facingDegrees; a note"
+  " a footprint may take height, and then stands in views (with guides on) as a plain block that height above its floor (or the"
+  " ground), on a plinth down to the lowest ground under it; a path takes points [[x, y] or [x, y, z], ...] and may take width; a point takes at [x, y] and may take facingDegrees; a note"
   " takes at and a label, its text. Any shape may take a label and a note."
 )
 
@@ -1419,10 +1419,11 @@ async def getSketch(context: Context, sheet: str | None = None):
 @guardedTool()
 async def renderSketch(
   context: Context, center: list[float], width: float, sheets: list[str] | None = None, layers: list[str] = ["regions", "plots", "water"],
-  bandHeight: float = 25.0,
+  bandHeight: float = 25.0, spotHeights: bool = True,
 ):
   """Draw a plan: the zone from straight above in quiet grey relief (lighter higher, a step every bandHeight units, slopes shaded
-  from the northwest), `width` units across about `center`, north up, with a coordinate grid, a scale bar, the sketch sheets (all, or
+  from the northwest), `width` units across about `center`, north up, with a coordinate grid (the ground's height written at each
+  crossing unless spotHeights is false), a scale bar, the sketch sheets (all, or
   those named) in their own colors (areas dashed, footprints filled with their facing arrows and heights, paths at their widths,
   points, notes), and the plan's own layers: regions (dashed, named), plots (outlined, by address), and water (blue)."""
   if len(center) != 2 or width <= 0:
@@ -1433,7 +1434,8 @@ async def renderSketch(
     "view": {"map": {"center": center, "width": width}}, "outputPath": str(basePath), "figureModel": None, "shading": "relief",
     "bandHeight": bandHeight, "guides": False, "sky": await zoneSky(zone),
   })
-  overlays = await callBridge(context, "planOverlays", {"sheets": sheets, "layers": layers})
+  spots = planDrawing.gridCrossings(center, width, base["height"] / base["width"]) if spotHeights else []
+  overlays = await callBridge(context, "planOverlays", {"sheets": sheets, "layers": layers, "spots": spots})
   outputPath = newRenderPath()
   drawn = await anyio.to_thread.run_sync(planDrawing.drawPlan, basePath, outputPath, center, width, overlays)
   basePath.unlink()

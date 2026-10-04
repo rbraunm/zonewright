@@ -19,10 +19,10 @@ sketchKinds = ("area", "footprint", "path", "point", "note")
 namePattern = re.compile(r"^[A-Za-z0-9_-]+$")
 shapeKeys = {"name", "kind", "outline", "rectangle", "points", "at", "width", "floor", "height", "facingDegrees", "label", "note"}
 massingMaterialName = "zonewrightSketchMassing"
-# Massing is lit from the northwest, as layout drawings are, so its sides read apart.
-massingLight = (-0.5, 0.5, 0.7071)
-massingColor = (0.78, 0.76, 0.72)
-massingAmbient = 0.45
+massingVersion = 2
+massingColor = (0.82, 0.8, 0.76)
+# Massing shades each face by the way it faces, the same from every view: tops lightest, then east and west, then north and south.
+massingShade = {"base": 0.45, "up": 0.4, "eastWest": 0.25, "northSouth": 0.1}
 # Ground under a shape is sampled on a grid at least this fine, and no finer than this many samples.
 groundSampleSpacing = 4.0
 groundSampleLimit = 2500
@@ -299,30 +299,36 @@ def outlinesOn(sheet):
 
 
 def massingMaterial():
+  """The massing blocks' material, rebuilt when a file holds one from an earlier version of its shading."""
   material = bpy.data.materials.get(massingMaterialName)
-  if material is None:
-    material = bpy.data.materials.new(massingMaterialName)
+  if material is None or material.get("zonewrightVersion") != massingVersion:
+    if material is None:
+      material = bpy.data.materials.new(massingMaterialName)
+    material["zonewrightVersion"] = massingVersion
     material.use_nodes = True
     nodes, links = material.node_tree.nodes, material.node_tree.links
     nodes.clear()
     geometry = nodes.new("ShaderNodeNewGeometry")
-    facing = nodes.new("ShaderNodeVectorMath")
-    facing.operation = "DOT_PRODUCT"
-    links.new(geometry.outputs["Normal"], facing.inputs[0])
-    facing.inputs[1].default_value = massingLight
-    lit = nodes.new("ShaderNodeMath")
-    lit.operation = "MAXIMUM"
-    links.new(facing.outputs["Value"], lit.inputs[0])
-    lit.inputs[1].default_value = 0.0
-    shade = nodes.new("ShaderNodeMath")
-    shade.operation = "MULTIPLY_ADD"
-    links.new(lit.outputs["Value"], shade.inputs[0])
-    shade.inputs[1].default_value = 1 - massingAmbient
-    shade.inputs[2].default_value = massingAmbient
+    normal = nodes.new("ShaderNodeSeparateXYZ")
+    links.new(geometry.outputs["Normal"], normal.inputs["Vector"])
+    shade = nodes.new("ShaderNodeValue")
+    shade.outputs["Value"].default_value = massingShade["base"]
+    total = shade.outputs["Value"]
+    for axis, weight, operation in (("Z", massingShade["up"], "MAXIMUM"), ("X", massingShade["eastWest"], "ABSOLUTE"), ("Y", massingShade["northSouth"], "ABSOLUTE")):
+      part = nodes.new("ShaderNodeMath")
+      part.operation = operation
+      links.new(normal.outputs[axis], part.inputs[0])
+      part.inputs[1].default_value = 0.0
+      added = nodes.new("ShaderNodeMath")
+      added.operation = "MULTIPLY_ADD"
+      links.new(part.outputs["Value"], added.inputs[0])
+      added.inputs[1].default_value = weight
+      links.new(total, added.inputs[2])
+      total = added.outputs["Value"]
     shaded = nodes.new("ShaderNodeVectorMath")
     shaded.operation = "SCALE"
     shaded.inputs[0].default_value = massingColor
-    links.new(shade.outputs["Value"], shaded.inputs["Scale"])
+    links.new(total, shaded.inputs["Scale"])
     emission = nodes.new("ShaderNodeEmission")
     links.new(shaded.outputs["Vector"], emission.inputs["Color"])
     output = nodes.new("ShaderNodeOutputMaterial")
@@ -331,22 +337,21 @@ def massingMaterial():
 
 
 def shapeMesh(name, spec, geometry, probe):
-  """The shape in the scene: a footprint with a height as a block standing on its floor (or the lowest ground under it), drawn in
-  views with the guides; anything else as its outline, path, or spot, which views do not draw."""
+  """The shape in the scene: a footprint with a height as a block from the lowest ground under it to its height above its floor (or
+  that ground), so it stands on a plinth where the ground falls away, drawn in views with the guides; anything else as its outline,
+  path, or spot, which views do not draw."""
   kind = spec["kind"]
   mesh = bpy.data.meshes.new(name)
   if kind in ("area", "footprint"):
     outline = numpy.array(geometry)[:, :2]
-    if "floor" in spec:
-      base = spec["floor"]
-    else:
-      heights, _, _ = groundUnder(probe, outline)
-      found = heights[~numpy.isnan(heights)]
-      base = float(found.min()) if len(found) else 0.0
+    heights, _, _ = groundUnder(probe, outline)
+    found = heights[~numpy.isnan(heights)]
+    lowest = float(found.min()) if len(found) else spec.get("floor", 0.0)
+    base = spec.get("floor", lowest)
     if polygonArea(outline) < 0:
       outline = outline[::-1]
     count = len(outline)
-    bottom = [(x, y, base + sketchLift) for x, y in outline]
+    bottom = [(x, y, min(base, lowest) + sketchLift) for x, y in outline]
     if kind == "footprint" and "height" in spec:
       top = [(x, y, base + spec["height"]) for x, y in outline]
       faces = [tuple(range(count))[::-1], tuple(range(count, 2 * count))]
@@ -449,8 +454,9 @@ def getSketch(sheet):
   return {"sheets": [{"sheet": name, "shapes": [describeShape(shape, probe, outlinesOn(name)) for shape in members]} for name, members in sorted(sheets.items())]}
 
 
-def planOverlays(sheets, layers):
-  """What a plan drawing lays over the base: the sheets' shapes and the plan's own regions, plots, and water, in plan coordinates."""
+def planOverlays(sheets, layers, spots):
+  """What a plan drawing lays over the base: the sheets' shapes, the plan's own regions, plots, and water, and the ground's height at
+  each of spots ([x, y]; those over no ground are left out), in plan coordinates."""
   known = {readSpec(shape)["sheet"] for shape in sketchObjects()}
   if sheets is not None:
     missing = sorted(set(sheets) - known)
@@ -461,7 +467,13 @@ def planOverlays(sheets, layers):
   if unknownLayers:
     raise ValueError(f"layers are regions, plots, and water; got {unknownLayers}")
   bpy.context.view_layer.update()
-  overlays = {"sheets": [], "regions": [], "plots": [], "water": []}
+  overlays = {"sheets": [], "regions": [], "plots": [], "water": [], "spots": []}
+  if spots:
+    probe = GroundProbe()
+    for x, y in spots:
+      height = probe.height(x, y)
+      if height is not None:
+        overlays["spots"].append({"at": [x, y], "height": round(height, 1)})
   for sheet in chosen:
     shapes = []
     for shape in sketchObjects(sheet):

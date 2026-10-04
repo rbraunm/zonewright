@@ -69,8 +69,21 @@ def facingArrow(draw, frame, center, facingDegrees, reach, color):
     draw.line([end, (end[0] + 12 * math.cos(angle + side), end[1] + 12 * math.sin(angle + side))], fill=color, width=3)
 
 
+def gridStepFor(width):
+  return next((step for step in gridSteps if width / step <= 12), gridSteps[-1])
+
+
+def gridCrossings(center, width, aspect):
+  """The grid's crossings inside a plan width units across about center, height width * aspect."""
+  step = gridStepFor(width)
+  height = width * aspect
+  xs = range(math.ceil((center[0] - width / 2) / step) * step, math.floor(center[0] + width / 2) + 1, step)
+  ys = range(math.ceil((center[1] - height / 2) / step) * step, math.floor(center[1] + height / 2) + 1, step)
+  return [[x, y] for x in xs for y in ys]
+
+
 def drawGrid(draw, frame):
-  step = next((step for step in gridSteps if frame.width / step <= 12), gridSteps[-1])
+  step = gridStepFor(frame.width)
   left, right = frame.center[0] - frame.width / 2, frame.center[0] + frame.width / 2
   bottom, top = frame.center[1] - frame.height / 2, frame.center[1] + frame.height / 2
   for x in range(math.ceil(left / step) * step, math.floor(right) + 1, step):
@@ -95,6 +108,14 @@ def drawScale(draw, frame, step):
   nx, ny = frame.size[0] - 30, 50
   draw.polygon([(nx, ny - 26), (nx - 10, ny), (nx + 10, ny)], fill=(0, 0, 0))
   labelAt(draw, (nx, ny + 14), "N", (0, 0, 0), 16)
+
+
+def drawSpots(draw, frame, spots):
+  """The ground's height at each grid crossing, written just beside it."""
+  for spot in spots:
+    x, y = frame.pixel(spot["at"])
+    draw.ellipse([x - 2, y - 2, x + 2, y + 2], fill=(0, 0, 0, 255))
+    labelAt(draw, (x + 4, y + 3), f"{spot['height']:.0f}", (90, 30, 0), 12, "la")
 
 
 def drawWater(draw, frame, bodies):
@@ -145,8 +166,14 @@ def drawShape(draw, frame, shape, color):
     middle = points[len(points) // 2 - 1] if len(points) > 1 else points[0]
     after = points[len(points) // 2]
     anchor = ((middle[0] + after[0]) / 2, (middle[1] + after[1]) / 2)
-  elif kind in ("point", "note"):
-    anchor = (points[0][0], points[0][1] - (14 if kind == "point" else 0))
+  elif kind == "point":
+    labelAt(draw, (points[0][0] + 10, points[0][1]), label, color, 15, "lm")
+    return
+  elif kind == "note":
+    anchor = points[0]
+  elif kind == "area":
+    # An area's name sits just inside its top, clear of the footprints and points usually drawn in its middle.
+    anchor = (centroidOf(points)[0], min(point[1] for point in points) + 14)
   else:
     anchor = centroidOf(points)
   labelAt(draw, anchor, label, color, 15 if kind != "note" else 14)
@@ -164,6 +191,7 @@ def drawPlan(basePath, outputPath, center, width, overlays):
   drawWater(draw, frame, overlays["water"])
   drawRegions(draw, frame, overlays["regions"])
   drawPlots(draw, frame, overlays["plots"])
+  drawSpots(draw, frame, overlays["spots"])
   legend = []
   for index, sheet in enumerate(overlays["sheets"]):
     color = sheetColors[index % len(sheetColors)]
