@@ -54,12 +54,12 @@ arrowLength = 16.0
 groundCastHeight = 50.0
 footprintStep = 8.0
 gradeBatterReach = 600.0
-# Assessment: how far around a plot it looks, and what counts as a drop, a wall, water at its edge, a view, seclusion, prominence.
+# Assessment: how far around a plot it looks, and what counts as a drop, a wall, water at its edge, seclusion, prominence. A view is
+# judged by looking out from the plot, never measured.
 sideProbes = (10.0, 30.0, 60.0)
 sideRise = 15.0
 waterfrontDistance = 40.0
 surroundingRadii = (200.0, 400.0, 600.0)
-viewRise = 60.0
 enclosureReach = 300.0
 enclosureDirections = 32
 eyeHeight = 6.0
@@ -621,8 +621,6 @@ def assessPlot(address):
   suggested = []
   if water is not None and water <= waterfrontDistance:
     suggested.append({"feature": "waterfront", "because": f"water {water} units from its edge"})
-  if standsAbove is not None and standsAbove >= viewRise and enclosure < 0.5:
-    suggested.append({"feature": "view", "because": f"stands {standsAbove} above its surroundings, open on {round((1 - enclosure) * 100)}% of sides"})
   if (nearestPlot is None or nearestPlot >= secludedNeighbourDistance) and (routeDistance is None or routeDistance >= secludedRouteDistance) and enclosure >= 0.5:
     suggested.append({"feature": "secluded", "because": f"nearest plot {None if nearestPlot is None else round(nearestPlot)} units off, enclosed on {round(enclosure * 100)}% of sides"})
   if prominence is not None and prominence["routeSamplesInRange"] >= prominentSamples and prominence["share"] >= prominentShare:

@@ -159,3 +159,18 @@ def testStreetOfPlotsExportsTheZonesHousingFile(stageBlenderServer, tmp_path):
   assert "overlap" in overlapped
   assert noHousing["housing"] == {"role": "none", "plots": 0, "file": None, "assetList": None}
   assert not (tmp_path / "teststreet_housing.json").exists() and not (tmp_path / "teststreet_assets.txt").exists()
+
+
+
+def testAPlotStandsOnGroundMadeJustBeforeIt(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await freshScene(session)
+    await flatGround(session, tmp_path)
+    # A ledge 100 high (y -50..150) at the foot of a cliff 300 high (y 150..350), placed and at once built on.
+    await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "ledge", "size": [400, 200, 100], "location": [0, 50, 0]})
+    await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "cliff", "size": [800, 200, 300], "location": [0, 250, 0]})
+    await session.expectSuccess("setZoneHousing", decision)
+    return await session.expectSuccess("placePlot", {"address": "101 Ledge Walk", "center": [0, 50], "facingDegrees": 180})
+
+  placed = stageBlenderServer.session(steps)
+  assert placed["center"][2] == 100.0

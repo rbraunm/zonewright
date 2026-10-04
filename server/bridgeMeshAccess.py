@@ -113,6 +113,8 @@ def isPlayerSolid(sceneObject):
 
 def playerSolidParts():
   """Each mesh players stand on and are blocked by, with its world matrix; a collection instance gives each of its meshes."""
+  # An object moved or made since the last evaluation still holds its old world matrix until the scene is evaluated.
+  bpy.context.view_layer.update()
   parts = []
   for sceneObject in bpy.context.scene.objects:
     if not isPlayerSolid(sceneObject):

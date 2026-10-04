@@ -1892,7 +1892,8 @@ async def assessPlot(context: Context, address: str):
   """Measure a plot where it lies: the ground under it (unevenness, tilt, the cut and fill to level it), what rises and falls beyond each
   side, its entrance point (for walkRoute from the street), water beside it, how high it stands over its surroundings, how enclosed it
   is, rock over it, its nearest plot and route, how much of the zone's main routes see it, and overlaps; and the features those
-  suggest, for pricing (set them with editPlot features). The measures check what a picture shows; look at the plot too."""
+  suggest, for pricing (set them with editPlot features). A view is never suggested: judge it from pictures taken at the plot's edge,
+  looking out as its owner would. The measures check what a picture shows; look at the plot too."""
   return await callBridge(context, "assessPlot", {"address": address})
 
 
