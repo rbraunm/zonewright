@@ -51,7 +51,7 @@ def testRunPythonErrorCarriesTraceback(stageBlenderServer):
   assert 'File "<runPython>", line 2, in explode' in errorText
 
 
-def testCrashIsReportedAndNextCallStartsFresh(stageBlenderServer):
+def testCrashIsReportedAndNextCallStartsFresh(freshBlenderServer):
   async def steps(session):
     await session.expectSuccess("runPython", {"code": "survivor = 1"})
     crashText = await session.expectError("runPython", {"code": "import os\nos._exit(7)"})
@@ -60,7 +60,7 @@ def testCrashIsReportedAndNextCallStartsFresh(stageBlenderServer):
     runningStatus = await session.expectSuccess("getToolingStatus")
     return crashText, crashedStatus["bridge"], afterCrash, runningStatus["bridge"]
 
-  crashText, crashedBridge, afterCrash, runningBridge = stageBlenderServer.session(steps)
+  crashText, crashedBridge, afterCrash, runningBridge = freshBlenderServer.session(steps)
   assert "Blender exited with code 7 during runPython" in crashText
   assert crashedBridge["state"] == "crashed"
   assert crashedBridge["exitCode"] == 7
@@ -265,7 +265,7 @@ result = [pixel(240), pixel(720)]
     assert abs(measured - shade * highest) <= 2 / 255
 
 
-def testSyncStopsAnIdleBridgeButRefusesUnsavedChanges(stageBlenderServer):
+def testSyncStopsAnIdleBridgeButRefusesUnsavedChanges(freshBlenderServer):
   async def steps(session):
     await session.expectSuccess("runPython", {"code": "bpy.data.objects.new('marker', None)"})
     refusal = await session.expectError("syncTooling")
@@ -274,7 +274,7 @@ def testSyncStopsAnIdleBridgeButRefusesUnsavedChanges(stageBlenderServer):
     status = await session.expectSuccess("getToolingStatus")
     return refusal, synced, status
 
-  refusal, synced, status = stageBlenderServer.session(steps)
+  refusal, synced, status = freshBlenderServer.session(steps)
   assert "unsaved changes; save it or open another file with discardUnsavedChanges before syncing" in refusal
   assert synced["actions"] == []
   assert status["bridge"] == {"state": "notStarted"}
