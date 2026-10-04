@@ -4,6 +4,7 @@ from pathlib import Path
 
 from PIL import Image
 
+from testModelsAndDressing import freshScene
 from testReviewViews import crateScene, environment
 
 longNote = "The crate from the south, low over the ground: does it sit on the grass, and does the grass run on behind it to the edge"
@@ -64,3 +65,52 @@ def testReviewCamerasReproduceTheirViewsAndRenderAsOneSheet(stageBlenderServer, 
   assert moved["eye"] == [0.0, -150.0, 90.0] and moved["note"] == "farther back"
   assert excludedFor(exported, "a camera") == ["crateFrame", "high", "standing"]
   assert deleted == {"deleted": ["high"], "remaining": ["crateFrame", "standing"]}
+
+
+offLedge = [[120, 0, 70], [44, 0, 70], [36, 0, 0], [-100, 0, 0]]
+
+
+def testReviewRoutesWalkByNameAndRenderAsAStripOfEyeLevelFrames(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [304, 120], "spacing": 8, "location": [0, 0, 0], "collection": "terrain"})
+    await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "ledge", "size": [100, 80, 70], "location": [90, 0, 0]})
+    await session.expectSuccess("setZoneProperties", environment)
+    saved = await session.expectSuccess("saveReviewRoute", {"name": "offLedge", "path": offLedge})
+    byName = await session.expectSuccess("walkRoute", {"route": "offLedge"})
+    byPath = await session.expectSuccess("walkRoute", {"path": offLedge})
+    both = await session.expectError("walkRoute", {"route": "offLedge", "path": offLedge})
+    strip = await session.expectImage("renderRouteStrip", {"route": "offLedge", "spacing": 50}, mimeType="image/jpeg")
+    firstView = await session.expectImage("renderView", {"view": strip[1]["frames"][0]["view"]})
+    withFigure = await session.expectImage("compareRenders", {"before": strip[1]["frames"][0]["outputPath"], "after": firstView[1]["outputPath"]}, mimeType="image/jpeg")
+    tooMany = await session.expectError("renderRouteStrip", {"route": "offLedge", "spacing": 5})
+    exported = await session.expectSuccess("checkExport", {"path": str(tmp_path / "routes.eqg"), "purpose": "test"})
+    deleted = await session.expectSuccess("deleteReviewRoutes", {"names": ["offLedge"]})
+    gone = await session.expectError("walkRoute", {"route": "offLedge"})
+    return saved, byName, byPath, both, strip, firstView, withFigure, tooMany, exported, deleted, gone
+
+  saved, byName, byPath, both, strip, firstView, withFigure, tooMany, exported, deleted, gone = stageBlenderServer.session(steps)
+  assert saved == {"name": "offLedge", "path": [[float(value) for value in point] for point in offLedge], "length": 220.0}
+  # Walked by name, the route is walked exactly as its points are: off the ledge's sheer side, 70 down, is a drop.
+  assert byName == byPath and [problem["kind"] for problem in byName["problems"]] == ["drop"]
+  assert "Give path" in both
+  image, planned = strip
+  # Frames every 50 along the route where the walk stands, and one where it stops at the drop; all look along the route (west).
+  frames = planned["frames"]
+  assert [frame["distance"] for frame in frames if frame["problem"] is None] == [0.0, 50.0, 100.0, 150.0, 200.0]
+  drop = [frame for frame in frames if frame["problem"] is not None]
+  assert len(drop) == 1 and drop[0]["problem"]["kind"] == "drop" and 80 <= drop[0]["distance"] <= 81 and drop[0]["problem"]["resumesAtDistance"] <= 82
+  assert [frame["view"]["standAt"][2] for frame in frames] == [70.0, 70.0, 70.0, 0.0, 0.0, 0.0]
+  assert all(frame["view"]["headingDegrees"] == 270.0 for frame in frames)
+  # Along the way a frame looks at where the walk stands 30 on (on flat ground 5.5 below the eye); the drop's frame looks past the brink
+  # down to the ground below.
+  assert abs(frames[0]["view"]["pitchDegrees"] - math.degrees(math.atan2(-5.5, 30))) < 0.02
+  assert drop[0]["view"]["pitchDegrees"] < -60
+  assert Image.open(io.BytesIO(image)).size == (8 + 4 * (640 + 8), 8 + 2 * (360 + 20 + 8))
+  # A frame is the eye-level view of its standAt, heading, and pitch without the scale figure: the same view rendered by renderView
+  # differs only where she stands, 15 ahead and a step aside: a figure-shaped box beside the middle of the picture.
+  left, top, right, bottom = withFigure[1]["changedBounds"]
+  assert 0 < withFigure[1]["changedShare"] < 0.04 and 320 < left < right < 640 and right - left < 120 and 90 < top < bottom < 400, withFigure[1]
+  assert "more than 16 on a sheet" in tooMany and "spacing of at least" in tooMany
+  assert excludedFor(exported, "a guide") == ["offLedge"]
+  assert deleted == {"deleted": ["offLedge"], "remaining": []} and "No review route named 'offLedge'" in gone

@@ -1,9 +1,9 @@
 """The open scene's zone gathered as the zone survey gathers a client zone, so it is measured by the same methods: what export ships
 (bridgeExport.exportedObjects), the terrain collection's meshes as its terrain and every other mesh and collection instance placed on
 it. Runs under Blender's Python."""
-import os
-
+import bisect
 import math
+import os
 
 import bpy
 import mathutils
@@ -13,6 +13,8 @@ import numpy
 import bridgeBoundaries
 import bridgeExport
 import bridgeMeshAccess
+import bridgeReviewGuides
+import bridgeViews
 from playerScale import playerHeight, stepHeight, walkableNormalZ
 
 # How far a route looks to each side for a drop or a wall, and how finely; how far above for a ceiling; and how far below it still
@@ -34,6 +36,10 @@ obstacleRefinements = 5
 steepestWalkableDegrees = math.degrees(math.acos(walkableNormalZ))
 up = bridgeMeshAccess.up
 down = bridgeMeshAccess.down
+# A route strip's frame looks toward the route this far on from where it stands, so the way ahead shows.
+stripLookAhead = 30.0
+# Stations and route points closer than this along a route are one place.
+samePlace = 1e-6
 
 
 def triangulated(sceneObject, depsgraph, matrix):
@@ -320,7 +326,123 @@ def roundVector(vector):
   return [round(float(component), 1) for component in vector]
 
 
+def givenPath(path, route):
+  if (path is None) == (route is None):
+    raise ValueError("Give path, the route's [x, y, z] points, or route, the name of a saved review route")
+  return bridgeReviewGuides.routePath(route) if route is not None else path
+
+
+def walkGivenRoute(path, route, sampleSpacing):
+  return walkRoute(givenPath(path, route), sampleSpacing)
+
+
+class RouteLine:
+  """A route's points by plan distance along it; past its end it runs on level with its last point, along its last segment."""
+
+  def __init__(self, path):
+    bridgeReviewGuides.requireRoutePath(path)
+    self.points = [mathutils.Vector(point) for point in path]
+    self.starts = numpy.concatenate([[0.0], numpy.cumsum([math.hypot(end.x - start.x, end.y - start.y) for start, end in zip(self.points[:-1], self.points[1:])])])
+    self.length = float(self.starts[-1])
+
+  def segmentAt(self, distance):
+    """The segment a distance lies on: at a route point the one starting there, past the end the last."""
+    return int(min(numpy.searchsorted(self.starts, distance, side="right") - 1, len(self.points) - 2))
+
+  def direction(self, segment):
+    return mathutils.Vector((self.points[segment + 1].x - self.points[segment].x, self.points[segment + 1].y - self.points[segment].y, 0.0)).normalized()
+
+  def pointAt(self, distance):
+    segment = self.segmentAt(distance)
+    if distance > self.length:
+      last = self.points[-1]
+      return last + self.direction(segment) * (distance - self.length)
+    share = (distance - self.starts[segment]) / (self.starts[segment + 1] - self.starts[segment])
+    return self.points[segment].lerp(self.points[segment + 1], share)
+
+
+def lookedAt(strides, distance, pastStops):
+  """Where the walk stands stripLookAhead on from a distance along the route (strides: its footing, None while stopped, by distance);
+  short of pastStops, its last footing before a stop that comes sooner, None when it stops at once."""
+  target = None
+  for strideDistance, footing in strides[bisect.bisect_right([entry[0] for entry in strides], distance + samePlace):]:
+    if strideDistance > distance + stripLookAhead + samePlace:
+      break
+    if footing is not None:
+      target = footing
+    elif not pastStops:
+      break
+  return target
+
+
+def stripFrame(line, distance, footing, target, problem):
+  """An eye-level frame standing on footing at a distance along the route, heading along it, its pitch toward target (level for none)."""
+  heading = line.direction(line.segmentAt(distance))
+  pitch = 0.0 if target is None else math.degrees(math.atan2(target.z - (footing.z + bridgeViews.eyeHeight), math.hypot(target.x - footing.x, target.y - footing.y)))
+  return {
+    "distance": round(distance, 1), "standAt": [round(float(value), 3) for value in footing],
+    "headingDegrees": round(math.degrees(math.atan2(heading.x, heading.y)) % 360, 2), "pitchDegrees": round(pitch, 2), "problem": problem,
+  }
+
+
+def planRouteStrip(path, route, spacing):
+  """Walk a route as walkRoute does and plan an eye-level frame every `spacing` along it in plan, where the walk stands, and one where
+  each of the walk's problems starts; stations the walk cannot reach (between a stop and where it takes up again) get none. A frame along
+  the way looks at where the walk stands stripLookAhead on, or at its brink when it stops sooner; a problem's frame looks past it."""
+  path = givenPath(path, route)
+  if spacing <= 0:
+    raise ValueError(f"spacing must be positive, got {spacing}")
+  line = RouteLine(path)
+  stations = [step * spacing for step in range(math.floor(line.length / spacing + samePlace) + 1)]
+  marks = []
+  for distance, isStation in sorted([(distance, True) for distance in stations] + [(float(start), False) for start in line.starts]):
+    if marks and distance - marks[-1][0] < samePlace:
+      marks[-1] = (marks[-1][0], marks[-1][1] or isStation)
+    else:
+      marks.append((distance, isStation))
+  walk = RouteWalk(bridgeBoundaries.collisionSurfaces(), bridgeMeshAccess.swimSurfaces(), bridgeBoundaries.boundarySurfaces())
+  walk.start(line.pointAt(0.0), line.direction(0))
+  strides = [(marks[0][0], walk.footing.copy())]
+  footings = {marks[0][0]: walk.footing.copy()}
+  # Where each problem starts, along the route and exactly underfoot (its reported place is rounded): a stop where the walk stood
+  # before the stride that stopped it, a stretch where the stride that began it landed.
+  problemPlaces, resumeDistances = [], {}
+  for (startDistance, _), (endDistance, isStation) in zip(marks[:-1], marks[1:]):
+    direction = line.direction(line.segmentAt(startDistance))
+    start, end = line.pointAt(startDistance), line.pointAt(endDistance)
+    count = max(1, math.ceil(math.hypot(end.x - start.x, end.y - start.y) / routeStride))
+    for stride in range(1, count + 1):
+      share = stride / count
+      awaiting = walk.stopped if walk.stopped is not None and walk.stopped["resumesAt"] is None else None
+      before, standing = len(walk.problems), walk.footing
+      walk.advance(start.lerp(end, share), direction)
+      distance = startDistance + (endDistance - startDistance) * share
+      strides.append((distance, None if walk.footing is None else walk.footing.copy()))
+      problemPlaces += [(distance, standing if "at" in problem else walk.footing) for problem in walk.problems[before:]]
+      if awaiting is not None and awaiting["resumesAt"] is not None:
+        resumeDistances[id(awaiting)] = distance
+    if isStation:
+      footings[endDistance] = strides[-1][1]
+  frames, notStoodOn = [], []
+  for distance, isStation in marks:
+    if not isStation:
+      continue
+    if footings[distance] is None:
+      notStoodOn.append(round(distance, 1))
+    else:
+      frames.append(stripFrame(line, distance, footings[distance], lookedAt(strides, distance, False), None))
+  for problem, (distance, footing) in zip(walk.problems, problemPlaces):
+    shown = problem | ({"resumesAtDistance": round(resumeDistances[id(problem)], 1)} if id(problem) in resumeDistances else {})
+    frames.append(stripFrame(line, distance, footing, lookedAt(strides, distance, True), shown))
+  frames.sort(key=lambda frame: (frame["distance"], frame["problem"] is not None))
+  return {
+    "route": route, "length": round(line.length, 1), "spacing": spacing, "walkable": not walk.problems, "problems": walk.problems,
+    "oneWay": walk.oneWay, "frames": frames, "stationsNotStoodOn": notStoodOn,
+  }
+
+
 commands = {
   "collectConstruction": (collectConstruction, False),
-  "walkRoute": (walkRoute, False),
+  "walkRoute": (walkGivenRoute, False),
+  "planRouteStrip": (planRouteStrip, False),
 }

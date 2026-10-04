@@ -1,6 +1,7 @@
-"""Review cameras: guides kept in the .blend for looking at the zone the same way again, in their own collection, never drawn in views
-and never exported. A review camera holds the pose of a view (an eye and a target, standing where a player stands, or framing objects),
-where the scale figure stood in it, and a note of what to judge there. Runs under Blender's Python."""
+"""Review cameras and routes: guides kept in the .blend for looking at the zone the same way again, each kind in its own collection,
+never drawn in views and never exported. A review camera holds the pose of a view (an eye and a target, standing where a player stands,
+or framing objects), where the scale figure stood in it, and a note of what to judge there; a review route is a polyline that walkRoute
+walks and renderRouteStrip follows. Runs under Blender's Python."""
 import json
 import math
 
@@ -13,7 +14,9 @@ import bridgeObjects
 import bridgeViews
 
 cameraCollectionName = "reviewCameras"
+routeCollectionName = "reviewRoutes"
 reviewCameraProperty = "zonewrightReviewCamera"
+reviewRouteProperty = "zonewrightReviewRoute"
 
 
 def requireName(name, kind):
@@ -126,8 +129,83 @@ def deleteReviewCameras(names):
   return {"deleted": sorted(set(names)), "remaining": [cameraObject.name for cameraObject in reviewCameras()]}
 
 
+def reviewRoutes():
+  return sorted((sceneObject for sceneObject in bpy.context.scene.objects if reviewRouteProperty in sceneObject), key=lambda sceneObject: sceneObject.name)
+
+
+def requireRoutePath(path):
+  if not isinstance(path, list) or len(path) < 2 or any(not isinstance(point, list) or len(point) != 3 or not all(bridgeCommands.isFiniteNumber(value) for value in point) for point in path):
+    raise ValueError(f"A route is at least two [x, y, z] points, got {path!r}")
+  for start, end in zip(path[:-1], path[1:]):
+    if math.hypot(end[0] - start[0], end[1] - start[1]) < 1e-6:
+      raise ValueError(f"The route stands still between {start} and {end}; each point must lie elsewhere across the ground")
+
+
+def planLength(path):
+  return sum(math.hypot(end[0] - start[0], end[1] - start[1]) for start, end in zip(path[:-1], path[1:]))
+
+
+def routePath(name):
+  """A saved review route's points, in order."""
+  routeObject = bpy.data.objects.get(name)
+  if routeObject is None or reviewRouteProperty not in routeObject:
+    raise ValueError(f"No review route named '{name}'; saved routes: {[route.name for route in reviewRoutes()]}")
+  mesh = routeObject.data
+  count = len(mesh.vertices)
+  if count < 2 or len(mesh.polygons) or sorted(tuple(sorted(edge.vertices)) for edge in mesh.edges) != [(index, index + 1) for index in range(count - 1)]:
+    raise ValueError(f"Review route '{name}' is no longer one line through its points in order; save it again with saveReviewRoute")
+  return [list(routeObject.matrix_world @ vertex.co) for vertex in mesh.vertices]
+
+
+def describeRoute(routeObject):
+  path = routePath(routeObject.name)
+  return {"name": routeObject.name, "path": [roundVector(point) for point in path], "length": round(planLength(path), 2)}
+
+
+def saveReviewRoute(name, path):
+  requireName(name, "review route")
+  requireRoutePath(path)
+  existing = bpy.data.objects.get(name)
+  if existing is not None and reviewRouteProperty not in existing:
+    raise ValueError(f"An object named '{name}' already exists and is not a review route")
+  mesh = bpy.data.meshes.new(name)
+  mesh.from_pydata([tuple(point) for point in path], [(index, index + 1) for index in range(len(path) - 1)], [])
+  if existing is not None:
+    replaced = existing.data
+    existing.data = mesh
+    existing.matrix_world = mathutils.Matrix.Identity(4)
+    bpy.data.meshes.remove(replaced)
+    routeObject = existing
+  else:
+    routeObject = bpy.data.objects.new(name, mesh)
+    routeObject[bridgeMeshAccess.guideProperty] = "reviewRoute"
+    routeObject[reviewRouteProperty] = True
+    routeObject.hide_render = True
+    bridgeObjects.targetCollection(routeCollectionName).objects.link(routeObject)
+  bpy.context.view_layer.update()
+  return describeRoute(routeObject)
+
+
+def getReviewRoutes():
+  return {"routes": [describeRoute(routeObject) for routeObject in reviewRoutes()]}
+
+
+def deleteReviewRoutes(names):
+  byName = {routeObject.name: routeObject for routeObject in reviewRoutes()}
+  requireKnown(names, byName, "routes")
+  for name in sorted(set(names)):
+    mesh = byName[name].data
+    bpy.data.objects.remove(byName[name])
+    bpy.data.meshes.remove(mesh)
+  removeIfEmpty(routeCollectionName)
+  return {"deleted": sorted(set(names)), "remaining": [routeObject.name for routeObject in reviewRoutes()]}
+
+
 commands = {
   "saveReviewCamera": (saveReviewCamera, True),
   "getReviewCameras": (getReviewCameras, False),
   "deleteReviewCameras": (deleteReviewCameras, True),
+  "saveReviewRoute": (saveReviewRoute, True),
+  "getReviewRoutes": (getReviewRoutes, False),
+  "deleteReviewRoutes": (deleteReviewRoutes, True),
 }

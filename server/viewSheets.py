@@ -1,5 +1,5 @@
-"""Sheets of preview renders: the same view before and after a change with what changed between them, views around a subject, and
-review cameras."""
+"""Sheets of preview renders: the same view before and after a change with what changed between them, views around a subject, review
+cameras, and frames along a route."""
 from pathlib import Path
 
 import numpy

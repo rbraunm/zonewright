@@ -4,6 +4,7 @@ import functools
 import inspect
 import io
 import json
+import math
 import os
 import sys
 from pathlib import Path
@@ -1411,14 +1412,15 @@ async def measure(context: Context, points: list[list[float]], snapToSurface: bo
 
 
 @guardedTool()
-async def walkRoute(context: Context, path: list[list[float]], sampleSpacing: float = 4.0):
+async def walkRoute(context: Context, path: list[list[float]] | None = None, route: str | None = None, sampleSpacing: float = 4.0):
   """Walk a route as a player would, over what the client collides with (rendered meshes and collection instances, and the
   boundaries, never drawn; not water, which is waded or swum, nor faces players pass through: liquid and cutout materials, objects
   marked passable, faces an imported zone file flags passable; nor guides, regions, spawns, or doors, taken as open; ground inside a
   solid is no footing, ground under one-sided cover such as a roof plane is): from its first point, following the footing underfoot
-  past each point of `path` [[x, y, z], ...], whose heights only need to be within a step of the footing (so a route can run over an
-  arch or under it). Judged for a player 6 units tall who walks slopes up to 60 degrees and steps up 2, in half-unit strides whatever
-  `sampleSpacing`, which sets only the profile's rows. Returns the length walked, the steepest face stood on, the narrowest footing
+  past each point of `path` [[x, y, z], ...] or of the saved review route named `route` (saveReviewRoute), whose heights only need to
+  be within a step of the footing (so a route can run over an arch or under it). Judged for a player 6 units tall who walks slopes up
+  to 60 degrees and steps up 2, in half-unit strides whatever `sampleSpacing`, which sets only the profile's rows (give `path` or
+  `route`, not both; renderRouteStrip shows the walk in pictures). Returns the length walked, the steepest face stood on, the narrowest footing
   (how far it runs to each side before a drop of more than a player's height, a wall, a step too high, or a face too steep; null
   beyond 60), the lowest headroom, the deepest water over the footing; `problems`, everything that stops a player, each once over the
   stretch it covers: blocked (a boundary across the way at half a player's height, where it stands), rise (a wall or step over 2 in
@@ -1428,7 +1430,7 @@ async def walkRoute(context: Context, path: list[list[float]], sampleSpacing: fl
   climb back: ledge (a drop over a step, its height) and steep (a face over 60 descended); walkable when there are no problems; and a
   profile along the way (each row with the water depth over its footing, or null). Use it on decks, ramps, ledges, and the ways into
   an area."""
-  return await callBridge(context, "walkRoute", {"path": path, "sampleSpacing": sampleSpacing})
+  return await callBridge(context, "walkRoute", {"path": path, "route": route, "sampleSpacing": sampleSpacing})
 
 
 @guardedTool(description="Move the selected vertices of a mesh by `offset` [x, y, z] world units. With `falloff` {center, radius, curve: constant|linear|smooth|sharp} the move fades with distance from the center; this is the precise, fine-detail edit. With shaping passes, the move goes into the active pass." + caveShapingHelp + selectorHelp)
@@ -1946,6 +1948,68 @@ async def renderReviewSet(context: Context, names: list[str] | None = None, shad
     context, zone, [{"camera": name} for name in chosen], [f"{name}: {cameras[name]['note']}" for name in chosen], shading, await zoneFigureModel(zone),
   )
   return [sheet, size | {"cameras": [{"name": name, "note": cameras[name]["note"], "outputPath": path} for name, path in zip(chosen, paths)]}]
+
+
+@guardedTool()
+async def saveReviewRoute(context: Context, name: str, path: list[list[float]]):
+  """Keep a named review route: a polyline [[x, y, z], ...] (heights within a step of the ground, as walkRoute takes them) in the
+  reviewRoutes collection, kept in the .blend, never drawn in views and never exported; saved again under its name it takes the new
+  path. walkRoute and renderRouteStrip take its name as `route`."""
+  return await callBridge(context, "saveReviewRoute", {"name": name, "path": path})
+
+
+@guardedTool()
+async def getReviewRoutes(context: Context):
+  """The review routes by name, each with its points and its length in plan."""
+  return await callBridge(context, "getReviewRoutes", {})
+
+
+@guardedTool()
+async def deleteReviewRoutes(context: Context, names: list[str]):
+  """Delete the named review routes; refuses, deleting none, when a name is not a review route."""
+  return await callBridge(context, "deleteReviewRoutes", {"names": names})
+
+
+def problemText(problem):
+  """A walk's problem in a few words, for a frame's label."""
+  kind = problem["kind"]
+  if kind == "drop":
+    text = "drop: no footing within 60 below"
+  elif kind == "rise":
+    text = "rise: over 60 high" if problem["height"] is None else f"rise {problem['height']:g} high"
+  elif kind == "blocked":
+    text = "blocked by a boundary"
+  elif kind == "steep":
+    text = f"steep climb, {problem['steepestDegrees']:g} degrees"
+  else:
+    text = f"headroom {problem['lowest']:g}"
+  if "resumesAt" in problem:
+    text += "; the walk never finds footing again" if problem["resumesAt"] is None else f"; walking on from {problem['resumesAtDistance']:g}"
+  return text
+
+
+@guardedTool()
+async def renderRouteStrip(context: Context, spacing: float, route: str | None = None, path: list[list[float]] | None = None):
+  """walkRoute as a strip of eye-level frames: walks a saved review route (route) or a path [[x, y, z], ...] as walkRoute does, and
+  renders a frame every `spacing` along it in plan (from its start) and one where each problem the walk meets starts, each standing
+  where the walk stands there (eye 5.5 over the footing; no scale figure), heading along the route and pitched toward where the walk
+  stands 30 further on, or toward the brink where it stops if sooner (a problem's frame looks past the problem: down past the brink of a
+  drop), laid out on one sheet in order along the route, each labeled with its distance and any problem (up to 16 frames). Places the
+  walk cannot reach, between a stop and where it walks on, get no frame (stationsNotStoodOn); the problem's frame shows why. The result
+  gives the walk (length in plan, walkable, problems, oneWay) and each frame's distance, view (renderView renders it, adding the scale
+  figure), problem, and render path."""
+  planned = await callBridge(context, "planRouteStrip", {"path": path, "route": route, "spacing": spacing})
+  frames, problems, length = planned["frames"], len(planned["problems"]), planned["length"]
+  if len(frames) > sheetViews:
+    room = sheetViews - problems
+    advice = f"use a spacing of at least {math.ceil(length / (room - 1))}" if room > 1 else "strip a shorter part of the route"
+    raise ToolError(f"{len(frames)} frames ({len(frames) - problems} every {spacing:g} along {length:g} and {problems} at problems) are more than {sheetViews} on a sheet; {advice}")
+  views = [{"standAt": frame["standAt"], "headingDegrees": frame["headingDegrees"], "pitchDegrees": frame["pitchDegrees"]} for frame in frames]
+  labels = [f"{frame['distance']:g} of {length:g}" + ("" if frame["problem"] is None else f": {problemText(frame['problem'])}") for frame in frames]
+  sheet, size, paths = await renderSheet(context, await callBridge(context, "getZoneProperties", {}), views, labels, "client", None)
+  return [sheet, size | {key: planned[key] for key in ("route", "length", "spacing", "walkable", "problems", "oneWay", "stationsNotStoodOn")} | {
+    "frames": [{"distance": frame["distance"], "view": view, "problem": frame["problem"], "outputPath": path} for frame, view, path in zip(frames, views, paths)],
+  }]
 
 
 @guardedTool()
