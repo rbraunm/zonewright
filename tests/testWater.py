@@ -57,15 +57,14 @@ def testPoolFloodsItsBasinToItsLevelUnderItsBanks(stageBlenderServer, tmp_path):
     banks = (await session.expectSuccess("runPython", {"code": "waterName = 'pool'" + readGroundUnderBoundary}))["result"]
     lowered = await session.expectSuccess("editWater", {"name": "pool", "level": -10})
     atTen = await meshOf(session, "pool")
-    volumes = await session.expectSuccess("getWaterVolumes", {"name": "pool"})
     halved = await session.expectSuccess("shapeWaterExtent", {"name": "pool", "mode": "remove", "area": {"polygon": [[12, -200], [200, -200], [200, 200], [12, 200]]}})
     westOnly = await meshOf(session, "pool")
     dry = await session.expectError("floodWater", {"name": "dryPool", "seed": [90, 0], "level": -5, "material": "water"})
     wrongLiquid = await session.expectError("floodWater", {"name": "fallPool", "seed": [0, 0], "level": -5, "material": "falls"})
     everywhere = await session.expectSuccess("floodWater", {"name": "sea", "seed": [150, 150], "level": 1, "material": "water"})
-    return flooded, atFive, banks, lowered, atTen, volumes, halved, westOnly, dry, wrongLiquid, everywhere
+    return flooded, atFive, banks, lowered, atTen, halved, westOnly, dry, wrongLiquid, everywhere
 
-  flooded, atFive, banks, lowered, atTen, volumes, halved, westOnly, dry, wrongLiquid, everywhere = stageBlenderServer.session(steps)
+  flooded, atFive, banks, lowered, atTen, halved, westOnly, dry, wrongLiquid, everywhere = stageBlenderServer.session(steps)
   # The cone stands below -5 within 75 of its middle: the surface lies flat at the level over all of that, reaching at most a few cells
   # past it so its edge lies under the banks.
   five = numpy.array(atFive["vertices"])
@@ -74,11 +73,6 @@ def testPoolFloodsItsBasinToItsLevelUnderItsBanks(stageBlenderServer, tmp_path):
   assert flooded["built"]["deepest"] == 15 and flooded["built"]["reachesGroundEnd"] == []
   ten = numpy.array(atTen["vertices"])
   assert numpy.allclose(ten[:, 2], -10) and ten[:, 0].max() < five[:, 0].max()
-  boxes = volumes["volumes"]
-  assert all(box["name"].startswith("AWT_pool") for box in boxes)
-  assert all(abs(box["center"][2] + box["halfExtents"][2] - -10) <= 1 for box in boxes)
-  assert any(all(abs(box["center"][axis]) <= box["halfExtents"][axis] for axis in (0, 1)) for box in boxes)
-  assert min(box["center"][2] - box["halfExtents"][2] for box in boxes) <= -20 - 4 + 0.01
   # The stroke takes the east of the pool away; the surface stops within a cell of its edge.
   assert numpy.array(westOnly["vertices"])[:, 0].max() <= 16 and halved["definition"]["strokes"][0]["mode"] == "remove"
   assert "the ground is at -2.0 and the level -5.0" in dry
@@ -179,14 +173,18 @@ def testWaterExportsTheClientsShadersAndSwimVolumes(stageBlenderServer, tmp_path
     await session.expectSuccess("pourWaterfall", {"name": "fall", "lip": [[-10, 60, 20], [10, 60, 20]], "bottom": -5, "throw": 0, "material": "falls"})
     missing = await session.expectError("createLiquidMaterial", {"name": "flat", "liquid": "water", "diffuseTexture": str(tmp_path / "water_c.png"), "normalTexture": str(tmp_path / "water_n.png")})
     stray = await session.expectError("createLiquidMaterial", {"name": "fallBias", "liquid": "waterfall", "diffuseTexture": str(tmp_path / "fall_c.png"), "fresnelBias": 0.3})
+    undecided = await session.expectSuccess("exportZone", {"path": str(archivePath)})
+    boxes = await session.expectSuccess("buildSwimVolumes", {"body": "pool"})
     exported = await session.expectSuccess("exportZone", {"path": str(archivePath)})
-    return missing, stray, exported
+    return missing, stray, undecided, boxes, exported
 
-  missing, stray, exported = stageBlenderServer.session(steps)
+  missing, stray, undecided, boxes, exported = stageBlenderServer.session(steps)
   assert "missing ['environment']" in missing and "does not take ['fresnelBias']" in stray
   archive = eqArchive.EQArchive(archivePath)
   zone = eqgFiles.parseZone(archive.read("testwater.zon"), "testwater.zon")
-  assert exported["regions"] == [region["name"] for region in zone["regions"]] and all(name.startswith("AWT_pool") for name in exported["regions"])
+  # Export derives no swim volumes: without boxes the pool is listed as undecided and the .zon gets no regions; with them, exactly those.
+  assert undecided["regions"] == [] and undecided["swim"] == {"undecided": ["pool"], "changed": []}
+  assert exported["regions"] == [region["name"] for region in zone["regions"]] == boxes["built"] and exported["swim"] == {"undecided": [], "changed": []}
   assert all(abs(region["center"][2] + region["halfExtents"][2] - -5) <= 1 and region["rotation"] == (0.0, 0.0, 0.0) for region in zone["regions"])
   pool, fall = (eqgFiles.parseModel(archive.read(f"obj_{name}.mod"), name)["materials"][0] for name in ("pool", "fall"))
   assert pool["shader"] == "Opaque_MaxWater.fx" and fall["shader"] == "Opaque_MaxWaterFall.fx"

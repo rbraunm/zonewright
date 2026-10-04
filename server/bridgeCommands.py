@@ -17,6 +17,7 @@ import bridgeModels
 import bridgeObjects
 import bridgeShaping
 import bridgeSketch
+import bridgeSwim
 import bridgeSurfacing
 import bridgeViews
 import bridgeWater
@@ -258,8 +259,8 @@ def previewZone(sky):
   return zone | sky["environment"] if sky is not None else zone
 
 
-def renderView(view, outputPath, figureModel, shading, bandHeight, guides, sky):
-  return bridgeViews.renderView(bpy.context.scene, previewZone(sky), sky, view, outputPath, figureModel, shading, bandHeight, guides)
+def renderView(view, outputPath, figureModel, shading, bandHeight, guides, sky, swimVolumes):
+  return bridgeViews.renderView(bpy.context.scene, previewZone(sky), sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes)
 
 
 def pick(view, pixel, sky):
@@ -283,7 +284,7 @@ commands = {
   "pick": (pick, False),
   "renderPasses": (renderPasses, False),
   "renderModelThumbnails": (bridgeViews.renderModelThumbnails, False),
-} | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands | bridgeModels.commands | bridgeExport.commands | bridgePasses.commands | bridgeEnvironment.commands | bridgeReview.commands | bridgeAuthoring.commands | bridgeWater.commands | bridgeHousing.commands | bridgeSketch.commands
+} | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands | bridgeModels.commands | bridgeExport.commands | bridgePasses.commands | bridgeEnvironment.commands | bridgeReview.commands | bridgeAuthoring.commands | bridgeWater.commands | bridgeHousing.commands | bridgeSketch.commands | bridgeSwim.commands
 
 
 def dispatch(command, arguments):

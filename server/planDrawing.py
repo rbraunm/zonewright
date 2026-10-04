@@ -1,5 +1,6 @@
-"""A plan drawing: sketch sheets and the plan's regions, plots, and water laid in crisp lines and labels over a top-down relief render,
-with a coordinate grid, a scale bar, and north up."""
+"""Plan and section drawings. A plan lays sketch sheets and the plan's regions, plots, and water in crisp lines and labels over a top-down
+relief render, with a coordinate grid, a scale bar, and north up. A section draws where a vertical plane cuts the zone, at one scale
+across and up."""
 import math
 
 from PIL import Image, ImageDraw, ImageFont
@@ -9,6 +10,7 @@ sheetColors = ((200, 40, 40), (30, 90, 200), (20, 140, 70), (170, 60, 170), (210
 regionColor = (60, 60, 60)
 plotColor = (150, 90, 20)
 waterColor = (40, 120, 220)
+swimColors = {"water": (0, 150, 190), "lava": (220, 90, 0)}
 gridColor = (255, 255, 255)
 labelHalo = (255, 255, 255)
 gridSteps = (10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000)
@@ -125,6 +127,15 @@ def drawWater(draw, frame, bodies):
       draw.polygon([pixels[index] for index in triangle], fill=(*waterColor, 110))
 
 
+def drawSwim(draw, frame, boxes):
+  """Swim volumes as dashed rectangles in plan, named small."""
+  for box in boxes:
+    (low, high) = box["corners"]
+    points = [frame.pixel(point) for point in ((low[0], low[1]), (high[0], low[1]), (high[0], high[1]), (low[0], high[1]))]
+    dashedLine(draw, points + points[:1], (*swimColors[box["liquid"]], 255), 2)
+    labelAt(draw, centroidOf(points), box["name"], swimColors[box["liquid"]], 11)
+
+
 def drawRegions(draw, frame, regions):
   for region in regions:
     points = [frame.pixel(point) for point in region["outline"]]
@@ -189,6 +200,7 @@ def drawPlan(basePath, outputPath, center, width, overlays):
   draw = ImageDraw.Draw(layer)
   step = drawGrid(draw, frame)
   drawWater(draw, frame, overlays["water"])
+  drawSwim(draw, frame, overlays["swim"])
   drawRegions(draw, frame, overlays["regions"])
   drawPlots(draw, frame, overlays["plots"])
   drawSpots(draw, frame, overlays["spots"])
@@ -204,3 +216,70 @@ def drawPlan(basePath, outputPath, center, width, overlays):
   image = Image.alpha_composite(image, layer).convert("RGB")
   image.save(outputPath)
   return {"gridStep": step, "size": list(size), "sheetColors": {name: list(color) for name, color in legend}}
+
+
+sectionSize = (1440, 810)
+sectionPadding = (60, 40)
+groundColor = (110, 70, 40)
+massingColor = (90, 90, 90)
+sectionBackground = (238, 236, 232)
+
+
+def drawSection(outputPath, cuts, start, end, bottom, top):
+  """Draw a section's cuts: the ground's profile, water surfaces, swim volumes as boxes, sketch massing, and plot pads, at one scale
+  across and up, with a height grid, the distance along the line, and its two ends named by their coordinates."""
+  width, height = sectionSize
+  padX, padY = sectionPadding
+  length = cuts["length"]
+  scale = min((width - 2 * padX) / length, (height - 2 * padY) / (top - bottom))
+  left = padX + ((width - 2 * padX) - length * scale) / 2
+  baseline = height - padY - ((height - 2 * padY) - (top - bottom) * scale) / 2
+
+  def pixel(s, z):
+    return (left + s * scale, baseline - (z - bottom) * scale)
+
+  image = Image.new("RGBA", sectionSize, (*sectionBackground, 255))
+  draw = ImageDraw.Draw(image, "RGBA")
+  step = gridStepFor(max(length, top - bottom))
+  for z in range(math.ceil(bottom / step) * step, math.floor(top) + 1, step):
+    y = pixel(0, z)[1]
+    draw.line([(left, y), (left + length * scale, y)], fill=(205, 205, 205, 255), width=1)
+    labelAt(draw, (left - 6, y), str(z), (60, 60, 60), 13, "rm")
+  for s in range(0, math.floor(length) + 1, step):
+    x = pixel(s, 0)[0]
+    draw.line([(x, pixel(0, top)[1]), (x, pixel(0, bottom)[1])], fill=(218, 218, 218, 255), width=1)
+    labelAt(draw, (x, pixel(0, bottom)[1] + 12), str(s), (60, 60, 60), 12)
+  for box in cuts["swim"]:
+    corners = [pixel(box["s"][0], box["z"][1]), pixel(box["s"][1], box["z"][0])]
+    color = swimColors[box["liquid"]]
+    draw.rectangle([corners[0], corners[1]], fill=(*color, 60))
+    outline = [corners[0], (corners[1][0], corners[0][1]), corners[1], (corners[0][0], corners[1][1])]
+    dashedLine(draw, outline + outline[:1], (*color, 255), 2)
+    labelAt(draw, ((corners[0][0] + corners[1][0]) / 2, corners[1][1] - 9), box["name"], color, 11)
+  for entry in cuts["massing"]:
+    for s0, z0, s1, z1 in entry["segments"]:
+      draw.line([pixel(s0, z0), pixel(s1, z1)], fill=(*massingColor, 255), width=3)
+    labelAt(draw, pixel(*middleOf(entry["segments"])), entry["label"], massingColor, 13)
+  for s0, z0, s1, z1 in cuts["ground"]:
+    draw.line([pixel(s0, z0), pixel(s1, z1)], fill=(*groundColor, 255), width=3)
+  for entry in cuts["water"]:
+    for s0, z0, s1, z1 in entry["segments"]:
+      draw.line([pixel(s0, z0), pixel(s1, z1)], fill=(*waterColor, 255), width=3)
+    labelAt(draw, pixel(*middleOf(entry["segments"])), entry["name"], waterColor, 12)
+  for entry in cuts["plots"]:
+    for s0, z0, s1, z1 in entry["segments"]:
+      draw.line([pixel(s0, z0), pixel(s1, z1)], fill=(*plotColor, 255), width=4)
+    labelAt(draw, pixel(*middleOf(entry["segments"])), entry["name"], plotColor, 12)
+  fromLabel, toLabel = (f"[{point[0]:g}, {point[1]:g}]" for point in (start, end))
+  labelAt(draw, (left, padY / 2), fromLabel, (0, 0, 0), 14, "lm")
+  labelAt(draw, (left + length * scale, padY / 2), toLabel, (0, 0, 0), 14, "rm")
+  bar = step * scale
+  draw.line([(width - padX - bar, height - 16), (width - padX, height - 16)], fill=(0, 0, 0, 255), width=4)
+  labelAt(draw, (width - padX - bar / 2, height - 28), f"{step} units", (0, 0, 0), 13)
+  image.convert("RGB").save(outputPath)
+  return {"gridStep": step, "unitsPerPixel": round(1 / scale, 4)}
+
+
+def middleOf(segments):
+  s0, z0, s1, z1 = segments[len(segments) // 2]
+  return (s0 + s1) / 2, max(z0, z1) + 0.0

@@ -14,7 +14,7 @@ import bridgeEnvironment
 import bridgeHousing
 import bridgeMeshAccess
 import bridgeSurfacing
-import bridgeWater
+import bridgeSwim
 
 terrainCollectionName = "terrain"
 modelArraysFileName = "modelArrays.npz"
@@ -41,6 +41,8 @@ def exclusionReason(sceneObject):
     return "a guide"
   if bridgeMeshAccess.regionIntentProperty in sceneObject:
     return "a region: the plan"
+  if bridgeSwim.swimProperty in sceneObject:
+    return "a swim volume: written as a .zon region"
   if sceneObject.hide_render:
     return "hidden from renders"
   if sceneObject.type == "EMPTY" and not bridgeEnvironment.isEmitter(sceneObject) and not bridgeMeshAccess.isCollectionInstance(sceneObject):
@@ -189,7 +191,6 @@ def fileStem(text):
 
 
 def collectZoneExport(outputFolder, zoneName):
-  scene = bpy.context.scene
   depsgraph = bpy.context.evaluated_depsgraph_get()
   materials = {}
 
@@ -199,6 +200,7 @@ def collectZoneExport(outputFolder, zoneName):
     return material.name
 
   shipped, excluded = exportedObjects()
+  regions, swimDecisions = bridgeSwim.swimRegions()
   terrainParts, models, placements, lights, emitters = [], {}, [], [], []
   for sceneObject, role in shipped:
     if role == "light":
@@ -253,7 +255,7 @@ def collectZoneExport(outputFolder, zoneName):
   return {
     "zone": zoneName, "arrays": os.path.join(outputFolder, modelArraysFileName), "terrain": {"file": f"ter_{zoneName}.ter", "materials": terrain["materials"], "arrays": "terrain"},
     "models": modelList, "materials": list(materials.values()), "placements": placementList, "lights": lights, "emitters": emitters,
-    "regions": bridgeWater.waterVolumes(), "housing": bridgeHousing.collectHousing(), "excluded": excluded, "toConfirm": decisionsToConfirm(shipped),
+    "regions": regions, "swim": swimDecisions, "housing": bridgeHousing.collectHousing(), "excluded": excluded, "toConfirm": decisionsToConfirm(shipped),
   }
 
 

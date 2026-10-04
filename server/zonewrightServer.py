@@ -642,8 +642,8 @@ async def setZoneProperties(
 
 
 @guardedTool()
-async def renderView(context: Context, view: dict, shading: str = "client", bandHeight: float = 50.0, guides: bool = True):
-  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], or with z on the ground within 50 units below it, for caves and under overhangs; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog. shading "client" draws the zone as the client does; "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout. Guides (plot outlines) draw unless guides is false."""
+async def renderView(context: Context, view: dict, shading: str = "client", bandHeight: float = 50.0, guides: bool = True, swimVolumes: bool = False):
+  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], or with z on the ground within 50 units below it, for caves and under overhangs; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog. shading "client" draws the zone as the client does; "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout. Guides (plot outlines, sketch massing) draw unless guides is false; with swimVolumes, each swim volume draws as a see-through block (cyan water, orange lava)."""
   outputPath = newRenderPath()
   figureModel = None
   zone = await callBridge(context, "getZoneProperties", {})
@@ -653,7 +653,7 @@ async def renderView(context: Context, view: dict, shading: str = "client", band
     figureModel = {key: figure[key] for key in ("folder", "scale", "avatarHeight")}
   description = await callBridge(context, "renderView", {
     "view": view, "outputPath": str(outputPath), "figureModel": figureModel, "shading": shading, "bandHeight": bandHeight, "guides": guides,
-    "sky": await zoneSky(zone),
+    "sky": await zoneSky(zone), "swimVolumes": swimVolumes,
   })
   return [Image(data=outputPath.read_bytes(), format="png"), description]
 
@@ -871,7 +871,9 @@ async def exportZone(context: Context, path: str):
   collection's meshes; a placed object takes one uniform scale. Materials must come from createMaterial: diffuse and normal map export
   as Opaque_MaxCB1.fx, diffuse only as Opaque_MaxC1.fx, a cutout (diffuse only) as Chroma_MPLBasicAT.fx. DDS textures are stored
   unchanged, others as uncompressed DDS with power-of-two sides; createLiquidMaterial materials export as the client's water, waterfall,
-  and lava shaders with their values. Water bodies' swim volumes go into the .zon as AWT_ (water) and ALV_ (lava) regions. Point lights
+  and lava shaders with their values. The swim volumes go into the .zon as AWT_ (water) and ALV_ (lava) regions, as they stand (export
+  derives none and refuses boxes a zone file cannot hold); `swim` lists the pools and rivers whose swimming is undecided (no boxes and not
+  marked not swimmable) or changed since their boxes were accepted. Point lights
   placed with placeLight go into the .zon; emitters placed with placeEmitter go into <zone>_EnvironmentEmitters.txt beside the archive
   (the client reads that list loose from its own folder). A zone with housing (setZoneHousing) also gets <zone>_housing.json beside the
   archive, its plots as Peridot's plot content gives them (address, border door, center and heading in the server's axes, size across
@@ -911,7 +913,7 @@ async def exportZone(context: Context, path: str):
   except (OSError, ValueError) as error:
     raise ToolError(f"{type(error).__name__}: {error}") from error
   return summary | {
-    "path": str(archivePath), "excluded": groupedExclusions(collected["excluded"]), "toConfirm": collected["toConfirm"],
+    "path": str(archivePath), "excluded": groupedExclusions(collected["excluded"]), "toConfirm": collected["toConfirm"], "swim": collected["swim"],
     "emitterList": str(emitterListPath) if emitterList is not None else None,
     "housing": None if housing is None else {"role": housing["housing"]["role"], "plots": len(housing["plots"]), "file": str(housingPath) if hasPlots else None, "assetList": str(assetListPath) if hasPlots else None},
   }
@@ -1434,14 +1436,15 @@ async def renderSketch(
   from the northwest), `width` units across about `center`, north up, with a coordinate grid (the ground's height written at each
   crossing unless spotHeights is false), a scale bar, the sketch sheets (all, or
   those named) in their own colors (areas dashed, footprints filled with their facing arrows and heights, paths at their widths,
-  points, notes), and the plan's own layers: regions (dashed, named), plots (outlined, by address), and water (blue)."""
+  points, notes), and the plan's own layers: regions (dashed, named), plots (outlined, by address), water (blue), and swim (the swim
+  volumes, dashed)."""
   if len(center) != 2 or width <= 0:
     raise ToolError(f"center is [x, y] and width positive, got {center} and {width}")
   zone = await callBridge(context, "getZoneProperties", {})
   basePath = newRenderPath()
   base = await callBridge(context, "renderView", {
     "view": {"map": {"center": center, "width": width}}, "outputPath": str(basePath), "figureModel": None, "shading": "relief",
-    "bandHeight": bandHeight, "guides": False, "sky": await zoneSky(zone),
+    "bandHeight": bandHeight, "guides": False, "sky": await zoneSky(zone), "swimVolumes": False,
   })
   spots = planDrawing.gridCrossings(center, width, base["height"] / base["width"]) if spotHeights else []
   overlays = await callBridge(context, "planOverlays", {"sheets": sheets, "layers": layers, "spots": spots})
@@ -1453,6 +1456,68 @@ async def renderSketch(
     "bandHeight": bandHeight, "gridStep": drawn["gridStep"], "sheetColors": drawn["sheetColors"],
     "shapes": {sheet["sheet"]: len(sheet["shapes"]) for sheet in overlays["sheets"]},
   }]
+
+
+@guardedTool()
+async def renderSection(
+  context: Context, start: list[float], end: list[float], bottom: float, top: float,
+  layers: list[str] = ["ground", "water", "swim", "massing", "plots"],
+):
+  """Draw a section: where the vertical plane through the line from start [x, y] to end [x, y] cuts the zone, seen from the line's right
+  so start is on the left, from bottom to top at one scale across and up: the ground players stand on (brown; caves, overhangs, and
+  arches show as the shapes they are), water surfaces (blue), swim volumes (dashed boxes, cyan water and orange lava), sketch massing
+  (grey), and plot pads (orange), with a height grid and the distance along the line. For judging what plans cannot show: swim
+  volumes against the surface and the bed, a cave's headroom, a plot's pad against the slope, stacked floors, an arch's span. The
+  result also gives the cuts as numbers (s along the line, z height)."""
+  if len(start) != 2 or len(end) != 2:
+    raise ToolError(f"start and end are [x, y], got {start} and {end}")
+  cuts = await callBridge(context, "sectionCuts", {"start": start, "end": end, "bottom": bottom, "top": top, "layers": layers})
+  outputPath = newRenderPath()
+  drawn = await anyio.to_thread.run_sync(planDrawing.drawSection, outputPath, cuts, start, end, bottom, top)
+  summary = {
+    "outputPath": str(outputPath), "length": cuts["length"], "gridStep": drawn["gridStep"], "unitsPerPixel": drawn["unitsPerPixel"],
+    "groundSegments": len(cuts["ground"]),
+    "water": [{"name": entry["name"], "levels": [min(min(z0, z1) for _, z0, _, z1 in entry["segments"]), max(max(z0, z1) for _, z0, _, z1 in entry["segments"])]} for entry in cuts["water"]],
+    "swim": cuts["swim"],
+    "massing": [{"name": entry["name"], "label": entry["label"]} for entry in cuts["massing"]],
+    "plots": [entry["name"] for entry in cuts["plots"]],
+  }
+  return [Image(data=outputPath.read_bytes(), format="png"), summary]
+
+
+@guardedTool()
+async def buildSwimVolumes(context: Context, body: str, area: dict | None = None, replaceEdited: bool = False):
+  """Starting swim volumes for a pool or river: boxes over its grid where its surface covers water over the bed, grouped while their
+  tops stay within a unit of the surface, bottoms 4 under the deepest bed below them (stopping a unit over any open space under the
+  bed, a cave below the water). They are named for the .zon regions they become (AWT_ water, ALV_ lava) and kept in "swimVolumes" as
+  boxes to look at and adjust by hand (transformObjects, duplicateObjects, deleteObjects; placeSwimVolume adds one). area ({"circle":
+  ...} or {"polygon": ...}) builds only inside it. A rebuild replaces the body's generated boxes there and refuses over boxes edited or
+  placed by hand unless replaceEdited. The result gives the body's state and findings (surface left uncovered, a top away from the
+  surface, ground rising to the top inside a box): things to look at, never errors, since a box need not match a surface."""
+  return await callBridge(context, "buildSwimVolumes", {"body": body, "area": area, "replaceEdited": replaceEdited})
+
+
+@guardedTool()
+async def placeSwimVolume(context: Context, name: str, liquid: str, minimum: list[float], maximum: list[float], body: str | None = None):
+  """Place a swim volume by hand from its corners [x, y, z], square to the axes: water or lava, named <prefix><name> (AWT_ or ALV_
+  added), tied to a pool or river (body) or standing alone: a floating pool, a cove, a pool without a surface. Adjust it like any box."""
+  return await callBridge(context, "placeSwimVolume", {"name": name, "liquid": liquid, "minimum": minimum, "maximum": maximum, "body": body})
+
+
+@guardedTool()
+async def acceptSwimVolumes(context: Context, body: str):
+  """Mark a body's swim volumes as made for the body as it now is: after its water or its bed changed and the boxes were looked at again
+  (renderView with swimVolumes, renderSketch's swim layer). Hand edits stay as they are."""
+  return await callBridge(context, "acceptSwimVolumes", {"body": body})
+
+
+@guardedTool()
+async def getSwimVolumes(context: Context, name: str | None = None):
+  """The swim volumes (or one by name), each with its liquid, body, corners, and whether it was edited or placed by hand; every pool and
+  river's swim state (boxed; changed since its boxes were accepted; notSwimmable, as editWater's swimmable false marks a fountain or a
+  trickle; undecided) with its findings; and any errors a zone file cannot hold (a box turned or without size, names that clash once
+  lowercased, a prefix against its liquid, a body gone), which export refuses."""
+  return await callBridge(context, "getSwimVolumes", {"name": name})
 
 
 @guardedTool()
@@ -1681,9 +1746,10 @@ async def createLiquidMaterial(
 waterBodyHelp = (
   " A water body is one named object in the water collection, rebuilt from what it was made from whenever editWater or"
   " shapeWaterExtent changes it, against the ground as it then is; look at it after every change (renderView close at the shore and"
-  " from above), then adjust. Its surface reaches a little under its banks so no seam shows; the swim volumes the client needs (AWT_"
-  " boxes, ALV_ for lava) are derived from it at export (getWaterVolumes shows them). The ground is every rendered mesh that is not"
-  " water, a guide, or a plot border. The result's `built` reports what the build found: a pool or river's deepest point and where it"
+  " from above), then adjust. Its surface reaches a little under its banks so no seam shows. Where players swim is designed"
+  " apart from the surface, as swim volumes (buildSwimVolumes starts them, placeSwimVolume adds one), once the water and bed settle;"
+  " editWater's swimmable false marks a body no one swims in. The ground is what players stand on: rendered meshes and collection"
+  " instances that are not water, guides, regions, spawns, or doors. The result's `built` reports what the build found: a pool or river's deepest point and where it"
   " runs off the end of the ground (a zone edge used as a source or an end, or a leak to bound)."
 )
 
@@ -1743,18 +1809,19 @@ async def pourWaterfall(
 @guardedTool(description=(
   "Change what a water body is made from and build it again against the ground as it is now: a pool's level, seed, within (an empty"
   " list removes it), spacing, worldUnitsPerRepeat, or strokes (an empty list clears them); a river's path, reach, spacing,"
-  " worldUnitsPerRepeat, or strokes; a fall's lip, bottom, throw, spread, spacing, or worldUnitsPerRepeat; any body's material. With"
-  " nothing to change it only rebuilds, for after the ground under it has changed." + waterBodyHelp
+  " worldUnitsPerRepeat, or strokes; a pool or river's swimmable (false: no one swims in it, a fountain or a trickle; true: it is"
+  " swum, its swim volumes to be built); a fall's lip, bottom, throw, spread, spacing, or worldUnitsPerRepeat; any body's material."
+  " With nothing to change it only rebuilds, for after the ground under it has changed." + waterBodyHelp
 ))
 async def editWater(
   context: Context, name: str, level: float | None = None, seed: list[float] | None = None, within: list[list[float]] | None = None,
   path: list[list[float]] | None = None, reach: float | None = None, lip: list[list[float]] | None = None, bottom: float | None = None,
   throw: float | None = None, spread: float | None = None, spacing: float | None = None, worldUnitsPerRepeat: float | None = None,
-  strokes: list[dict] | None = None, material: str | None = None,
+  strokes: list[dict] | None = None, swimmable: bool | None = None, material: str | None = None,
 ):
   changes = {
     "level": level, "seed": seed, "within": within, "path": path, "reach": reach, "lip": lip, "bottom": bottom, "throw": throw,
-    "spread": spread, "spacing": spacing, "worldUnitsPerRepeat": worldUnitsPerRepeat, "strokes": strokes,
+    "spread": spread, "spacing": spacing, "worldUnitsPerRepeat": worldUnitsPerRepeat, "strokes": strokes, "swimmable": swimmable,
   }
   return await callBridge(context, "editWater", {"name": name, "changes": {key: value for key, value in changes.items() if value is not None}, "material": material})
 
@@ -1781,13 +1848,6 @@ async def carveWaterBed(context: Context, name: str, objectName: str, depth: flo
 async def getWater(context: Context):
   """Every water body: its kind, what it is made from, its material, its levels and plan bounds, and its mesh counts."""
   return await callBridge(context, "getWater", {})
-
-
-@guardedTool()
-async def getWaterVolumes(context: Context, name: str):
-  """The swim volumes export would write under a pool or river: boxes whose tops stay within a unit of its surface and whose bottoms
-  lie under the deepest ground beneath, each AWT_ (water) or ALV_ (lava) and named for the body."""
-  return await callBridge(context, "describeWaterVolumes", {"name": name})
 
 
 # Housing

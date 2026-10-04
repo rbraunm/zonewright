@@ -13,6 +13,7 @@ import bridgeAuthoring
 import bridgeHousing
 import bridgeMeshAccess
 import bridgeObjects
+import bridgeSwim
 
 sketchProperty = "zonewrightSketch"
 sketchKinds = ("area", "footprint", "path", "point", "note")
@@ -463,11 +464,11 @@ def planOverlays(sheets, layers, spots):
     if missing:
       raise ValueError(f"No sketch sheets {missing}; sheets: {sorted(known)}")
   chosen = sorted(known) if sheets is None else sheets
-  unknownLayers = sorted(set(layers) - {"regions", "plots", "water"})
+  unknownLayers = sorted(set(layers) - {"regions", "plots", "water", "swim"})
   if unknownLayers:
-    raise ValueError(f"layers are regions, plots, and water; got {unknownLayers}")
+    raise ValueError(f"layers are regions, plots, water, and swim; got {unknownLayers}")
   bpy.context.view_layer.update()
-  overlays = {"sheets": [], "regions": [], "plots": [], "water": [], "spots": []}
+  overlays = {"sheets": [], "regions": [], "plots": [], "water": [], "swim": [], "spots": []}
   if spots:
     probe = GroundProbe()
     for x, y in spots:
@@ -487,6 +488,8 @@ def planOverlays(sheets, layers, spots):
       {"address": plot.name, "corners": [roundPoint(corner) for corner in bridgeHousing.footprint(plot)], "facingDegrees": round(bridgeHousing.facingOf(plot), 1)}
       for plot in bridgeHousing.plotObjects()
     ]
+  if "swim" in layers:
+    overlays["swim"] = [{"name": box.name, "liquid": bridgeSwim.readBox(box)["liquid"], "corners": bridgeSwim.boxCorners(box)} for box in bridgeSwim.swimBoxes()]
   if "water" in layers:
     for body in bpy.context.scene.objects:
       if bridgeMeshAccess.waterProperty in body and not body.hide_render:
@@ -495,9 +498,98 @@ def planOverlays(sheets, layers, spots):
   return overlays
 
 
+sectionLayers = ("ground", "water", "swim", "massing", "plots")
+# Cuts reaching past the drawing by this share of its size are dropped; the drawing clips the rest.
+sectionMargin = 0.1
+
+
+def planeSegments(positions, triangles, start, along, normal):
+  """Where triangles cross the vertical plane through start along `along`: segments as [s0, z0, s1, z1], s the distance along."""
+  if len(triangles) == 0:
+    return numpy.zeros((0, 4))
+  offsets = positions[:, :2] - start
+  sides = offsets @ normal
+  sides[sides == 0] = 1e-9
+  distances = offsets @ along
+  heights = positions[:, 2]
+  triangleSides = sides[triangles]
+  crossing = triangles[(triangleSides.min(axis=1) < 0) & (triangleSides.max(axis=1) > 0)]
+  ends = []
+  for first, second in ((0, 1), (1, 2), (2, 0)):
+    a, b = crossing[:, first], crossing[:, second]
+    cut = sides[a] * sides[b] < 0
+    share = numpy.where(cut, sides[a] / numpy.where(cut, sides[a] - sides[b], 1.0), 0.0)
+    ends.append((cut, distances[a] + share * (distances[b] - distances[a]), heights[a] + share * (heights[b] - heights[a])))
+  segments = []
+  for row in range(len(crossing)):
+    points = [(s[row], z[row]) for cut, s, z in ends if cut[row]]
+    if len(points) == 2:
+      segments.append([points[0][0], points[0][1], points[1][0], points[1][1]])
+  return numpy.array(segments).reshape(-1, 4)
+
+
+def keptSegments(segments, length, bottom, top):
+  margin = sectionMargin * max(length, top - bottom)
+  inside = (numpy.maximum(segments[:, 0], segments[:, 2]) >= -margin) & (numpy.minimum(segments[:, 0], segments[:, 2]) <= length + margin)
+  inside &= (numpy.maximum(segments[:, 1], segments[:, 3]) >= bottom - margin) & (numpy.minimum(segments[:, 1], segments[:, 3]) <= top + margin)
+  return numpy.round(segments[inside], 2).tolist()
+
+
+def sectionCuts(start, end, bottom, top, layers):
+  """What the zone holds where the vertical plane through the line from start to end cuts it, in the plane's own terms (s along the line
+  from start, z height): the ground players stand on, water surfaces, swim volumes, sketch massing, and plot pads."""
+  unknown = sorted(set(layers) - set(sectionLayers))
+  if unknown:
+    raise ValueError(f"Section layers are {list(sectionLayers)}; got {unknown}")
+  if len(start) != 2 or len(end) != 2 or top <= bottom:
+    raise ValueError(f"A section runs from [x, y] to [x, y] between a bottom and a higher top, got {start}, {end}, {bottom}, {top}")
+  start, end = numpy.array(start, dtype=numpy.float64), numpy.array(end, dtype=numpy.float64)
+  length = float(numpy.linalg.norm(end - start))
+  if length < 1e-6:
+    raise ValueError("A section's two points must differ")
+  along = (end - start) / length
+  normal = numpy.array([-along[1], along[0]])
+  bpy.context.view_layer.update()
+  cuts = {"length": round(length, 2), "ground": [], "water": [], "swim": [], "massing": [], "plots": []}
+
+  def cutObjects(sceneObjects):
+    found = []
+    for sceneObject in sceneObjects:
+      positions, triangles = bridgeMeshAccess.worldTriangles([sceneObject])
+      segments = keptSegments(planeSegments(positions, triangles, start, along, normal), length, bottom, top)
+      if segments:
+        found.append({"name": sceneObject.name, "segments": segments})
+    return found
+
+  if "ground" in layers:
+    positions, triangles = bridgeMeshAccess.partTriangles(bridgeMeshAccess.playerSolidParts())
+    cuts["ground"] = keptSegments(planeSegments(positions, triangles, start, along, normal), length, bottom, top)
+  if "water" in layers:
+    cuts["water"] = cutObjects([body for body in bpy.context.scene.objects if bridgeMeshAccess.waterProperty in body and not body.hide_render])
+  if "massing" in layers:
+    cuts["massing"] = [entry | {"label": readSpec(bpy.data.objects[entry["name"]]).get("label") or readSpec(bpy.data.objects[entry["name"]])["name"]} for entry in cutObjects([shape for shape in sketchObjects() if len(shape.data.polygons)])]
+  if "plots" in layers:
+    cuts["plots"] = cutObjects(bridgeHousing.plotObjects())
+  if "swim" in layers:
+    for box in bridgeSwim.swimBoxes():
+      (low, high) = bridgeSwim.boxCorners(box)
+      enter, leave = -math.inf, math.inf
+      for axis in (0, 1):
+        if abs(along[axis]) < 1e-12:
+          if not low[axis] <= start[axis] <= high[axis]:
+            enter, leave = 1.0, 0.0
+          continue
+        first, second = (low[axis] - start[axis]) / along[axis], (high[axis] - start[axis]) / along[axis]
+        enter, leave = max(enter, min(first, second)), min(leave, max(first, second))
+      if leave > enter:
+        cuts["swim"].append({"name": box.name, "liquid": bridgeSwim.readBox(box)["liquid"], "s": [round(enter, 2), round(leave, 2)], "z": [low[2], high[2]]})
+  return cuts
+
+
 commands = {
   "sketchShapes": (sketchShapes, True),
   "eraseSketch": (eraseSketch, True),
   "getSketch": (getSketch, False),
   "planOverlays": (planOverlays, False),
+  "sectionCuts": (sectionCuts, False),
 }

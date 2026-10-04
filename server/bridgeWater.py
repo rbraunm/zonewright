@@ -33,11 +33,6 @@ maximumFloodPoints = 250000
 lipLeadIn = 4.0
 # How far in front of and behind its lip a fall looks for the ground, in its spacings, to tell its front from its back.
 lipProbeSpacings = 2.0
-# Swim volumes: each box's top lies within this of the surface over every part of it, and its bottom this far under the deepest ground
-# beneath it.
-volumeTolerance = 1.0
-volumeFloorMargin = 4.0
-volumePrefixes = {"water": "AWT_", "lava": "ALV_"}
 up = mathutils.Vector((0.0, 0.0, 1.0))
 down = mathutils.Vector((0.0, 0.0, -1.0))
 reach = bridgeMeshAccess.waterReach
@@ -155,6 +150,8 @@ def validatedDefinition(definition):
       raise ValueError(f"A fall's bottom {definition['bottom']} must lie below every point of its lip")
     if definition["throw"] < 0 or definition["spread"] <= 0:
       raise ValueError(f"throw must be at least 0 and spread positive, got {definition['throw']} and {definition['spread']}")
+  if "swimmable" in definition and not isinstance(definition["swimmable"], bool):
+    raise ValueError(f"swimmable is true or false, got {definition['swimmable']!r}")
   for stroke in definition.get("strokes", []):
     if stroke["mode"] not in strokeModes:
       raise ValueError(f"A stroke's mode is one of {list(strokeModes)}, got '{stroke['mode']}'")
@@ -490,8 +487,8 @@ def pourWaterfall(name, lip, bottom, throw, spread, spacing, worldUnitsPerRepeat
 
 
 editableFields = {
-  "pool": ("seed", "level", "within", "spacing", "worldUnitsPerRepeat", "strokes"),
-  "river": ("path", "reach", "spacing", "worldUnitsPerRepeat", "strokes"),
+  "pool": ("seed", "level", "within", "spacing", "worldUnitsPerRepeat", "strokes", "swimmable"),
+  "river": ("path", "reach", "spacing", "worldUnitsPerRepeat", "strokes", "swimmable"),
   "fall": ("lip", "bottom", "throw", "spread", "spacing", "worldUnitsPerRepeat"),
 }
 
@@ -563,96 +560,10 @@ def carveWaterBed(name, objectName, depth, shoreWidth):
   return bridgeShaping.moveSummary(sceneObject, positions, updated) | {"underWater": int(under.sum()), "deepestBed": round(float(updated[under, 2].min()), 2)}
 
 
-# Swim volumes
+# Names
 
 def fileStem(text):
   return re.sub(r"[^a-z0-9]+", "", text.lower())
-
-
-def bandRectangles(cells):
-  """Cover cells keyed (i, j) with rectangles of whole cells, greedily: across each row as far as it runs, then down while whole rows
-  below match."""
-  remaining = set(cells)
-  for i, j in sorted(cells, key=lambda cell: (cell[1], cell[0])):
-    if (i, j) not in remaining:
-      continue
-    last = i
-    while (last + 1, j) in remaining:
-      last += 1
-    bottomRow = j
-    while all((column, bottomRow + 1) in remaining for column in range(i, last + 1)):
-      bottomRow += 1
-    for column in range(i, last + 1):
-      for row in range(j, bottomRow + 1):
-        remaining.discard((column, row))
-    yield i, last, j, bottomRow
-
-
-def bodyVolumes(sceneObject, ground):
-  """The swim volumes under a pool or river: on its grid, each cell whose middle the surface covers with water above the ground,
-  grouped into boxes whose tops stay within volumeTolerance of the surface and whose bottoms lie under the deepest ground at any of
-  their cells' middles and corners."""
-  definition = readDefinition(sceneObject)
-  material = sceneObject.material_slots[0].material if sceneObject.material_slots else None
-  liquid = bridgeSurfacing.liquidOf(material)
-  if liquid is None or liquid["liquid"] not in volumePrefixes:
-    raise ValueError(f"Water body '{sceneObject.name}' needs a water or lava material for its swim volumes")
-  spacing = definition["spacing"]
-  surface = bridgeMeshAccess.worldTree([sceneObject])
-  positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
-  low, high = numpy.floor(positions[:, :2].min(0) / spacing).astype(int), numpy.ceil(positions[:, :2].max(0) / spacing).astype(int)
-  above = float(positions[:, 2].max()) + 1
-  cells = {}
-  for i in range(low[0], high[0]):
-    for j in range(low[1], high[1]):
-      x, y = (i + 0.5) * spacing, (j + 0.5) * spacing
-      location, _, _, _ = surface.ray_cast(mathutils.Vector((x, y, above)), down, reach)
-      if location is None:
-        continue
-      depth = ground.depth(x, y, location.z)
-      if depth:
-        corners = [ground.depth(x + dx * spacing / 2, y + dy * spacing / 2, location.z) for dx in (-1, 1) for dy in (-1, 1)]
-        cells[(i, j)] = (location.z, location.z - max([depth] + [corner for corner in corners if corner]))
-  bands = {}
-  for cell, (level, _) in cells.items():
-    bands.setdefault(math.floor(level / volumeTolerance), []).append(cell)
-  boxes = []
-  for band in sorted(bands):
-    for first, last, firstRow, lastRow in bandRectangles(bands[band]):
-      covered = [cells[(i, j)] for i in range(first, last + 1) for j in range(firstRow, lastRow + 1)]
-      top = min(level for level, _ in covered)
-      bottom = min(floor for _, floor in covered) - volumeFloorMargin
-      boxes.append({
-        "center": [(first + last + 1) / 2 * spacing, (firstRow + lastRow + 1) / 2 * spacing, (top + bottom) / 2],
-        "halfExtents": [(last - first + 1) * spacing / 2, (lastRow - firstRow + 1) * spacing / 2, (top - bottom) / 2],
-      })
-  stem = fileStem(sceneObject.name)
-  return [box | {"name": f"{volumePrefixes[liquid['liquid']]}{stem}{index:02d}", "body": sceneObject.name} for index, box in enumerate(boxes, 1)]
-
-
-def waterVolumes():
-  bodies = [
-    sceneObject for sceneObject in bpy.context.scene.objects
-    if bridgeMeshAccess.waterProperty in sceneObject and not sceneObject.hide_render and readDefinition(sceneObject)["kind"] != "fall"
-  ]
-  if not bodies:
-    return []
-  ground = Ground()
-  volumes = [box for sceneObject in bodies for box in bodyVolumes(sceneObject, ground)]
-  names = [box["name"] for box in volumes]
-  duplicates = sorted({name for name in names if names.count(name) > 1})
-  if duplicates:
-    raise ValueError(f"Water bodies' names must stay distinct once lowercased to letters and digits; their volumes would share {duplicates}")
-  return volumes
-
-
-def describeVolumes(name):
-  """The swim volumes export would write for one body, to look at before exporting."""
-  sceneObject = bridgeMeshAccess.requireWater(name)
-  if readDefinition(sceneObject)["kind"] == "fall":
-    raise ValueError(f"'{name}' is a fall; falls have no swim volume")
-  volumes = bodyVolumes(sceneObject, Ground())
-  return {"name": name, "volumes": [{key: [round(value, 2) for value in box[key]] if key != "name" and key != "body" else box[key] for key in box} for box in volumes]}
 
 
 commands = {
@@ -663,5 +574,4 @@ commands = {
   "shapeWaterExtent": (shapeWaterExtent, True),
   "carveWaterBed": (carveWaterBed, True),
   "getWater": (getWater, False),
-  "describeWaterVolumes": (describeVolumes, False),
 }

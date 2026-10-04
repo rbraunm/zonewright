@@ -11,6 +11,7 @@ import numpy
 import bridgeClientLight
 import bridgeMeshAccess
 import bridgeModels
+import bridgeSwim
 import skyDrawing
 from playerScale import swimEyeAboveSurface
 
@@ -43,6 +44,9 @@ skyImageHeight = 1024
 # Layout shading lights from the northwest, as relief maps do, so slopes read the same whatever the zone's sun.
 layoutLightDirection = (-0.5, 0.5, 0.7071)
 layoutAmbient = 0.3
+# Swim volumes drawn in a view: see-through blocks, cyan for water and orange for lava.
+swimColors = {"water": (0.1, 0.85, 1.0), "lava": (1.0, 0.45, 0.05)}
+swimAlpha = 0.3
 layoutHeightColors = ((0.0, (0.22, 0.36, 0.26)), (0.35, (0.58, 0.56, 0.36)), (0.7, (0.62, 0.45, 0.32)), (1.0, (0.92, 0.9, 0.87)))
 # Relief shading is the layout drawing in quiet greys, for a plan's lines and labels to stand out over.
 reliefHeightColors = ((0.0, (0.5, 0.5, 0.48)), (1.0, (0.93, 0.93, 0.91)))
@@ -66,6 +70,7 @@ class PreviewScene:
     self.sky = sky
     self.skyImage = None
     self.createdObjects = []
+    self.createdMaterials = []
     self.scene = bpy.data.scenes.new(previewName)
     for sourceObject in sourceScene.objects:
       if sourceObject.type not in ("LIGHT", "CAMERA") and not sourceObject.hide_render and (guides or bridgeMeshAccess.guideProperty not in sourceObject):
@@ -150,7 +155,39 @@ class PreviewScene:
     figure = bridgeModels.modelObject(figureModel["folder"], previewName + "Figure", figureModel["scale"], origin, 90 - facingHeadingDegrees)
     return self.addObject(figure)
 
+  def drawSwimVolumes(self):
+    """Each swim volume as a see-through block in its liquid's color, to look at against the water and the bed."""
+    for box in bridgeSwim.swimBoxes():
+      liquid = bridgeSwim.readBox(box)["liquid"]
+      (low, high) = bridgeSwim.boxCorners(box)
+      corners = [(x, y, z) for z in (low[2], high[2]) for y in (low[1], high[1]) for x in (low[0], high[0])]
+      faces = [(0, 2, 3, 1), (4, 5, 7, 6), (0, 1, 5, 4), (2, 6, 7, 3), (0, 4, 6, 2), (1, 3, 7, 5)]
+      mesh = bpy.data.meshes.new(previewName + "Swim")
+      mesh.from_pydata(corners, [], faces)
+      mesh.materials.append(self.swimMaterial(liquid))
+      self.addObject(bpy.data.objects.new(previewName + "Swim", mesh))
+
+  def swimMaterial(self, liquid):
+    material = bpy.data.materials.new(previewName + "Swim" + liquid)
+    material.use_nodes = True
+    material.surface_render_method = "BLENDED"
+    nodes, links = material.node_tree.nodes, material.node_tree.links
+    nodes.clear()
+    emission = nodes.new("ShaderNodeEmission")
+    emission.inputs["Color"].default_value = (*swimColors[liquid], 1.0)
+    clear = nodes.new("ShaderNodeBsdfTransparent")
+    mix = nodes.new("ShaderNodeMixShader")
+    mix.inputs["Fac"].default_value = swimAlpha
+    links.new(clear.outputs[0], mix.inputs[1])
+    links.new(emission.outputs[0], mix.inputs[2])
+    output = nodes.new("ShaderNodeOutputMaterial")
+    links.new(mix.outputs[0], output.inputs["Surface"])
+    self.createdMaterials.append(material)
+    return material
+
   def remove(self):
+    for material in self.createdMaterials:
+      bpy.data.materials.remove(material)
     for createdObject in self.createdObjects:
       data = createdObject.data
       bpy.data.objects.remove(createdObject)
@@ -349,7 +386,7 @@ def roundVector(vector, digits=3):
   return [round(float(component), digits) for component in vector]
 
 
-def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, bandHeight, guides):
+def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes):
   if shading not in viewShadings:
     raise ValueError(f"shading must be one of {list(viewShadings)}, got '{shading}'")
   # A map or a layout or relief drawing is for reading the shape, so none is fogged nor has a sky.
@@ -358,6 +395,8 @@ def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, b
   try:
     description = placeCamera(preview, view, figureModel)
     preview.drawSky()
+    if swimVolumes:
+      preview.drawSwimVolumes()
     if shading != "client":
       description["heightRange"] = list(applyLayoutShading(preview, bandHeight, layoutHeightColors if shading == "layout" else reliefHeightColors))
       description["bandHeight"] = bandHeight
