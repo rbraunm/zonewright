@@ -1435,10 +1435,11 @@ async def renderSketch(
 ):
   """Draw a plan: the zone from straight above in quiet grey relief (lighter higher, a step every bandHeight units, slopes shaded
   from the northwest), `width` units across about `center`, north up, with a coordinate grid (the ground's height written at each
-  crossing unless spotHeights is false), a scale bar, the sketch sheets (all, or
-  those named) in their own colors (areas dashed, footprints filled with their facing arrows and heights, paths at their widths,
-  points, notes), and the plan's own layers: regions (dashed, named), plots (outlined, by address), water (blue), and swim (the swim
-  volumes, dashed)."""
+  crossing unless spotHeights is false, giving way wherever a label stands), a scale bar, the sketch sheets (all, or
+  those named) in their own colors (areas dashed and faintly filled, footprints filled with their facing arrows and heights, paths at
+  their widths, points, notes; every shape shows, inside an area or under another sheet's), and the plan's own layers: regions
+  (dashed, named), plots (outlined, by address, with a mark pointing out of the entrance side), water (blue), and swim (the swim
+  volumes, dashed). Labels are placed clear of one another."""
   if len(center) != 2 or width <= 0:
     raise ToolError(f"center is [x, y] and width positive, got {center} and {width}")
   zone = await callBridge(context, "getZoneProperties", {})
@@ -1501,14 +1502,16 @@ async def renderOrbit(
 @guardedTool()
 async def renderSection(
   context: Context, start: list[float], end: list[float], bottom: float, top: float,
-  layers: list[str] = ["ground", "water", "swim", "massing", "plots"],
+  layers: list[str] = ["ground", "water", "swim", "massing", "sketch", "plots"],
 ):
   """Draw a section: where the vertical plane through the line from start [x, y] to end [x, y] cuts the zone, seen from the line's right
-  so start is on the left, from bottom to top at one scale across and up: the ground players stand on (brown; caves, overhangs, and
-  arches show as the shapes they are), water surfaces (blue), swim volumes (dashed boxes, cyan water and orange lava), sketch massing
-  (grey), and plot pads (orange), with a height grid and the distance along the line. For judging what plans cannot show: swim
-  volumes against the surface and the bed, a cave's headroom, a plot's pad against the slope, stacked floors, an arch's span. The
-  result also gives the cuts as numbers (s along the line, z height)."""
+  so start is on the left, from bottom to top at one scale across and up, clipped to that frame: the ground players stand on (brown;
+  caves, overhangs, and arches show as the shapes they are), water surfaces (blue), swim volumes (dashed boxes, cyan water and orange
+  lava), sketch massing (grey), sketch areas' floors (dashed) and paths in their sheets' colors (a path's rise and fall where it runs
+  along the line, level across its width where it crosses it), and plot pads (orange, level at the plot's height across its footprint,
+  with a mark on its entrance side pointing out), each named just above, with a height grid and the distance along the line. For
+  judging what plans cannot show: swim volumes against the surface and the bed, a cave's headroom, a plot's pad against the slope,
+  stacked floors and the stairs between them, an arch's span. The result also gives the cuts as numbers (s along the line, z height)."""
   if len(start) != 2 or len(end) != 2:
     raise ToolError(f"start and end are [x, y], got {start} and {end}")
   cuts = await callBridge(context, "sectionCuts", {"start": start, "end": end, "bottom": bottom, "top": top, "layers": layers})
@@ -1520,7 +1523,8 @@ async def renderSection(
     "water": [{"name": entry["name"], "levels": [min(min(z0, z1) for _, z0, _, z1 in entry["segments"]), max(max(z0, z1) for _, z0, _, z1 in entry["segments"])]} for entry in cuts["water"]],
     "swim": cuts["swim"],
     "massing": [{"name": entry["name"], "label": entry["label"]} for entry in cuts["massing"]],
-    "plots": [entry["name"] for entry in cuts["plots"]],
+    "sketch": [{"sheet": entry["sheet"], "shape": entry["shape"], "pieces": entry["pieces"]} for entry in cuts["sketch"]],
+    "plots": [{key: entry[key] for key in ("name", "s", "z", "entrance")} for entry in cuts["plots"]],
   }
   return [Image(data=outputPath.read_bytes(), format="png"), summary]
 
@@ -1939,7 +1943,7 @@ def borderModelFolder(kind):
 
 
 plotHelp = (
-  " A plot is a guide on the ground (its outline, and an arrow out of its entrance side) with the client's own border model (a player's"
+  " A plot is a guide on the ground (its outline, and a chevron pointing out of its entrance side) with the client's own border model (a player's"
   " OBP_LOTSQUARE, a guild's OBP_GUILDSQUARE, sized as a door's size scales it, in whole percents) at its center, as players will see"
   " it; guides draw in renderView (guides false hides them) and never export. `facingDegrees` is the way its entrance faces, toward its"
   " street (0 = +Y, clockwise). Sizes are [across, along] (along runs from the entrance to the back); the default is the stock plot:"
@@ -1971,13 +1975,14 @@ async def setZoneHousing(
 @guardedTool()
 async def getHousing(context: Context):
   """The zone's housing decision and every plot: address, kind, center, facing, size, allowances, features, price with each step that
-  led to it, upkeep, and border size; plot counts against its budget; and overlapping plots, which export refuses."""
+  led to it, upkeep, border size, and grading (the ground it is graded on, its margin and batter, or null); plot counts against its
+  budget; and overlapping plots, which export refuses."""
   return await callBridge(context, "getHousing", {})
 
 
 @guardedTool(description=(
   "Place one plot at `center` [x, y], its address its name (\"101 Canyon Way\"); its height is the ground's under its center unless"
-  " `height` is given. `features` (from the zone's featureMultipliers) and `pricePlatinum` (an override of the derived price) set its"
+  " `height` is given (the ground as it lies, without any plot's grading). `features` (from the zone's featureMultipliers) and `pricePlatinum` (an override of the derived price) set its"
   " price. The result gives its price and any plots it overlaps." + plotHelp
 ))
 async def placePlot(
@@ -1993,9 +1998,11 @@ async def placePlot(
 
 
 @guardedTool(description=(
-  "Change one plot: newAddress, kind, center (its height follows the ground unless `height` is given), facingDegrees, size, height,"
-  " items, pets, features (replacing its list), pricePlatinum (an override; 0 returns it to its derived price). A plot whose kind or"
-  " size changes gets a new border. Grade it again after moving it." + plotHelp
+  "Change one plot: newAddress, kind, center (its height follows the ground as it lies, without any plot's grading, unless `height` is"
+  " given), facingDegrees, size, height, items, pets, features (replacing its list), pricePlatinum (an override; 0 returns it to its"
+  " derived price). A plot whose kind or size changes gets a new border. A graded plot keeps its grading: renamed, its pass is renamed;"
+  " moved, turned, resized, or raised, its ground is graded again where it now lies, and the result's grading says as gradePlot does"
+  " what that changed. Nothing changes when the edit is refused." + plotHelp
 ))
 async def editPlot(
   context: Context, address: str, newAddress: str | None = None, kind: str | None = None, center: list[float] | None = None,
@@ -2019,19 +2026,24 @@ async def editPlot(
 
 
 @guardedTool()
-async def removePlot(context: Context, address: str, gradedObject: str | None = None):
-  """Remove a plot and its border. With `gradedObject`, the terrain it was graded on, its grading pass goes too and the ground returns
-  to what it was; otherwise the graded ground stays."""
-  return await callBridge(context, "removePlot", {"address": address, "terrainObject": gradedObject})
+async def removePlot(context: Context, address: str, keepGrading: bool = False):
+  """Remove a plot and its border. A graded plot's grading goes with it: its pass is removed and the other plots graded on that ground
+  are graded again without it, their pads untouched. With keepGrading the ground stays as it is, the plot's pass kept as ordinary
+  shaping named "kept grade <address>". Nothing is removed when the removal is refused."""
+  return await callBridge(context, "removePlot", {"address": address, "keepGrading": keepGrading})
 
 
 @guardedTool()
 async def gradePlot(context: Context, address: str, objectName: str, margin: float = 10.0, batterDegrees: float = 35.0):
-  """Level the ground (objectName) under a plot and `margin` around it to the plot's height, in its own shaping pass ("grade
-  <address>"), cutting into ground above it and filling ground below it, each meeting the ground around at `batterDegrees`, as a
-  builder's cut and fill slopes do. Grading again (after moving the plot) replaces what the pass held; removing the pass takes the
-  grading back. A plot standing far off the ground around it is refused: move it or change its height. Look at the cut and fill
-  slopes in a render; paint them like the rest of the ground."""
+  """Grade a plot on the ground (objectName): level its footprint and `margin` around it at the plot's height, cutting into ground
+  above it and filling ground below it, each meeting the ground around at `batterDegrees`, as a builder's cut and fill slopes do, in
+  the plot's own shaping pass ("grade <address>"). Every plot graded on that ground is graded together from the ground without their
+  passes, so no plot's pad is ever disturbed by another's slopes and the result does not depend on the order plots were graded in;
+  where two pads stand too close for their difference in height, the ground between them runs in one straight bank, steeper than the
+  batter, listed in steepBanks (move a plot, change its height, or build a retaining wall there). touched names the other plots whose
+  ground within 60 units of their edges changed: look at them too. Grading again (with another margin or batter) replaces what the pass
+  held; editPlot keeps a graded plot graded, and removePlot takes its grading back. A plot standing far off the ground around it is
+  refused: move it or change its height. Look at the cut and fill slopes in a render; paint them like the rest of the ground."""
   return await callBridge(context, "gradePlot", {"address": address, "objectName": objectName, "margin": margin, "batterDegrees": batterDegrees})
 
 
@@ -2052,10 +2064,12 @@ async def layOutPlots(
   features: list[str] | None = None, collection: str | None = None,
 ):
   """A starting point for a row of plots along a street: stations along `path` [[x, y], ...] a plot's width plus `gap` apart, each plot
-  `setback` from the path on `side` (left, right, or both, looking along the path), facing the street, addressed "<number> <street>"
-  from firstNumber in order along it (left before right at each station). Plots that would overlap another or find no ground are
-  skipped and listed. Then look at each one and adjust it (editPlot, gradePlot, assessPlot): a street of identical plots is a draft,
-  not a neighborhood."""
+  `setback` from the path on `side` (left, right, or both, looking along the path), facing the street, addressed "<number> <street>".
+  Every place takes the next number from firstNumber in order along the street (left before right at each station) whether or not a
+  plot fits there, so an address says where along the street it stands and, on both sides, each side keeps its own odd or even
+  numbers; places where a plot would overlap another or find no ground are skipped and listed with the address they leave free.
+  Refused when any of its addresses is taken. Then look at each plot and adjust it (editPlot, gradePlot, assessPlot): a street of
+  identical plots is a draft, not a neighborhood."""
   if kind not in ("player", "guild"):
     raise ToolError(f"kind is player or guild, got '{kind}'")
   folder = await anyio.to_thread.run_sync(borderModelFolder, kind)

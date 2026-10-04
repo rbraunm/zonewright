@@ -1,8 +1,13 @@
 import io
+import math
+import sys
+from pathlib import Path
 
 import numpy
 from PIL import Image
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
+import planDrawing
 from testModelsAndDressing import freshScene
 from testWater import basin, liquidMaterials
 
@@ -41,9 +46,14 @@ def testASketchIsMeasuredAgainstTheGroundUnderIt(stageBlenderServer, tmp_path):
     unsure = await session.expectError("eraseSketch", {"sheet": "camp"})
     erased = await session.expectSuccess("eraseSketch", {"sheet": "camp", "names": ["shed"]})
     listed = await session.expectSuccess("getSketch", {"sheet": "camp"})
-    return drawn, taller, objects["result"], walk, crossing, unsure, erased, listed
+    await session.expectSuccess("sketch", {"sheet": "spare", "shapes": [{"name": "well", "kind": "point", "at": [0, 100]}]})
+    wholly = await session.expectSuccess("eraseSketch", {"sheet": "camp", "wholeSheet": True})
+    collections = (await session.expectSuccess("runPython", {"code": "result = sorted(c.name for c in bpy.data.collections if c.name.startswith('sketch'))"}))["result"]
+    gone = await session.expectError("getSketch", {"sheet": "camp"})
+    remaining = await session.expectSuccess("getSketch", {})
+    return drawn, taller, objects["result"], walk, crossing, unsure, erased, listed, (wholly, collections, gone, remaining)
 
-  drawn, taller, objects, walk, crossing, unsure, erased, listed = stageBlenderServer.session(steps)
+  drawn, taller, objects, walk, crossing, unsure, erased, listed, (wholly, collections, gone, remaining) = stageBlenderServer.session(steps)
   shapes = {shape["name"]: shape for shape in drawn["shapes"]}
   tavern = shapes["tavern"]
   assert tavern["area"] == 1200.0 and tavern["bounds"] == [[135.0, -20.0], [165.0, 20.0]] and tavern["facingDegrees"] == 90.0
@@ -68,6 +78,9 @@ def testASketchIsMeasuredAgainstTheGroundUnderIt(stageBlenderServer, tmp_path):
   assert erased == {"sheet": "camp", "erased": 1, "remaining": 5}
   assert [shape["name"] for shape in listed["sheets"][0]["shapes"]] == ["idea", "road", "tavern", "yard", "zoneIn"]
   assert listed["sheets"][0]["shapes"][2]["nearest"]["shape"] == "yard"
+  # Erased whole, a sheet takes its collection with it and leaves the other sheets.
+  assert wholly == {"sheet": "camp", "erased": 5, "remaining": 0} and collections == ["sketch spare"]
+  assert "No sketch sheet 'camp'; sheets: ['spare']" in gone and [sheet["sheet"] for sheet in remaining["sheets"]] == ["spare"]
 
 
 def testAPlanDrawsSketchesOverAReliefMap(stageBlenderServer, tmp_path):
@@ -89,3 +102,89 @@ def testAPlanDrawsSketchesOverAReliefMap(stageBlenderServer, tmp_path):
   assert tavern[0] > tavern[1] + 40 and tavern[0] > tavern[2] + 40
   assert pool[2] > pool[0] + 30
   assert abs(ground[0] - ground[1]) < 12 and abs(ground[1] - ground[2]) < 12
+
+
+def testAPlanDrawsShapesInsideAnAreaOverItsFill(stageBlenderServer):
+  # The yard's name sorts after the house and the note inside it, and another sheet's footprint lies under it too.
+  yard = [
+    {"name": "yard", "kind": "area", "outline": [[-100, -60], [100, -60], [100, 60], [-100, 60]]},
+    {"name": "aHouse", "kind": "footprint", "rectangle": {"center": [-50, 0], "size": [30, 30], "headingDegrees": 0}, "height": 10},
+    {"name": "bNote", "kind": "note", "at": [40, 30], "label": "a note"},
+  ]
+
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [400, 400], "spacing": 10, "location": [0, 0, 0]})
+    await session.expectSuccess("setZoneProperties", environment)
+    await session.expectSuccess("sketch", {"sheet": "camp", "shapes": yard})
+    await session.expectSuccess("sketch", {"sheet": "other", "shapes": [{"name": "under", "kind": "footprint", "rectangle": {"center": [50, -25], "size": [24, 24], "headingDegrees": 0}}]})
+    return await session.expectImage("renderSketch", {"center": [0, 0], "width": 300, "layers": [], "spotHeights": False})
+
+  image, description = stageBlenderServer.session(steps)
+  pixels = numpy.asarray(Image.open(io.BytesIO(image)).convert("RGB"), dtype=numpy.int64)
+  assert description["sheetColors"] == {"camp": [200, 40, 40], "other": [30, 90, 200]}
+
+  def at(x, y):
+    return pixels[round(405 - y * 4.8), round(720 + x * 4.8)]
+
+  # The house's fill shows red over the yard's faint tint, the other sheet's footprint blue, and the note's words are written.
+  house, under, bare = at(-58, -8), at(56, -31), at(-80, 40)
+  assert house[0] > house[1] + 60 and house[0] > house[2] + 60 and bare[0] - bare[1] < 40
+  assert under[2] > under[0] + 40
+  note = pixels[round(405 - 30 * 4.8) - 12:round(405 - 30 * 4.8) + 12, round(720 + 40 * 4.8) - 50:round(720 + 40 * 4.8) + 50]
+  assert (numpy.abs(note - numpy.array([200, 40, 40])).max(axis=-1) <= 35).sum() > 20
+
+
+def testMeasuresAndSpotHeightsNeverShowNegativeZero(stageBlenderServer):
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [200, 200], "spacing": 10, "location": [0, 0, -0.01]})
+    return await session.expectSuccess("sketch", {"sheet": "flat", "shapes": [
+      {"name": "court", "kind": "area", "outline": [[-50, -50], [50, -50], [50, 50], [-50, 50]], "floor": 0},
+      {"name": "lane", "kind": "path", "points": [[-80, 0], [80, 0]]},
+      {"name": "well", "kind": "point", "at": [0, 0]},
+    ]})
+
+  drawn = stageBlenderServer.session(steps)
+
+  def numbers(value):
+    if isinstance(value, float):
+      yield value
+    elif isinstance(value, dict):
+      for item in value.values():
+        yield from numbers(item)
+    elif isinstance(value, list):
+      for item in value:
+        yield from numbers(item)
+
+  # The ground at -0.01 measures 0 to a tenth: never -0.0, nor a spot height of -0.
+  zeros = [number for number in numbers(drawn) if number == 0]
+  assert len(zeros) > 5 and all(math.copysign(1.0, number) == 1.0 for number in zeros)
+  assert planDrawing.heightLabel(-0.3) == "0" and planDrawing.heightLabel(-0.6) == "-1"
+
+
+def testASectionDrawsAreaFloorsAndAStairAlongIt(stageBlenderServer):
+  court = [
+    {"name": "lowerCourt", "kind": "area", "rectangle": {"center": [0, -30], "size": [100, 80], "headingDegrees": 0}, "floor": 0},
+    {"name": "upperTerrace", "kind": "area", "rectangle": {"center": [0, 110], "size": [100, 60], "headingDegrees": 0}, "floor": 40},
+    {"name": "stair", "kind": "path", "points": [[30, 10, 0], [30, 80, 40]], "width": 12},
+    {"name": "crossing", "kind": "path", "points": [[-60, 50, 20], [60, 50, 20]], "width": 10},
+  ]
+
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [300, 300], "spacing": 10, "location": [0, 0, 0]})
+    await session.expectSuccess("sketch", {"sheet": "court", "shapes": court})
+    return await session.expectImage("renderSection", {"start": [30, -60], "end": [30, 140], "bottom": -20, "top": 60})
+
+  image, cut = stageBlenderServer.session(steps)
+  # Along x 30 from y -60: the lower court's floor from the line's start to its north edge (s 70), the stair rising along the line
+  # from there to the terrace's floor at 40, and the path crossing at y 50 level across its 10 width.
+  assert {entry["shape"]: entry["pieces"] for entry in cut["sketch"]} == {
+    "crossing": [[105.0, 20.0, 115.0, 20.0]], "lowerCourt": [[0.0, 0.0, 70.0, 0.0]], "stair": [[70.0, 0.0, 140.0, 40.0]],
+    "upperTerrace": [[140.0, 40.0, 200.0, 40.0]],
+  }
+  pixels = numpy.asarray(Image.open(io.BytesIO(image)).convert("RGB"), dtype=numpy.int64)
+  # 200 along and 80 up at 6.6 pixels a unit; the stair drawn in the sheet's red halfway up.
+  column, row = round(60 + 6.6 * 87.5), round(669 - (10 + 20) * 6.6)
+  assert (numpy.abs(pixels[row - 3:row + 4, column - 3:column + 4] - numpy.array([200, 40, 40])).max(axis=-1) <= 30).any()

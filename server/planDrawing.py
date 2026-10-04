@@ -1,6 +1,7 @@
 """Plan and section drawings. A plan lays sketch sheets and the plan's regions, plots, and water in crisp lines and labels over a top-down
 relief render, with a coordinate grid, a scale bar, and north up. A section draws where a vertical plane cuts the zone, at one scale
-across and up."""
+across and up. Translucent fills each go on their own layer, composited in turn, so a fill tints what lies under it and never erases
+it; lines go over the fills and labels over everything, each label clear of those placed before it."""
 import math
 
 from PIL import Image, ImageDraw, ImageFont
@@ -16,6 +17,11 @@ labelHalo = (255, 255, 255)
 gridSteps = (10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000)
 dashLength = 10
 gapLength = 6
+spotColor = (90, 30, 0)
+gridLabelColor = (40, 40, 40)
+# A plot's entrance mark in plan, in pixels: a triangle this long pointing out of the middle of its entrance side, this wide at its base.
+entranceMarkLength = 11
+entranceMarkWidth = 14
 
 
 class PlanFrame:
@@ -40,6 +46,50 @@ def fontOf(size):
 
 def labelAt(draw, position, text, color, size=15, anchor="mm"):
   draw.text(position, text, fill=color, font=fontOf(size), anchor=anchor, stroke_width=3, stroke_fill=labelHalo)
+
+
+def boxesOverlap(first, second):
+  return first[0] < second[2] and second[0] < first[2] and first[1] < second[3] and second[1] < first[3]
+
+
+class LabelBoard:
+  """Labels placed so none covers another: each goes at its spot, or the nearest spot around it clear of the labels placed before it."""
+
+  def __init__(self, draw, size):
+    self.draw, self.size, self.taken = draw, size, []
+
+  def textBox(self, position, text, size, anchor):
+    return self.draw.textbbox(position, text, font=fontOf(size), anchor=anchor, stroke_width=3)
+
+  def isClear(self, box, inside=True):
+    within = box[0] >= 0 and box[1] >= 0 and box[2] <= self.size[0] and box[3] <= self.size[1]
+    return (within or not inside) and not any(boxesOverlap(box, other) for other in self.taken)
+
+  def reserve(self, box):
+    self.taken.append(box)
+
+  def write(self, position, text, color, size=15, anchor="mm"):
+    """Write a label at position, reserving its place."""
+    self.reserve(self.textBox(position, text, size, anchor))
+    labelAt(self.draw, position, text, color, size, anchor)
+
+  def place(self, position, text, color, size=15, anchor="mm"):
+    """Write a label at position, or moved the least distance clear of the labels already placed; where every spot tried is taken, at
+    position, as a label is never left out."""
+    box = self.textBox(position, text, size, anchor)
+    width, height = box[2] - box[0], box[3] - box[1]
+    for ring in range(4):
+      for across, up in ((0, 0),) if ring == 0 else ((0, -1), (0, 1), (-1, 0), (1, 0), (-1, -1), (1, -1), (-1, 1), (1, 1)):
+        spot = (position[0] + across * ring * (width / 2 + 4), position[1] + up * ring * (height + 2))
+        if self.isClear(self.textBox(spot, text, size, anchor)):
+          self.write(spot, text, color, size, anchor)
+          return
+    self.write(position, text, color, size, anchor)
+
+
+def heightLabel(height):
+  """A height as a whole number, never negative zero."""
+  return str(round(height))
 
 
 def dashedLine(draw, points, color, width):
@@ -84,40 +134,60 @@ def gridCrossings(center, width, aspect):
   return [[x, y] for x in xs for y in ys]
 
 
-def drawGrid(draw, frame):
+def gridLines(frame):
+  """The grid's step and its lines' places along x and y."""
   step = gridStepFor(frame.width)
   left, right = frame.center[0] - frame.width / 2, frame.center[0] + frame.width / 2
   bottom, top = frame.center[1] - frame.height / 2, frame.center[1] + frame.height / 2
-  for x in range(math.ceil(left / step) * step, math.floor(right) + 1, step):
+  return step, range(math.ceil(left / step) * step, math.floor(right) + 1, step), range(math.ceil(bottom / step) * step, math.floor(top) + 1, step)
+
+
+def drawGrid(draw, frame):
+  _, xs, ys = gridLines(frame)
+  for x in xs:
     px = frame.pixel((x, 0))[0]
     draw.line([(px, 0), (px, frame.size[1])], fill=gridColor, width=1)
-    labelAt(draw, (px + 3, 4), str(x), (40, 40, 40), 13, "la")
-  for y in range(math.ceil(bottom / step) * step, math.floor(top) + 1, step):
+  for y in ys:
     py = frame.pixel((0, y))[1]
     draw.line([(0, py), (frame.size[0], py)], fill=gridColor, width=1)
-    labelAt(draw, (4, py - 3), str(y), (40, 40, 40), 13, "ld")
-  return step
 
 
-def drawScale(draw, frame, step):
+def labelGrid(board, frame):
+  _, xs, ys = gridLines(frame)
+  for x in xs:
+    board.write((frame.pixel((x, 0))[0] + 3, 4), str(x), gridLabelColor, 13, "la")
+  for y in ys:
+    board.write((4, frame.pixel((0, y))[1] - 3), str(y), gridLabelColor, 13, "ld")
+
+
+def drawScale(board, frame, step):
+  draw = board.draw
   bar = frame.length(step)
   x0, y0 = 20, frame.size[1] - 24
-  draw.rectangle([x0 - 6, y0 - 26, x0 + bar + 70, y0 + 10], fill=(255, 255, 255, 200))
+  panel = [x0 - 6, y0 - 26, x0 + bar + 70, y0 + 10]
+  draw.rectangle(panel, fill=(255, 255, 255, 200))
+  board.reserve(panel)
   draw.line([(x0, y0), (x0 + bar, y0)], fill=(0, 0, 0), width=4)
   for x in (x0, x0 + bar):
     draw.line([(x, y0 - 6), (x, y0 + 6)], fill=(0, 0, 0), width=2)
   labelAt(draw, (x0 + bar / 2, y0 - 14), f"{step} units", (0, 0, 0), 14)
   nx, ny = frame.size[0] - 30, 50
   draw.polygon([(nx, ny - 26), (nx - 10, ny), (nx + 10, ny)], fill=(0, 0, 0))
-  labelAt(draw, (nx, ny + 14), "N", (0, 0, 0), 16)
+  board.reserve([nx - 10, ny - 26, nx + 10, ny])
+  board.write((nx, ny + 14), "N", (0, 0, 0), 16)
 
 
-def drawSpots(draw, frame, spots):
-  """The ground's height at each grid crossing, written just beside it."""
+def drawSpots(board, frame, spots):
+  """The ground's height at each grid crossing, written just beside it, where no other label is: a spot gives way to every label."""
   for spot in spots:
     x, y = frame.pixel(spot["at"])
-    draw.ellipse([x - 2, y - 2, x + 2, y + 2], fill=(0, 0, 0, 255))
-    labelAt(draw, (x + 4, y + 3), f"{spot['height']:.0f}", (90, 30, 0), 12, "la")
+    text = heightLabel(spot["height"])
+    dot = [x - 2, y - 2, x + 2, y + 2]
+    label = board.textBox((x + 4, y + 3), text, 12, "la")
+    if board.isClear(dot, inside=False) and board.isClear(label):
+      board.draw.ellipse(dot, fill=(0, 0, 0, 255))
+      board.reserve(dot)
+      board.write((x + 4, y + 3), text, spotColor, 12, "la")
 
 
 def drawWater(draw, frame, bodies):
@@ -140,30 +210,41 @@ def drawRegions(draw, frame, regions):
   for region in regions:
     points = [frame.pixel(point) for point in region["outline"]]
     dashedLine(draw, points + points[:1], (*regionColor, 230), 2)
-    labelAt(draw, centroidOf(points), region["name"], regionColor, 13)
 
 
 def drawPlots(draw, frame, plots):
+  """Each plot's outline and a mark pointing out of the middle of its entrance side."""
   for plot in plots:
     points = [frame.pixel(point) for point in plot["corners"]]
     draw.polygon(points, outline=(*plotColor, 255), width=2)
-    labelAt(draw, centroidOf(points), plot["address"], plotColor, 12)
+    middle = ((points[0][0] + points[1][0]) / 2, (points[0][1] + points[1][1]) / 2)
+    heading = math.radians(plot["facingDegrees"])
+    out = (math.sin(heading), -math.cos(heading))
+    side = (-out[1], out[0])
+    tip = (middle[0] + out[0] * entranceMarkLength, middle[1] + out[1] * entranceMarkLength)
+    draw.polygon([tip, (middle[0] + side[0] * entranceMarkWidth / 2, middle[1] + side[1] * entranceMarkWidth / 2), (middle[0] - side[0] * entranceMarkWidth / 2, middle[1] - side[1] * entranceMarkWidth / 2)], fill=(*plotColor, 255))
 
 
-def drawShape(draw, frame, shape, color):
+def fillShape(draw, frame, shape, color):
+  """A shape's translucent part: an area's or footprint's fill, a path's width."""
   points = [frame.pixel(point) for point in shape["plan"]]
-  label = shape.get("label") or shape["name"]
+  if shape["kind"] == "area":
+    draw.polygon(points, fill=(*color, 40))
+  elif shape["kind"] == "footprint":
+    draw.polygon(points, fill=(*color, 110))
+  elif shape["kind"] == "path" and "width" in shape:
+    draw.line(points, fill=(*color, 70), width=max(2, round(frame.length(shape["width"]))), joint="curve")
+
+
+def strokeShape(draw, frame, shape, color):
+  """A shape's lines and marks: an area's dashed edge, a footprint's edge, a path's line, a point's dot, and the way it faces."""
+  points = [frame.pixel(point) for point in shape["plan"]]
   kind = shape["kind"]
   if kind == "area":
-    draw.polygon(points, fill=(*color, 40))
     dashedLine(draw, points + points[:1], (*color, 255), 3)
   elif kind == "footprint":
-    draw.polygon(points, fill=(*color, 110), outline=(*color, 255), width=3)
-    if "height" in shape:
-      label += f" (h {shape['height']:g})"
+    draw.polygon(points, outline=(*color, 255), width=3)
   elif kind == "path":
-    if "width" in shape:
-      draw.line(points, fill=(*color, 70), width=max(2, round(frame.length(shape["width"]))), joint="curve")
     draw.line(points, fill=(*color, 255), width=2)
   elif kind == "point":
     x, y = points[0]
@@ -173,49 +254,88 @@ def drawShape(draw, frame, shape, color):
     center = centroidOf(plan)
     reach = 0.35 * max(max(p[0] for p in plan) - min(p[0] for p in plan), max(p[1] for p in plan) - min(p[1] for p in plan), frame.width / 40)
     facingArrow(draw, frame, center, shape["facingDegrees"], reach, (*color, 255))
+
+
+def labelShape(board, frame, shape, color):
+  points = [frame.pixel(point) for point in shape["plan"]]
+  label = shape.get("label") or shape["name"]
+  kind = shape["kind"]
+  if kind == "footprint" and "height" in shape:
+    label += f" (h {shape['height']:g})"
   if kind == "path":
     middle = points[len(points) // 2 - 1] if len(points) > 1 else points[0]
     after = points[len(points) // 2]
-    anchor = ((middle[0] + after[0]) / 2, (middle[1] + after[1]) / 2)
+    board.place(((middle[0] + after[0]) / 2, (middle[1] + after[1]) / 2), label, color, 15)
   elif kind == "point":
-    labelAt(draw, (points[0][0] + 10, points[0][1]), label, color, 15, "lm")
-    return
+    board.place((points[0][0] + 10, points[0][1]), label, color, 15, "lm")
   elif kind == "note":
-    anchor = points[0]
+    board.place(points[0], label, color, 14)
   elif kind == "area":
-    # An area's name sits just inside its top, clear of the footprints and points usually drawn in its middle.
-    anchor = (centroidOf(points)[0], min(point[1] for point in points) + 14)
+    # An area's name sits just inside the top of what the drawing shows of it, clear of the footprints and points usually drawn in its
+    # middle.
+    left, right = max(0, min(point[0] for point in points)), min(frame.size[0], max(point[0] for point in points))
+    board.place(((left + right) / 2, max(0, min(point[1] for point in points)) + 14), label, color, 15)
   else:
-    anchor = centroidOf(points)
-  labelAt(draw, anchor, label, color, 15 if kind != "note" else 14)
+    board.place(centroidOf(points), label, color, 15)
+
+
+# Shapes' labels are placed smallest shapes first: they have the least room to move before leaving what they name.
+labelOrder = ("point", "footprint", "note", "path", "area")
 
 
 def drawPlan(basePath, outputPath, center, width, overlays):
-  """Lay the overlays over the base render, scaled up so lines and labels stay crisp, and save the drawing."""
+  """Lay the overlays over the base render, scaled up so lines and labels stay crisp, and save the drawing: water, regions, then every
+  sheet's area fills, footprint fills and path widths each composited in turn, then every line and mark, then the labels, which the
+  ground's spot heights give way to."""
   with Image.open(basePath) as base:
     size = (round(base.width * planScale), round(base.height * planScale))
     image = base.convert("RGB").resize(size, Image.Resampling.BICUBIC).convert("RGBA")
   frame = PlanFrame(center, width, size)
-  layer = Image.new("RGBA", size, (0, 0, 0, 0))
-  draw = ImageDraw.Draw(layer)
-  step = drawGrid(draw, frame)
-  drawWater(draw, frame, overlays["water"])
-  drawSwim(draw, frame, overlays["swim"])
-  drawRegions(draw, frame, overlays["regions"])
-  drawPlots(draw, frame, overlays["plots"])
-  drawSpots(draw, frame, overlays["spots"])
-  legend = []
-  for index, sheet in enumerate(overlays["sheets"]):
-    color = sheetColors[index % len(sheetColors)]
-    legend.append((sheet["sheet"], color))
-    for shape in sheet["shapes"]:
-      drawShape(draw, frame, shape, color)
-  drawScale(draw, frame, step)
-  for row, (name, color) in enumerate(legend):
-    labelAt(draw, (frame.size[0] - 16, 80 + row * 20), f"sketch {name}", color, 15, "ra")
-  image = Image.alpha_composite(image, layer).convert("RGB")
-  image.save(outputPath)
-  return {"gridStep": step, "size": list(size), "sheetColors": {name: list(color) for name, color in legend}}
+
+  def overlay(paint):
+    nonlocal image
+    layer = Image.new("RGBA", size, (0, 0, 0, 0))
+    paint(ImageDraw.Draw(layer))
+    image = Image.alpha_composite(image, layer)
+
+  sheets = [(sheet, sheetColors[index % len(sheetColors)]) for index, sheet in enumerate(overlays["sheets"])]
+  shapes = [(shape, color) for sheet, color in sheets for shape in sheet["shapes"]]
+  overlay(lambda draw: drawGrid(draw, frame))
+  overlay(lambda draw: drawWater(draw, frame, overlays["water"]))
+  overlay(lambda draw: drawSwim(draw, frame, overlays["swim"]))
+  overlay(lambda draw: drawRegions(draw, frame, overlays["regions"]))
+  for kinds in (("area",), ("footprint", "path")):
+    for shape, color in shapes:
+      if shape["kind"] in kinds:
+        overlay(lambda draw, shape=shape, color=color: fillShape(draw, frame, shape, color))
+
+  def strokes(draw):
+    for shape, color in shapes:
+      strokeShape(draw, frame, shape, color)
+    drawPlots(draw, frame, overlays["plots"])
+
+  overlay(strokes)
+  step = gridStepFor(frame.width)
+
+  def labels(draw):
+    board = LabelBoard(draw, size)
+    labelGrid(board, frame)
+    drawScale(board, frame, step)
+    for row, (sheet, color) in enumerate(sheets):
+      board.write((frame.size[0] - 16, 80 + row * 20), f"sketch {sheet['sheet']}", color, 15, "ra")
+    for kind in labelOrder:
+      for shape, color in shapes:
+        if shape["kind"] == kind:
+          labelShape(board, frame, shape, color)
+    for plot in overlays["plots"]:
+      board.place(centroidOf([frame.pixel(point) for point in plot["corners"]]), plot["address"], plotColor, 12)
+    for region in overlays["regions"]:
+      board.place(centroidOf([frame.pixel(point) for point in region["outline"]]), region["name"], regionColor, 13)
+    drawSpots(board, frame, overlays["spots"])
+
+  overlay(labels)
+  image.convert("RGB").save(outputPath)
+  return {"gridStep": step, "size": list(size), "sheetColors": {sheet["sheet"]: list(color) for sheet, color in sheets}}
 
 
 sectionSize = (1440, 810)
@@ -225,9 +345,36 @@ massingColor = (90, 90, 90)
 sectionBackground = (238, 236, 232)
 
 
+# A section's label stands this many pixels above the top of what it names.
+sectionLabelLift = 8
+# A plot's pad in section: its line's width, the ticks at its ends, and its entrance mark, in pixels.
+padWidth = 5
+padTick = 7
+entranceMarkSection = 10
+# A path without a width crossing a section shows as a diamond this many pixels across.
+crossingMark = 5
+
+
+def clippedSegment(segment, length, bottom, top):
+  """The part of a segment [s0, z0, s1, z1] inside the drawing's frame (0 to length along, bottom to top), or None."""
+  s0, z0, s1, z1 = segment
+  enter, leave = 0.0, 1.0
+  for origin, delta, low, high in ((s0, s1 - s0, 0.0, length), (z0, z1 - z0, bottom, top)):
+    if delta == 0:
+      if not low <= origin <= high:
+        return None
+      continue
+    first, second = (low - origin) / delta, (high - origin) / delta
+    enter, leave = max(enter, min(first, second)), min(leave, max(first, second))
+  if enter > leave:
+    return None
+  return (s0 + enter * (s1 - s0), z0 + enter * (z1 - z0), s0 + leave * (s1 - s0), z0 + leave * (z1 - z0))
+
+
 def drawSection(outputPath, cuts, start, end, bottom, top):
-  """Draw a section's cuts: the ground's profile, water surfaces, swim volumes as boxes, sketch massing, and plot pads, at one scale
-  across and up, with a height grid, the distance along the line, and its two ends named by their coordinates."""
+  """Draw a section's cuts, clipped to its frame: the ground's profile, water surfaces, swim volumes as boxes, sketch massing, sketch
+  area floors (dashed) and paths in their sheets' colors, and plot pads with their entrances, at one scale across and up, with a
+  height grid, the distance along the line, and its two ends named by their coordinates; each label just above what it names."""
   width, height = sectionSize
   padX, padY = sectionPadding
   length = cuts["length"]
@@ -238,48 +385,93 @@ def drawSection(outputPath, cuts, start, end, bottom, top):
   def pixel(s, z):
     return (left + s * scale, baseline - (z - bottom) * scale)
 
-  image = Image.new("RGBA", sectionSize, (*sectionBackground, 255))
+  image = Image.new("RGB", sectionSize, sectionBackground)
   draw = ImageDraw.Draw(image, "RGBA")
+  board = LabelBoard(draw, sectionSize)
+  labels = []
+
+  def lines(segments, color, lineWidth, dashed=False):
+    """Draw the segments' parts inside the frame, and return those parts."""
+    kept = [clipped for segment in segments if (clipped := clippedSegment(segment, length, bottom, top)) is not None]
+    for s0, z0, s1, z1 in kept:
+      if dashed:
+        dashedLine(draw, [pixel(s0, z0), pixel(s1, z1)], (*color, 255), lineWidth)
+      else:
+        draw.line([pixel(s0, z0), pixel(s1, z1)], fill=(*color, 255), width=lineWidth)
+    return kept
+
+  def extent(kept):
+    """The pixel box around drawn parts."""
+    corners = [pixel(s, z) for s0, z0, s1, z1 in kept for s, z in ((s0, z0), (s1, z1))]
+    return [min(x for x, _ in corners), min(y for _, y in corners), max(x for x, _ in corners), max(y for _, y in corners)]
+
+  def nameAbove(kept, text, color, size, overTop):
+    """Name drawn parts just above them: over the middle of their top (a block), or over the middle of their longest part (a line)."""
+    if not kept:
+      return
+    if overTop:
+      box = extent(kept)
+      labels.append((((box[0] + box[2]) / 2, box[1] - sectionLabelLift), text, color, size))
+      return
+    s0, z0, s1, z1 = max(kept, key=lambda piece: math.hypot(piece[2] - piece[0], piece[3] - piece[1]))
+    x, y = pixel((s0 + s1) / 2, (z0 + z1) / 2)
+    labels.append(((x, y - sectionLabelLift), text, color, size))
+
   step = gridStepFor(max(length, top - bottom))
   for z in range(math.ceil(bottom / step) * step, math.floor(top) + 1, step):
     y = pixel(0, z)[1]
     draw.line([(left, y), (left + length * scale, y)], fill=(205, 205, 205, 255), width=1)
-    labelAt(draw, (left - 6, y), str(z), (60, 60, 60), 13, "rm")
+    board.write((left - 6, y), str(z), (60, 60, 60), 13, "rm")
   for s in range(0, math.floor(length) + 1, step):
     x = pixel(s, 0)[0]
     draw.line([(x, pixel(0, top)[1]), (x, pixel(0, bottom)[1])], fill=(218, 218, 218, 255), width=1)
-    labelAt(draw, (x, pixel(0, bottom)[1] + 12), str(s), (60, 60, 60), 12)
+    board.write((x, pixel(0, bottom)[1] + 12), str(s), (60, 60, 60), 12)
+  fromLabel, toLabel = (f"[{point[0]:g}, {point[1]:g}]" for point in (start, end))
+  board.write((left, padY / 2), fromLabel, (0, 0, 0), 14, "lm")
+  board.write((left + length * scale, padY / 2), toLabel, (0, 0, 0), 14, "rm")
+  bar = step * scale
+  draw.line([(width - padX - bar, height - 16), (width - padX, height - 16)], fill=(0, 0, 0, 255), width=4)
+  board.write((width - padX - bar / 2, height - 28), f"{step} units", (0, 0, 0), 13)
   for box in cuts["swim"]:
     corners = [pixel(box["s"][0], box["z"][1]), pixel(box["s"][1], box["z"][0])]
     color = swimColors[box["liquid"]]
     draw.rectangle([corners[0], corners[1]], fill=(*color, 60))
     outline = [corners[0], (corners[1][0], corners[0][1]), corners[1], (corners[0][0], corners[1][1])]
     dashedLine(draw, outline + outline[:1], (*color, 255), 2)
-    labelAt(draw, ((corners[0][0] + corners[1][0]) / 2, corners[1][1] - 9), box["name"], color, 11)
+    labels.append((((corners[0][0] + corners[1][0]) / 2, corners[1][1] - 9), box["name"], color, 11))
+  lines(cuts["ground"], groundColor, 3)
   for entry in cuts["massing"]:
-    for s0, z0, s1, z1 in entry["segments"]:
-      draw.line([pixel(s0, z0), pixel(s1, z1)], fill=(*massingColor, 255), width=3)
-    labelAt(draw, pixel(*middleOf(entry["segments"])), entry["label"], massingColor, 13)
-  for s0, z0, s1, z1 in cuts["ground"]:
-    draw.line([pixel(s0, z0), pixel(s1, z1)], fill=(*groundColor, 255), width=3)
+    kept = lines(entry["segments"], massingColor, 3)
+    if kept:
+      board.reserve(extent(kept))
+    nameAbove(kept, entry["label"], massingColor, 13, True)
+  for entry in cuts["sketch"]:
+    color = sheetColors[cuts["sheets"].index(entry["sheet"]) % len(sheetColors)]
+    kept = lines([piece for piece in entry["pieces"] if piece[0] != piece[2]], color, 3, dashed=entry["kind"] == "area")
+    for s, z, _, _ in (piece for piece in entry["pieces"] if piece[0] == piece[2]):
+      if 0 <= s <= length and bottom <= z <= top:
+        x, y = pixel(s, z)
+        draw.polygon([(x, y - crossingMark), (x + crossingMark, y), (x, y + crossingMark), (x - crossingMark, y)], fill=(*color, 255))
+        kept.append((s, z, s, z))
+    nameAbove(kept, entry["label"], color, 13, False)
   for entry in cuts["water"]:
-    for s0, z0, s1, z1 in entry["segments"]:
-      draw.line([pixel(s0, z0), pixel(s1, z1)], fill=(*waterColor, 255), width=3)
-    labelAt(draw, pixel(*middleOf(entry["segments"])), entry["name"], waterColor, 12)
+    nameAbove(lines(entry["segments"], waterColor, 3), entry["name"], waterColor, 12, False)
   for entry in cuts["plots"]:
-    for s0, z0, s1, z1 in entry["segments"]:
-      draw.line([pixel(s0, z0), pixel(s1, z1)], fill=(*plotColor, 255), width=4)
-    labelAt(draw, pixel(*middleOf(entry["segments"])), entry["name"], plotColor, 12)
-  fromLabel, toLabel = (f"[{point[0]:g}, {point[1]:g}]" for point in (start, end))
-  labelAt(draw, (left, padY / 2), fromLabel, (0, 0, 0), 14, "lm")
-  labelAt(draw, (left + length * scale, padY / 2), toLabel, (0, 0, 0), 14, "rm")
-  bar = step * scale
-  draw.line([(width - padX - bar, height - 16), (width - padX, height - 16)], fill=(0, 0, 0, 255), width=4)
-  labelAt(draw, (width - padX - bar / 2, height - 28), f"{step} units", (0, 0, 0), 13)
-  image.convert("RGB").save(outputPath)
+    kept = lines([[entry["s"][0], entry["z"], entry["s"][1], entry["z"]]], plotColor, padWidth)
+    for s0, z, s1, _ in kept:
+      for s in (s0, s1):
+        x, y = pixel(s, z)
+        draw.line([(x, y - padTick), (x, y + padTick)], fill=(*plotColor, 255), width=2)
+      if entry["entrance"] is not None and s0 - 1e-6 <= entry["entrance"] <= s1 + 1e-6:
+        x, y = pixel(entry["entrance"], z)
+        y -= padTick + entranceMarkSection / 2
+        tip = x + entry["outward"] * entranceMarkSection
+        draw.polygon([(tip, y), (x, y - entranceMarkSection / 2), (x, y + entranceMarkSection / 2)], fill=(*plotColor, 255))
+    if kept:
+      box = extent(kept)
+      board.reserve([box[0] - entranceMarkSection, box[1] - padTick - entranceMarkSection, box[2] + entranceMarkSection, box[3] + padTick])
+    nameAbove(kept, entry["name"], plotColor, 12, True)
+  for position, text, color, size in labels:
+    board.place(position, text, color, size, "mb")
+  image.save(outputPath)
   return {"gridStep": step, "unitsPerPixel": round(1 / scale, 4)}
-
-
-def middleOf(segments):
-  s0, z0, s1, z1 = segments[len(segments) // 2]
-  return (s0 + s1) / 2, max(z0, z1) + 0.0
