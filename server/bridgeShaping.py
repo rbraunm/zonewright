@@ -616,11 +616,7 @@ def followContours(objectName, selector):
 
 
 def splitAtPeaks(meshEditor, cutting, values, points, tree, level):
-  """Split each edge of the cut faces whose ends lie on one side of a distance level that the distance between them passes (an edge
-  up a wall one cell wide, both ends on the border, passes a level below half the wall's height) where it lies farthest past the
-  level, and triangulate the faces around the new vertices, so the level crosses each edge at most once. A face that gained two new
-  vertices is first split between them: both lie past the level, and a diagonal from one end of the wall to the other would pass it
-  twice again. Returns how many edges it split."""
+  """Split edges the distance level crosses twice where they lie farthest past it, and triangulate around; returns how many it split."""
   splits = []
   for edge in sorted({edge for face in cutting for edge in face.edges}, key=lambda edge: edge.index):
     start, end = edge.verts
@@ -646,6 +642,9 @@ def splitAtPeaks(meshEditor, cutting, values, points, tree, level):
     points.append(points[start.index] + fraction * (points[end.index] - points[start.index]))
     touched.update(vertex.link_faces)
     inserted.add(vertex)
+  # An edge up a wall one cell wide, both ends on the border, passes a level below half the wall's height twice. A face that gained two
+  # new vertices is split between them first: both lie past the level, and a diagonal from one end of the wall to the other would pass
+  # it twice again.
   for face in sorted(touched, key=lambda face: face.index):
     peaks = [vertex for vertex in face.verts if vertex in inserted]
     if len(peaks) >= 2 and not any(peaks[1] in edge.verts for edge in peaks[0].link_edges if edge in face.edges):
@@ -660,10 +659,7 @@ def splitAtPeaks(meshEditor, cutting, values, points, tree, level):
 
 
 def cutContours(objectName, levels, distanceFrom, selector, onlyAbove):
-  """Cut the selected faces along level lines, as an artist adds an edge loop: lines of equal height, or with distanceFrom, of equal
-  distance from the border of the faces it picks (with onlyAbove, only from where the faces beyond it rise above them: a wall's foot,
-  not its lip). Each crossed edge splits where the line crosses it (the new vertex placed alike in every shaping pass, with UVs and face
-  paint carried over), an edge the line crosses twice first splits between (splitAtPeaks), and each crossed face splits along the line."""
+  """Cut the selected faces along lines of equal height, or of equal distance from distanceFrom's border (footBorders with onlyAbove)."""
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   if not levels or len(set(levels)) != len(levels):
     raise ValueError(f"levels is a list of different values, got {levels!r}")
@@ -680,10 +676,7 @@ def cutContours(objectName, levels, distanceFrom, selector, onlyAbove):
       raise ValueError(f"Distances from a border are positive, got {levels!r}")
     picked = bridgeMeshAccess.evaluateSelector(distanceFrom, sceneObject, "faces")
     bridgeMeshAccess.requireSelection(picked, distanceFrom, sceneObject, "faces")
-    border, pickedFaces, beyondFaces = bridgeMeshAccess.faceBorders(sceneObject, picked, ~picked)
-    if onlyAbove:
-      heights = bridgeMeshAccess.readFaceArrays(sceneObject)[0][:, 2]
-      border = border[heights[beyondFaces] > heights[pickedFaces]]
+    border = (bridgeMeshAccess.footBorders(sceneObject, ~picked, picked) if onlyAbove else bridgeMeshAccess.faceBorders(sceneObject, picked, ~picked))[0]
     if not len(border):
       raise ValueError(f"The faces {distanceFrom!r} picks have no border{' below the faces beyond them' if onlyAbove else ''} on '{objectName}'")
     edges = bridgeMeshAccess.meshEdges(sceneObject.data)

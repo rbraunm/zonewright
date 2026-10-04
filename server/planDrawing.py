@@ -120,6 +120,30 @@ def drawSpots(draw, frame, spots):
     labelAt(draw, (x + 4, y + 3), f"{spot['height']:.0f}", (90, 30, 0), 12, "la")
 
 
+def spotCovers(draw, frame, spots):
+  """The boxes each spot height's dot and number cover on the drawing."""
+  covered = []
+  for spot in spots:
+    x, y = frame.pixel(spot["at"])
+    numberBox = draw.textbbox((x + 4, y + 3), f"{spot['height']:.0f}", font=fontOf(12), anchor="la", stroke_width=3)
+    covered.append((x - 3, y - 3, numberBox[2], numberBox[3]))
+  return covered
+
+
+def clearLabelAt(draw, frame, center, text, color, size, covered):
+  """Label text at the point nearest center, a quarter of a grid step apart, whose box overlaps nothing covered, and cover it there."""
+  quarter = frame.length(gridStepFor(frame.width)) / 4
+  offsets = sorted(((dx * quarter, dy * quarter) for dx in range(-4, 5) for dy in range(-4, 5)), key=lambda offset: math.hypot(*offset))
+  for dx, dy in offsets:
+    box = draw.textbbox((center[0] + dx, center[1] + dy), text, font=fontOf(size), anchor="mm", stroke_width=3)
+    if not any(box[0] < other[2] and other[0] < box[2] and box[1] < other[3] and other[1] < box[3] for other in covered):
+      labelAt(draw, (center[0] + dx, center[1] + dy), text, color, size)
+      covered.append(box)
+      return
+  # Crowded all around (a tight zoom on a grid of spot heights): the label keeps its own place.
+  labelAt(draw, center, text, color, size)
+
+
 def drawWater(draw, frame, bodies):
   for body in bodies:
     pixels = [frame.pixel(point) for point in body["positions"]]
@@ -127,27 +151,27 @@ def drawWater(draw, frame, bodies):
       draw.polygon([pixels[index] for index in triangle], fill=(*waterColor, 110))
 
 
-def drawSwim(draw, frame, boxes):
+def drawSwim(draw, frame, boxes, covered):
   """Swim volumes as dashed rectangles in plan, named small."""
   for box in boxes:
     (low, high) = box["corners"]
     points = [frame.pixel(point) for point in ((low[0], low[1]), (high[0], low[1]), (high[0], high[1]), (low[0], high[1]))]
     dashedLine(draw, points + points[:1], (*swimColors[box["liquid"]], 255), 2)
-    labelAt(draw, centroidOf(points), box["name"], swimColors[box["liquid"]], 11)
+    clearLabelAt(draw, frame, centroidOf(points), box["name"], swimColors[box["liquid"]], 11, covered)
 
 
-def drawRegions(draw, frame, regions):
+def drawRegions(draw, frame, regions, covered):
   for region in regions:
     points = [frame.pixel(point) for point in region["outline"]]
     dashedLine(draw, points + points[:1], (*regionColor, 230), 2)
-    labelAt(draw, centroidOf(points), region["name"], regionColor, 13)
+    clearLabelAt(draw, frame, centroidOf(points), region["name"], regionColor, 13, covered)
 
 
-def drawPlots(draw, frame, plots):
+def drawPlots(draw, frame, plots, covered):
   for plot in plots:
     points = [frame.pixel(point) for point in plot["corners"]]
     draw.polygon(points, outline=(*plotColor, 255), width=2)
-    labelAt(draw, centroidOf(points), plot["address"], plotColor, 12)
+    clearLabelAt(draw, frame, centroidOf(points), plot["address"], plotColor, 12, covered)
 
 
 def drawShape(draw, frame, shape, color):
@@ -200,9 +224,10 @@ def drawPlan(basePath, outputPath, center, width, overlays):
   draw = ImageDraw.Draw(layer)
   step = drawGrid(draw, frame)
   drawWater(draw, frame, overlays["water"])
-  drawSwim(draw, frame, overlays["swim"])
-  drawRegions(draw, frame, overlays["regions"])
-  drawPlots(draw, frame, overlays["plots"])
+  covered = spotCovers(draw, frame, overlays["spots"])
+  drawSwim(draw, frame, overlays["swim"], covered)
+  drawRegions(draw, frame, overlays["regions"], covered)
+  drawPlots(draw, frame, overlays["plots"], covered)
   drawSpots(draw, frame, overlays["spots"])
   legend = []
   for index, sheet in enumerate(overlays["sheets"]):

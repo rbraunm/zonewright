@@ -1,8 +1,12 @@
 import io
+import sys
+from pathlib import Path
 
 import numpy
-from PIL import Image
+from PIL import Image, ImageDraw
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
+import planDrawing
 from testModelsAndDressing import freshScene
 from testWater import basin, liquidMaterials
 
@@ -89,3 +93,26 @@ def testAPlanDrawsSketchesOverAReliefMap(stageBlenderServer, tmp_path):
   assert tavern[0] > tavern[1] + 40 and tavern[0] > tavern[2] + 40
   assert pool[2] > pool[0] + 30
   assert abs(ground[0] - ground[1]) < 12 and abs(ground[1] - ground[2]) < 12
+
+
+def testPlanNamesSitBesideTheSpotHeightsNotOnThem():
+  image = Image.new("RGBA", (720, 405), (0, 0, 0, 0))
+  draw = ImageDraw.Draw(image)
+  frame = planDrawing.PlanFrame([0, 0], 300, (720, 405))
+  spots = [{"at": [x, y], "height": 23.0} for x in (-25, 0, 25) for y in (-25, 0, 25)]
+  covered = planDrawing.spotCovers(draw, frame, spots)
+  spotBoxes = list(covered)
+  planDrawing.drawRegions(draw, frame, [{"name": "hollow", "outline": [[-40, -40], [40, -40], [40, 40], [-40, 40]]}], covered)
+  label = covered[-1]
+
+  def overlap(a, b):
+    return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
+
+  # The region's middle is a grid crossing with a spot height on it: the name there would cover the spot, so it moves beside it,
+  # within a grid step of the middle and over no spot's dot or number.
+  middle = frame.pixel((0, 0))
+  atMiddle = draw.textbbox(middle, "hollow", font=planDrawing.fontOf(13), anchor="mm", stroke_width=3)
+  assert any(overlap(atMiddle, box) for box in spotBoxes)
+  assert len(covered) == len(spotBoxes) + 1 and not any(overlap(label, box) for box in spotBoxes)
+  step = frame.length(25)
+  assert abs((label[0] + label[2]) / 2 - middle[0]) < step and abs((label[1] + label[3]) / 2 - middle[1]) < step

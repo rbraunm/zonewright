@@ -93,27 +93,88 @@ def testConformSurfaceEdgesKeepsANarrowStrokeWhole(stageBlenderServer, tmp_path)
   assert borderLength(after["vertices"], after["faces"], afterSurface["values"]) < 0.95 * borderLength(before["vertices"], before["faces"], beforeSurface["values"])
 
 
-def testConformSurfaceEdgesLeavesABorderItEvenedAsItIs(stageBlenderServer, tmp_path):
+def testConformSurfaceEdgesLeavesABorderItEvenedAsItIsUntilPaintBesideItChanges(stageBlenderServer, tmp_path):
+  trail = {"nearPath": {"path": [[-100, -75, 0], [-70, -45, 0], [-78, -10, 0], [-48, 20, 0], [-8, 25, 0]], "radius": 6}}
+
   async def steps(session):
+    async def conform(smoothing):
+      return await session.expectSuccess("conformSurfaceEdges", {"objectName": "ground", "layer": "trail", "smoothing": smoothing})
+
     await freshScene(session)
     await twoMaterials(session, tmp_path)
-    await stripedGround(session, "ground", 200, 8)
-    await session.expectSuccess("addSurfaceLayer", {"objectName": "ground", "name": "road"})
-    await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "road", "material": "stone", "selector": {"nearPath": {"path": [[-100, -30, 0], [-30, -100, 0]], "radius": 16}}})
-    before = (await session.expectSuccess("runPython", shaped("ground")))["result"]
-    beforeSurface = (await session.expectSuccess("runPython", surface("ground", "road")))["result"]
-    first = await session.expectSuccess("conformSurfaceEdges", {"objectName": "ground", "layer": "road", "smoothing": 8})
-    once = (await session.expectSuccess("runPython", shaped("ground")))["result"]
-    onceSurface = (await session.expectSuccess("runPython", surface("ground", "road")))["result"]
-    second = await session.expectSuccess("conformSurfaceEdges", {"objectName": "ground", "layer": "road", "smoothing": 8})
-    twice = (await session.expectSuccess("runPython", shaped("ground")))["result"]
-    return before, beforeSurface, first, once, onceSurface, second, twice
+    await stripedGround(session, "ground", 240, 8)
+    await session.expectSuccess("addSurfaceLayer", {"objectName": "ground", "name": "trail"})
+    await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "trail", "material": "stone", "selector": trail})
+    states = {"painted": (await session.expectSuccess("runPython", surface("ground", "trail")))["result"], "first": await conform(16)}
+    states["once"] = (await session.expectSuccess("runPython", shaped("ground")))["result"]
+    states["onceSurface"] = (await session.expectSuccess("runPython", surface("ground", "trail")))["result"]
+    states["again"] = [await conform(smoothing) for smoothing in (16, 12, 8)]
+    states["agains"] = (await session.expectSuccess("runPython", shaped("ground")))["result"]
+    await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "trail", "material": "stone", "selector": {"nearPath": {"path": [[40, -90, 0], [90, 60, 0]], "radius": 6}}})
+    states["layer"] = await conform(16)
+    states["withNew"] = (await session.expectSuccess("runPython", shaped("ground")))["result"]
+    await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "trail", "material": "stone", "selector": {"sphere": {"center": [-8, 25, 0], "radius": 10}}})
+    states["beside"] = await conform(16)
+    states["besideShape"] = (await session.expectSuccess("runPython", shaped("ground")))["result"]
+    states["wider"] = await conform(24)
+    return states
 
-  before, beforeSurface, first, once, onceSurface, second, twice = stageBlenderServer.session(steps)
-  # The 45-degree road's stair-stepped edges are evened once; run again, the evened border moves nothing.
-  assert first["movedVertices"] > 20
-  assert borderLength(once["vertices"], once["faces"], onceSurface["values"]) < 0.85 * borderLength(before["vertices"], before["faces"], beforeSurface["values"])
-  assert second["movedVertices"] == 0 and second["changedFaces"] == 0 and twice["vertices"] == once["vertices"]
+  states = stageBlenderServer.session(steps)
+  stone = 0
+  once, onceSurface = states["once"], states["onceSurface"]
+  trailBorder = borderSegments(once["vertices"], once["faces"], onceSurface["values"], stone, uncovered)
+  # A 12-wide closed trail evened over 16 stays one piece; run again over 16, 12, or 8 it is left exactly as it is, every one of its
+  # border edges evened before.
+  assert states["first"]["movedVertices"] > 20 and pieceCount(once["faces"], [index for index, value in enumerate(onceSurface["values"]) if value == stone]) == 1
+  for again in states["again"]:
+    assert again["movedVertices"] == 0 and again["changedFaces"] == 0 and again["alreadyEvened"] == len(trailBorder) > 30
+  assert states["agains"]["vertices"] == once["vertices"]
+  # Conforming the whole layer for a new stroke evens only the new stroke: the trail does not move.
+  near = [index for index, point in enumerate(once["vertices"]) if distancesTo([point], trailBorder)[0] < 12]
+  assert states["layer"]["movedVertices"] > 10 and states["layer"]["alreadyEvened"] == len(trailBorder)
+  assert all(states["withNew"]["vertices"][index] == once["vertices"][index] for index in near)
+  # Paint beside the trail's end makes that stretch new to even; the rest stays where it was.
+  moved = [index for index, (old, new) in enumerate(zip(states["withNew"]["vertices"], states["besideShape"]["vertices"])) if old != new]
+  assert states["beside"]["movedVertices"] == len(moved) > 0
+  assert all(math.dist(states["withNew"]["vertices"][index][:2], (-8, 25)) < 40 for index in moved)
+  # A larger smoothing evens it all again.
+  assert states["wider"]["alreadyEvened"] == 0 and states["wider"]["movedVertices"] > 0
+
+
+def testConformSurfaceEdgesEvensAStrokeWhosePiecesTouchAtCornersAsOne(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await freshScene(session)
+    await threeMaterials(session, tmp_path)
+    await stripedGround(session, "ground", 240, 8)
+    for layer in ("thin", "cross"):
+      await session.expectSuccess("addSurfaceLayer", {"objectName": "ground", "name": layer})
+    await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "thin", "material": "sand", "selector": {"nearPath": {"path": [[15, -100, 0], [60, -75, 0], [105, -95, 0]], "radius": 5}}})
+    await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "cross", "material": "dirt", "selector": {"nearPath": {"path": [[5, 25, 0], [115, 110, 0]], "radius": 10}}})
+    await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "cross", "material": "sand", "selector": {"nearPath": {"path": [[10, 110, 0], [115, 20, 0]], "radius": 6}}})
+    states = {"before": (await session.expectSuccess("runPython", shaped("ground")))["result"]}
+    for layer in ("thin", "cross"):
+      states[layer] = (await session.expectSuccess("runPython", surface("ground", layer)))["result"]
+      await session.expectSuccess("conformSurfaceEdges", {"objectName": "ground", "layer": layer, "smoothing": 12})
+      states[layer + "After"] = (await session.expectSuccess("runPython", surface("ground", layer)))["result"]
+    states["after"] = (await session.expectSuccess("runPython", shaped("ground")))["result"]
+    return states
+
+  states = stageBlenderServer.session(steps)
+  before, after = states["before"], states["after"]
+  # The materials were made grass, dirt, sand; grass is never painted, so dirt and sand take the layers' first slots in paint order.
+  sand, dirt = 0, 1
+
+  def painted(surfaceResult, value):
+    return [index for index, entry in enumerate(surfaceResult["values"]) if entry == value]
+
+  # A 10-wide stroke painted as three pieces touching only at corners comes out one smooth stroke.
+  assert pieceCount(before["faces"], painted(states["thin"], sand)) == 3 and pieceCount(after["faces"], painted(states["thinAfter"], sand)) == 1
+  assert borderLength(after["vertices"], after["faces"], states["thinAfter"]["values"]) < 0.8 * borderLength(before["vertices"], before["faces"], states["thin"]["values"])
+  # A sand trail painted across a dirt road in one layer: the trail stays one piece, the road it cuts in two stays two, and the borders
+  # lose their stair-steps.
+  assert pieceCount(after["faces"], painted(states["crossAfter"], sand)) == 1 == pieceCount(before["faces"], painted(states["cross"], sand))
+  assert pieceCount(after["faces"], painted(states["crossAfter"], dirt)) == 2 == pieceCount(before["faces"], painted(states["cross"], dirt))
+  assert borderLength(after["vertices"], after["faces"], states["crossAfter"]["values"]) < 0.85 * borderLength(before["vertices"], before["faces"], states["cross"]["values"])
 
 
 def testConformSurfaceEdgesKeepsARoundAreaRound(stageBlenderServer, tmp_path):
@@ -277,6 +338,58 @@ def testTransitionStraddlingCountsOnlyFacesTheStripWantsAndItsMappingIsItsOwn(st
     assert abs(u - x / 16) < 1e-4 and abs(v - y / 16) < 1e-4
 
 
+def testPaintTransitionRunsOverNotchesInAWallsFootWithoutSmearing(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await freshScene(session)
+    await twoMaterials(session, tmp_path)
+    await stripedGround(session, "ground", 240, 8)
+    await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "mesa"})
+    await session.expectSuccess("sculptOutline", {"objectName": "ground", "mode": "fill", "outline": [[-70, -30], [-20, -62], [50, -42], [62, 28], [0, 70], [-62, 42]], "base": 0, "profile": [[-6, 0], [0, 36], [40, 36]]})
+    await session.expectSuccess("projectUVs", {"objectName": "ground", "method": "box", "worldUnitsPerRepeat": 64})
+    await session.expectSuccess("addSurfaceLayer", {"objectName": "ground", "name": "ground"})
+    await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "ground", "material": "sand", "selector": {"all": True}})
+    await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "ground", "material": "stone", "selector": {"slope": {"minimumDegrees": 40, "maximumDegrees": 180}}})
+    await session.expectSuccess("addSurfaceLayer", {"objectName": "ground", "name": "blend"})
+    await session.expectSuccess("cutContours", {"objectName": "ground", "levels": [14], "distanceFrom": {"material": "sand"}, "selector": {"material": "stone"}, "onlyAbove": True})
+    ground = (await session.expectSuccess("runPython", surface("ground", "ground")))["result"]
+    strip = await session.expectSuccess("paintTransition", {"objectName": "ground", "layer": "blend", "material": "sand", "selector": {"material": "stone"}, "toward": {"material": "sand"}, "width": 14, "worldUnitsPerRepeat": 32, "onlyAbove": True})
+    stripSurface = (await session.expectSuccess("runPython", surface("ground", "blend")))["result"]
+    shape = (await session.expectSuccess("runPython", shaped("ground")))["result"]
+    return ground, strip, stripSurface, shape
+
+  ground, strip, stripSurface, shape = stageBlenderServer.session(steps)
+  sand, stone = 0, 1
+  vertices, faces = shape["vertices"], shape["faces"]
+
+  def middle(face):
+    return numpy.mean([vertices[index] for index in face], axis=0)
+
+  # The foot has notches: sand faces poking up the wall, standing higher than the stone beside them.
+  owners = {}
+  for index, face in enumerate(faces):
+    for a, b in zip(face, face[1:] + face[:1]):
+      owners.setdefault((min(a, b), max(a, b)), []).append(index)
+  notchSides = 0
+  for sharing in owners.values():
+    if len(sharing) == 2 and {ground["values"][face] for face in sharing} == {sand, stone}:
+      sandFace, stoneFace = sorted(sharing, key=lambda face: ground["values"][face] != sand)
+      notchSides += middle(faces[sandFace])[2] > middle(faces[stoneFace])[2] + 1
+  assert notchSides >= 4
+  # The foot runs on whole over them, so every face the strip wants is painted; and no face's mapping collapses along the wall (every
+  # face spans along the texture about as far as it spans along the wall), which is what smeared one column of it over a notch.
+  assert strip["straddlingFaces"] == 0 and strip["painted"] > 150
+  for face, value in enumerate(stripSurface["values"]):
+    if value == uncovered:
+      continue
+    corners = numpy.array([vertices[index] for index in faces[face]])
+    normal = numpy.cross(corners[1] - corners[0], corners[2] - corners[0])
+    across = numpy.cross(normal, [0, 0, 1])
+    extent = numpy.ptp(corners @ (across / numpy.linalg.norm(across)))
+    mapping = cornerUVs(stripSurface, face)
+    assert numpy.ptp([u for u, _ in mapping]) * 32 > 0.3 * extent
+    assert all(-1e-6 <= v <= 1 + 1e-6 for _, v in mapping)
+
+
 def testCleanLiftsOrFillsWithTheLayersOwnPaintOnly(stageBlenderServer, tmp_path):
   async def steps(session):
     await freshScene(session)
@@ -334,6 +447,11 @@ def testEdgeNoiseKeepsStrokesWholeAndEdgesWithinItsAmplitude(stageBlenderServer,
       await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "paint", "material": "stone", "selector": stroke, "edgeNoise": {"featureSize": 24, "amplitude": amplitude, "seed": seed}})
       strokes.append((await session.expectSuccess("runPython", surface("ground", "paint")))["result"])
       await session.expectSuccess("eraseSurface", {"objectName": "ground", "layer": "paint", "selector": {"all": True}})
+    for seed, y in ((1, 20), (2, 50), (3, 80)):
+      narrow = {"nearPath": {"path": [[-95, y, 0], [-30, y + 18, 0], [30, y - 10, 0], [95, y + 12, 0]], "radius": 6}}
+      await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "paint", "material": "stone", "selector": narrow, "edgeNoise": {"featureSize": 14, "amplitude": 3, "seed": seed}})
+      strokes.append((await session.expectSuccess("runPython", surface("ground", "paint")))["result"])
+      await session.expectSuccess("eraseSurface", {"objectName": "ground", "layer": "paint", "selector": {"all": True}})
     await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "paint", "material": "stone", "selector": {"box": {"minimum": [-200, -200, -1], "maximum": [0, 200, 1]}}, "edgeNoise": {"featureSize": 30, "amplitude": 12, "seed": 1}})
     half = (await session.expectSuccess("runPython", surface("ground", "paint")))["result"]
     centers = (await session.expectSuccess("runPython", {"code": readCenters}))["result"]
@@ -341,8 +459,8 @@ def testEdgeNoiseKeepsStrokesWholeAndEdgesWithinItsAmplitude(stageBlenderServer,
 
   strokes, half, centers = stageBlenderServer.session(steps)
   stone = 0
-  # A 14-wide stroke under noise half its radius bends as a whole and stays in one piece, whatever the seed; so does the stroke the
-  # sweep saw break into four, at amplitude 4 and seed 2.
+  # A stroke under noise stays in one piece whatever the seed: 14 wide under noise half its radius, the stroke the sweep saw break
+  # into four (amplitude 4, seed 2), and 12-wide strokes under noise as fine as the stroke is wide, where it pinched them to a corner.
   for painted in strokes:
     assert pieceCount(painted["faces"], [index for index, value in enumerate(painted["values"]) if value == stone]) == 1
   # The half plane's edge at x = 0 wanders both ways, and no face farther than the amplitude from it changes.
@@ -539,6 +657,27 @@ mesh.update()
     assert abs(z - 0.5 * x) < 1e-3
 
 
+def testRebuildRegionSplitsItsQuadsAndTurnsTheirDiagonalsToTheNewGround(stageBlenderServer):
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [160, 160], "spacing": 8, "location": [0, 0, 0], "collection": "terrain"})
+    await session.expectSuccess("createRegion", {"name": "terrace", "outline": [[0, -40], [40, 0], [0, 40], [-40, 0]], "bottom": -100, "top": 100, "intent": "a diamond terrace"})
+    rebuilt = await session.expectSuccess("rebuildRegion", {"objectName": "ground", "selector": {"region": "terrace"}, "mode": "height", "height": 12, "fadeDistance": 16})
+    return rebuilt, (await session.expectSuccess("runPython", shaped("ground")))["result"]
+
+  rebuilt, shape = stageBlenderServer.session(steps)
+  vertices, faces = shape["vertices"], shape["faces"]
+
+  def inside(index):
+    x, y, _ = vertices[index]
+    return abs(x) + abs(y) < 40
+
+  # The grid's quads in the terrace become triangles, and diagonals turn to run along its sloping edges; the quads far outside stay.
+  assert all(len(face) == 3 for face in faces if all(inside(index) for index in face))
+  assert all(len(face) == 4 for face in faces if all(abs(vertices[index][0]) + abs(vertices[index][1]) > 60 for index in face))
+  assert rebuilt["turnedDiagonals"] > 0
+
+
 def testClearRegionTakesBackSpilledPaintWithTheSameEdgeNoiseAndResetNamesPassesStillShapingIt(stageBlenderServer, tmp_path):
   noise = {"featureSize": 20, "amplitude": 8, "seed": 4}
 
@@ -572,6 +711,40 @@ def testClearRegionTakesBackSpilledPaintWithTheSameEdgeNoiseAndResetNamesPassesS
   assert all(value == uncovered for value in after["values"])
   assert cleared["shaping"]["passes"] == ["hill", "terrace"] and cleared["shaping"]["stillShapedBy"] == []
   assert "it needs surfacing" in noSurfacing
+
+
+def testClearRegionTakesBackTheSpillOnGroundReshapedSincePainting(stageBlenderServer, tmp_path):
+  noise = {"featureSize": 20, "amplitude": 6, "seed": 4}
+
+  async def steps(session):
+    await freshScene(session)
+    await twoMaterials(session, tmp_path)
+    await stripedGround(session, "ground", 200, 8)
+    await session.expectSuccess("createRegion", {"name": "camp", "outline": [[-40, -40], [40, -40], [40, 40], [-40, 40]], "bottom": -50, "top": 100, "intent": "a camp clearing"})
+    await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "mound"})
+    await session.expectSuccess("sculptAtPoint", {"objectName": "ground", "mode": "raise", "center": [0, 0, 0], "radius": 60, "strength": 14, "direction": [0, 0, 1]})
+    await session.expectSuccess("addSurfaceLayer", {"objectName": "ground", "name": "ground"})
+    await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "ground", "material": "stone", "selector": {"region": "camp"}, "edgeNoise": noise})
+    await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "ground", "material": "sand", "selector": {"nearPath": {"path": [[44, -20, 0], [96, -20, 0]], "radius": 6}}})
+    painted = (await session.expectSuccess("runPython", surface("ground", "ground")))["result"]
+    paintedCenters = (await session.expectSuccess("runPython", {"code": readCenters}))["result"]
+    await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "terrace"})
+    leveled = await session.expectSuccess("rebuildRegion", {"objectName": "ground", "selector": {"region": "camp"}, "mode": "height", "height": 6, "fadeDistance": 12})
+    await session.expectSuccess("clearRegion", {"region": "camp", "terrainObject": "ground", "surfacing": True, "edgeNoise": noise})
+    after = (await session.expectSuccess("runPython", surface("ground", "ground")))["result"]
+    centers = (await session.expectSuccess("runPython", {"code": readCenters}))["result"]
+    return painted, paintedCenters, leveled, after, centers
+
+  painted, paintedCenters, leveled, after, centers = stageBlenderServer.session(steps)
+  stone, sand = 0, 1
+  # The camp was painted with a noisy edge spilling past the region, then leveled (its edge vertices moved, its diagonals turned):
+  # cleared with the same edgeNoise, none of its paint is left, while the sand path that runs on beyond the noise's reach keeps its
+  # far end.
+  assert leveled["turnedDiagonals"] > 0
+  assert any(value == stone and (abs(x) > 40 or abs(y) > 40) for value, (x, y, _) in zip(painted["values"], paintedCenters))
+  assert stone not in after["values"]
+  assert all(value == sand for value, (x, _, _) in zip(after["values"], centers) if x > 60 and value != uncovered)
+  assert sum(value == sand for value, (x, _, _) in zip(after["values"], centers) if x > 60) > 10
 
 
 def testResetRegionNamesThePassesThatStillShapeTheArea(stageBlenderServer):

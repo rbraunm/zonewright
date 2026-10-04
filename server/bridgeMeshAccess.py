@@ -520,6 +520,65 @@ def faceBorders(sceneObject, side, other):
   return numpy.r_[edges[forward], edges[backward]], numpy.r_[first[forward], second[backward]], numpy.r_[second[forward], first[backward]]
 
 
+def tracedChains(segments, joins):
+  """Border edges [vertex, vertex] joined end to end, on through a vertex two meet at or that `joins` pairs: (vertices, edges, closed)."""
+  touching = {}
+  for index, (start, end) in enumerate(segments.tolist()):
+    touching.setdefault(start, []).append(index)
+    touching.setdefault(end, []).append(index)
+
+  def onward(vertex, arriving):
+    if vertex in joins:
+      return joins[vertex].get(arriving)
+    others = touching[vertex]
+    return (others[1] if others[0] == arriving else others[0]) if len(others) == 2 else None
+
+  used = numpy.zeros(len(segments), dtype=bool)
+  chains = []
+  for seed in range(len(segments)):
+    if used[seed]:
+      continue
+    used[seed] = True
+    start, end = (int(vertex) for vertex in segments[seed])
+    vertices, indices, closed = [start, end], [seed], False
+    for forward in (True, False):
+      segment, tip = seed, (end if forward else start)
+      while not closed:
+        following = onward(tip, segment)
+        if following is None:
+          break
+        if following == seed:
+          closed = True
+          break
+        if used[following]:
+          raise RuntimeError(f"Border edge {following} joins two chains")
+        used[following] = True
+        segment = following
+        tip = int(segments[segment][1] if segments[segment][0] == tip else segments[segment][0])
+        if forward:
+          vertices.append(tip)
+          indices.append(segment)
+        else:
+          vertices.insert(0, tip)
+          indices.insert(0, segment)
+    chains.append((vertices, indices, closed))
+  return chains
+
+
+def footBorders(sceneObject, side, other):
+  """The edges where side faces meet other faces along the chains of them where side mostly rises above other: a wall's foot, not its lip."""
+  borderEdges, sideFaces, otherFaces = faceBorders(sceneObject, side, other)
+  heights = readFaceArrays(sceneObject)[0][:, 2]
+  positions, _ = readVertexArrays(sceneObject)
+  segments = meshEdges(sceneObject.data)[borderEdges]
+  rising = numpy.where(heights[sideFaces] > heights[otherFaces], 1.0, -1.0) * numpy.linalg.norm(positions[segments[:, 1]] - positions[segments[:, 0]], axis=1)
+  # A notch of ground in a wall's foot runs down beside rock for a step: the foot is decided chain by chain, so it stays whole there.
+  foot = numpy.zeros(len(borderEdges), dtype=bool)
+  for _, indices, _ in tracedChains(segments, {}):
+    foot[indices] = rising[indices].sum() > 0
+  return borderEdges[foot], sideFaces[foot], otherFaces[foot]
+
+
 class BorderDistance:
   """Exact distances from points to a border made of segments between mesh positions: samples along the segments in a KD tree find
   the segments near a point, and the nearest of those gives the distance, the segment, and how far along it."""

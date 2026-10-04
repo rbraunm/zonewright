@@ -1438,7 +1438,7 @@ async def renderSketch(
   crossing unless spotHeights is false), a scale bar, the sketch sheets (all, or
   those named) in their own colors (areas dashed, footprints filled with their facing arrows and heights, paths at their widths,
   points, notes), and the plan's own layers: regions (dashed, named), plots (outlined, by address), water (blue), and swim (the swim
-  volumes, dashed)."""
+  volumes, dashed), their names set beside the spot heights rather than over them."""
   if len(center) != 2 or width <= 0:
     raise ToolError(f"center is [x, y] and width positive, got {center} and {width}")
   zone = await callBridge(context, "getZoneProperties", {})
@@ -1591,15 +1591,16 @@ async def removeSurfaceLayer(context: Context, objectName: str, name: str):
   " (nearPath with a radius), around a point (sphere), or masks combined with them. A slope or height mask inside a region is a recipe"
   " as the client's terrain ecosystems use them (rock on that region's steep ground, a band of ground at chosen heights); one hard rule"
   " across the whole zone is not. edgeNoise {featureSize, amplitude, seed} moves the painted edge along the ground by smooth noise, up"
-  " to `amplitude` units, so it wanders as a painted edge does instead of tracing a circle, a line, or the grid; the ground on both"
-  " sides of the edge moves alike, so a stroke bends as a whole and stays in one piece while the amplitude is no more than about half"
-  " its radius. The noise is laid out in plan: the same edgeNoise on the same selector picks the same faces again (eraseSurface,"
-  " clearRegion)." + selectorHelp))
+  " to about `amplitude` units (a face further where faces are larger), so it wanders as a painted edge does instead of tracing a"
+  " circle, a line, or the grid. It never breaks a selected piece apart: where the noise would pinch a narrow stroke through, the faces"
+  " it took there go back, and faces it would leave touching the piece only at a corner are left out. The noise is laid out in plan:"
+  " the same edgeNoise on the same selector picks the same faces again on ground left as it was (eraseSurface, clearRegion); reshaped"
+  " since, its edge can land a face to either side." + selectorHelp))
 async def paintSurface(context: Context, objectName: str, layer: str, material: str, selector: dict, edgeNoise: dict | None = None):
   return await callBridge(context, "paintSurface", {"objectName": objectName, "layer": layer, "material": material, "selector": selector, "edgeNoise": edgeNoise})
 
 
-@guardedTool(description="Erase a surfacing layer where the selector says, with the same edgeNoise as paintSurface, so the layers beneath show again, each with its own mapping (a transition erased leaves the mapping beneath it as it was)." + selectorHelp)
+@guardedTool(description="Erase a surfacing layer where the selector says, with edgeNoise as paintSurface takes it, so the layers beneath show again, each with its own mapping (a transition erased leaves the mapping beneath it as it was)." + selectorHelp)
 async def eraseSurface(context: Context, objectName: str, layer: str, selector: dict, edgeNoise: dict | None = None):
   return await callBridge(context, "eraseSurface", {"objectName": objectName, "layer": layer, "selector": selector, "edgeNoise": edgeNoise})
 
@@ -1622,12 +1623,16 @@ async def editSurface(
 @guardedTool(description=(
   "Bring a surfacing layer's edges onto the mesh's own edges along a smooth line, as the client's zones run material borders along"
   " edges their artists modeled: each border is evened out along its length over about `smoothing` world units (a cell or two of the"
-  " mesh takes out saw teeth; more rounds bends further), keeping the area a closed border encloses, so a narrow stroke keeps its"
-  " width; the vertex nearest where each mesh edge crosses the evened line slides along that edge onto it, in every shaping pass alike"
-  " and carrying its UVs; and faces near it take the side of the line their middle lies on. Running it again on a border it evened"
-  " leaves it as it is. Borders on creases (a cliff's foot or lip) already run on modeled edges and stay; a piece whose whole outline is"
-  " shorter than about three times `smoothing` is left as it is (editSurface clean takes specks off). Within the selector only; faces"
-  " that would turn over keep their vertices (keptInPlace)." + selectorHelp))
+  " mesh takes out saw teeth; more rounds bends further, and a stroke narrower than about twice the smoothing has its ends rounded"
+  " back), keeping the area a closed border encloses; where two pieces of a stroke touch only at a corner, its border runs on through"
+  " the corner the way it bends least, so the stroke is evened as one. The vertex nearest where each mesh edge crosses the evened line"
+  " slides along that edge onto it (the farther one where the nearer serves another crossing), in every shaping pass alike and"
+  " carrying its UVs, and each face near the line takes the side of it that holds most of the face. Each border edge it evens keeps"
+  " the smoothing it was evened at: run again at that smoothing or less, those borders stay as they are (alreadyEvened); a larger"
+  " smoothing evens them further; painting, erasing, or editing beside one makes it new to even. Borders on creases (a cliff's foot or"
+  " lip) already run on modeled edges and stay; a closed piece whose outline is shorter than about three times `smoothing` is left as"
+  " it is (editSurface clean takes specks off). Within the selector only; crossings no vertex could slide onto without turning a face"
+  " over are left (keptInPlace)." + selectorHelp))
 async def conformSurfaceEdges(context: Context, objectName: str, layer: str, smoothing: float, selector: dict = allSelector):
   return await callBridge(context, "conformSurfaceEdges", {"objectName": objectName, "layer": layer, "smoothing": smoothing, "selector": selector})
 
@@ -1635,8 +1640,8 @@ async def conformSurfaceEdges(context: Context, objectName: str, layer: str, smo
 @guardedTool(description=(
   "Cut the selected faces along level lines, as an artist adds an edge loop where a material, a ledge, or a band should begin: lines of"
   " equal height at each of `levels`, or with distanceFrom (a selector), lines at each distance in `levels` from the border of the"
-  " faces it picks; with onlyAbove, only from the border where the faces beyond the picked ones rise above them (a wall's foot, not its"
-  " lip), as paintTransition's onlyAbove measures its strip. Each crossed edge splits where the line crosses it, the new vertex placed"
+  " faces it picks; with onlyAbove, only from the stretches of border where the faces beyond the picked ones mostly rise above them (a"
+  " wall's foot, notches of ground poking up it and all, not its lip), as paintTransition's onlyAbove measures its strip. Each crossed edge splits where the line crosses it, the new vertex placed"
   " alike in every shaping pass with UVs and surfacing paint carried over, and each crossed face splits along the line, so a height"
   " band, a stratum, or a transition strip ends on a modeled edge instead of zigzagging across the triangles. An edge the line crosses"
   " twice (up a wall one cell wide, both ends on the border) is first split where it lies farthest past the level, so both crossings"
@@ -1651,14 +1656,16 @@ async def cutContours(
   "Paint a transition texture where two grounds meet, as the client's zones blend one into the next: a strip `width` units wide"
   " along the border between the faces `selector` picks and those `toward` picks, on the selector's side, painted with `material`"
   " into `layer` and mapped so the texture's bottom edge lies on the border and its top `width` away, repeating along the border every"
-  " worldUnitsPerRepeat units (around a closed border, the nearest whole number of repeats, so the strip has no seam). For a texture"
-  " that tiles across but not down, such as sand blending up into rock at a wall's foot. The strip keeps its own mapping in its layer:"
+  " worldUnitsPerRepeat units (around a closed border, the nearest whole number of repeats, so the strip has no seam); how far along the"
+  " border a corner lies is spanned smoothly out from the border, so the faces over a corner it turns around (a notch of ground poking"
+  " up a wall) share out the turn. For a texture that tiles across but not down, such as sand blending up into rock at a wall's foot."
+  " The strip keeps its own mapping in its layer:"
   " erasing, muting, or removing it shows the mapping beneath again. Only faces lying wholly within `width`, over which the distance runs"
   " evenly and along one stretch of border, are painted; the faces the strip wants but cannot paint are counted"
   " (straddlingFaces): cut a contour at `width` first (cutContours with distanceFrom the toward faces and the same onlyAbove) so the strip"
-  " ends on a modeled edge. With onlyAbove, the strip runs only from the border where the selector's faces rise above the toward faces"
-  " and up from it: the foot of a wall, where rock rises from the ground, and not the lip of a ledge, where ground ends above rock"
-  " falling away." + selectorHelp))
+  " ends on a modeled edge. With onlyAbove, the strip runs only from the stretches of border where the selector's faces mostly rise"
+  " above the toward faces, and up from them: the foot of a wall, where rock rises from the ground, notches and all, and not the lip"
+  " of a ledge, where ground ends above rock falling away." + selectorHelp))
 async def paintTransition(
   context: Context, objectName: str, layer: str, material: str, selector: dict, toward: dict, width: float, worldUnitsPerRepeat: float,
   onlyAbove: bool = False,
@@ -1684,7 +1691,9 @@ async def resetRegion(context: Context, objectName: str, selector: dict, passes:
   " a blank slate already joined to its surroundings; mode height levels it to `height`. Faded in over fadeDistance from the edge."
   " With shaping passes, its vertices also go back to where the base lays them out in plan, so sideways moves of earlier passes (a"
   " roughened or faceted wall, contours a fill snapped onto) leave no creases, and the change goes into the active pass; without"
-  " passes nothing records where they lay, and they keep their places in plan." + selectorHelp))
+  " passes nothing records where they lay, and they keep their places in plan. Its quads are split into triangles whose diagonals turn"
+  " to follow the new ground (turnedDiagonals), as diagonals turned for the old shape would crease the new one, so its faces change."
+  + selectorHelp))
 async def rebuildRegion(context: Context, objectName: str, selector: dict, mode: str, height: float | None = None, fadeDistance: float = 0.0):
   return await callBridge(context, "rebuildRegion", {"objectName": objectName, "selector": selector, "mode": mode, "height": height, "fadeDistance": fadeDistance})
 
@@ -1696,9 +1705,10 @@ async def clearRegion(
 ):
   """Take a region back to start it again, in one stroke: its surfacing erased from every layer of the terrain over the region's faces,
   or with edgeNoise {featureSize, amplitude, seed} over them as paintSurface's edgeNoise moves their edge, so passing the edgeNoise the
-  region was painted with also takes back the paint that spilled past its edge (without it, that spill stays); its shaping kept, reset
-  (passes taken back), or rebuilt (spanned from the ground around it), faded over fadeDistance; and the objects placed in it (models,
-  lights, emitters) deleted."""
+  region was painted with also takes back the paint that spilled past its edge, and any paint lying wholly within the noise's reach
+  of the region, cut off from paint beyond it, so the spill goes even where the ground was reshaped since (without edgeNoise, the
+  spill stays); its shaping kept, reset (passes taken back), or rebuilt (spanned from the ground around it), faded over
+  fadeDistance; and the objects placed in it (models, lights, emitters) deleted."""
   return await callBridge(context, "clearRegion", {
     "region": region, "terrainObject": terrainObject, "shaping": shaping, "surfacing": surfacing, "objects": objects, "fadeDistance": fadeDistance,
     "edgeNoise": edgeNoise,
