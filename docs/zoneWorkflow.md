@@ -55,11 +55,13 @@ The zone survey's `construction` group measures every client zone: terrain trian
 Each shaping operation writes into a named pass on the terrain (a Blender shape key over the terrain's base shape). Passes are listed, and each can be set to any strength, muted, removed, or collapsed into the base. Export draws the terrain as the passes combine. A change of resolution (subdividing) collapses the passes first, since a pass holds one offset per vertex.
 
 - **Rough:** large forms from a few inputs: a mound or basin at a point, a ridge or valley along a path with a cross-section profile, a plateau.
-- **Refine:** the point and path brushes (raise, lower, smooth, flatten, crease, carve), and grading a route so it reads as a path.
+- **Refine:** the point and path brushes (raise, lower, smooth, flatten, crease, carve), and grading a route so it reads as a path (`gradeRoute`: a bench level across, graded between the heights given, with landings at hairpins and batters meeting the ground; the artist places a switchback's hairpins, the tool never adds one).
 - **Breakup:** warp (moving vertices sideways by smooth noise, so round shapes stop being round) and roughen (fractal noise up and down, by feature size, amplitude, and octaves), each in its own pass and limited by a mask.
 - **Masks** shared by every terrain and surfacing tool: slope range, height range, distance from a route, regions, and the existing selectors; they pick within an area chosen by intent.
 
 The usual sequence for natural ground: rough forms, look, warp, look, medium roughen, look, smooth where it went too far, carve routes and channels, fine roughen masked off the routes, look. Any pass that does not help is turned down or removed.
+
+Some passes are defined: a graded route keeps its definition in its own pass, and the plots graded on a terrain keep theirs on the plots and are graded together, as one feature placed at the first of their passes. A defined pass is rebuilt whole from its definition against the ground under it, so it holds the move from that ground to its target and takes no other shaping. Each is graded on the ground without its own pass and without any defined pass made after it, so where two meet (a route arriving at a plot's entrance, two routes crossing) the later one wins. Grading one again replays every later one whose ground it changed; other shaping made later (a roughen, a sculpt) leaves the defined passes off target until `regradeTerrain` grades them all again in the order they were made. Look at the ground after a regrade as after any pass.
 
 ### Terrain that is not a heightfield
 

@@ -11,6 +11,7 @@ import bpy
 import mathutils
 import numpy
 
+import bridgeGrading
 import bridgeMeshAccess
 import bridgeModels
 import bridgeObjects
@@ -480,9 +481,9 @@ def editPlot(address, newAddress, kind, center, facingDegrees, size, height, ite
   if grading is not None and (name != plot.name or center is not None or height is not None or facingDegrees is not None or rebuild or ground != grading["ground"]):
     pad = padOf(name, location, facing, spec["size"], location[2], grading)
     if ground == grading["ground"]:
-      plans.append(planGrading(ground, {plot.name: None, name: pad}, {plot.name, name}))
+      plans.append(bridgeGrading.planPlots(ground, {plot.name: None, name: pad}, {plot.name, name}))
     else:
-      plans += [planGrading(grading["ground"], {plot.name: None}, {plot.name}), planGrading(ground, {name: pad}, {name})]
+      plans += [bridgeGrading.planPlots(grading["ground"], {plot.name: None}, {plot.name}), bridgeGrading.planPlots(ground, {name: pad}, {name})]
   plot.name = name
   plot.data.name = name
   plot.location = location.tolist()
@@ -505,8 +506,8 @@ def editPlot(address, newAddress, kind, center, facingDegrees, size, height, ite
   bpy.context.view_layer.update()
   graded = {}
   if plans:
-    applied = [applyGrading(plan) for plan in plans]
-    graded = {"grading": applied[-1] | padSummary(plans[-1], name) | ({"formerGround": applied[0]} if len(plans) > 1 else {})}
+    applied = [bridgeGrading.applyPlots(plan) for plan in plans]
+    graded = {"grading": applied[-1] | padSummary(bridgeGrading.plotPlanOf(plans[-1]), name) | ({"formerGround": applied[0]} if len(plans) > 1 else {})}
   return plotRecord(plot, housing) | ({"border": border} if border else {}) | {"overlaps": overlapsOf(plot)} | graded
 
 
@@ -525,7 +526,7 @@ def removePlot(address, keepGrading):
     keys = sceneObject.data.shape_keys
     if keepGrading and key is not None and keys.key_blocks.get(keptGradePrefix + address) is not None:
       raise ValueError(f"'{sceneObject.name}' already has a shaping pass '{keptGradePrefix}{address}'; rename or remove it first")
-    plan = planGrading(sceneObject, {address: None}, {address}, kept=address if keepGrading else None)
+    plan = bridgeGrading.planPlots(sceneObject, {address: None}, {address}, kept=address if keepGrading else None)
   removed = [plot.name]
   border = borderOf(plot)
   if border is not None:
@@ -537,7 +538,7 @@ def removePlot(address, keepGrading):
   guide = plot.data
   bpy.data.objects.remove(plot)
   bpy.data.meshes.remove(guide)
-  return {"removed": removed, "grading": None if plan is None else applyGrading(plan)}
+  return {"removed": removed, "grading": None if plan is None else bridgeGrading.applyPlots(plan)}
 
 
 def gradePassName(address):
@@ -587,8 +588,8 @@ def plotPad(plot):
   return padOf(plot.name, plot.matrix_world.translation, facingOf(plot), readPlot(plot)["size"], plot.matrix_world.translation.z, gradingOf(plot))
 
 
-def ungradedPositions(sceneObject, addresses):
-  """The mesh as seen; as seen without the named plots' passes; and the rows each of those passes moves, and how far."""
+def heldGrading(sceneObject, addresses):
+  """The mesh as seen, and the rows each of the named plots' passes moves, and how far."""
   shown, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
   keys = sceneObject.data.shape_keys
   held = {}
@@ -600,10 +601,7 @@ def ungradedPositions(sceneObject, addresses):
         offsets = (bridgePasses.keyCoordinates(key) - reference) * key.value
         rows = numpy.flatnonzero(numpy.abs(offsets).max(axis=1) > 0)
         held[address] = (rows, offsets[rows])
-  local = numpy.zeros_like(shown)
-  for rows, offsets in held.values():
-    local[rows] += offsets
-  return shown, shown - local @ bridgeMeshAccess.matrixArray(sceneObject.matrix_world)[:3, :3].T, held
+  return shown, held
 
 
 class GroundLookup:
@@ -706,15 +704,14 @@ def gradedHeights(ground, pads, reached):
   return graded, owner, [{"plots": list(pair), "steepestDegrees": round(degrees, 1)} for pair, degrees in sorted(banks.items())]
 
 
-def planGrading(sceneObject, overrides, subjects, kept=None):
-  """Work out the grading of every plot on an object, overrides {address: pad or None} applied, before anything changes."""
-  if sceneObject.modifiers:
-    raise ValueError(f"'{sceneObject.name}' has modifiers; grading passes combine before modifiers, so apply or remove them first")
+def planGrading(sceneObject, overrides, subjects, kept, ground):
+  """Work out the grading of every plot on an object, overrides {address: pad or None} applied, on ground (world positions of the mesh
+  without the plots' passes, as bridgeGrading.planPlots gives it), before anything changes."""
   current = gradedOn(sceneObject)
   pads = {address: plotPad(plot) for address, plot in current.items()} | overrides
   pads = [pad for _, pad in sorted(pads.items()) if pad is not None]
   owned = (set(current) | set(overrides)) - {kept}
-  shown, ground, held = ungradedPositions(sceneObject, sorted(owned))
+  shown, held = heldGrading(sceneObject, sorted(owned))
   lookup = GroundLookup(sceneObject, ground)
   reached = [padReach(lookup, pad) for pad in pads]
   graded, owner, banks = gradedHeights(ground, pads, reached)
@@ -795,12 +792,12 @@ def gradePlot(address, objectName, margin, batterDegrees):
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   stored = plot.get(gradingProperty)
   # Grading again where the ground it was graded on was deleted is how such a plot is put right: there is nothing there to take back.
-  former = None if stored is None or stored["ground"] in (None, sceneObject) else planGrading(stored["ground"], {address: None}, {address})
+  former = None if stored is None or stored["ground"] in (None, sceneObject) else bridgeGrading.planPlots(stored["ground"], {address: None}, {address})
   pad = padOf(address, plot.matrix_world.translation, facingOf(plot), readPlot(plot)["size"], plot.matrix_world.translation.z, {"margin": margin, "batterDegrees": batterDegrees})
-  plan = planGrading(sceneObject, {address: pad}, {address})
+  plan = bridgeGrading.planPlots(sceneObject, {address: pad}, {address})
   setGrading(plot, sceneObject, margin, batterDegrees)
-  formerGround = {} if former is None else {"formerGround": applyGrading(former)}
-  return {"plot": address} | padSummary(plan, address) | applyGrading(plan) | formerGround
+  formerGround = {} if former is None else {"formerGround": bridgeGrading.applyPlots(former)}
+  return {"plot": address} | padSummary(bridgeGrading.plotPlanOf(plan), address) | bridgeGrading.applyPlots(plan) | formerGround
 
 
 # Judging a plot

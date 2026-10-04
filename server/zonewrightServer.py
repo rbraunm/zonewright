@@ -1273,7 +1273,7 @@ async def setShapingPass(context: Context, objectName: str, name: str, strength:
 
 @guardedTool()
 async def removeShapingPass(context: Context, objectName: str, name: str):
-  """Remove a shaping pass and what it holds; the other passes keep theirs."""
+  """Remove a shaping pass and what it holds; the other passes keep theirs. A graded route's pass takes its definition with it."""
   return await callBridge(context, "removeShapingPass", {"objectName": objectName, "name": name})
 
 
@@ -1281,6 +1281,48 @@ async def removeShapingPass(context: Context, objectName: str, name: str):
 async def collapseShapingPasses(context: Context, objectName: str):
   """Make a mesh's shape as it is seen (its passes combined) its new base and drop the passes, so its faces can change again."""
   return await callBridge(context, "collapseShapingPasses", {"objectName": objectName})
+
+
+@guardedTool()
+async def gradeRoute(
+  context: Context, objectName: str, name: str, points: list[list[float]], width: float | None = None, widths: list[float] | None = None,
+  maximumGradeDegrees: float = 26.0, cutBatterDegrees: float = 70.0, fillBatterDegrees: float | None = 45.0, landingLength: float | None = None,
+):
+  """Grade a route into the ground (objectName) as a builder benches a path into a hillside: a bench `width` wide (or `widths`, one per
+  point, changing evenly between them), level across, along `points` [[x, y] or [x, y, z], ...]. A point's z fixes its height; the
+  points between fixed heights take an even grade by plan length, and an end given without z takes the ground there. A stretch steeper
+  than maximumGradeDegrees is refused, naming it and the run it needs: the tool never adds a switchback, so place the hairpins' points.
+  A bend turns on an arc the route's width in radius, so the bench stays level across it; a turn over 90 degrees (a hairpin) turns on
+  an arc of half the width and is a flat landing, at least `landingLength` long (by default the width) and at least the arc, centered
+  on the turn. Ground above the bench is cut down to it, meeting the ground at cutBatterDegrees; ground below is filled up to it,
+  meeting the ground at fillBatterDegrees (null makes a ledge whose outside drops away, refused where its bench would stand more than 2
+  over the ground, naming each span). The whole route is graded as one: inside its bench the bench's height wins, elsewhere the lowest
+  cut and the highest fill, and where those disagree (between two legs) the cut, so a lower leg is never buried; the ground between two
+  legs close together is dressed into one straight bank from one's edge to the other's, and between legs further apart nothing is left
+  standing above the higher of them, so no ridge or berm stands between a switchback's legs. Refused where one part's
+  batter would reach another part's bench (legs too close for their difference in height), naming the spot and the separation needed;
+  where any of the bench lies under rock (a covered way is a cave); and where its batters would reach more than 600 out. The vertices
+  nearest the bench's edges slide onto them, so the path's edges run as clean lines. The route goes into its own pass, "route <name>",
+  which keeps its definition and takes no other shaping: grading it again under its name replaces it, rebuilt from the ground as it
+  stands without that pass; removeShapingPass takes it back, definition and all. It is graded on the ground without any defined pass
+  made after it (a later route, or plot grading first made later), and every later one whose ground it changes is graded again after
+  it (replayed, with what each moved), so where two meet the later one wins; regradeTerrain puts them all back on target after other
+  shaping. Returns each segment's grade, the landings, the deepest cut and highest fill, how far the batters reach, the centerline at
+  its graded heights (for painting the path or walking it), and a walkRoute along that centerline. Look at it at eye height up and down
+  each leg, from across the valley, and in sections across the legs; then paint the bench and its batters."""
+  return await callBridge(context, "gradeRoute", {
+    "objectName": objectName, "name": name, "points": points, "width": width, "widths": widths, "maximumGradeDegrees": maximumGradeDegrees,
+    "cutBatterDegrees": cutBatterDegrees, "fillBatterDegrees": fillBatterDegrees, "landingLength": landingLength,
+  })
+
+
+@guardedTool()
+async def regradeTerrain(context: Context, objectName: str):
+  """Put every defined pass on a mesh back on target after other shaping changed the ground under them (a roughen, a sculpt, a pass
+  turned up, down, or off): each graded route (gradeRoute) and the plots graded on it (gradePlot, all together) are taken back and
+  graded again in the order they were first made, each on the ground as it then stands, so where two meet the later one still wins. A
+  muted or turned defined pass comes back unmuted at full strength (restoredFrom says which). Reports what each one moved, in order."""
+  return await callBridge(context, "regradeTerrain", {"objectName": objectName})
 
 
 @guardedTool(description=(
@@ -2149,7 +2191,10 @@ async def gradePlot(context: Context, address: str, objectName: str, margin: flo
   passes, so no plot's pad is ever disturbed by another's slopes and the result does not depend on the order plots were graded in;
   where two pads stand too close for their difference in height, the ground between them runs in one straight bank, steeper than the
   batter, listed in steepBanks (move a plot, change its height, or build a retaining wall there). touched names the other plots whose
-  ground within 60 units of their edges changed: look at them too. Grading again (with another margin or batter) replaces what the pass
+  ground within 60 units of their edges changed: look at them too. The plots are graded on the ground without any defined pass made
+  after the first of them (a route graded later, gradeRoute), and every such later pass whose ground the grading changes is graded
+  again after it, so a route to a plot's entrance stays on its bench (replayed lists them, with what each moved; editPlot and removePlot
+  replay alike). Grading again (with another margin or batter) replaces what the pass
   held; grading on other ground takes its grading back from the ground it was on (formerGround reports that). editPlot keeps a graded
   plot graded, and removePlot takes its grading back. The grading follows the ground when it is renamed; when that ground is deleted,
   grade the plot again where it stands. A plot standing far off the ground around it is refused: move it or change its height.

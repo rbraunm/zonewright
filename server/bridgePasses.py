@@ -1,6 +1,8 @@
 """Shaping passes: each shaping operation on a mesh can go into a named pass (a Blender shape key over the mesh's base shape) that can
 later be turned up or down, muted, removed, or collapsed into the base, so shaping is revised by adjusting passes rather than redone.
-Runs under Blender's Python."""
+A defined pass keeps the definition it is rebuilt from (bridgeGrading), which goes with it. Runs under Blender's Python."""
+import json
+
 import numpy
 
 import bridgeMeshAccess
@@ -8,6 +10,8 @@ import bridgeMeshAccess
 baseKeyName = "base"
 # A pass at -1 inverts what it holds, at 2 doubles it.
 strengthRange = (-1.0, 2.0)
+# Kept on the mesh's shape keys, so collapsing the passes takes the definitions with them.
+definitionsProperty = "zonewrightPassDefinitions"
 
 
 def passList(sceneObject):
@@ -37,7 +41,25 @@ def activePass(sceneObject):
     raise ValueError(f"'{sceneObject.name}' has shaping passes but none is active; add one for this shaping (addShapingPass) or make one active (setShapingPass)")
   if key.mute or key.value == 0:
     raise ValueError(f"Shaping pass '{key.name}' of '{sceneObject.name}' is {'muted' if key.mute else 'at strength 0'}, so shaping it would not show; unmute it or set a strength first")
+  if key.name in passDefinitions(sceneObject):
+    raise ValueError(f"Shaping pass '{key.name}' of '{sceneObject.name}' is rebuilt whole from its definition, so shaping put into it would be lost; shape in another pass (addShapingPass, or setShapingPass makeActive)")
   return key
+
+
+def passDefinitions(sceneObject):
+  """The definitions of a mesh's defined passes, by pass name."""
+  keys = sceneObject.data.shape_keys
+  return {} if keys is None or definitionsProperty not in keys else json.loads(keys[definitionsProperty])
+
+
+def setPassDefinition(sceneObject, name, definition):
+  """Keep a pass's definition with it, or with definition None drop it."""
+  definitions = passDefinitions(sceneObject)
+  if definition is None:
+    definitions.pop(name, None)
+  else:
+    definitions[name] = definition
+  sceneObject.data.shape_keys[definitionsProperty] = json.dumps(definitions)
 
 
 def keyCoordinates(key):
@@ -103,6 +125,8 @@ def clearPassesKeeping(sceneObject, localPositions):
 def removeShapingPass(objectName, name):
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   key = requirePass(sceneObject, name)
+  if name in passDefinitions(sceneObject):
+    setPassDefinition(sceneObject, name, None)
   sceneObject.shape_key_remove(key)
   keys = sceneObject.data.shape_keys
   if len(keys.key_blocks) == 1:
