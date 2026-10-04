@@ -45,4 +45,4 @@ Item models (`IT<number>`) come from the first archive the client loads that def
 ## Limits
 
 - **Missing textures.** A texture missing from every linked archive draws magenta and is listed in `missingTextures`. The neighborhood's `OBJ_TREEM` bark is one: only its normal map ships.
-- **Particles.** Particle effects (flames, smoke) are not drawn.
+- **Particles.** An object's own particle effects (actor emitters) are not drawn; a zone's environment emitters are.

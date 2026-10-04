@@ -80,14 +80,16 @@ What is worth keeping and sharing is committed in the repository's `catalog/` fo
 
 ## Lights and emitters in Blender
 
-A zone light is a point light whose `eqRadius` property holds the EQ radius, colored with the EQ RGB (0-1). A particle emitter is an empty whose `eqEmitterDefinition` and `eqEmitterLifespan` properties hold the client definition index and the list's lifespan field. `placeLights` and `placeEmitters` make them. `importZone` and `importZoneFile` bring a zone's own lights and emitters in as these objects, and `exportZone` writes them out:
+A zone light is a point light whose `eqRadius` property holds the EQ radius, colored with the EQ RGB (0-1). A particle emitter is an empty whose `eqEmitterDefinition` and `eqEmitterLifespan` properties hold the client definition index and the list's lifespan field, and `eqEmitterAlwaysVisible` the seventh field some lists add. `placeLights` and `placeEmitters` make them. `importZone` and `importZoneFile` bring a zone's own lights and emitters in as these objects, and `exportZone` writes them out:
 
-- lights into the .zon;
-- emitters into `<zone>_EnvironmentEmitters.txt` beside the archive, which the client reads loose.
+- lights into the .zon, each at (field 2, -field 1, field 3) of its three position fields, as the client places it ([clientRendering.md](clientRendering.md#eqg-zones));
+- emitters into `<zone>_EnvironmentEmitters.txt` beside the archive, which the client reads loose: after a header line, each line's fields by position, whatever the header says (`eqgame.exe` `0x4a1c30`, `0x4a1e00`): name, the `EnvironmentEmittersNew.edd` definition index, x, y, z in the zone's axes, the lifespan in milliseconds (the client makes an emitter only when it is above 0), and an optional seventh field, always visible when not 0. The client's seven-field lists head their last two fields `AlwaysVisible^Lifespan` and hold the lifespan (4000000 on most) in the first of them; export writes the fields in the order the client reads them.
+
+A client-shaded view draws both as the client does ([clientRendering.md](clientRendering.md#point-lights)): a light's light on what it reaches (terrain takes only `LIB_` lights, placed objects and characters every light), and an emitter's particles from its client definition.
 
 ## Not read yet
 
 - **EQ terrain zones:** their lights, if they have any outside the .zon.
-- **Emitter definitions:** the client's `actoremittersnew.edd`, so an emitter is known by its index and the names zones give it.
+- **Emitter definitions in the catalog:** an emitter is known by its index and the names zones give it; the definitions themselves (read for views by `eqEmitterDefinitions`) are not surveyed.
 - **Classic objects' textures:** their use on placed objects (the zone's own meshes are measured).
-- **The preview:** it draws neither lights nor emitters.
+- **Measurements taken before the readers' fixes:** the light styles' example positions in `catalog/measured` were measured at the raw .zon fields, and the lifespans of seven-field emitter lists from their seventh field; `surveyAssets` with `allZones` and `refresh` measures them again.

@@ -1,7 +1,7 @@
 """The zone's particle emitters in a preview, drawn as the client draws their particles at a moment of their steady state
-(emitterParticles): each particle a quad facing the camera, or a beam along its axis turned to the camera, showing its texture frame
-times its color, blended over what lies behind (added where its definition adds) and never fogged, as the client's particle pass
-draws. Runs under Blender's Python."""
+(emitterParticles): each particle a quad facing the camera, a beam along its axis turned to the camera, or a quad lying level, showing
+its texture frame times its color, blended over what lies behind (added where its definition adds) and never fogged, after the rest of
+the zone, as the client's particle pass draws. Runs under Blender's Python."""
 import json
 import math
 import os
@@ -17,6 +17,9 @@ particleColorAttribute = "eqParticleColor"
 materialPrefix = "zonewrightParticles"
 originScale = 1e-3
 notDrawnNames = 5
+# The client draws no particle deeper in the view than this, less its definition's depth bias (0x100721e0 caps the particle far clip at
+# 0x1013680c's 500; 0x10074987 skips particles past it).
+farthestParticleDepth = 500.0
 assetsCache = {}
 
 
@@ -145,8 +148,8 @@ def emitterMesh(preview, label, particles, mode, camera, material, emitterPositi
   return preview.addObject(meshObject)
 
 
-def emitterParticlesOrReason(emitter, definitions, textures, cameraPosition):
-  """An emitter's particles and its definition, or why it draws none."""
+def emitterParticlesOrReason(emitter, definitions, textures, camera):
+  """An emitter's particles the view shows and its definition, or why it draws none."""
   index, lifespan = emitter["definition"], emitter["lifespan"]
   if index >= len(definitions):
     return None, None, f"definition {index} is past the client's {len(definitions)} environment emitter definitions"
@@ -154,14 +157,20 @@ def emitterParticlesOrReason(emitter, definitions, textures, cameraPosition):
   if lifespan <= 0:
     return None, None, f"lifespan {lifespan}: the client makes an emitter only for a lifespan above 0"
   try:
-    particles = emitterParticles.steadyParticles(definition, emitter["name"], emitter["position"], lifespan, cameraPosition)
+    particles = emitterParticles.steadyParticles(definition, emitter["name"], emitter["position"], lifespan, list(camera["position"]))
   except ValueError as error:
     return None, None, f"definition {index} ('{definition['name']}'): {error}"
   if not particles:
     return None, None, f"definition {index} ('{definition['name']}') makes no particles"
   if definition["texture"].lower() not in textures:
     return None, None, f"definition {index} ('{definition['name']}') names texture '{definition['texture']}', which no effect folder holds"
-  return particles, definition, None
+  shown = [
+    particle for particle in particles
+    if camera["forward"].dot(mathutils.Vector(particle["center"]) - camera["position"]) - definition["depthBias"] <= farthestParticleDepth
+  ]
+  if not shown:
+    return None, None, f"farther into the view than the client draws particles ({farthestParticleDepth:g})"
+  return shown, definition, None
 
 
 def drawEmitters(preview, sourceScene, assetsPath):
@@ -182,7 +191,7 @@ def drawEmitters(preview, sourceScene, assetsPath):
   }
   materials, drawn, particleCount, notDrawn = {}, 0, 0, {}
   for emitter in emitters:
-    particles, definition, reason = emitterParticlesOrReason(emitter, definitions, textures, list(camera["position"]))
+    particles, definition, reason = emitterParticlesOrReason(emitter, definitions, textures, camera)
     if reason is not None:
       notDrawn.setdefault(reason, []).append(emitter["name"])
       continue

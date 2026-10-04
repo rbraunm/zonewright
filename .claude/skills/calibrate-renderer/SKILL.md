@@ -33,7 +33,6 @@ It imports the zone, renders the screenshot's view as passes, fits the scene lig
 
 - **Shifted or scaled scene:** the camera. Its constants (`eyeAboveLoc`, `pitchOffsetDegrees` in `eqCalibration.py`, `verticalFieldOfViewDegrees` in `bridgeViews.py`) come from aligning renders to screenshots; re-measure them with several shots before changing them, and note an outlier shot rather than bending the constants to it.
 - **Wrong overall light:** the time of day differs between shots; the fit measures it per shot. Shots of one zone a few minutes apart should fit alike.
-- **Local glows, sky, distant haze:** point lights are not drawn yet, nor the sky's clouds and stars; fog without the zone header's values is a guess (see `docs
-enderingWorklist.md`).
+- **Local glows, sky, distant haze:** point lights and environment emitters draw, with the rules `docs\clientRendering.md` lists as not settled; the sky's clouds and stars do not; fog without the zone header's values is a guess (see `docs\renderingWorklist.md`).
 - **Missing props, people, and grass:** without a recording, doors, ground items, and spawns are not placed (the neighborhood's info board and teleport arch are doors). With one, NPCs still lack their equipment, live-only models and looks are listed in the result's `recorded.notPlaced`, and some live textures differ from this client's (the neighborhood's arched gate draws as bars). An EQ terrain zone's radial flora is not drawn. All of these count against the difference.
 - **Magenta:** a texture no archive holds, as for the client.
