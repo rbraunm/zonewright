@@ -488,14 +488,14 @@ def testAPlanMarksPlotEntrancesAndKeepsSpotHeightsOffTheirAddresses(stageBlender
   pixels = numpy.asarray(Image.open(io.BytesIO(image)).convert("RGB"), dtype=numpy.int64)
 
   def at(x, y):
-    # 2.4 pixels a unit, the plan's center in the middle of its 1440 x 810: the 5 x 5 pixels about [x, y].
-    column, row = round(720 + x * 2.4), round(405 - y * 2.4)
+    # 2.4 pixels a unit, the plan's center in the middle of its 1440 x 810, north (+X) up: the 5 x 5 pixels about [x, y].
+    column, row = round(720 - y * 2.4), round(405 - x * 2.4)
     return pixels[row - 2:row + 3, column - 2:column + 3]
 
   def near(colors, target, within=30):
     return numpy.abs(colors - numpy.array(target)).max(axis=-1) <= within
 
-  # Facing east, its entrance mark points out of the middle of its east side, 84.55 out; nothing marks its west side.
+  # Facing +X (the game's north), its entrance mark points out of the middle of that side, 84.55 out; nothing marks the side opposite.
   assert near(at(84.55 + 2.5, 0), (150, 90, 20)).any() and not near(at(-84.55 - 2.5, 0), (150, 90, 20)).any()
   # Its address sits beside the grid crossing at its center, within a grid step of it, rather than over the crossing's spot height:
   # that dot is drawn, as the next crossing's is.

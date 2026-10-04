@@ -25,8 +25,9 @@ shapeKeys = {"name", "kind", "outline", "rectangle", "points", "at", "width", "f
 massingMaterialName = "zonewrightSketchMassing"
 massingVersion = 2
 massingColor = (0.82, 0.8, 0.76)
-# Massing shades each face by the way it faces, the same from every view: tops lightest, then east and west, then north and south.
-massingShade = {"base": 0.45, "up": 0.4, "eastWest": 0.25, "northSouth": 0.1}
+# Massing shades each face by the way it faces, the same from every view: tops lightest, then north and south (+X and -X), then east and
+# west.
+massingShade = {"base": 0.45, "up": 0.4, "northSouth": 0.25, "eastWest": 0.1}
 # A boundary face whose plan covers less than this share of its own area stands upright: a wall, drawn in plan as a line.
 uprightPlanShare = 0.01
 planLayers = ("regions", "plots", "water", "swim", "boundaries", "zoneLines")
@@ -326,7 +327,7 @@ def massingMaterial():
     shade = nodes.new("ShaderNodeValue")
     shade.outputs["Value"].default_value = massingShade["base"]
     total = shade.outputs["Value"]
-    for axis, weight, operation in (("Z", massingShade["up"], "MAXIMUM"), ("X", massingShade["eastWest"], "ABSOLUTE"), ("Y", massingShade["northSouth"], "ABSOLUTE")):
+    for axis, weight, operation in (("Z", massingShade["up"], "MAXIMUM"), ("X", massingShade["northSouth"], "ABSOLUTE"), ("Y", massingShade["eastWest"], "ABSOLUTE")):
       part = nodes.new("ShaderNodeMath")
       part.operation = operation
       links.new(normal.outputs[axis], part.inputs[0])

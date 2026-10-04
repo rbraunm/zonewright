@@ -215,12 +215,11 @@ def testPlanNamesEachSwimVolumeInsideItClearOfTheOthers(stageBlenderServer, tmp_
   bounds = {name: board.textBox(position, text, planDrawing.swimLabelSize) for name, text, position in labels}
   rectangles = {}
   for box in boxes:
-    (left, bottom), (right, top) = frame.pixel(box["corners"][0]), frame.pixel(box["corners"][1])
-    rectangles[box["name"]] = (left, top, right, bottom)
-  # Each box is named inside itself, in full where its name fits and by its number in the narrow strips where it does not, and no name
-  # overlaps another; the drawing reports any box it left unnamed.
+    corners = [frame.pixel(corner) for corner in box["corners"]]
+    rectangles[box["name"]] = (min(x for x, _ in corners), min(y for _, y in corners), max(x for x, _ in corners), max(y for _, y in corners))
+  # Each box is named inside itself and no name overlaps another; the drawing reports any box it left unnamed.
   assert sorted(list(bounds) + unnamed) == sorted(rectangles)
-  assert {text for _, text, _ in labels} >= {"AWT_pool01"} and any(text == name[-2:] for name, text, _ in labels)
+  assert {text for _, text, _ in labels} >= {"AWT_pool01"}
   for name, (left, top, right, bottom) in bounds.items():
     boxLeft, boxTop, boxRight, boxBottom = rectangles[name]
     assert boxLeft <= left and right <= boxRight and boxTop <= top and bottom <= boxBottom
@@ -229,6 +228,18 @@ def testPlanNamesEachSwimVolumeInsideItClearOfTheOthers(stageBlenderServer, tmp_
     for b in named[index + 1:]:
       assert a[2] <= b[0] or b[2] <= a[0] or a[3] <= b[1] or b[3] <= a[1]
   assert drawn["unnamedSwimVolumes"] == unnamed
+
+
+def testASwimVolumeTooNarrowForItsNameIsNamedByItsNumber():
+  frame = planDrawing.PlanFrame([0, 0], 260, (1440, 810))
+  board = planDrawing.LabelBoard(ImageDraw.Draw(Image.new("RGBA", frame.size)), frame.size)
+  boxes = [
+    {"name": "AWT_pool01", "liquid": "water", "corners": [[-40, -60, -5], [40, 60, 0]]},
+    {"name": "AWT_pool02", "liquid": "water", "corners": [[-40, 70, -5], [40, 76, 0]]},
+  ]
+  labels, unnamed = planDrawing.swimLabels(board, frame, boxes)
+  # North (+X) up: the second box is 80 units tall on the plan but only 6 across, too narrow for its name and wide enough for its number.
+  assert [(name, text) for name, text, _ in labels] == [("AWT_pool01", "AWT_pool01"), ("AWT_pool02", "02")] and unnamed == []
 
 
 def pixelsOf(image):

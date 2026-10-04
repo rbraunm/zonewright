@@ -55,8 +55,9 @@ valueShadings = ("objects", "curvature", "triangleDensity", "texelDensity")
 viewShadings = ("client", "layout", "relief", "coverage") + valueShadings
 # The sky is soft everywhere, so an equirectangular image at about a fifth of a degree a pixel draws it.
 skyImageHeight = 1024
-# Layout shading lights from the northwest, as relief maps do, so slopes read the same whatever the zone's sun.
-layoutLightDirection = (-0.5, 0.5, 0.7071)
+# Layout shading lights from the game's northwest (+X north, +Y west), the top left of a map, as relief maps do, so slopes read the same
+# whatever the zone's sun.
+layoutLightDirection = (0.5, 0.5, 0.7071)
 layoutAmbient = 0.3
 # Swim volumes tint a view: cyan for water and magenta for lava, which shows over lava's oranges.
 swimColors = {"water": (0.1, 0.85, 1.0), "lava": (1.0, 0.15, 0.85)}
@@ -381,11 +382,11 @@ def placeCamera(preview, view, figureModel):
     if figureModel is not None and "figureAt" in view:
       footing = standingGround(preview, surfaces, view["figureAt"], "figureAt")
       toEye = eye - footing
-      facing = view["headingDegrees"] + 180 if toEye.xy.length < 1e-6 else math.degrees(math.atan2(toEye.x, toEye.y))
+      facing = (view["headingDegrees"] + 180 if toEye.xy.length < 1e-6 else math.degrees(math.atan2(toEye.x, toEye.y))) % 360
       preview.addFigure(footing, figureModel, facing)
       description |= {"figure": list(footing), "figureFacingDegrees": facing}
     elif figureModel is not None:
-      description |= {"figure": list(placeScaleFigure(preview, surfaces, ground, view["headingDegrees"], figureModel)), "figureFacingDegrees": view["headingDegrees"] + 180}
+      description |= {"figure": list(placeScaleFigure(preview, surfaces, ground, view["headingDegrees"], figureModel)), "figureFacingDegrees": (view["headingDegrees"] + 180) % 360}
     return description
   raise ValueError(f"A view is {{camera}}, {{eye, target}}, {{map}}, {{frame}}, or {{standAt, headingDegrees, pitchDegrees}} with an optional figureAt; got keys {sorted(viewKeys)}")
 
@@ -525,7 +526,7 @@ def guideThickness(view):
 
 
 def placeMapCamera(preview, mapView):
-  """Straight down from above everything, orthographic, north (+Y) up and east (+X) right."""
+  """Straight down from above everything, orthographic, the game's north (+X) up and east (-Y) right, as the in-game map draws."""
   requireMapView(mapView)
   bottom, top = sceneHeightRange(preview)
   if preview.guides:
@@ -536,7 +537,7 @@ def placeMapCamera(preview, mapView):
   camera.data.sensor_fit = "HORIZONTAL"
   camera.data.ortho_scale = mapView["width"]
   camera.location = mathutils.Vector((*mapView["center"], top + mapClearance))
-  camera.rotation_quaternion = mathutils.Quaternion()
+  camera.rotation_quaternion = mathutils.Quaternion((0.0, 0.0, 1.0), math.radians(-90.0))
   camera.data.clip_end = top - bottom + 2 * mapClearance
   return {"mapCenter": list(mapView["center"]), "mapWidth": mapView["width"], "mapHeight": mapView["width"] * renderHeight / renderWidth, "unitsPerPixel": mapView["width"] / renderWidth, "figure": None}
 

@@ -24,14 +24,15 @@ coverageMap = {"view": {"map": {"center": [0, 0], "width": 120}}, "shading": "co
 # Flat ground facing up in the coverage light (from the northwest, 45 degrees up): half ambient plus half of the light.
 upShade = 0.5 + 0.5 * 0.7071
 colors = {"orange": (1.0, 0.5, 0.0), "brown": (0.45, 0.28, 0.12), "magenta": (0.95, 0.1, 0.85), "grey": (0.62, 0.62, 0.6)}
-# Map pixels (8 to a unit, the origin at the middle): the base patch, the blockout patch, a sand face on the border, plain grass, and
-# the tops of the slab and the post.
-pixels = {"base": (416, 334), "blockout": (288, 78), "border": (640, 110), "grass": (256, 302), "slabTop": (480, 462), "postTop": (672, 462)}
+# Map pixels (8 to a unit, the origin at the middle, north (+X) up and east (-Y) right) of the base patch, the blockout patch, a sand
+# face on the border, plain grass, and the tops of the slab and the post.
+mapPoints = {"base": (-8, -8), "blockout": (-24, 24), "border": (20, 20), "grass": (-28, -4), "slabTop": (0, -24), "postTop": (24, -24)}
+pixels = {name: (480 - 8 * y, 270 - 8 * x) for name, (x, y) in mapPoints.items()}
 
 
 async def faultyPlot(session, folder):
   """A 64 x 64 terrain of 8-unit cells surfaced with grass over a dirt base: a 2 x 2 cell patch left unpainted at the middle's
-  southwest, a sand band along the east edge meeting the grass with no transition, a blockout patch; a slab textured at four times
+  southeast (-x, -y), a sand band along the north (+x) edge meeting the grass with no transition, a blockout patch; a slab textured at four times
   grass's repeat with its top wound backwards, and a post projected from above so its sides take no texture."""
   await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
   await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [64, 64], "spacing": 8, "location": [0, 0, 0], "collection": "terrain"})

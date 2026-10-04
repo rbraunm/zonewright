@@ -53,7 +53,7 @@ def testBoundariesBlockPlayersFollowTheGroundAndDrawOnlyAsGuides(stageBlenderSer
     view = {"eye": [100, 0, 10], "target": [150, 0, 10]}
     guided, _ = await session.expectImage("renderView", {"view": view})
     clean, _ = await session.expectImage("renderView", {"view": view, "guides": False})
-    mapped, _ = await session.expectImage("renderView", {"view": {"map": {"center": [0, 0], "width": 400}}})
+    mapped, _ = await session.expectImage("renderView", {"view": {"map": {"center": [100, 0], "width": 400}}})
     await session.expectSuccess("sculptAtPoint", {"objectName": "ground", "mode": "raise", "center": [150, 0, 0], "radius": 30, "strength": 12})
     redrawn = await session.expectSuccess("placeBoundaryWall", {"name": "eastWall", "path": [[150, -100], [150, 100]], "height": 40})
     listed = await session.expectSuccess("getBoundaries", {})
@@ -74,9 +74,10 @@ def testBoundariesBlockPlayersFollowTheGroundAndDrawOnlyAsGuides(stageBlenderSer
   red, green, _ = pixel(guided, 480, 270)
   assert red - green > 40, (red, green)
   assert numpy.abs(pixel(clean, 480, 270) - [128, 140, 153]).max() <= 1
-  wallRed, wallGreen, _ = pixel(mapped, 840, 270)
-  besideRed, besideGreen, _ = pixel(mapped, 820, 270)
-  assert wallRed - wallGreen > 40 and besideGreen > besideRed, (pixel(mapped, 840, 270), pixel(mapped, 820, 270))
+  # North (+X) up: the wall at x 150 runs across the map 50 units above its middle, and 20 pixels below it lies open ground.
+  wallRed, wallGreen, _ = pixel(mapped, 480, 150)
+  besideRed, besideGreen, _ = pixel(mapped, 480, 170)
+  assert wallRed - wallGreen > 40 and besideGreen > besideRed, (pixel(mapped, 480, 150), pixel(mapped, 480, 170))
   assert redrawn["replaced"] is True and redrawn["ground"][0] == 0.0 and 5 < redrawn["ground"][1] <= 12 and abs(redrawn["maximum"][2] - redrawn["ground"][1] - 40) <= 0.011
   assert [(entry["name"], entry["kind"], entry["triangles"]) for entry in listed["boundaries"]] == [("eastWall", "wall", 100), ("floor", "floor", 2), ("lid", "lid", 2)]
   assert listed["errors"] == [] and listed["passable"] == []
@@ -218,7 +219,7 @@ def guidePixel(image, x, y):
 
 
 def testBoundariesAndZoneLinesDrawInEveryShadingPlanAndSection(stageBlenderServer, tmp_path):
-  overhead = {"map": {"center": [0, 0], "width": 400}}
+  overhead = {"map": {"center": [0, 0], "width": 800}}
 
   async def steps(session):
     await groundedBasin(session, tmp_path)
@@ -230,13 +231,14 @@ def testBoundariesAndZoneLinesDrawInEveryShadingPlanAndSection(stageBlenderServe
     for shading in ("layout", "relief"):
       for guides in (True, False):
         views[(shading, guides)], _ = await session.expectImage("renderView", {"view": overhead, "shading": shading, "guides": guides})
-    plan, _ = await session.expectImage("renderSketch", {"center": [0, 0], "width": 400})
-    barePlan, _ = await session.expectImage("renderSketch", {"center": [0, 0], "width": 400, "layers": ["regions", "plots", "water"]})
+    plan, _ = await session.expectImage("renderSketch", {"center": [0, 0], "width": 800})
+    barePlan, _ = await session.expectImage("renderSketch", {"center": [0, 0], "width": 800, "layers": ["regions", "plots", "water"]})
     section, cuts = await session.expectImage("renderSection", {"start": [-200, 2], "end": [200, 2], "bottom": -30, "top": 60})
     return views, plan, barePlan, section, cuts
 
   views, plan, barePlan, section, cuts = stageBlenderServer.session(steps)
-  wall, lid, line, open = (840, 200), (120, 270), (252, 270), (480, 100)
+  # 1.2 pixels a unit, north (+X) up: the wall at (150, 29), the lid at (-150, 0), the zone line at (-95, 0), and open ground at (0, 71).
+  wall, lid, line, open = (445, 90), (480, 450), (480, 384), (395, 270)
   for shading in ("layout", "relief"):
     guided, bare = views[(shading, True)], views[(shading, False)]
     wallRed, wallGreen, _ = guidePixel(guided, *wall) - guidePixel(bare, *wall)
@@ -245,9 +247,10 @@ def testBoundariesAndZoneLinesDrawInEveryShadingPlanAndSection(stageBlenderServe
     assert wallRed - wallGreen > 50 and lidRed - lidGreen > 50, (shading, guidePixel(guided, *wall), guidePixel(bare, *wall), guidePixel(guided, *lid), guidePixel(bare, *lid))
     assert lineGreen - lineRed > 50, (shading, guidePixel(guided, *line), guidePixel(bare, *line))
     assert numpy.array_equal(guidePixel(guided, *open), guidePixel(bare, *open))
-  assert numpy.abs(guidePixel(plan, 1260, 189) - [215, 30, 25]).max() <= 2
-  planLidRed, planLidGreen, _ = guidePixel(plan, 180, 333) - guidePixel(barePlan, 180, 333)
-  planLineRed, planLineGreen, _ = guidePixel(plan, 378, 376) - guidePixel(barePlan, 378, 376)
+  # The plan at 1.8 pixels a unit: the wall's line at (150, 60), inside the lid at (-150, 20), inside the zone line at (-95, 8).
+  assert numpy.abs(guidePixel(plan, 612, 135) - [215, 30, 25]).max() <= 2
+  planLidRed, planLidGreen, _ = guidePixel(plan, 684, 675) - guidePixel(barePlan, 684, 675)
+  planLineRed, planLineGreen, _ = guidePixel(plan, 706, 576) - guidePixel(barePlan, 706, 576)
   assert planLidRed - planLidGreen > 30 and planLineGreen - planLineRed > 30
   [cutWall, cutLid] = cuts["boundaries"]
   assert cutWall["name"] == "eastWall" and cutWall["kind"] == "wall" and {(s0, s1) for s0, _, s1, _ in cutWall["segments"]} == {(350.0, 350.0)}

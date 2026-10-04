@@ -87,19 +87,19 @@ def testAPlanDrawsSketchesOverAReliefMap(stageBlenderServer, tmp_path):
   async def steps(session):
     await campScene(session, tmp_path)
     await session.expectSuccess("sketch", {"sheet": "camp", "shapes": campShapes})
-    return await session.expectImage("renderSketch", {"center": [0, 0], "width": 500})
+    return await session.expectImage("renderSketch", {"center": [0, 0], "width": 600})
 
   image, description = stageBlenderServer.session(steps)
   pixels = numpy.asarray(Image.open(io.BytesIO(image)).convert("RGB"), dtype=numpy.int64)
   assert pixels.shape == (810, 1440, 3) and description["sheetColors"] == {"camp": [200, 40, 40]}
-  scale = 1440 / 500
+  scale = 1440 / 600
 
   def at(x, y):
-    return pixels[round(405 - y * scale), round(720 + x * scale)]
+    return pixels[round(405 - x * scale), round(720 - y * scale)]
 
   # Inside the tavern (clear of its name, set just above the spot height at its middle) the sheet's red fill shows over the grey
   # relief; over the pool, the water's blue.
-  tavern, pool, ground = at(140, -12), at(-40, 30), at(-200, -100)
+  tavern, pool, ground = at(140, -12), at(-40, 30), at(-140, -200)
   assert tavern[0] > tavern[1] + 40 and tavern[0] > tavern[2] + 40
   assert pool[2] > pool[0] + 30
   assert abs(ground[0] - ground[1]) < 12 and abs(ground[1] - ground[2]) < 12
@@ -167,13 +167,13 @@ def testAPlanDrawsShapesInsideAnAreaOverItsFill(stageBlenderServer):
   assert description["sheetColors"] == {"camp": [200, 40, 40], "other": [30, 90, 200]}
 
   def at(x, y):
-    return pixels[round(405 - y * 4.8), round(720 + x * 4.8)]
+    return pixels[round(405 - x * 4.8), round(720 - y * 4.8)]
 
   # The house's fill shows red over the yard's faint tint, the other sheet's footprint blue, and the note's words are written.
   house, under, bare = at(-58, -8), at(56, -31), at(-80, 40)
   assert house[0] > house[1] + 60 and house[0] > house[2] + 60 and bare[0] - bare[1] < 40
   assert under[2] > under[0] + 40
-  note = pixels[round(405 - 30 * 4.8) - 12:round(405 - 30 * 4.8) + 12, round(720 + 40 * 4.8) - 50:round(720 + 40 * 4.8) + 50]
+  note = pixels[round(405 - 40 * 4.8) - 12:round(405 - 40 * 4.8) + 12, round(720 - 30 * 4.8) - 50:round(720 - 30 * 4.8) + 50]
   assert (numpy.abs(note - numpy.array([200, 40, 40])).max(axis=-1) <= 35).sum() > 20
 
 
@@ -234,7 +234,7 @@ def testASectionDrawsAreaFloorsAndAStairAlongIt(stageBlenderServer):
 
 def testAPlanNamesOnlyTheAreasThatReachIntoIt(stageBlenderServer):
   areas = [
-    {"name": "farNorth", "kind": "area", "rectangle": {"center": [-100, 600], "size": [100, 100], "headingDegrees": 0}},
+    {"name": "farNorth", "kind": "area", "rectangle": {"center": [300, -100], "size": [100, 100], "headingDegrees": 0}},
     {"name": "edge", "kind": "area", "rectangle": {"center": [80, 100], "size": [100, 80], "headingDegrees": 0}},
   ]
 
@@ -251,7 +251,7 @@ def testAPlanNamesOnlyTheAreasThatReachIntoIt(stageBlenderServer):
   def red(rows, columns):
     return (numpy.abs(pixels[rows, columns] - numpy.array([200, 40, 40])).max(axis=-1) <= 35).sum()
 
-  # 4.8 pixels a unit: the frame reaches y 84.4. The area crossing its top edge (x 30..130, columns 864..1344) is named just inside
-  # the top; the one wholly north of it (x -150..-50, columns 0..480) is not named at all.
-  assert red(slice(0, 60), slice(954, 1254)) > 20
-  assert red(slice(0, 60), slice(0, 480)) == 0
+  # 4.8 pixels a unit, north (+X) up: the frame reaches x 84.4. The area crossing its top edge (y 60..140, columns 48..432) is named
+  # just inside the top; the one wholly north of it (y -150..-50, columns 960..1440) is not named at all.
+  assert red(slice(0, 60), slice(140, 340)) > 20
+  assert red(slice(0, 60), slice(960, 1440)) == 0

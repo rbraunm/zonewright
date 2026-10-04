@@ -165,16 +165,16 @@ def testLabelsNameOnlyWhatTheViewShowsAndTheObjectsShadingColorsEachObject(stage
   assert numpy.abs(pixelsOf(objects[0])[y, x] - expected).max() <= 2, (pixelsOf(objects[0])[y, x], expected)
 
 
-# A map 260 across about (8, 0): 960 pixels for 260 units, the fine grid's middle at (-80, 0), the coarse grid's at (0, 0), and the
-# mound's top at (80, 0).
-diagnosticMap = {"map": {"center": [8, 0], "width": 260}}
-pixelsPerUnit = 960 / 260
+# A map 480 across about (8, 0), north (+X) up: 2 pixels a unit, the fine grid's middle at (-80, 0), the coarse grid's at (0, 0), and
+# the mound's top at (80, 0), one above another.
+diagnosticMap = {"map": {"center": [8, 0], "width": 480}}
+pixelsPerUnit = 960 / 480
 # Ground facing up takes the shading's ambient 0.6 and 0.4 of the northwest light, which is 45 degrees up.
 upShade = 0.6 + 0.4 * math.sqrt(0.5)
 
 
 def mapPixel(x, y):
-  return int((x - 8 + 130) * pixelsPerUnit), int((540 / 2) - y * pixelsPerUnit)
+  return int((240 - y) * pixelsPerUnit), int(540 / 2 - (x - 8) * pixelsPerUnit)
 
 
 def rampColor(fraction):

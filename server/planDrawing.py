@@ -30,15 +30,15 @@ entranceMarkWidth = 14
 
 
 class PlanFrame:
-  """World plan coordinates to pixels of the drawing."""
+  """World plan coordinates to pixels of the drawing: the game's north (+X) up and east (-Y) right, width across and height up."""
 
   def __init__(self, center, width, size):
     self.center, self.width, self.size = center, width, size
     self.height = width * size[1] / size[0]
 
   def pixel(self, point):
-    x = (point[0] - self.center[0] + self.width / 2) / self.width * self.size[0]
-    y = (self.center[1] + self.height / 2 - point[1]) / self.height * self.size[1]
+    x = (self.center[1] + self.width / 2 - point[1]) / self.width * self.size[0]
+    y = (self.center[0] + self.height / 2 - point[0]) / self.height * self.size[1]
     return (x, y)
 
   def length(self, units):
@@ -144,39 +144,43 @@ def gridStepFor(width):
   return next((step for step in gridSteps if width / step <= 12), gridSteps[-1])
 
 
+def gridValues(low, high, step):
+  return range(math.ceil(low / step) * step, math.floor(high) + 1, step)
+
+
 def gridCrossings(center, width, aspect):
-  """The grid's crossings inside a plan width units across about center, height width * aspect."""
+  """The grid's crossings inside a plan width units across (along y) about center, height width * aspect (along x)."""
   step = gridStepFor(width)
   height = width * aspect
-  xs = range(math.ceil((center[0] - width / 2) / step) * step, math.floor(center[0] + width / 2) + 1, step)
-  ys = range(math.ceil((center[1] - height / 2) / step) * step, math.floor(center[1] + height / 2) + 1, step)
+  xs = gridValues(center[0] - height / 2, center[0] + height / 2, step)
+  ys = gridValues(center[1] - width / 2, center[1] + width / 2, step)
   return [[x, y] for x in xs for y in ys]
 
 
 def gridLines(frame):
-  """The grid's step and its lines' places along x and y."""
+  """The grid's step and its lines' places along x (running across the drawing) and along y (running up it)."""
   step = gridStepFor(frame.width)
-  left, right = frame.center[0] - frame.width / 2, frame.center[0] + frame.width / 2
-  bottom, top = frame.center[1] - frame.height / 2, frame.center[1] + frame.height / 2
-  return step, range(math.ceil(left / step) * step, math.floor(right) + 1, step), range(math.ceil(bottom / step) * step, math.floor(top) + 1, step)
+  xs = gridValues(frame.center[0] - frame.height / 2, frame.center[0] + frame.height / 2, step)
+  ys = gridValues(frame.center[1] - frame.width / 2, frame.center[1] + frame.width / 2, step)
+  return step, xs, ys
 
 
 def drawGrid(draw, frame):
   _, xs, ys = gridLines(frame)
   for x in xs:
-    px = frame.pixel((x, 0))[0]
-    draw.line([(px, 0), (px, frame.size[1])], fill=gridColor, width=1)
-  for y in ys:
-    py = frame.pixel((0, y))[1]
+    py = frame.pixel((x, 0))[1]
     draw.line([(0, py), (frame.size[0], py)], fill=gridColor, width=1)
+  for y in ys:
+    px = frame.pixel((0, y))[0]
+    draw.line([(px, 0), (px, frame.size[1])], fill=gridColor, width=1)
 
 
 def labelGrid(board, frame):
   _, xs, ys = gridLines(frame)
   for x in xs:
-    board.write((frame.pixel((x, 0))[0] + 3, 4), str(x), gridLabelColor, 13, "la")
+    board.write((4, frame.pixel((x, 0))[1] - 3), str(x), gridLabelColor, 13, "ld")
   for y in ys:
-    board.write((4, frame.pixel((0, y))[1] - 3), str(y), gridLabelColor, 13, "ld")
+    board.write((frame.pixel((0, y))[0] + 3, 4), str(y), gridLabelColor, 13, "la")
 
 
 def drawScale(board, frame, step):

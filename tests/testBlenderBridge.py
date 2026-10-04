@@ -247,7 +247,7 @@ width, height = image.size
 index = ((height // 2) * width + width // 4) * 4
 result = list(image.pixels[index:index + 3])
 """})
-    # The pixel a quarter across and a quarter down lies 100 units west and 56.25 north of the center.
+    # North up, as the in-game map: the pixel a quarter across and a quarter down lies 100 units west (+Y) and 56.25 north (+X) of the center.
     picked = await session.expectSuccess("pick", {"view": mapView, "pixel": [240, 135]})
     return description, middle["result"], picked
 
@@ -255,7 +255,7 @@ result = list(image.pixels[index:index + 3])
   assert description["unitsPerPixel"] == 400 / 960 and description["mapHeight"] == 225
   assert max(abs(measured - fogComponent) for measured, fogComponent in zip(middle, zoneProperties["fogColor"])) > 0.1
   assert picked["hit"] is True and picked["object"] == "ground" and picked["direction"] == [0.0, 0.0, -1.0]
-  assert abs(picked["position"][0] - (100 - 100 + 400 / 960 / 2)) < 0.01 and abs(picked["position"][1] - (50 + 56.25 - 400 / 960 / 2)) < 0.01
+  assert abs(picked["position"][0] - (100 + 56.25 - 400 / 960 / 2)) < 0.01 and abs(picked["position"][1] - (50 + 100 - 400 / 960 / 2)) < 0.01
 
 
 def testLayoutShadingColorsByHeightAndSlope(stageBlenderServer):
@@ -272,10 +272,10 @@ bpy.context.scene.collection.objects.link(bpy.data.objects.new('mesa', mesh))
     pixels = await session.expectSuccess("runPython", {"code": f"""
 image = bpy.data.images.load(r'{description['outputPath']}')
 width, height = image.size
-def pixel(column):
-  index = ((height // 2) * width + column) * 4
+def pixel(row):
+  index = ((height - 1 - row) * width + width // 2) * 4
   return list(image.pixels[index:index + 3])
-result = [pixel(240), pixel(720)]
+result = [pixel(510), pixel(30)]
 """})
     return description, pixels["result"]
 
