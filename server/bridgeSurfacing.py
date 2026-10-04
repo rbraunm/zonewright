@@ -15,6 +15,10 @@ uvLayerName = "UVMap"
 diffuseNodeName = "zonewrightDiffuse"
 normalNodeName = "zonewrightNormal"
 cutoutPropertyName = "zonewrightCutout"
+# A blockout material is a layout stand-in: a game export refuses it on exported faces.
+blockoutPropertyName = "zonewrightBlockout"
+# A material paintTransition laid as a strip: a border it lies along is bridged.
+transitionPropertyName = "zonewrightTransition"
 environmentNodeName = "zonewrightEnvironment"
 secondDiffuseNodeName = "zonewrightDiffuse1"
 # A liquid material keeps its liquid and shader values in this property; zone export writes them as the client's shader properties.
@@ -37,7 +41,7 @@ def loadImage(path, colorSpace):
   return image
 
 
-def createMaterial(name, diffuseTexture, normalTexture, cutout, alphaThreshold):
+def createMaterial(name, diffuseTexture, normalTexture, cutout, alphaThreshold, blockout):
   if bpy.data.materials.get(name) is not None:
     raise ValueError(f"A material named '{name}' already exists")
   if cutout and not 0 < alphaThreshold < 1:
@@ -56,6 +60,7 @@ def createMaterial(name, diffuseTexture, normalTexture, cutout, alphaThreshold):
   diffuse.image = diffuseImage
   diffuse.interpolation = "Linear"
   material[cutoutPropertyName] = bool(cutout)
+  material[blockoutPropertyName] = bool(blockout)
   normal = None
   if normalImage is not None:
     normalNode = nodes.new("ShaderNodeTexImage")
@@ -65,7 +70,7 @@ def createMaterial(name, diffuseTexture, normalTexture, cutout, alphaThreshold):
     links.new(normalNode.outputs["Color"], normalMap.inputs["Color"])
     normal = normalMap.outputs["Normal"]
   bridgeClientLight.surfaceOutput(material, diffuse.outputs["Color"], diffuse.outputs["Alpha"], "cutout" if cutout else "opaque", False, alphaThreshold, normal)
-  return {"material": name, "diffuseTexture": diffuse.image.name, "normalTexture": os.path.basename(normalTexture) if normalTexture else None, "cutout": cutout}
+  return {"material": name, "diffuseTexture": diffuse.image.name, "normalTexture": os.path.basename(normalTexture) if normalTexture else None, "cutout": cutout, "blockout": blockout}
 
 
 def requireLiquidValues(liquid, values):

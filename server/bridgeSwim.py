@@ -328,7 +328,7 @@ def structuralErrors():
 
 
 def swimRegions():
-  """The .zon regions export writes, from the boxes as they stand; and the bodies whose swimming is undecided or changed."""
+  """The .zon regions export writes, from the boxes as they stand."""
   bpy.context.view_layer.update()
   errors = structuralErrors()
   if errors:
@@ -337,17 +337,19 @@ def swimRegions():
   for box in swimBoxes():
     center, halfExtents = boxBounds(box)
     regions.append({"name": box.name, "center": center, "halfExtents": halfExtents})
+  return regions
+
+
+def swimDecisions():
+  """The pools and rivers whose swimming is undecided (no boxes and not marked not swimmable) or changed since their boxes were accepted."""
   bodies = swimBodies()
-  undecided, changed = [], []
-  if bodies:
-    ground = bridgeWater.Ground()
-    for body in bodies:
-      state = describeBody(body, ground)["state"]
-      if state == "undecided":
-        undecided.append(body.name)
-      elif state == "changed":
-        changed.append(body.name)
-  return regions, {"undecided": undecided, "changed": changed}
+  decisions = {"undecided": [], "changed": []}
+  ground = bridgeWater.Ground() if bodies else None
+  for body in bodies:
+    state = describeBody(body, ground)["state"]
+    if state in decisions:
+      decisions[state].append(body)
+  return decisions
 
 
 def boxCorners(box):

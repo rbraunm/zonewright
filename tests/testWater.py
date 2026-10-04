@@ -173,17 +173,23 @@ def testWaterExportsTheClientsShadersAndSwimVolumes(stageBlenderServer, tmp_path
     await session.expectSuccess("pourWaterfall", {"name": "fall", "lip": [[-10, 60, 20], [10, 60, 20]], "bottom": -5, "throw": 0, "material": "falls"})
     missing = await session.expectError("createLiquidMaterial", {"name": "flat", "liquid": "water", "diffuseTexture": str(tmp_path / "water_c.png"), "normalTexture": str(tmp_path / "water_n.png")})
     stray = await session.expectError("createLiquidMaterial", {"name": "fallBias", "liquid": "waterfall", "diffuseTexture": str(tmp_path / "fall_c.png"), "fresnelBias": 0.3})
-    undecided = await session.expectSuccess("exportZone", {"path": str(archivePath)})
+    await session.expectSuccess("saveFile", {"path": str(tmp_path / "testwater.blend")})
+    undecided = await session.expectSuccess("exportZone", {"path": str(archivePath), "purpose": "test"})
+    refusedForGame = await session.expectSuccess("checkExport", {"path": str(archivePath), "purpose": "game"})
     boxes = await session.expectSuccess("buildSwimVolumes", {"body": "pool"})
-    exported = await session.expectSuccess("exportZone", {"path": str(archivePath)})
-    return missing, stray, undecided, boxes, exported
+    await session.expectSuccess("saveFile", {})
+    exported = await session.expectSuccess("exportZone", {"path": str(archivePath), "purpose": "test"})
+    return missing, stray, undecided, refusedForGame, boxes, exported
 
-  missing, stray, undecided, boxes, exported = stageBlenderServer.session(steps)
+  missing, stray, undecided, refusedForGame, boxes, exported = stageBlenderServer.session(steps)
   assert "missing ['environment']" in missing and "does not take ['fresnelBias']" in stray
   archive = eqArchive.EQArchive(archivePath)
   zone = eqgFiles.parseZone(archive.read("testwater.zon"), "testwater.zon")
   # Export derives no swim volumes: without boxes the pool is listed as undecided and the .zon gets no regions; with them, exactly those.
   assert undecided["regions"] == [] and undecided["swim"] == {"undecided": ["pool"], "changed": []}
+  assert [finding for finding in undecided["findings"] if finding["finding"].startswith("swim")] == [{"finding": "swim undecided", "body": "pool", "at": [0.0, 0.0, -5.0]}]
+  # A game export refuses a pool whose swimming is undecided.
+  assert {"failure": "swim undecided", "body": "pool", "at": [0.0, 0.0, -5.0]} in refusedForGame["failures"]
   assert exported["regions"] == [region["name"] for region in zone["regions"]] == boxes["built"] and exported["swim"] == {"undecided": [], "changed": []}
   assert all(abs(region["center"][2] + region["halfExtents"][2] - -5) <= 1 and region["rotation"] == (0.0, 0.0, 0.0) for region in zone["regions"])
   pool, fall = (eqgFiles.parseModel(archive.read(f"obj_{name}.mod"), name)["materials"][0] for name in ("pool", "fall"))

@@ -571,7 +571,8 @@ def paintTransition(objectName, layer, material, selector, toward, width, worldU
   selector's side, and map them so the texture's bottom edge lies on that border and its top `width` away, repeating along the border
   every worldUnitsPerRepeat units: how a transition texture blends one ground into the next. Faces straddling `width` are left and
   counted; cut a contour there first (cutContours with distanceFrom) so the strip ends on a modeled edge. With onlyAbove, only faces
-  lying above the nearest point of the border are painted: a wall's foot, not the lip where ground ends above rock falling away."""
+  lying above the nearest point of the border are painted: a wall's foot, not the lip where ground ends above rock falling away. The
+  material is marked as a transition, so export checks count the borders it lies along as bridged."""
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   requireLayer(sceneObject, layer)
   if width <= 0 or worldUnitsPerRepeat <= 0:
@@ -629,6 +630,7 @@ def paintTransition(objectName, layer, material, selector, toward, width, worldU
   values = readFaceInts(mesh, layerAttributePrefix + layer)
   values[strip] = materialSlot(sceneObject, material)
   writeFaceInts(mesh, layerAttributePrefix + layer, values)
+  bpy.data.materials[material][bridgeSurfacing.transitionPropertyName] = True
   return {"painted": int(strip.sum()), "straddlingFaces": int(straddling.sum()), "borderLength": round(float(lengths.sum()), 1)} | compose(sceneObject)
 
 

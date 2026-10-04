@@ -644,7 +644,7 @@ async def setZoneProperties(
 
 @guardedTool()
 async def renderView(context: Context, view: dict, shading: str = "client", bandHeight: float = 50.0, guides: bool = True, swimVolumes: bool = False):
-  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], or with z on the ground within 50 units below it, for caves and under overhangs; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog. {"frame": {"objects": [names], "headingDegrees": h, "pitchDegrees": p}} looks at the named meshes or collection instances from that heading and pitch, standing back so they fit (its result's eye and target reproduce that camera). shading "client" draws the zone as the client does; "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout. Guides (plot outlines, sketch massing) draw unless guides is false; with swimVolumes, each swim volume draws as a see-through block (cyan water, orange lava)."""
+  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], or with z on the ground within 50 units below it, for caves and under overhangs; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog. {"frame": {"objects": [names], "headingDegrees": h, "pitchDegrees": p}} looks at the named meshes or collection instances from that heading and pitch, standing back so they fit (its result's eye and target reproduce that camera). shading "client" draws the zone as the client does; "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout; "coverage" draws only what exportZone would export, each face in the color of its export check status (checkExport): black where it cannot export, red for zero texture area, brown for a blockout material, yellow for texture stretched or squeezed, orange where the base material shows, magenta along a ground border without a transition strip, grey when fine, and blue wherever a face is seen from its back, lit from the northwest as layout is, softer so no shaded face reads as black, and without fog; the result counts the exported faces by status. Guides (plot outlines, sketch massing) draw unless guides is false; with swimVolumes, each swim volume draws as a see-through block (cyan water, orange lava)."""
   outputPath = newRenderPath()
   figureModel = None
   zone = await callBridge(context, "getZoneProperties", {})
@@ -864,58 +864,118 @@ def groupedExclusions(excluded, shownPerReason=25):
   return [{"reason": reason, "count": len(names), "objects": names[:shownPerReason]} for reason, names in sorted(groups.items())]
 
 
-@guardedTool()
-async def exportZone(context: Context, path: str):
-  """Write the open scene as an EQG zone archive at `path`, an absolute path ending in <zone>.eqg, the zone's short name in lowercase
-  letters and digits. The `terrain` collection's meshes become the zone's terrain; every other rendered mesh becomes a model placed at
-  its object's transform (copies sharing a mesh and without modifiers share one model) and every collection instance a model of its
-  collection's meshes; a placed object takes one uniform scale. Materials must come from createMaterial: diffuse and normal map export
-  as Opaque_MaxCB1.fx, diffuse only as Opaque_MaxC1.fx, a cutout (diffuse only) as Chroma_MPLBasicAT.fx. DDS textures are stored
-  unchanged, others as uncompressed DDS with power-of-two sides; createLiquidMaterial materials export as the client's water, waterfall,
-  and lava shaders with their values. The swim volumes go into the .zon as AWT_ (water) and ALV_ (lava) regions, as they stand (export
-  derives none and refuses boxes a zone file cannot hold); `swim` lists the pools and rivers whose swimming is undecided (no boxes and not
-  marked not swimmable) or changed since their boxes were accepted. Point lights
-  placed with placeLight go into the .zon; emitters placed with placeEmitter go into <zone>_EnvironmentEmitters.txt beside the archive
-  (the client reads that list loose from its own folder). A zone with housing (setZoneHousing) also gets <zone>_housing.json beside the
-  archive, its plots as Peridot's plot content gives them (address, border door, center and heading in the server's axes, size across
-  and along, price, upkeep, item capacity, pets, features) with their border doors (OBP_LOTSQUARE or OBP_GUILDSQUARE, open type 160,
-  in the server's axes and EQ heading), and <zone>_assets.txt naming stonesquare.eqg, which holds the border models. What is not the
-  zone's own geometry is left out and listed by reason in `excluded`: guides, plot borders, regions, anything hidden from renders, and
-  placed client content (spawns and doors, which are the server's data; client objects, which do not export yet; imported zones,
-  which are reference). `toConfirm` lists shipped meshes with shaping passes off or surfacing layers muted, which leave the zone as if
-  never made. No baked light is written yet."""
+exportChecksHelp = (
+  " purpose is \"test\" (quick renders and test loads) or \"game\" (files for the EQ client and server). Both refuse the hard errors:"
+  " the file unsaved; objects export cannot take (a non-mesh in the terrain collection or among a placed collection's members, a placed"
+  " model scaled unevenly, model names that collide); faces with no material or a material createMaterial or createLiquidMaterial did not"
+  " make; a missing, packed, generated, or other-drive image, a non-DDS image whose sides are not powers of two, DDS data under another"
+  " extension, two images that would share one DDS name, a cutout with a normal map; meshes without texture coordinates; a liquid"
+  " material on anything but a water body; a mesh with surfacing layers whose modifiers change its faces; swim volumes a zone file"
+  " cannot hold; housing the server would refuse. A game export also"
+  " refuses blockout materials (createMaterial blockout) on exported faces, pools and rivers whose swimming is undecided or changed"
+  " since their boxes were accepted, missing view values (fogOn, minClip, maxClip, sky, and the fog's start, end, and density when it is"
+  " on), and, until reach mapping exists, any zone: containment cannot be checked yet. A test export lists blockout and swimming as"
+  " findings. Findings, never refusals, for both: texture coverage, each with where it lies: the base material showing where no unmuted"
+  " surfacing layer covers a face; ground borders on the terrain where two ground materials meet, walkable ground on at least one side,"
+  " with no paintTransition strip between them, as a length per border and its stretches (each a center, bounds, and length); texture stretched or squeezed (a texel lying over 2x longer one way than the other"
+  " in the world, or world units per repeat over 2x off, either way, the material's area-weighted median, `usualRepeat`); zero texture"
+  " area; and back faces (faces wound against the rest of their surface: a closed surface faces out, a terrain sheet up)."
+  " Each failure and finding names the object (and the placed objects that place it), the material, the image, and the face count, with"
+  " the faces' connected pieces (center and face count, largest first); renderView shading \"coverage\" draws the same statuses."
+  " `coverage` counts the exported faces by status; `excluded` lists what is not the zone's own geometry by reason (guides, plot borders,"
+  " regions, anything hidden from renders, placed client content); `toConfirm` lists shipped meshes with shaping passes off or surfacing"
+  " layers muted, which leave the zone as if never made; `swim` the undecided and changed pools and rivers."
+)
+
+
+def exportTarget(path):
   archivePath = Path(path)
   if not archivePath.is_absolute() or archivePath.suffix != ".eqg" or not archivePath.parent.is_dir():
     raise ToolError(f"'{path}' is not an absolute .eqg path in an existing folder")
   zone = archivePath.stem
   if not eqgExport.zoneNamePattern.match(zone):
     raise ToolError(f"Zone name '{zone}' must be lowercase letters and digits, as the client's zone short names are")
-  collected = await callBridge(context, "collectZoneExport", {"outputFolder": str(toolingRoot / "exports" / zone), "zoneName": zone})
+  return archivePath, zone
+
+
+def exportReport(report):
+  return {key: report[key] for key in ("purpose", "failures", "findings", "coverage")} | {
+    "excluded": groupedExclusions(report["excluded"]), "toConfirm": report["toConfirm"], "swim": report["swim"],
+  }
+
+
+@guardedTool(description=(
+  "Run every check exportZone runs for a purpose on the open scene, writing nothing, and list every failure (what would stop the export)"
+  " and every finding at once. `path` is where the archive would go (an absolute <zone>.eqg path, the zone's short name in lowercase"
+  " letters and digits)." + exportChecksHelp
+))
+async def checkExport(context: Context, path: str, purpose: str):
+  archivePath, zone = exportTarget(path)
+  report = await callBridge(context, "checkZoneExport", {"purpose": purpose})
+  return {"path": str(archivePath), "zone": zone} | exportReport(report)
+
+
+@guardedTool(description=(
+  "Write the saved scene as an EQG zone archive at `path`, an absolute path ending in <zone>.eqg, the zone's short name in lowercase"
+  " letters and digits, after the checks for its purpose (checkExport): any failure refuses the export and lists them all, and nothing is"
+  " written. Every file is written under a temporary name and renamed into place only once all are written, so a refused or failed"
+  " export never replaces the last good archive or leaves partial files. The `terrain` collection's meshes become the zone's terrain;"
+  " every other rendered mesh becomes a model placed at its object's transform (copies sharing a mesh and without modifiers share one"
+  " model) and every collection instance a model of its collection's meshes. createMaterial materials export as the client's shaders:"
+  " diffuse and normal map as Opaque_MaxCB1.fx, diffuse only as Opaque_MaxC1.fx, a cutout (diffuse only) as Chroma_MPLBasicAT.fx;"
+  " createLiquidMaterial materials as its water, waterfall, and lava shaders with their values. DDS textures are stored unchanged, others"
+  " as uncompressed DDS. The swim volumes go into the .zon as AWT_ (water) and ALV_ (lava) regions as they stand (export derives none)."
+  " Point lights placed with placeLights go into the .zon; emitters placed with placeEmitters go into <zone>_EnvironmentEmitters.txt"
+  " beside the archive (the client reads that list loose from its own folder). A zone with housing (setZoneHousing) also gets"
+  " <zone>_housing.json beside the archive, its plots as Peridot's plot content gives them (address, border door, center and heading in"
+  " the server's axes, size across and along, price, upkeep, item capacity, pets, features) with their border doors (OBP_LOTSQUARE or"
+  " OBP_GUILDSQUARE, open type 160, in the server's axes and EQ heading), and <zone>_assets.txt naming stonesquare.eqg, which holds the"
+  " border models. Lists an earlier export left that this scene no longer has are removed. No baked light is written yet." + exportChecksHelp
+))
+async def exportZone(context: Context, path: str, purpose: str):
+  archivePath, zone = exportTarget(path)
+  checked = await callBridge(context, "collectZoneExport", {"outputFolder": str(toolingRoot / "exports" / zone), "zoneName": zone, "purpose": purpose})
+  report = checked["report"]
+  if report["failures"]:
+    raise ToolError(
+      f"exportZone ({purpose}) refused, nothing written: {len(report['failures'])} failure(s); checkExport lists the findings too\n"
+      + json.dumps(report["failures"], indent=1)
+    )
+  collected = checked["collected"]
   try:
     data, summary = await anyio.to_thread.run_sync(eqgExport.zoneArchive, collected)
-    emitterListPath = archivePath.parent / f"{zone}_EnvironmentEmitters.txt"
-    emitterList = eqEmitters.emitterListText(collected["emitters"]) if collected["emitters"] else None
-    housing = collected["housing"]
-    housingPath = archivePath.parent / f"{zone}_housing.json"
-    assetListPath = archivePath.parent / f"{zone}_assets.txt"
-    hasPlots = housing is not None and bool(housing["plots"])
-    archivePath.write_bytes(data)
-    # Lists left from an earlier export would place emitters or plots this scene no longer has.
-    if emitterList is None:
-      emitterListPath.unlink(missing_ok=True)
-    else:
-      emitterListPath.write_bytes(emitterList.encode("latin1"))
-    if hasPlots:
-      housingPath.write_text(json.dumps({"zone": zone} | housing, indent=1), encoding="ascii")
-      assetListPath.write_bytes("".join(f"{archive}\r\n" for archive in housing["assets"]).encode("latin1"))
-    else:
-      housingPath.unlink(missing_ok=True)
-      assetListPath.unlink(missing_ok=True)
   except (OSError, ValueError) as error:
     raise ToolError(f"{type(error).__name__}: {error}") from error
-  return summary | {
-    "path": str(archivePath), "excluded": groupedExclusions(collected["excluded"]), "toConfirm": collected["toConfirm"], "swim": collected["swim"],
-    "emitterList": str(emitterListPath) if emitterList is not None else None,
+  housing = collected["housing"]
+  hasPlots = housing is not None and bool(housing["plots"])
+  emitterListPath = archivePath.parent / f"{zone}_EnvironmentEmitters.txt"
+  housingPath = archivePath.parent / f"{zone}_housing.json"
+  assetListPath = archivePath.parent / f"{zone}_assets.txt"
+  # A list left from an earlier export would place emitters or plots this scene no longer has, so a list with nothing to say is removed.
+  contents = {
+    archivePath: data,
+    emitterListPath: eqEmitters.emitterListText(collected["emitters"]).encode("latin1") if collected["emitters"] else None,
+    housingPath: json.dumps({"zone": zone} | housing, indent=1).encode("ascii") if hasPlots else None,
+    assetListPath: "".join(f"{archive}\r\n" for archive in housing["assets"]).encode("latin1") if hasPlots else None,
+  }
+  temporaries = {}
+  try:
+    for target, content in contents.items():
+      if content is not None:
+        temporaries[target] = target.with_name(target.name + ".partial")
+        temporaries[target].write_bytes(content)
+    for target, temporary in temporaries.items():
+      temporary.replace(target)
+    for target, content in contents.items():
+      if content is None:
+        target.unlink(missing_ok=True)
+  except OSError as error:
+    raise ToolError(f"{type(error).__name__}: {error}") from error
+  finally:
+    for temporary in temporaries.values():
+      temporary.unlink(missing_ok=True)
+  return summary | {"path": str(archivePath)} | exportReport(report) | {
+    "emitterList": str(emitterListPath) if contents[emitterListPath] is not None else None,
     "housing": None if housing is None else {"role": housing["housing"]["role"], "plots": len(housing["plots"]), "file": str(housingPath) if hasPlots else None, "assetList": str(assetListPath) if hasPlots else None},
   }
 
@@ -1686,11 +1746,15 @@ def catalogTexturePath(texture):
 
 
 @guardedTool()
-async def createMaterial(context: Context, name: str, diffuseTexture: str, normalTexture: str | None = None, cutout: bool = False, alphaThreshold: float = 0.5):
+async def createMaterial(context: Context, name: str, diffuseTexture: str, normalTexture: str | None = None, cutout: bool = False, alphaThreshold: float = 0.5, blockout: bool = False):
   """A Phase 1 material: diffuse texture, optional normal map, no shine; cutout makes the diffuse alpha a hard alpha test for foliage
-  cards. A texture is an absolute path or a catalog texture id (texture/<name>@<hash>), which uses the catalog's extracted file. The
-  material is kept in the file whether or not anything uses it yet."""
-  return await callBridge(context, "createMaterial", {"name": name, "diffuseTexture": catalogTexturePath(diffuseTexture), "normalTexture": catalogTexturePath(normalTexture), "cutout": cutout, "alphaThreshold": alphaThreshold})
+  cards. blockout marks a layout stand-in (a grey to block out with): a game export refuses it on exported faces, a test export lists
+  it, and coverage views draw it brown. A texture is an absolute path or a catalog texture id (texture/<name>@<hash>), which uses the
+  catalog's extracted file. The material is kept in the file whether or not anything uses it yet."""
+  return await callBridge(context, "createMaterial", {
+    "name": name, "diffuseTexture": catalogTexturePath(diffuseTexture), "normalTexture": catalogTexturePath(normalTexture), "cutout": cutout,
+    "alphaThreshold": alphaThreshold, "blockout": blockout,
+  })
 
 
 @guardedTool(description="Assign a material to the selected faces of a mesh without surfacing layers, adding a material slot if needed: for objects and blockout. A zone's terrain is surfaced by painting into layers (addSurfaceLayer, paintSurface)." + selectorHelp)

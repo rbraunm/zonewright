@@ -9,6 +9,7 @@ import mathutils
 import numpy
 
 import bridgeClientLight
+import bridgeExportChecks
 import bridgeMeshAccess
 import bridgeModels
 import bridgeSwim
@@ -41,7 +42,7 @@ figureStepDrop = 4.0
 figureMinimumDistance = 3.0
 figureSideOffset = 1.5
 mapClearance = 100.0
-viewShadings = ("client", "layout", "relief")
+viewShadings = ("client", "layout", "relief", "coverage")
 # The sky is soft everywhere, so an equirectangular image at about a fifth of a degree a pixel draws it.
 skyImageHeight = 1024
 # Layout shading lights from the northwest, as relief maps do, so slopes read the same whatever the zone's sun.
@@ -427,7 +428,7 @@ def roundVector(vector, digits=3):
 def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes):
   if shading not in viewShadings:
     raise ValueError(f"shading must be one of {list(viewShadings)}, got '{shading}'")
-  # A map or a layout or relief drawing is for reading the shape, so none is fogged nor has a sky.
+  # A map, or a layout, relief, or coverage drawing, is for reading shape or coverage, so none is fogged nor has a sky.
   shapeOnly = "map" in view or shading != "client"
   preview = PreviewScene(sourceScene, zone | {"fogOn": False} if shapeOnly else zone, guides, None if shapeOnly else sky)
   try:
@@ -435,9 +436,12 @@ def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, b
     preview.drawSky()
     if swimVolumes:
       preview.drawSwimVolumes()
-    if shading != "client":
+    if shading == "coverage":
+      description["coverage"] = bridgeExportChecks.drawCoverage(preview)
+    elif shading != "client":
       description["heightRange"] = list(applyLayoutShading(preview, bandHeight, layoutHeightColors if shading == "layout" else reliefHeightColors))
       description["bandHeight"] = bandHeight
+    if shading != "client":
       if preview.camera.data.type != "ORTHO":
         preview.camera.data.clip_end = max((corner - preview.camera.location).length for corner in sceneCorners(preview)) + mapClearance
     preview.scene.render.filepath = outputPath

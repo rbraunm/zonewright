@@ -129,15 +129,18 @@ def testStreetOfPlotsExportsTheZonesHousingFile(stageBlenderServer, tmp_path):
     await flatGround(session, tmp_path)
     await session.expectSuccess("setZoneHousing", decision)
     laid = await session.expectSuccess("layOutPlots", {"street": "Main Street", "path": [[-300, 0], [300, 0]], "side": "both"})
-    exported = await session.expectSuccess("exportZone", {"path": str(archivePath)})
+    await session.expectSuccess("saveFile", {"path": str(tmp_path / "teststreet.blend")})
+    exported = await session.expectSuccess("exportZone", {"path": str(archivePath), "purpose": "test"})
     housingFile = json.loads((tmp_path / "teststreet_housing.json").read_text())
     assets = (tmp_path / "teststreet_assets.txt").read_bytes()
     await session.expectSuccess("placePlot", {"address": "200 Main Street", "center": [-200, 100], "facingDegrees": 0})
-    overlapped = await session.expectError("exportZone", {"path": str(archivePath)})
+    await session.expectSuccess("saveFile", {})
+    overlapped = await session.expectError("exportZone", {"path": str(archivePath), "purpose": "test"})
     for plot in ["200 Main Street"] + [entry["address"] for entry in laid["placed"]]:
       await session.expectSuccess("removePlot", {"address": plot})
     await session.expectSuccess("setZoneHousing", {"role": "none"})
-    noHousing = await session.expectSuccess("exportZone", {"path": str(archivePath)})
+    await session.expectSuccess("saveFile", {})
+    noHousing = await session.expectSuccess("exportZone", {"path": str(archivePath), "purpose": "test"})
     return laid, exported, housingFile, assets, overlapped, noHousing
 
   laid, exported, housingFile, assets, overlapped, noHousing = stageBlenderServer.session(steps)
@@ -156,7 +159,7 @@ def testStreetOfPlotsExportsTheZonesHousingFile(stageBlenderServer, tmp_path):
   assert doors[first["door"]]["name"] == "OBP_LOTSQUARE" and doors[first["door"]]["openType"] == 160 and doors[first["door"]]["size"] == 100
   assert math.dist(doors[first["door"]]["position"][:2], first["center"][:2]) < 1.5
   assert housingFile["housing"]["placement"] == "world" and assets == b"stonesquare.eqg\r\n"
-  assert "overlap" in overlapped
+  assert "refused, nothing written: 1 failure(s)" in overlapped and "overlap" in overlapped
   assert noHousing["housing"] == {"role": "none", "plots": 0, "file": None, "assetList": None}
   assert not (tmp_path / "teststreet_housing.json").exists() and not (tmp_path / "teststreet_assets.txt").exists()
 

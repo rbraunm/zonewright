@@ -92,7 +92,8 @@ def testExportWritesTheTerrainWithItsPassesCombined(stageBlenderServer, tmp_path
     await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "hill"})
     await session.expectSuccess("sculptAtPoint", {"objectName": "ground", "mode": "raise", "center": [0, 0, 0], "radius": 20, "strength": 10, "direction": [0, 0, 1]})
     await session.expectSuccess("setShapingPass", {"objectName": "ground", "name": "hill", "strength": 0.3})
-    return await session.expectSuccess("exportZone", {"path": str(archivePath)})
+    await session.expectSuccess("saveFile", {"path": str(tmp_path / "passplot.blend")})
+    return await session.expectSuccess("exportZone", {"path": str(archivePath), "purpose": "test"})
 
   stageBlenderServer.session(steps)
   terrain = eqgFiles.parseModel(eqArchive.EQArchive(archivePath).read("ter_passplot.ter"), "ter_passplot.ter")
