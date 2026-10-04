@@ -47,8 +47,8 @@ skyImageHeight = 1024
 # Layout shading lights from the northwest, as relief maps do, so slopes read the same whatever the zone's sun.
 layoutLightDirection = (-0.5, 0.5, 0.7071)
 layoutAmbient = 0.3
-# Swim volumes drawn in a view: see-through blocks, cyan for water and orange for lava.
-swimColors = {"water": (0.1, 0.85, 1.0), "lava": (1.0, 0.45, 0.05)}
+# Swim volumes tint a view: cyan for water and magenta for lava, which shows over lava's oranges.
+swimColors = {"water": (0.1, 0.85, 1.0), "lava": (1.0, 0.15, 0.85)}
 swimAlpha = 0.3
 layoutHeightColors = ((0.0, (0.22, 0.36, 0.26)), (0.35, (0.58, 0.56, 0.36)), (0.7, (0.62, 0.45, 0.32)), (1.0, (0.92, 0.9, 0.87)))
 # Relief shading is the layout drawing in quiet greys, for a plan's lines and labels to stand out over.
@@ -158,33 +158,58 @@ class PreviewScene:
     figure = bridgeModels.modelObject(figureModel["folder"], previewName + "Figure", figureModel["scale"], origin, 90 - facingHeadingDegrees)
     return self.addObject(figure)
 
-  def drawSwimVolumes(self):
-    """Each swim volume as a see-through block in its liquid's color, to look at against the water and the bed."""
-    for box in bridgeSwim.swimBoxes():
-      liquid = bridgeSwim.readBox(box)["liquid"]
-      (low, high) = bridgeSwim.boxCorners(box)
-      corners = [(x, y, z) for z in (low[2], high[2]) for y in (low[1], high[1]) for x in (low[0], high[0])]
-      faces = [(0, 2, 3, 1), (4, 5, 7, 6), (0, 1, 5, 4), (2, 6, 7, 3), (0, 4, 6, 2), (1, 3, 7, 5)]
-      mesh = bpy.data.meshes.new(previewName + "Swim")
-      mesh.from_pydata(corners, [], faces)
-      mesh.materials.append(self.swimMaterial(liquid))
-      self.addObject(bpy.data.objects.new(previewName + "Swim", mesh))
+  def tintSwimVolumes(self, viewPath):
+    """Tint a rendered view where the swim volumes stand, from a render of the boxes alone with the ground held out and the water left out."""
+    # A box's top lies at the surface it was built under or a little below it (on a sloping river); drawn in one render with the water,
+    # the two fight for depth or the surface hides the top. Rendered apart, the ground still hides what lies behind or under it.
+    holdout = bpy.data.collections.new(previewName + "Holdout")
+    self.scene.collection.children.link(holdout)
+    viewLayer = self.scene.view_layers[0]
+    override = viewLayer.material_override
+    render = self.scene.render
+    try:
+      for sceneObject in list(self.scene.collection.objects):
+        if sceneObject is not self.camera:
+          self.scene.collection.objects.unlink(sceneObject)
+          if bridgeMeshAccess.waterProperty not in sceneObject:
+            holdout.objects.link(sceneObject)
+      viewLayer.layer_collection.children[holdout.name].holdout = True
+      viewLayer.material_override = None
+      materials = {}
+      for box in bridgeSwim.swimBoxes():
+        liquid = bridgeSwim.readBox(box)["liquid"]
+        if liquid not in materials:
+          materials[liquid] = self.swimMaterial(liquid)
+        (low, high) = bridgeSwim.boxCorners(box)
+        corners = [(x, y, z) for z in (low[2], high[2]) for y in (low[1], high[1]) for x in (low[0], high[0])]
+        faces = [(0, 2, 3, 1), (4, 5, 7, 6), (0, 1, 5, 4), (2, 6, 7, 3), (0, 4, 6, 2), (1, 3, 7, 5)]
+        mesh = bpy.data.meshes.new(previewName + "Swim")
+        mesh.from_pydata(corners, [], faces)
+        mesh.materials.append(materials[liquid])
+        self.addObject(bpy.data.objects.new(previewName + "Swim", mesh))
+      boxesPath = os.path.splitext(viewPath)[0] + "_swimVolumes.png"
+      render.film_transparent = True
+      render.image_settings.color_mode = "RGBA"
+      render.filepath = boxesPath
+      bpy.ops.render.render(write_still=True, scene=self.scene.name)
+      view, boxes = readImagePixels(viewPath), readImagePixels(boxesPath)
+      os.remove(boxesPath)
+    finally:
+      viewLayer.material_override = override
+      bpy.data.collections.remove(holdout)
+    cover = boxes[:, :, 3:] * swimAlpha
+    view[:, :, :3] = view[:, :, :3] * (1 - cover) + boxes[:, :, :3] * cover
+    writeImagePixels(view, viewPath)
 
   def swimMaterial(self, liquid):
     material = bpy.data.materials.new(previewName + "Swim" + liquid)
     material.use_nodes = True
-    material.surface_render_method = "BLENDED"
     nodes, links = material.node_tree.nodes, material.node_tree.links
     nodes.clear()
     emission = nodes.new("ShaderNodeEmission")
     emission.inputs["Color"].default_value = (*swimColors[liquid], 1.0)
-    clear = nodes.new("ShaderNodeBsdfTransparent")
-    mix = nodes.new("ShaderNodeMixShader")
-    mix.inputs["Fac"].default_value = swimAlpha
-    links.new(clear.outputs[0], mix.inputs[1])
-    links.new(emission.outputs[0], mix.inputs[2])
     output = nodes.new("ShaderNodeOutputMaterial")
-    links.new(mix.outputs[0], output.inputs["Surface"])
+    links.new(emission.outputs[0], output.inputs["Surface"])
     self.createdMaterials.append(material)
     return material
 
@@ -207,6 +232,33 @@ class PreviewScene:
     bpy.data.scenes.remove(self.scene)
     if override is not None:
       bpy.data.materials.remove(override)
+
+
+def readImagePixels(path):
+  """An image file's pixels as stored, RGBA from 0 to 1, rows bottom to top as Blender holds them."""
+  image = bpy.data.images.load(path)
+  try:
+    image.colorspace_settings.name = "Non-Color"
+    width, height = image.size
+    pixels = numpy.empty(width * height * 4, dtype=numpy.float32)
+    image.pixels.foreach_get(pixels)
+  finally:
+    bpy.data.images.remove(image)
+  return pixels.reshape(height, width, 4)
+
+
+def writeImagePixels(pixels, path):
+  """Write pixels as readImagePixels gives them to an RGB PNG, as stored."""
+  height, width = pixels.shape[:2]
+  image = bpy.data.images.new(previewName + "Image", width, height, alpha=False)
+  try:
+    image.colorspace_settings.name = "Non-Color"
+    image.pixels.foreach_set(pixels.ravel())
+    image.filepath_raw = path
+    image.file_format = "PNG"
+    image.save()
+  finally:
+    bpy.data.images.remove(image)
 
 
 def lookRotation(forward):
@@ -433,8 +485,6 @@ def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, b
   try:
     description = placeCamera(preview, view, figureModel)
     preview.drawSky()
-    if swimVolumes:
-      preview.drawSwimVolumes()
     if shading != "client":
       description["heightRange"] = list(applyLayoutShading(preview, bandHeight, layoutHeightColors if shading == "layout" else reliefHeightColors))
       description["bandHeight"] = bandHeight
@@ -443,6 +493,8 @@ def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, b
     preview.scene.render.filepath = outputPath
     start = time.perf_counter()
     bpy.ops.render.render(write_still=True, scene=preview.scene.name)
+    if swimVolumes and bridgeSwim.swimBoxes():
+      preview.tintSwimVolumes(outputPath)
     renderSeconds = time.perf_counter() - start
   finally:
     preview.remove()

@@ -41,7 +41,7 @@ def exclusionReason(sceneObject):
     return "a guide"
   if bridgeMeshAccess.regionIntentProperty in sceneObject:
     return "a region: the plan"
-  if bridgeSwim.swimProperty in sceneObject:
+  if bridgeMeshAccess.swimProperty in sceneObject:
     return "a swim volume: written as a .zon region"
   if sceneObject.hide_render:
     return "hidden from renders"

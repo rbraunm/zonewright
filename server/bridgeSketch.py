@@ -13,7 +13,9 @@ import bridgeAuthoring
 import bridgeHousing
 import bridgeMeshAccess
 import bridgeObjects
+import bridgeSurfacing
 import bridgeSwim
+import bridgeWater
 
 sketchProperty = "zonewrightSketch"
 sketchKinds = ("area", "footprint", "path", "point", "note")
@@ -491,16 +493,27 @@ def planOverlays(sheets, layers, spots):
   if "swim" in layers:
     overlays["swim"] = [{"name": box.name, "liquid": bridgeSwim.readBox(box)["liquid"], "corners": bridgeSwim.boxCorners(box)} for box in bridgeSwim.swimBoxes()]
   if "water" in layers:
-    for body in bpy.context.scene.objects:
-      if bridgeMeshAccess.waterProperty in body and not body.hide_render:
+    bodies = renderedWater()
+    ground = bridgeWater.Ground() if bodies else None
+    for body in bodies:
+      liquid = bridgeSurfacing.liquidOf(body.material_slots[0].material)["liquid"]
+      if bridgeWater.readDefinition(body)["kind"] == "fall":
         positions, triangles = bridgeMeshAccess.worldTriangles([body])
-        overlays["water"].append({"name": body.name, "positions": numpy.round(positions[:, :2], 1).tolist(), "triangles": triangles.tolist()})
+        shown = {"runs": [], "loops": numpy.round(positions[triangles][:, :, :2], 1).tolist()}
+      else:
+        shown = bridgeWater.visibleSurface(body, ground)
+      overlays["water"].append({"name": body.name, "liquid": liquid} | shown)
   return overlays
+
+
+def renderedWater():
+  return [body for body in bpy.context.scene.objects if bridgeMeshAccess.waterProperty in body and not body.hide_render]
 
 
 sectionLayers = ("ground", "water", "swim", "massing", "plots")
 # Cuts reaching past the drawing by this share of its size are dropped; the drawing clips the rest.
 sectionMargin = 0.1
+waterSectionStep = 0.5
 
 
 def planeSegments(positions, triangles, start, along, normal):
@@ -526,6 +539,33 @@ def planeSegments(positions, triangles, start, along, normal):
     if len(points) == 2:
       segments.append([points[0][0], points[0][1], points[1][0], points[1][1]])
   return numpy.array(segments).reshape(-1, 4)
+
+
+def shownWater(segments, start, along, ground):
+  """The parts of a water body's section segments players see, not tucked under the ground: sampled every waterSectionStep, each change placed by halving."""
+  pieces = []
+  for s0, z0, s1, z1 in segments:
+    count = max(1, math.ceil(math.hypot(s1 - s0, z1 - z0) / waterSectionStep))
+
+    def shows(share):
+      s, z = s0 + share * (s1 - s0), z0 + share * (z1 - z0)
+      return not ground.insideRock((*(start + s * along), z))
+
+    shares = [index / count for index in range(count + 1)]
+    showing = [shows(share) for share in shares]
+    changes = [0.0]
+    for index in range(count):
+      if showing[index] != showing[index + 1]:
+        low, high = shares[index], shares[index + 1]
+        for _ in range(bridgeWater.edgeHalvings):
+          middle = (low + high) / 2
+          low, high = (middle, high) if shows(middle) == showing[index] else (low, middle)
+        changes.append((low + high) / 2)
+    changes.append(1.0)
+    for first, last in zip(changes[:-1], changes[1:]):
+      if last > first and shows((first + last) / 2):
+        pieces.append([s0 + first * (s1 - s0), z0 + first * (z1 - z0), s0 + last * (s1 - s0), z0 + last * (z1 - z0)])
+  return numpy.array(pieces).reshape(-1, 4)
 
 
 def keptSegments(segments, length, bottom, top):
@@ -565,7 +605,14 @@ def sectionCuts(start, end, bottom, top, layers):
     positions, triangles = bridgeMeshAccess.partTriangles(bridgeMeshAccess.playerSolidParts())
     cuts["ground"] = keptSegments(planeSegments(positions, triangles, start, along, normal), length, bottom, top)
   if "water" in layers:
-    cuts["water"] = cutObjects([body for body in bpy.context.scene.objects if bridgeMeshAccess.waterProperty in body and not body.hide_render])
+    bodies = renderedWater()
+    ground = bridgeWater.Ground() if bodies else None
+    for body in bodies:
+      positions, triangles = bridgeMeshAccess.worldTriangles([body])
+      shown = shownWater(planeSegments(positions, triangles, start, along, normal), start, along, ground)
+      segments = keptSegments(shown, length, bottom, top)
+      if segments:
+        cuts["water"].append({"name": body.name, "segments": segments})
   if "massing" in layers:
     cuts["massing"] = [entry | {"label": readSpec(bpy.data.objects[entry["name"]]).get("label") or readSpec(bpy.data.objects[entry["name"]])["name"]} for entry in cutObjects([shape for shape in sketchObjects() if len(shape.data.polygons)])]
   if "plots" in layers:

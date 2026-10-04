@@ -16,7 +16,6 @@ import bridgeObjects
 import bridgeSurfacing
 import bridgeWater
 
-swimProperty = "zonewrightSwimVolume"
 swimCollectionName = "swimVolumes"
 volumePrefixes = {"water": "AWT_", "lava": "ALV_"}
 namePattern = re.compile(r"^[A-Za-z0-9]+$")
@@ -32,11 +31,11 @@ dryShare = 0.5
 
 
 def swimBoxes():
-  return sorted((sceneObject for sceneObject in bpy.context.scene.objects if swimProperty in sceneObject), key=lambda box: box.name)
+  return sorted((sceneObject for sceneObject in bpy.context.scene.objects if bridgeMeshAccess.swimProperty in sceneObject), key=lambda box: box.name)
 
 
 def readBox(box):
-  return json.loads(box[swimProperty])
+  return json.loads(box[bridgeMeshAccess.swimProperty])
 
 
 def boxBounds(box):
@@ -162,7 +161,7 @@ def boxObject(name, liquid, body, center, halfExtents, built, fingerprint):
   box.empty_display_size = 1.0
   box.location = center
   box.scale = halfExtents
-  box[swimProperty] = json.dumps({"liquid": liquid, "body": body, "built": built, "fingerprint": fingerprint})
+  box[bridgeMeshAccess.swimProperty] = json.dumps({"liquid": liquid, "body": body, "built": built, "fingerprint": fingerprint})
   bridgeObjects.targetCollection(swimCollectionName).objects.link(box)
   return box
 
@@ -222,6 +221,8 @@ def placeSwimVolume(name, liquid, minimum, maximum, body):
     raise ValueError(f"minimum and maximum are [x, y, z] corners with every maximum above its minimum, got {minimum} and {maximum}")
   if body is not None:
     bodyObject = requireSwimBody(body)
+    if bridgeWater.readDefinition(bodyObject).get("swimmable") is False:
+      raise ValueError(f"'{body}' is marked not swimmable; mark it swimmable (editWater swimmable true) before giving it swim volumes")
     if liquidOfBody(bodyObject) != liquid:
       raise ValueError(f"'{body}' is {liquidOfBody(bodyObject)}, not {liquid}")
   fullName = volumePrefixes[liquid] + name
@@ -243,7 +244,7 @@ def acceptSwimVolumes(body):
   ground = bridgeWater.Ground()
   fingerprint = bodyFingerprint(bodyObject, bodyCells(bodyObject, ground)[0])
   for box in boxes:
-    box[swimProperty] = json.dumps(readBox(box) | {"fingerprint": fingerprint})
+    box[bridgeMeshAccess.swimProperty] = json.dumps(readBox(box) | {"fingerprint": fingerprint})
   return {"body": body, "accepted": [box.name for box in boxes]} | describeBody(bodyObject, ground)
 
 
@@ -257,8 +258,7 @@ def describeBox(box):
 
 
 def describeBody(body, ground):
-  """A body's swim state (boxed, changed since its boxes were accepted, not swimmable, or undecided) and what its boxes leave uncovered
-  or hold that may not be meant (a top away from the surface, a box mostly over dry ground): findings to look at, never errors."""
+  """A body's swim state (boxed, changed since accepted, not swimmable, undecided) and findings to look at, never errors: cells left uncovered, tops away from the surface, boxes mostly over dry ground or without water over them."""
   definition = bridgeWater.readDefinition(body)
   boxes = [box for box in swimBoxes() if readBox(box)["body"] == body.name]
   if definition.get("swimmable") is False:
@@ -273,6 +273,8 @@ def describeBody(body, ground):
   uncovered = [cell for cell, (level, _, _) in cells.items() if not any(insideBox((cell[0] + 0.5) * spacing, (cell[1] + 0.5) * spacing, level - volumeTolerance / 2, center, half) for center, half in bounds)]
   if uncovered:
     findings.append({"finding": "surface uncovered", "cells": len(uncovered), "at": [[round((i + 0.5) * spacing, 1), round((j + 0.5) * spacing, 1)] for i, j in uncovered[:findingSamples]]})
+  surface = bridgeMeshAccess.worldTree([body])
+  above = float(bridgeMeshAccess.readVertexArrays(body)[0][:, 2].max()) + 1
   for box, (center, half) in zip(boxes, bounds):
     top = center[2] + half[2]
     levels = [level for cell, (level, _, _) in cells.items() if insideBox((cell[0] + 0.5) * spacing, (cell[1] + 0.5) * spacing, center[2], center, half)]
@@ -283,7 +285,16 @@ def describeBody(body, ground):
     # A box at a shore always meets some bank; one mostly over ground holds dry land.
     if len(dry) >= dryShare * len(samples):
       findings.append({"finding": "mostly over dry ground", "box": box.name, "at": dry[:findingSamples]})
+    unwatered = [[round(float(x), 1), round(float(y), 1)] for x, y in samples if not waterOver(surface, ground, x, y, above)]
+    if len(unwatered) >= dryShare * len(samples):
+      findings.append({"finding": "mostly without water over it", "box": box.name, "at": unwatered[:findingSamples]})
   return {"state": state, "boxes": [box.name for box in boxes], "findings": findings}
+
+
+def waterOver(surface, ground, x, y, above):
+  """Whether the body's surface (a BVH over it) stands over [x, y] with water under it down to the bed."""
+  location, _, _, _ = surface.ray_cast(mathutils.Vector((x, y, above)), down, bridgeMeshAccess.waterReach)
+  return location is not None and bool(ground.depth(x, y, location.z))
 
 
 def insideBox(x, y, z, center, half):
@@ -308,9 +319,10 @@ def getSwimVolumes(name):
 
 
 def structuralErrors():
-  """What no zone file can hold: boxes turned or without size, names the client would mix up, prefixes against their liquid, bodies gone."""
+  """What no zone file can hold: boxes turned or without size, names the client mixes up, prefixes against their liquid, bodies gone, boxes of a body no one swims in."""
   errors = []
-  bodies = {body.name for body in swimBodies()}
+  swimmable = {body.name: bridgeWater.readDefinition(body).get("swimmable") is not False for body in swimBodies()}
+  bodies = set(swimmable)
   seen = {}
   for box in swimBoxes():
     spec = readBox(box)
@@ -322,6 +334,8 @@ def structuralErrors():
       errors.append(f"'{box.name}' holds {spec['liquid']} but its name does not start with {volumePrefixes[spec['liquid']]}")
     if spec["body"] is not None and spec["body"] not in bodies:
       errors.append(f"'{box.name}' belongs to '{spec['body']}', which is not a rendered pool or river")
+    elif spec["body"] is not None and not swimmable[spec["body"]]:
+      errors.append(f"'{box.name}' belongs to '{spec['body']}', which is marked not swimmable; delete the box or mark the body swimmable (editWater swimmable true)")
     seen.setdefault(box.name.lower(), []).append(box.name)
   errors += [f"Swim volumes {names} share a name once lowercased" for names in seen.values() if len(names) > 1]
   return errors
