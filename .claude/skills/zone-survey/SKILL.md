@@ -40,7 +40,7 @@ An interpretation is of the variant `importZone` draws: the classic one where a 
 
 ## Interpretive procedure
 
-Interpretive procedure version: 2
+Interpretive procedure version: 3
 
 Raise this version with any change to the procedure, the zone types, or the fields `recordZoneInterpretation` takes. Every interpretation recorded under an older version then reads as stale, so batch changes.
 
@@ -51,24 +51,25 @@ Raise this version with any change to the procedure, the zone types, or the fiel
 ### 2. Open the zone in a scratch scene
 
 1. `newFile`. If the open file holds unsaved work, save it first; discard only the scratch scene of an earlier survey.
-2. `importZone(zone)`.
+2. `importZone(zone)`. If it refuses the zone (a part of the client's files the renderer does not draw yet), stop: record nothing, and report the refusal as it reads.
 3. `setZoneProperties` with the survey's stand-in view, since fog and view distance are the server's zone row, not the client's files: `sky` `{"type": <zone>, "hour": 13, "minute": 0}` (the client's own sky for the zone, or its `default`; the result's sky chain says which), `specialAmbientColor` [0, 0, 0], `fogOn` false, `fogStart` 0, `fogDensity` 0.33, `minClip` the zone's longest `allGeometrySize` side, `fogEnd` and `maxClip` twice that, and `newEngineZone` false (EQEmu servers send false for every zone).
 
 The views are daylit and unfogged. An indoor zone is darker in the client: judge its mood by its baked light, textures, and forms, not by how bright the views are, and say nothing of its fog unless it is known.
 
 ### 3. Look
 
-Directions follow the game's compass, as `/loc` and the in-game map do: north is the scene's +X and west its +Y. Map views and plans draw +Y up, so up is west there and north is to the right; `renderSketch`'s north arrow marks +Y, not the game's north.
+Directions follow the game's compass, as `/loc` and the in-game map do: north is the scene's +X and west its +Y. Map views and plans draw north up, as the in-game map does: +X up and +Y to the left, so a map's `width` runs along y.
 
-1. **Overview.** A `renderView` map of the whole zone (`center` the middle of its extent, `width` its longest side and a margin) in client shading, and the same in layout shading (`bandHeight` about a tenth of its height range) for its shape. Plot the place names that matter as sketch points (`sketch` sheet `brewall`, each at its label's `scenePosition`, named in letters, digits, and `_`, with the label's text as its `label`) and draw them with `renderSketch` over the same frame. For a large zone, add a `renderSketch` plan of each part: its spot heights show where the floors are and how high.
-2. **Find the areas.** An area is a part players experience as a place of its own: a valley, a town, a courtyard, a cave, a shore, a dungeon wing or level. Read them off the overview and the place names; `verticality` says whether to expect enclosed ground and stacked levels.
+1. **Overview.** A `renderView` map of the whole zone (`center` the middle of its extent, `width` its y size or 16/9 of its x size, whichever is more, and a margin, since a map is 16 wide to 9 high) in client shading, and the same in layout shading (`bandHeight` about a tenth of its height range) for its shape. Plot the place names that matter as sketch points (`sketch` sheet `brewall`, each at its label's `scenePosition`, named in letters, digits, and `_`, with the label's text as its `label`) and draw them with `renderSketch` over the same frame. For a large zone, add a `renderSketch` plan of each part: its spot heights show where the floors are and how high. Where rooms are smaller than the plan's grid, one `sketch` call with a point at the middle of each room (on a sheet of its own) returns the floor under each, with no picture.
+2. **Find the areas.** An area is a part players experience as a place of its own: a valley, a town, a courtyard, a cave, a shore, a dungeon wing or level. Read them off the overview and the place names; `verticality` says whether to expect enclosed ground and stacked levels. A run of rooms alike (chambers repeated or mirrored along a wing) is one area, its views taken in different rooms of it; a corridor or tunnel too narrow to look down into is a connection, not an area.
 3. **Each area:** an oblique view from above onto its middle (`eye` back from it by about its width and raised by 0.6 to 1 times that, 30 to 45 degrees down, `target` its middle), showing its layout and how it meets its neighbours; and an eye-level view inside it facing its main feature or along its main route. A large or varied area takes more.
 4. **Each landmark:** an oblique or eye-level view that shows it clearly; the area views often do. `pick` on the view that shows it gives its exact location.
-5. **Stacked levels:** a `renderSection` across them.
+5. **Stacked levels:** a `renderSection` along the zone's main run and one across it, where `verticality` reports levels over one another; `walkRoute` settles which way a ramp or stair runs.
 
 Placing the cameras:
 
 - Walls, cliffs, and ceilings are drawn from inside only, so an oblique from outside a canyon, cave, or building looks through its walls and shows floors floating in the sky. In a walled area, set the oblique's `eye` inside the space, above the floor and below the rims, or straight over an open part looking down into it.
+- Some enclosed zones model their rooms' outsides as well (roofs over halls, the outer faces of walls): maps and plans of them show the roofs, and an oblique from outside shows a shell. Take every oblique from inside the room: the `eye` in a corner, about two thirds of the way from the floor to the ceiling, looking across to the far side and down to its middle.
 - `standAt` [x, y] stands on the highest ground at that point, which can be a rim, a roof, or a boulder's top, and finds none over a gap between canyons. Take floor points and heights off the part plans, and give [x, y, z] wherever floors stack or walls are near.
 - A view refused for no ground, or for no room to walk the scale figure ahead, names why: move the point onto the floor, or turn along the floor. A view that misses (a camera in rock or outside the walls, its subject hidden, a face of bare rock) is retaken, never recorded. In a walled zone, expect to retake about a third of the first views.
 
