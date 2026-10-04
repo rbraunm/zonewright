@@ -114,7 +114,7 @@ def renderedPixel(path, column, row):
 def testPreviewsDrawTheZonesSkyAndTakeItsLight(stageBlenderServer, tmp_path):
   handSet = {
     "ambientColor": [0.3, 0.3, 0.35], "bounceColor": [0, 0, 0], "sunColor": [0.6, 0.57, 0.5], "sunAzimuthDegrees": 135, "sunElevationDegrees": 45,
-    "fogColor": [0.55, 0.6, 0.7], "specialAmbientColor": [0, 0, 0], "fogStart": 30, "fogEnd": 2000, "fogDensity": 0.33, "newEngineZone": False,
+    "fogColor": [0.55, 0.6, 0.7], "specialAmbientColor": [0, 0, 0], "fogStart": 30, "fogEnd": 2000, "fogDensity": 0.33, "fogOn": True, "maxClip": 4000, "newEngineZone": False,
   }
   sky = {"type": "highpasshold", "hour": 13, "minute": 0}
   views = {"towardSun": [0, 100, 100], "awayFromSun": [0, -100, 100], "level": [100, 0, 0]}

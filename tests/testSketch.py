@@ -8,7 +8,7 @@ from testWater import basin, liquidMaterials
 
 environment = {
   "ambientColor": [0.3, 0.3, 0.3], "specialAmbientColor": [0, 0, 0], "bounceColor": [0, 0, 0], "sunColor": [0.6, 0.6, 0.6],
-  "sunAzimuthDegrees": 0, "sunElevationDegrees": 45, "fogColor": [0.5, 0.5, 0.5], "fogStart": 50, "fogEnd": 3000, "fogDensity": 0.1, "newEngineZone": False,
+  "sunAzimuthDegrees": 0, "sunElevationDegrees": 45, "fogColor": [0.5, 0.5, 0.5], "fogStart": 50, "fogEnd": 3000, "fogDensity": 0.1, "fogOn": True, "maxClip": 6000, "newEngineZone": False,
 }
 # A tavern facing east (+X): 30 deep along its facing and 40 across, so it spans x 135..165 and y -20..20; a shed 15 south of it; a yard
 # 20 north; a road from the west edge through the basin into the tavern; the zone-in north of the basin.

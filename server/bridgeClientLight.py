@@ -17,6 +17,8 @@ detailUVMap = "eqDetailUV"
 fogRange = 10.0
 environmentColors = ("ambientColor", "specialAmbientColor", "bounceColor", "sunColor", "fogColor")
 environmentValues = ("fogStart", "fogEnd", "fogDensity")
+# eqgame.exe pulls a fog end that reaches the far clip back to this share of the clip's distance past the fog start (0x48ac00).
+fogPullIn = 0.15
 # What the group outputs: the drawn color, or one of its inputs for calibration (bridgeViews.renderPasses). The render keeps only values
 # of 0 or more, so the normal pass holds normal * 0.5 + 0.5; the distance pass holds the distance from the camera.
 passes = ("lit", "base", "normal", "baked", "share", "distance")
@@ -144,6 +146,15 @@ def group():
   return tree
 
 
+def effectiveFog(zone):
+  """The fog the client draws: start, end, and density; none when the zone's fog is off (the zone type 0), and an end that reaches the
+  far clip pulled in short of it."""
+  start, end, clip = zone["fogStart"], zone["fogEnd"], zone["maxClip"]
+  if end >= clip:
+    end = clip - fogPullIn * (clip - start)
+  return start, end, zone["fogDensity"] if zone["fogOn"] else 0.0
+
+
 def applyEnvironment(zone):
   """Set the group's environment from the zone's properties."""
   nodes = group().nodes
@@ -152,9 +163,10 @@ def applyEnvironment(zone):
   sun = towardSun(zone["sunAzimuthDegrees"], zone["sunElevationDegrees"])
   for axis, component in zip("XYZ", sun):
     nodes["towardSun"].inputs[axis].default_value = component
-  nodes["fogStart"].outputs["Value"].default_value = zone["fogStart"]
-  nodes["fogRampScale"].outputs["Value"].default_value = fogRange / (zone["fogEnd"] - zone["fogStart"])
-  nodes["fogDensity"].outputs["Value"].default_value = zone["fogDensity"]
+  start, end, density = effectiveFog(zone)
+  nodes["fogStart"].outputs["Value"].default_value = start
+  nodes["fogRampScale"].outputs["Value"].default_value = fogRange / (end - start)
+  nodes["fogDensity"].outputs["Value"].default_value = density
 
 
 def surfaceOutput(material, baseColor, alpha, alphaMode, lit, threshold, normal=None, added=None):

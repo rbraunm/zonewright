@@ -605,12 +605,18 @@ async def setZoneProperties(
   fogStart: float | None = None,
   fogEnd: float | None = None,
   fogDensity: float | None = None,
+  fogOn: bool | None = None,
+  minClip: float | None = None,
+  maxClip: float | None = None,
   newEngineZone: bool | None = None,
   sky: dict | str | None = None,
 ):
   """Set the zone's EQ properties stored in the .blend, in the client's lighting terms (docs/clientRendering.md): ambient, special
   ambient, bounce, and sun colors (0-1, raw as the client uses them); the direction toward the sun (azimuth 0 = +Y, clockwise;
-  elevation -90 to 90); fog color, start, end (also the far clip), and density (the client's default is 0.33); newEngineZone,
+  elevation -90 to 90); fog color, start, end, and density (the client's default is 0.33); fogOn, whether the client fogs at all (the
+  zone row's ztype is not 0; Highpass Hold's is 0, so it draws no fog); minClip and maxClip, the zone row's clip distances (the far
+  clip runs from the minimum to the maximum with the player's clip slider; previews draw it at the maximum, and a fog end that
+  reaches it is pulled in to 15% short of the way from the fog start, as the client does); newEngineZone,
   the zone header's NewEngineZone, which sets the scale the client draws spawns at (the live dumps' zoneHeaders give it per zone;
   EQEmu sends false for every zone); and sky, the client sky the zone draws: {type, weather, hour, minute}. type is the sky type the
   client looks up, the zone's short name unless the server overrides it; a type sky.ini lacks gets the client's 'default' sky, as
@@ -621,7 +627,7 @@ async def setZoneProperties(
   updates = {
     "ambientColor": ambientColor, "specialAmbientColor": specialAmbientColor, "bounceColor": bounceColor, "sunColor": sunColor,
     "sunAzimuthDegrees": sunAzimuthDegrees, "sunElevationDegrees": sunElevationDegrees, "fogColor": fogColor, "fogStart": fogStart,
-    "fogEnd": fogEnd, "fogDensity": fogDensity, "newEngineZone": newEngineZone, "sky": sky,
+    "fogEnd": fogEnd, "fogDensity": fogDensity, "fogOn": fogOn, "minClip": minClip, "maxClip": maxClip, "newEngineZone": newEngineZone, "sky": sky,
   }
   given = {key: value for key, value in updates.items() if value is not None}
   if not given:
@@ -922,6 +928,8 @@ def passArrays(passes):
   return arrays
 
 
+# calibrateShot draws out to this, past any fog it fits or is given.
+calibrationClip = 1000000.0
 # How far from a screenshot's camera calibrateShot places what a recording shows.
 recordingReach = 1000.0
 # The recording writes -1 for a look value a spawn does not set (a non-Drakkin's tattoo, a WLD model's head override); the client reads
@@ -1028,10 +1036,11 @@ async def calibrateShot(
   await callBridge(context, "newFile", {"discardUnsavedChanges": discardUnsavedChanges})
   imported = await placeZone(context, zone, None)
   neutral = {"ambientColor": [1, 1, 1], "specialAmbientColor": [0, 0, 0], "bounceColor": [0, 0, 0], "sunColor": [0, 0, 0], "sunAzimuthDegrees": 0, "sunElevationDegrees": 45}
+  # The fog is used as given or fitted, without the client's pull-in at the far clip: calibration views stay well inside it.
   if all(fogGiven):
-    environment = {"fogColor": fogColor, "fogStart": fogStart, "fogEnd": fogEnd, "fogDensity": fogDensity, "newEngineZone": newEngineZone}
+    environment = {"fogColor": fogColor, "fogStart": fogStart, "fogEnd": fogEnd, "fogDensity": fogDensity, "fogOn": True, "maxClip": calibrationClip, "newEngineZone": newEngineZone}
   else:
-    environment = {"fogColor": [0, 0, 0], "fogStart": 0, "fogEnd": 100000, "fogDensity": 0, "newEngineZone": newEngineZone}
+    environment = {"fogColor": [0, 0, 0], "fogStart": 0, "fogEnd": 100000, "fogDensity": 0, "fogOn": True, "maxClip": calibrationClip, "newEngineZone": newEngineZone}
   await callBridge(context, "setZoneProperties", {"updates": neutral | environment})
   recorded = None
   if (recordingPath is None) != (liveDumpsPath is None):

@@ -14,7 +14,7 @@ mesh.materials.append(material)
 """
 zoneProperties = {
   "ambientColor": [0.3, 0.3, 0.35], "specialAmbientColor": [0, 0, 0], "bounceColor": [0, 0, 0], "sunColor": [0.6, 0.57, 0.5],
-  "sunAzimuthDegrees": 135, "sunElevationDegrees": 45, "fogColor": [0.55, 0.6, 0.7], "fogStart": 30, "fogEnd": 200, "fogDensity": 0.33,
+  "sunAzimuthDegrees": 135, "sunElevationDegrees": 45, "fogColor": [0.55, 0.6, 0.7], "fogStart": 30, "fogEnd": 200, "fogDensity": 0.33, "fogOn": True, "maxClip": 400,
   "newEngineZone": False,
 }
 eyeLevelView = {"standAt": [0, 0, 0], "headingDegrees": 0, "pitchDegrees": 0}
@@ -148,7 +148,7 @@ def testRenderWithoutZonePropertiesFails(stageBlenderServer):
     await session.expectSuccess("runPython", {"code": groundSceneCode})
     return await session.expectError("renderView", {"view": eyeLevelView})
 
-  assert "Zone properties missing: ['ambientColor', 'specialAmbientColor', 'bounceColor', 'sunColor', 'sunAzimuthDegrees', 'sunElevationDegrees', 'fogColor', 'fogStart', 'fogEnd', 'fogDensity', 'newEngineZone']" in stageBlenderServer.session(steps)
+  assert "Zone properties missing: ['ambientColor', 'specialAmbientColor', 'bounceColor', 'sunColor', 'sunAzimuthDegrees', 'sunElevationDegrees', 'fogColor', 'fogStart', 'fogEnd', 'fogDensity', 'fogOn', 'maxClip', 'newEngineZone']" in stageBlenderServer.session(steps)
 
 
 def testMisspelledOrMissingArgumentsAreRefused(stageBlenderServer):

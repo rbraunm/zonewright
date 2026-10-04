@@ -212,7 +212,7 @@ def testMaterialsSavedBeforeTheAddedLightInputDrawUnchanged(stageBlenderServer, 
     await session.expectSuccess("projectUVs", {"objectName": "ground", "method": "planar", "worldUnitsPerRepeat": 64, "direction": [0, 0, 1]})
     await session.expectSuccess("setZoneProperties", {
       "ambientColor": [0.3, 0.3, 0.3], "specialAmbientColor": [0, 0, 0], "bounceColor": [0, 0, 0], "sunColor": [0.6, 0.6, 0.6],
-      "sunAzimuthDegrees": 0, "sunElevationDegrees": 45, "fogColor": [0.5, 0.5, 0.5], "fogStart": 50, "fogEnd": 3000, "fogDensity": 0.1, "newEngineZone": False,
+      "sunAzimuthDegrees": 0, "sunElevationDegrees": 45, "fogColor": [0.5, 0.5, 0.5], "fogStart": 50, "fogEnd": 3000, "fogDensity": 0.1, "fogOn": True, "maxClip": 6000, "newEngineZone": False,
     })
     view = {"eye": [-150, -150, 80], "target": [0, 0, -10]}
     current, _ = await session.expectImage("renderView", {"view": view})

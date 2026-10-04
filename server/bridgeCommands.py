@@ -26,8 +26,10 @@ from bridgeState import requireNoUnsavedChanges, state
 zonePropertyName = "zonewrightZone"
 zonePropertyKeys = (
   "ambientColor", "specialAmbientColor", "bounceColor", "sunColor", "sunAzimuthDegrees", "sunElevationDegrees", "fogColor", "fogStart", "fogEnd",
-  "fogDensity", "newEngineZone", "sky",
+  "fogDensity", "fogOn", "minClip", "maxClip", "newEngineZone", "sky",
 )
+# The client raises a lower minimum clip to this (eqgame 0x4c9ee6).
+clientMinimumClip = 50.0
 skyKeys = {"type": str, "weather": str, "hour": int, "minute": int}
 fileImageSources = ("FILE", "SEQUENCE", "TILED")
 
@@ -229,6 +231,14 @@ def setZoneProperties(updates):
     raise ValueError(f"sunElevationDegrees must be in [-90, 90], got {zone['sunElevationDegrees']}")
   if "fogDensity" in zone and zone["fogDensity"] < 0:
     raise ValueError(f"fogDensity must be at least 0, got {zone['fogDensity']}")
+  if "fogOn" in zone and not isinstance(zone["fogOn"], bool):
+    raise ValueError(f"fogOn must be true or false, got {zone['fogOn']!r}")
+  if "minClip" in zone and zone["minClip"] < clientMinimumClip:
+    raise ValueError(f"minClip must be at least {clientMinimumClip:g}, as the client raises any lower one to it; got {zone['minClip']}")
+  if "minClip" in zone and "maxClip" in zone and zone["maxClip"] <= zone["minClip"]:
+    raise ValueError(f"maxClip {zone['maxClip']} must be greater than minClip {zone['minClip']}")
+  if "maxClip" in zone and "fogStart" in zone and zone["maxClip"] <= zone["fogStart"]:
+    raise ValueError(f"maxClip {zone['maxClip']} must be greater than fogStart {zone['fogStart']}: nothing would be drawn far enough to fog")
   if "newEngineZone" in zone and not isinstance(zone["newEngineZone"], bool):
     raise ValueError(f"newEngineZone must be true or false, got {zone['newEngineZone']!r}")
   bpy.context.scene[zonePropertyName] = zone

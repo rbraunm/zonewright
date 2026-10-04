@@ -55,7 +55,7 @@ def testPlayersStandOnTheBedUnderWaterAndOnInstancesButNotOnGuides(stageBlenderS
     await session.expectSuccess("runPython", {"code": instancedStepCode})
     await session.expectSuccess("setZoneProperties", {
       "ambientColor": [0.3, 0.3, 0.3], "specialAmbientColor": [0, 0, 0], "bounceColor": [0, 0, 0], "sunColor": [0.6, 0.6, 0.6],
-      "sunAzimuthDegrees": 0, "sunElevationDegrees": 45, "fogColor": [0.5, 0.5, 0.5], "fogStart": 50, "fogEnd": 3000, "fogDensity": 0.1, "newEngineZone": False,
+      "sunAzimuthDegrees": 0, "sunElevationDegrees": 45, "fogColor": [0.5, 0.5, 0.5], "fogStart": 50, "fogEnd": 3000, "fogDensity": 0.1, "fogOn": True, "maxClip": 6000, "newEngineZone": False,
     })
     across = await session.expectSuccess("walkRoute", {"path": [[-150, 0, 0], [150, 0, 0]]})
     overStep = await session.expectSuccess("walkRoute", {"path": [[-100, 150, 0], [100, 150, 0]]})

@@ -12,7 +12,7 @@ import eqCalibration
 texture = (200, 150, 100, 255)
 environment = {
   "ambientColor": [0.2, 0.25, 0.3], "specialAmbientColor": [0.05, 0, 0], "bounceColor": [0.1, 0.1, 0.2], "sunColor": [0.5, 0.4, 0.3],
-  "sunAzimuthDegrees": 0, "sunElevationDegrees": 30, "fogColor": [0.4, 0.5, 0.6], "fogStart": 0, "fogEnd": 1000, "fogDensity": 0,
+  "sunAzimuthDegrees": 0, "sunElevationDegrees": 30, "fogColor": [0.4, 0.5, 0.6], "fogStart": 0, "fogEnd": 1000, "fogDensity": 0, "fogOn": False, "maxClip": 2000,
   "newEngineZone": False,
 }
 
@@ -55,7 +55,7 @@ def testPreviewLightsAndFogsAsTheClientDoes(stageBlenderServer, tmp_path):
     await session.expectSuccess("setZoneProperties", environment)
     floor = await renderedPixel(session, {"eye": [0, 0, 20], "target": [0, 0.001, 0]})
     wall = await renderedPixel(session, {"eye": [0, 20, 5], "target": [0, 40, 5]})
-    await session.expectSuccess("setZoneProperties", {"fogStart": 0, "fogEnd": 40, "fogDensity": 0.33})
+    await session.expectSuccess("setZoneProperties", {"fogStart": 0, "fogEnd": 40, "fogDensity": 0.33, "fogOn": True})
     fogged = await renderedPixel(session, {"eye": [0, 0, 20], "target": [0, 0.001, 0]})
     return floor, wall, fogged
 
@@ -69,6 +69,32 @@ def testPreviewLightsAndFogsAsTheClientDoes(stageBlenderServer, tmp_path):
   for measured, expected in zip(fogged, clientPixel((0, 0, 1), math.exp(-(0.33 * 5) ** 2))):
     assert abs(measured - expected) <= 1.5 / 255
 
+
+
+def testFogIsOffWithTheZonesFogSwitchAndPulledInShortOfTheFarClip(stageBlenderServer, tmp_path):
+  texturePath = writePNG(tmp_path / "stone.png", 8, 8, texture)
+  view = {"eye": [0, 0, 20], "target": [0, 0.001, 0]}
+
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    await session.expectSuccess("createPrimitive", {"kind": "plane", "name": "floor", "size": [64, 64, 0], "location": [0, 0, 0]})
+    await session.expectSuccess("createMaterial", {"name": "stone", "diffuseTexture": str(texturePath)})
+    await session.expectSuccess("assignMaterial", {"objectName": "floor", "materialName": "stone"})
+    await session.expectSuccess("setZoneProperties", environment | {"fogStart": 0, "fogEnd": 40, "fogDensity": 0.33, "fogOn": False, "maxClip": 1000})
+    off = await renderedPixel(session, view)
+    await session.expectSuccess("setZoneProperties", {"fogOn": True, "fogEnd": 100, "maxClip": 60})
+    pulledIn = await renderedPixel(session, view)
+    refused = await session.expectError("setZoneProperties", {"minClip": 20})
+    return off, pulledIn, refused
+
+  off, pulledIn, refused = stageBlenderServer.session(steps)
+  # With the fog off the floor draws as if there were none, whatever the density.
+  for measured, expected in zip(off, clientPixel((0, 0, 1))):
+    assert abs(measured - expected) <= 1.5 / 255
+  # The fog end 100 reaches the far clip 60, so the client ends it at 60 - 0.15 * 60 = 51: the floor 20 away is 10 * 20 / 51 into the ramp.
+  for measured, expected in zip(pulledIn, clientPixel((0, 0, 1), math.exp(-(0.33 * 10 * 20 / 51) ** 2))):
+    assert abs(measured - expected) <= 1.5 / 255
+  assert "minClip must be at least 50" in refused
 
 def testImportZoneBringsTheClientsZone(stageBlenderServer):
   async def steps(session):
@@ -116,7 +142,7 @@ def testCalibrationFitsTheFogOfAShotWithoutAZoneHeader(stageBlenderServer, tmp_p
   shotName = "poknowledge,396.22,-192.08,-156.87,73.44,12.48"
   known = environment | {
     "ambientColor": [0.5, 0.5, 0.55], "specialAmbientColor": [0, 0, 0], "bounceColor": [0, 0, 0], "sunColor": [0.3, 0.3, 0.25], "sunAzimuthDegrees": 120,
-    "sunElevationDegrees": 40, "fogColor": [0.6, 0.65, 0.75], "fogStart": 50, "fogEnd": 600, "fogDensity": 0.33,
+    "sunElevationDegrees": 40, "fogColor": [0.6, 0.65, 0.75], "fogStart": 50, "fogEnd": 600, "fogDensity": 0.33, "fogOn": True, "maxClip": 1200,
   }
 
   async def steps(session):

@@ -105,7 +105,7 @@ def testViewsSeeAPassShapedJustBefore(stageBlenderServer):
     await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [64, 64], "spacing": 8, "location": [0, 0, 0]})
     await session.expectSuccess("setZoneProperties", {
       "ambientColor": [0.3, 0.3, 0.3], "specialAmbientColor": [0, 0, 0], "bounceColor": [0, 0, 0], "sunColor": [0.5, 0.5, 0.5],
-      "sunAzimuthDegrees": 135, "sunElevationDegrees": 45, "fogColor": [0.5, 0.5, 0.5], "fogStart": 30, "fogEnd": 200, "fogDensity": 0.33,
+      "sunAzimuthDegrees": 135, "sunElevationDegrees": 45, "fogColor": [0.5, 0.5, 0.5], "fogStart": 30, "fogEnd": 200, "fogDensity": 0.33, "fogOn": True, "maxClip": 400,
       "newEngineZone": False,
     })
     await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "pit"})

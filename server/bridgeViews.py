@@ -16,8 +16,10 @@ from playerScale import swimEyeAboveSurface
 
 requiredZoneKeys = (
   "ambientColor", "specialAmbientColor", "bounceColor", "sunColor", "sunAzimuthDegrees", "sunElevationDegrees", "fogColor", "fogStart", "fogEnd",
-  "fogDensity", "newEngineZone",
+  "fogDensity", "fogOn", "maxClip", "newEngineZone",
 )
+# The client turns its sky off when the fog it draws ends nearer than this (eqgame 0x48ae80).
+skyFogEndMinimum = 101.0
 previewName = "zonewrightPreview"
 renderWidth = 960
 renderHeight = 540
@@ -72,7 +74,8 @@ class PreviewScene:
     self.camera.data.sensor_fit = "VERTICAL"
     self.camera.data.angle = math.radians(verticalFieldOfViewDegrees)
     self.camera.data.clip_start = cameraClipStart
-    self.camera.data.clip_end = zone["fogEnd"]
+    # Drawn as for a player with the far clip slider at its maximum: the far clip is the zone's maximum clip.
+    self.camera.data.clip_end = zone["maxClip"]
     self.scene.camera = self.camera
     self.configureRender()
     self.configureWorld()
@@ -117,7 +120,7 @@ class PreviewScene:
 
   def drawSky(self):
     """The zone's sky behind everything, as the client draws it for the camera's height, which moves its horizon band."""
-    if self.sky is None:
+    if self.sky is None or (self.zone["fogOn"] and bridgeClientLight.effectiveFog(self.zone)[1] < skyFogEndMinimum):
       return
     textures = {texture["path"]: numpy.load(texture["path"]) for satellite in self.sky["satellites"] for texture in satellite["textures"]}
     width = 2 * skyImageHeight
@@ -351,7 +354,7 @@ def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, b
     raise ValueError(f"shading must be one of {list(viewShadings)}, got '{shading}'")
   # A map or a layout or relief drawing is for reading the shape, so none is fogged nor has a sky.
   shapeOnly = "map" in view or shading != "client"
-  preview = PreviewScene(sourceScene, zone | {"fogDensity": 0.0} if shapeOnly else zone, guides, None if shapeOnly else sky)
+  preview = PreviewScene(sourceScene, zone | {"fogOn": False} if shapeOnly else zone, guides, None if shapeOnly else sky)
   try:
     description = placeCamera(preview, view, figureModel)
     preview.drawSky()
@@ -452,7 +455,7 @@ thumbnailSide = 256
 # Neutral daylight for looking at a model on its own: a grey ambient and a white sun from the front right, no fog.
 thumbnailZone = {
   "ambientColor": [0.5, 0.5, 0.5], "specialAmbientColor": [0.0, 0.0, 0.0], "bounceColor": [0.0, 0.0, 0.0], "sunColor": [0.55, 0.55, 0.55],
-  "sunAzimuthDegrees": 135.0, "sunElevationDegrees": 45.0, "fogColor": [0.3, 0.33, 0.37], "fogStart": 0.0, "fogEnd": 1000000.0, "fogDensity": 0.0,
+  "sunAzimuthDegrees": 135.0, "sunElevationDegrees": 45.0, "fogColor": [0.3, 0.33, 0.37], "fogStart": 0.0, "fogEnd": 1000000.0, "fogDensity": 0.0, "fogOn": False, "maxClip": 1000000.0,
   "newEngineZone": False,
 }
 # EQ models face +X: seen from in front, to the right, and above.
