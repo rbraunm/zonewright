@@ -1,3 +1,4 @@
+import io
 import math
 import sys
 from pathlib import Path
@@ -147,6 +148,43 @@ def testImportZoneBringsTheClientsZone(stageBlenderServer):
     "objectArchives": ["poknowledge_obj.s3d"], "missingModels": [], "missingTextures": [], "droppedTriangles": 0, "particleCloudsNotDrawn": None,
   }
   assert imported["dimensions"] == [1968.0, 1968.0, 1011.931]
+  # A classic zone's zone lines are BSP regions, whose places are not read.
+  assert imported["zoneLines"] is None and imported["zoneLinesTilted"] is None
+
+
+def pixelAt(image, x, y):
+  return Image.open(io.BytesIO(image)).convert("RGB").getpixel((x, y))
+
+
+@pytest.mark.clientData("clientFiles")
+def testImportZoneBringsAnEQGZonesZoneLinesAsGuides(stageBlenderServer):
+  around = {"center": [2111, -729], "width": 900}
+
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    imported = await session.expectSuccess("importZone", {"zone": "draniksscar"})
+    await session.expectSuccess("setZoneProperties", environment)
+    lines = await session.expectSuccess("getZoneLines", {})
+    plan, _ = await session.expectImage("renderSketch", around)
+    bare, _ = await session.expectImage("renderSketch", around | {"layers": ["regions"]})
+    return imported, lines, plan, bare
+
+  imported, lines, plan, bare = stageBlenderServer.session(steps)
+  assert [line["name"] for line in imported["zoneLines"]] == ["ATP_3_", "ATP_2_", "ATP_1_"] and imported["zoneLinesTilted"] == []
+  # Each a 120 by 60 by 130 box at the .zon's center, turned by its first turn field read as 512ths of a turn (pi/2, pi, -pi/2 written
+  # in radians: a degree or two), with no target: the zone's files never say where a zone line leads.
+  assert lines["zoneLines"][1] == {
+    "name": "ATP_2_", "number": 2, "label": "", "minimum": [2049.57, -761.67, -272.05], "maximum": [2171.79, -697.09, -142.05], "target": None,
+    "headingDegrees": -2.21, "clientContent": "zone",
+  }
+  assert [(line["name"], line["number"], line["headingDegrees"], line["target"], line["clientContent"]) for line in lines["zoneLines"]] == [
+    ("ATP_1_", 1, -1.1, None, "zone"), ("ATP_2_", 2, -2.21, None, "zone"), ("ATP_3_", 3, 1.1, None, "zone"),
+  ]
+  # Guides an import brings are reference: no export check or game export gap counts them.
+  assert lines["errors"] == [] and lines["gaps"] == []
+  # The plan at 1.6 pixels a unit, north (+X) up: inside ATP_2_ at (2160, -712), clear of its name, the guide tints the tube green.
+  red, green, _ = (inGuide - inBare for inGuide, inBare in zip(pixelAt(plan, 692, 327), pixelAt(bare, 692, 327)))
+  assert green - red > 30, (pixelAt(plan, 692, 327), pixelAt(bare, 692, 327))
 
 
 @pytest.mark.clientData("calibration")

@@ -3,6 +3,7 @@ import hashlib
 import json
 import logging
 import multiprocessing
+import re
 import struct
 from pathlib import Path
 
@@ -37,7 +38,7 @@ def brewallMapPaths(clientRoot, zoneName):
 
 
 def readBrewallLabels(clientRoot, zoneName):
-  """Place labels from the Brewall map files: design notes only, never geometry or scale."""
+  """Place labels from the Brewall map files, each with the scene position it marks: design notes only, never geometry or scale."""
   labels = []
   for mapPath in brewallMapPaths(clientRoot, zoneName):
     for line in mapPath.read_text(encoding="latin1").splitlines():
@@ -48,8 +49,28 @@ def readBrewallLabels(clientRoot, zoneName):
         raise ValueError(f"{mapPath.name}: label line has {len(fields)} fields: {line}")
       mapX, mapY, mapZ = (float(value) for value in fields[0:3])
       # A map draws the server's -x to the right and -y down, north up as the in-game map does, so map (x, y) marks the scene's (-y, -x).
-      labels.append({"text": fields[7].replace("_", " "), "mapPosition": [mapX, mapY, mapZ], "scenePosition": [-mapY, -mapX, mapZ], "layer": mapPath.stem})
+      labels.append({"text": fields[7].replace("_", " "), "scenePosition": (-mapY, -mapX, mapZ), "layer": mapPath.stem})
   return labels
+
+
+def labelWords(text):
+  return set(re.findall(r"[a-z0-9]+", text.lower()))
+
+
+def zoneNotes(labels, minimum, maximum, text):
+  """Labels holding every word of text as a word of their own (all when None), those on the zone (inside minimum to maximum in plan) by
+  layer with their scene positions in whole units, and those off it (a map's legend and credits sit at made-up positions beside the
+  zone) by text."""
+  words = labelWords(text) if text is not None else set()
+  onZone, offZone = {}, []
+  for label in labels:
+    if not words <= labelWords(label["text"]):
+      continue
+    if all(minimum[axis] <= label["scenePosition"][axis] <= maximum[axis] for axis in (0, 1)):
+      onZone.setdefault(label["layer"], []).append({"text": label["text"], "scenePosition": [round(value) for value in label["scenePosition"]]})
+    else:
+      offZone.append(label["text"])
+  return {"labels": onZone, "offZone": {"count": len(offZone), "texts": offZone}}
 
 
 class SurveyCache:
@@ -91,13 +112,12 @@ def discoveredVariants(clientRoot, cache):
 
 
 def selectVariants(clientRoot, cache, zoneNames):
+  """The variants of the named zones (every zone's when None), and the names that are no zone in the client."""
   variants = discoveredVariants(clientRoot, cache)
   if zoneNames is None:
-    return variants
+    return variants, []
   unknownZones = sorted(set(zoneNames) - {variant["zone"] for variant in variants.values()})
-  if unknownZones:
-    raise ToolError(f"Not zones in {clientRoot}: {unknownZones}")
-  return {key: variant for key, variant in variants.items() if variant["zone"] in zoneNames}
+  return {key: variant for key, variant in variants.items() if variant["zone"] in zoneNames}, unknownZones
 
 
 def hashFiles(paths, cache, verifyHashes):
@@ -144,10 +164,11 @@ def measureVariant(clientRoot, source, groupNames):
 
 
 def surveyMeasured(clientRoot, toolingRoot, zoneNames, groupNames, reportProgress, verifyHashes=False):
-  """Technical lane: bring the named measured groups up to date for the named zones (all when None), measuring stale zones in parallel."""
+  """Technical lane: bring the named measured groups up to date for the named zones (all when None), measuring stale zones in parallel.
+  Returns each variant's row and the names that are no zone in the client."""
   validateMeasuredGroups(groupNames)
   cache = SurveyCache(toolingRoot)
-  variants = selectVariants(clientRoot, cache, zoneNames)
+  variants, unknownZones = selectVariants(clientRoot, cache, zoneNames)
   reportProgress(0, None, "checking zone file hashes")
   fileHashes = variantFileHashes(clientRoot, cache, variants, verifyHashes)
   entries = {key: cache.entry(key, fileHashes[key]) for key in variants}
@@ -177,4 +198,4 @@ def surveyMeasured(clientRoot, toolingRoot, zoneNames, groupNames, reportProgres
   return {
     key: {"zone": source["zone"], "format": source["format"]} | ({"error": errors[key]} if key in errors else {groupName: entries[key]["measured"][groupName]["value"] for groupName in groupNames})
     for key, source in sorted(variants.items())
-  }
+  }, unknownZones

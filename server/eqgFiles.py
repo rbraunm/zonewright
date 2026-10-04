@@ -1,3 +1,4 @@
+import re
 import struct
 
 import numpy
@@ -23,6 +24,11 @@ weightType = numpy.dtype([("count", "<u4"), ("influences", [("bone", "<i4"), ("w
 animationFrameType = numpy.dtype([("time", "<u4"), ("position", "<f4", 3), ("rotation", "<f4", 4), ("scale", "<f4", 3)])
 animationHeaderBytes = {1: 16, 2: 20}
 zoneRegionBytes = 40
+# A region's first turn field counts 512ths of a turn: read so, the boxes of the client's water regions written in that unit (most store
+# -128, a quarter turn) lie over their water, and those written in radians (-pi/2 in most) turn by about a degree and lie over theirs
+# unturned (docs/clientRendering.md, Regions).
+regionTurnUnits = 512
+zoneLinePrefix = "ATP_"
 skinnedWeightBytes = weightType.itemsize
 zoneLightBytes = 32
 layerRecordBytes = 32
@@ -163,6 +169,24 @@ def parseZone(zoneBytes, sourceName):
   if position != len(zoneBytes):
     raise ValueError(f"{sourceName}: zone data ends at {position} of {len(zoneBytes)} bytes")
   return {"version": version, "modelNames": modelNames, "placements": placements, "regions": regions, "lights": lights}
+
+
+def isZoneLine(regionName):
+  return regionName.upper().startswith(zoneLinePrefix)
+
+
+def zoneLineNumber(regionName):
+  """A zone line's number as the client reads it: atoi on the digits after ATP_ (eqgame 0x487530), 0 without any."""
+  match = re.match(r"[0-9]+", regionName[len(zoneLinePrefix):])
+  return int(match.group(0)) if match else 0
+
+
+def regionBox(region):
+  """A .zon region's box: about its center, its half extents' sizes along its own axes (some files store them negative), turned about
+  Z by its first turn field in 512ths of a turn, counter-clockwise from above, as a heading in degrees. Its other two turn fields,
+  whose reading is untraced, are given when either is not 0."""
+  box = {"center": tuple(region["center"]), "halfExtents": tuple(abs(value) for value in region["halfExtents"]), "headingDegrees": region["rotation"][0] * 360 / regionTurnUnits}
+  return box | ({"tiltFields": tuple(region["rotation"][1:])} if any(region["rotation"][1:]) else {})
 
 
 def placementMatrix(placement):

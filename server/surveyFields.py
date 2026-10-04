@@ -3,6 +3,7 @@ import re
 
 import numpy
 
+import eqgFiles
 import zoneGeometry
 from playerScale import playerHeight, walkableNormalZ
 
@@ -189,9 +190,24 @@ def regionKind(regionName):
   return f"other:{token}"
 
 
+def zoneLineFields(region):
+  box = eqgFiles.regionBox(region)
+  fields = {
+    "name": region["name"], "number": eqgFiles.zoneLineNumber(region["name"]), "center": roundList(box["center"]),
+    "size": roundList(2 * value for value in box["halfExtents"]), "headingDegrees": round(box["headingDegrees"], 2),
+  }
+  return fields | ({"tiltFields": roundList(box["tiltFields"], 4)} if "tiltFields" in box else {})
+
+
 def measureRegions(geometry, frames):
+  """The regions by kind, and an EQG zone's zone lines, each with the number the client reads from its name and its box (eqgFiles.regionBox);
+  a classic or EQ terrain zone's zone lines are None, their places not read."""
   kinds = collections.Counter(regionKind(name) for name in geometry["regionNames"])
-  return {"regionCount": len(geometry["regionNames"]), "regionsByKind": dict(sorted(kinds.items()))}
+  boxes = geometry["regionBoxes"]
+  return {
+    "regionCount": len(geometry["regionNames"]), "regionsByKind": dict(sorted(kinds.items())),
+    "zoneLines": None if boxes is None else [zoneLineFields(region) for region in boxes if eqgFiles.isZoneLine(region["name"])],
+  }
 
 
 # Steeper than this is a cliff or wall rather than a slope.
@@ -274,7 +290,7 @@ measuredGroups = {
   "surfaces": (2, measureSurfaces),
   "verticality": (2, measureVerticality),
   "content": (2, measureContent),
-  "regions": (1, measureRegions),
+  "regions": (2, measureRegions),
   "construction": (1, measureConstruction),
 }
 

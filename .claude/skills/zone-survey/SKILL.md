@@ -17,12 +17,13 @@ The survey caches what zonewright knows about every zone in the EverQuest client
 | `surfaces` | Area by surface kind (solid, invisible, passable, water, lava, cutout, translucent), solid area by slope band, walkable area and elevation percentiles |
 | `verticality` | A 128 x 128 grid of vertical probes: share of columns with a floor, share of floors with geometry overhead (enclosed), share with 1, 2, 3, 4+ walkable levels |
 | `content` | Texture count and top textures by area, placement count, distinct models, top placed models, missing models and asset archives |
-| `regions` | Water, lava, zone-line, and other regions from the zone data |
+| `regions` | Water, lava, zone-line, and other regions from the zone data; an EQG zone's zone lines each with its name, the number the client reads from it, center, size, and heading (a classic or EQ terrain zone's are `None`: not read) |
 | `construction` | How the zone is built: terrain triangles and density, textures on the terrain, the share of terrain triangles in material islands of one or two triangles (vertices welded by position), the terrain's steep share, how much steep area is terrain rather than placed models, and how much ground is painted from palette maps or blended |
 
-- `surveyZones(zones, groups, sortBy, limit)` returns rows for the named zones, or every zone when `zones` is omitted, sorted descending by a dotted path such as `dimensions.triangleCount`. Request only the groups the question needs.
+- `surveyZones(zones, groups, sortBy, limit)` returns rows for the named zones, or every zone when `zones` is omitted, in zone name order, or sorted descending by `sortBy`, a dotted path into a requested group such as `dimensions.triangleCount`. A name that is no zone in the client comes back in `unknownZones`, the rest answered. Request only the groups the question needs.
 - `getZoneSurvey(zone)` returns every measured group of the zone's variants, and its interpretation with its state.
-- `getZoneNotes(zone)` returns Brewall map labels: place names, each with its map position and the scene position it roughly marks (scene x, y = map -y, -x). They are design notes only; Brewall maps are never geometry or scale.
+- `getZoneNotes(zone, text)` returns Brewall map labels: those on the zone by map layer, each with the scene position it roughly marks (scene x, y = map -y, -x), and those off it (the map's legend and credits, at made-up positions) counted and named. `text` keeps the labels holding each of its words, such as `to` for the zone lines' destinations. They are design notes only; Brewall maps are never geometry or scale.
+- `importZone(zone)` brings an EQG zone's zone lines in as guides (`getZoneLines`; `renderSketch` and `renderSection` draw them in their `zoneLines` layer), with no target: the zone's files never say where a zone line leads.
 
 Each zone variant is keyed `zone:format` (`wld`, `eqgz`, `eqtzp`); some zones ship both a classic and an EQG version. A row with `error` is a variant whose files the parsers cannot read; report it, do not guess its values.
 

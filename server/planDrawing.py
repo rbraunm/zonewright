@@ -282,11 +282,9 @@ def drawBoundaries(draw, frame, boundaries):
 
 
 def drawZoneLines(draw, frame, zoneLines):
-  """Zone lines in plan: their boxes filled faintly green and outlined."""
+  """Zone lines in plan: their boxes' footprints (four corners in order around) filled faintly green and outlined."""
   for line in zoneLines:
-    (x0, y0), (x1, y1) = line["corners"]
-    points = [frame.pixel(point) for point in ((x0, y0), (x1, y0), (x1, y1), (x0, y1))]
-    draw.polygon(points, fill=(*zoneLineColor, 90), outline=(*zoneLineColor, 255), width=2)
+    draw.polygon([frame.pixel(point) for point in line["corners"]], fill=(*zoneLineColor, 90), outline=(*zoneLineColor, 255), width=2)
 
 
 def boundaryLabelSpot(frame, boundary):

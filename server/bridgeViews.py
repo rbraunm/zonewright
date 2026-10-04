@@ -234,7 +234,7 @@ class PreviewScene:
   def placeSwimVolumes(self):
     """Each swim volume as a block in its liquid's color."""
     materials = {liquid: self.emissionMaterial("Swim" + liquid, color) for liquid, color in swimColors.items()}
-    return [self.addBlock("Swim", bridgeSwim.boxCorners(box), materials[bridgeSwim.readBox(box)["liquid"]]) for box in bridgeSwim.swimBoxes()]
+    return [self.addBlock("Swim", bridgeBoundaries.boxCorners(box), materials[bridgeSwim.readBox(box)["liquid"]]) for box in bridgeSwim.swimBoxes()]
 
   def placeBoundaries(self, thickness):
     """The boundaries (bridgeBoundaries) as red slabs `thickness` thick, so a wall shows from above too, and the zone lines as green
@@ -257,9 +257,8 @@ class PreviewScene:
     lineMaterial = self.emissionMaterial("ZoneLine", zoneLineColor)
     return placed + [self.addBlock("ZoneLine", bridgeBoundaries.boxCorners(line), lineMaterial) for line in bridgeBoundaries.zoneLineObjects()]
 
-  def addBlock(self, label, corners, material):
-    low, high = corners
-    points = [(x, y, z) for z in (low[2], high[2]) for y in (low[1], high[1]) for x in (low[0], high[0])]
+  def addBlock(self, label, points, material):
+    """A box from its eight corners, x changing fastest, then y, then z (bridgeBoundaries.boxCorners)."""
     faces = [(0, 2, 3, 1), (4, 5, 7, 6), (0, 1, 5, 4), (2, 6, 7, 3), (0, 4, 6, 2), (1, 3, 7, 5)]
     mesh = bpy.data.meshes.new(previewName + label)
     mesh.from_pydata(points, [], faces)
