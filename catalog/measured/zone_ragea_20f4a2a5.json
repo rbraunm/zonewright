@@ -21700,7 +21700,8 @@
      "vertical": 0.637
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.001,
+     "solid": 0.999
     },
     "unitsPerRepeat": 9.6
    },
@@ -23187,7 +23188,8 @@
      "vertical": 0.998
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.003,
+     "solid": 0.997
     },
     "unitsPerRepeat": 15.3
    },
@@ -23361,7 +23363,7 @@
     "slopeShares": {
      "flat": 0.274,
      "overhang": 0.199,
-     "slope": 0.124,
+     "slope": 0.123,
      "steep": 0.047,
      "vertical": 0.356
     },
@@ -26695,6 +26697,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:ragea",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "ragea"
 }

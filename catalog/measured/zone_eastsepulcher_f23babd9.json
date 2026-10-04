@@ -38949,7 +38949,7 @@
    "archive": "eastsepulcher.eqg",
    "kind": "texture",
    "name": "concrete_bump_n.dds",
-   "problem": "UnidentifiedImageError: cannot identify image file <_io.BytesIO object at 0x000001F8A4987B00>"
+   "problem": "UnidentifiedImageError: no image reader identifies it"
   },
   "texture/coverage.dds@df5624ec": {
    "archives": [
@@ -39632,7 +39632,7 @@
      "vertical": 0.429
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 3.3
    },
@@ -39782,7 +39782,7 @@
      "vertical": 0.833
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 4.2
    },
@@ -40350,7 +40350,8 @@
      "vertical": 0.049
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.17,
+     "solid": 0.83
     },
     "unitsPerRepeat": 2.7
    },
@@ -41488,7 +41489,7 @@
      "vertical": 0.208
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.1
    },
@@ -42343,6 +42344,7 @@
      "vertical": 0.012
     },
     "surfaces": {
+     "passable": 0.0,
      "solid": 1.0
     },
     "unitsPerRepeat": 116.2
@@ -42584,7 +42586,8 @@
      "vertical": 0.724
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.01,
+     "solid": 0.99
     },
     "unitsPerRepeat": 2.9
    },
@@ -42650,7 +42653,8 @@
      "vertical": 0.225
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.001,
+     "solid": 0.999
     },
     "unitsPerRepeat": 12.8
    },
@@ -42976,6 +42980,7 @@
      "vertical": 0.896
     },
     "surfaces": {
+     "passable": 0.0,
      "solid": 1.0
     },
     "unitsPerRepeat": 13.5
@@ -43089,7 +43094,8 @@
      "vertical": 0.825
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.001,
+     "solid": 0.999
     },
     "unitsPerRepeat": 10.3
    },
@@ -44565,7 +44571,8 @@
      "vertical": 0.19
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.084,
+     "solid": 0.916
     },
     "unitsPerRepeat": 8.8
    },
@@ -45303,7 +45310,7 @@
      "vertical": 0.357
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.8
    },
@@ -45349,6 +45356,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:eastsepulcher",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "eastsepulcher"
 }

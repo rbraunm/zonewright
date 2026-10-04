@@ -81102,7 +81102,7 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.8
    },
@@ -81553,7 +81553,8 @@
      "vertical": 0.347
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.441,
+     "solid": 0.559
     },
     "unitsPerRepeat": 1.0
    },
@@ -81614,7 +81615,8 @@
      "vertical": 0.371
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.356,
+     "solid": 0.644
     },
     "unitsPerRepeat": 1.3
    },
@@ -81679,7 +81681,8 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.993,
+     "solid": 0.007
     },
     "unitsPerRepeat": 67.4
    },
@@ -82133,7 +82136,8 @@
      "vertical": 0.689
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.033,
+     "solid": 0.967
     },
     "unitsPerRepeat": 6.0
    },
@@ -82777,7 +82781,8 @@
      "vertical": 0.771
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.926,
+     "solid": 0.074
     },
     "unitsPerRepeat": 6.3
    },
@@ -84014,7 +84019,8 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.649,
+     "solid": 0.351
     },
     "unitsPerRepeat": 23.8
    },
@@ -84825,7 +84831,8 @@
      "vertical": 0.379
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.817,
+     "solid": 0.183
     },
     "unitsPerRepeat": 46.3
    },
@@ -84968,7 +84975,8 @@
      "vertical": 0.757
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.259,
+     "solid": 0.741
     },
     "unitsPerRepeat": 12.5
    },
@@ -85570,7 +85578,8 @@
      "vertical": 0.178
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.109,
+     "solid": 0.891
     },
     "unitsPerRepeat": 21.4
    },
@@ -85683,7 +85692,8 @@
      "vertical": 0.659
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.237,
+     "solid": 0.763
     },
     "unitsPerRepeat": 27.2
    },
@@ -85911,7 +85921,8 @@
      "vertical": 0.652
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.466,
+     "solid": 0.534
     },
     "unitsPerRepeat": 25.0
    },
@@ -89046,7 +89057,7 @@
      "vertical": 0.076
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 48.8
    },
@@ -89427,7 +89438,8 @@
      "vertical": 0.981
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.129,
+     "solid": 0.871
     },
     "unitsPerRepeat": 7.9
    },
@@ -89540,7 +89552,8 @@
      "vertical": 0.433
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.004,
+     "solid": 0.996
     },
     "unitsPerRepeat": 11.4
    },
@@ -92642,7 +92655,8 @@
      "vertical": 0.826
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.169,
+     "solid": 0.831
     },
     "unitsPerRepeat": 7.1
    },
@@ -93009,7 +93023,8 @@
      "vertical": 1.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.795,
+     "solid": 0.205
     },
     "unitsPerRepeat": 10.2
    },
@@ -93133,7 +93148,8 @@
      "vertical": 1.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.569,
+     "solid": 0.431
     },
     "unitsPerRepeat": 10.3
    },
@@ -93269,6 +93285,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:bloodmoon",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "bloodmoon"
 }

@@ -25540,7 +25540,8 @@
      "vertical": 0.846
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.995,
+     "solid": 0.005
     },
     "unitsPerRepeat": 14.2
    },
@@ -25597,7 +25598,7 @@
      "vertical": 0.686
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 5.1
    },
@@ -26072,7 +26073,7 @@
      "vertical": 0.835
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.0
    },
@@ -29828,7 +29829,7 @@
      "vertical": 0.028
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 2.2
    },
@@ -30687,7 +30688,7 @@
      "vertical": 0.777
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 21.3
    },
@@ -30894,7 +30895,7 @@
      "vertical": 0.777
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 12.3
    },
@@ -31097,7 +31098,8 @@
      "vertical": 0.05
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.001,
+     "solid": 0.999
     },
     "unitsPerRepeat": 7.4
    },
@@ -31158,7 +31160,8 @@
      "vertical": 0.164
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.093,
+     "solid": 0.907
     },
     "unitsPerRepeat": 0.3
    },
@@ -31263,7 +31266,8 @@
      "vertical": 0.029
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.065,
+     "solid": 0.935
     },
     "unitsPerRepeat": 6.9
    },
@@ -32313,7 +32317,7 @@
      "vertical": 0.405
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 32.0
    },
@@ -32421,7 +32425,8 @@
      "vertical": 0.626
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.249,
+     "solid": 0.751
     },
     "unitsPerRepeat": 5.3
    },
@@ -32528,7 +32533,7 @@
      "vertical": 0.443
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 13.2
    },
@@ -32634,7 +32639,7 @@
      "vertical": 0.588
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 19.1
    },
@@ -32743,7 +32748,8 @@
      "vertical": 0.565
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.59,
+     "solid": 0.41
     },
     "unitsPerRepeat": 19.6
    },
@@ -33395,7 +33401,8 @@
      "vertical": 0.485
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.025,
+     "solid": 0.975
     },
     "unitsPerRepeat": 16.0
    },
@@ -34854,6 +34861,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:thundercrest",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "thundercrest"
 }

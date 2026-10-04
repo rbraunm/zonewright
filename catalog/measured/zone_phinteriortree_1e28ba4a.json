@@ -2111,7 +2111,8 @@
      "vertical": 0.002
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.464,
+     "solid": 0.536
     },
     "unitsPerRepeat": 13.4
    },
@@ -2607,7 +2608,8 @@
      "vertical": 0.554
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.018,
+     "solid": 0.982
     },
     "unitsPerRepeat": 19.0
    },
@@ -3164,6 +3166,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:phinteriortree",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "phinteriortree"
 }

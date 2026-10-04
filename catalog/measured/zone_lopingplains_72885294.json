@@ -8123,7 +8123,7 @@
      "vertical": 0.676
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.1
    },
@@ -8958,7 +8958,7 @@
      "vertical": 0.758
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 10.7
    },
@@ -9098,7 +9098,7 @@
      "vertical": 0.639
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 18.1
    },
@@ -14655,7 +14655,8 @@
      "vertical": 0.319
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.999,
+     "solid": 0.001
     },
     "unitsPerRepeat": 71.9
    },
@@ -15021,7 +15022,7 @@
      "vertical": 0.911
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 49.4
    },
@@ -20535,7 +20536,8 @@
      "vertical": 0.961
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.984,
+     "solid": 0.016
     },
     "unitsPerRepeat": 14.2
    },
@@ -24440,6 +24442,6 @@
   "This EQ terrain zone's lights are not read"
  ],
  "source": "zone:lopingplains",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "lopingplains"
 }

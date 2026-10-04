@@ -2,15 +2,17 @@
 import contextlib
 import io
 import json
+import math
 import os
 
 import bpy
 
 import bridgeArrangement
 import bridgeAuthoring
+import bridgeBoundaries
 import bridgeDressing
 import bridgeEnvironment
-import bridgeExport
+import bridgeExportChecks
 import bridgeGrading
 import bridgeHousing
 import bridgePasses
@@ -29,7 +31,7 @@ from bridgeState import requireNoUnsavedChanges, state
 zonePropertyName = "zonewrightZone"
 zonePropertyKeys = (
   "ambientColor", "specialAmbientColor", "bounceColor", "sunColor", "sunAzimuthDegrees", "sunElevationDegrees", "fogColor", "fogStart", "fogEnd",
-  "fogDensity", "fogOn", "minClip", "maxClip", "newEngineZone", "sky",
+  "fogDensity", "fogOn", "minClip", "maxClip", "newEngineZone", "sky", "safePoint", "underworld",
 )
 # The client raises a lower minimum clip to this (eqgame 0x4c9ee6).
 clientMinimumClip = 50.0
@@ -105,12 +107,15 @@ def externalFileProblems(targetPath):
   return problems
 
 
-def saveFile(path):
+def saveFile(path, replaceExisting):
   targetPath = path if path is not None else bpy.data.filepath
   if not targetPath:
     raise ValueError("The open file has never been saved; pass a path")
   if not os.path.isabs(targetPath) or not targetPath.lower().endswith(".blend"):
     raise ValueError(f"'{targetPath}' is not an absolute path to a .blend file")
+  openPath = bpy.data.filepath
+  if os.path.exists(targetPath) and not (openPath and os.path.normcase(os.path.abspath(openPath)) == os.path.normcase(os.path.abspath(targetPath))) and not replaceExisting:
+    raise ValueError(f"'{targetPath}' already holds a file other than the open one; pass replaceExisting true to write over it")
   if not os.path.isdir(os.path.dirname(targetPath)):
     raise FileNotFoundError(f"folder '{os.path.dirname(targetPath)}' does not exist")
   problems = externalFileProblems(targetPath)
@@ -195,6 +200,10 @@ def validateColor(name, color):
     raise ValueError(f"{name} must be three numbers from 0 to 1, got {color!r}")
 
 
+def drawsSky(zone):
+  return zone.get("sky", skyDrawing.noSky) != skyDrawing.noSky
+
+
 def validateSky(sky):
   if not isinstance(sky, dict) or sorted(set(sky) - set(skyKeys)) or not {"type", "hour", "minute"} <= set(sky):
     raise ValueError(f"sky must be {{type, weather (optional), hour, minute}}, got {sky!r}")
@@ -205,21 +214,38 @@ def validateSky(sky):
     raise ValueError(f"sky hour must be 0-23 and minute 0-59, got {sky['hour']}:{sky['minute']}")
 
 
+def isFiniteNumber(value):
+  return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def validatePlayerValues(zone):
+  """The safe point [x, y, z, headingDegrees] where players arrive (heading 0 = +Y, clockwise) and the underworld height below it,
+  under which the client puts a falling player back."""
+  if "safePoint" in zone:
+    point = zone["safePoint"]
+    if not isinstance(point, list) or len(point) != 4 or not all(isFiniteNumber(value) for value in point):
+      raise ValueError(f"safePoint is [x, y, z, headingDegrees], got {point!r}")
+    if not 0 <= point[3] < 360:
+      raise ValueError(f"safePoint's headingDegrees runs from 0 up to 360, got {point[3]}")
+  if "underworld" in zone and not isFiniteNumber(zone["underworld"]):
+    raise ValueError(f"underworld is a height, got {zone['underworld']!r}")
+  if "safePoint" in zone and "underworld" in zone and zone["underworld"] >= zone["safePoint"][2]:
+    raise ValueError(f"underworld {zone['underworld']} must lie below the safe point's height {zone['safePoint'][2]}")
+
+
 def setZoneProperties(updates):
-  """Store zone properties; a sky None removes the sky. A sky supplies the light and the fog color, so setting one drops those that
-  were set by hand, and they cannot be set while it stays."""
+  """Store zone properties. A sky supplies the light and the fog color, so setting one drops those that were set by hand, and they
+  cannot be set while it stays; sky "none" (skyDrawing.noSky) states the zone draws none."""
   unknownKeys = sorted(set(updates) - set(zonePropertyKeys))
   if unknownKeys:
     raise ValueError(f"Unknown zone properties {unknownKeys}; known: {list(zonePropertyKeys)}")
   zone = readZoneProperties(bpy.context.scene) | updates
-  if zone.get("sky", "") is None:
-    del zone["sky"]
   replaced = []
-  if "sky" in zone:
+  if drawsSky(zone):
     validateSky(zone["sky"])
     supplied = sorted(set(updates) & set(skyDrawing.suppliedZoneKeys))
     if supplied:
-      raise ValueError(f"The zone's sky supplies {supplied}; remove the sky (sky \"none\") to set them by hand")
+      raise ValueError(f"The zone's sky supplies {supplied}; state that it draws none (sky \"none\") to set them by hand")
     replaced = sorted(set(zone) & set(skyDrawing.suppliedZoneKeys))
     for key in replaced:
       del zone[key]
@@ -244,6 +270,7 @@ def setZoneProperties(updates):
     raise ValueError(f"maxClip {zone['maxClip']} must be greater than fogStart {zone['fogStart']}: nothing would be drawn far enough to fog")
   if "newEngineZone" in zone and not isinstance(zone["newEngineZone"], bool):
     raise ValueError(f"newEngineZone must be true or false, got {zone['newEngineZone']!r}")
+  validatePlayerValues(zone)
   bpy.context.scene[zonePropertyName] = zone
   return {"zone": readZoneProperties(bpy.context.scene), "replacedBySky": replaced}
 
@@ -256,7 +283,7 @@ def previewZone(sky):
   """The zone's properties for a preview, with what its sky supplies: the server resolves the stored sky against the client's files
   and passes its state (eqSky.skyState)."""
   zone = readZoneProperties(bpy.context.scene)
-  if ("sky" in zone) != (sky is not None):
+  if drawsSky(zone) != (sky is not None):
     raise ValueError("The zone's sky and the sky state passed for it disagree")
   return zone | sky["environment"] if sky is not None else zone
 
@@ -286,7 +313,7 @@ commands = {
   "pick": (pick, False),
   "renderPasses": (renderPasses, False),
   "renderModelThumbnails": (bridgeViews.renderModelThumbnails, False),
-} | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands | bridgeModels.commands | bridgeExport.commands | bridgePasses.commands | bridgeEnvironment.commands | bridgeReview.commands | bridgeAuthoring.commands | bridgeWater.commands | bridgeHousing.commands | bridgeGrading.commands | bridgeSketch.commands | bridgeSwim.commands | bridgeArrangement.commands
+} | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands | bridgeModels.commands | bridgeExportChecks.commands | bridgePasses.commands | bridgeEnvironment.commands | bridgeReview.commands | bridgeAuthoring.commands | bridgeWater.commands | bridgeHousing.commands | bridgeGrading.commands | bridgeSketch.commands | bridgeSwim.commands | bridgeArrangement.commands | bridgeBoundaries.commands
 
 
 def dispatch(command, arguments):

@@ -13,6 +13,9 @@ plotColor = (150, 90, 20)
 waterColor = (40, 120, 220)
 liquidColors = {"water": waterColor, "waterfall": waterColor, "lava": (230, 90, 20)}
 swimColors = {"water": (0, 150, 190), "lava": (200, 30, 170)}
+boundaryColor = (215, 30, 25)
+zoneLineColor = (20, 150, 40)
+boundaryLineWidth = 4
 swimLabelSize = 11
 swimLabelMargin = 2
 gridColor = (255, 255, 255)
@@ -265,6 +268,31 @@ def labelSwim(board, frame, boxes):
   return unnamed
 
 
+def drawBoundaries(draw, frame, boundaries):
+  """Boundaries in plan: lids and floors filled faintly red, walls as red lines along their foot."""
+  for boundary in boundaries:
+    for area in boundary["areas"]:
+      draw.polygon([frame.pixel(point) for point in area], fill=(*boundaryColor, 70))
+    for start, end in boundary["lines"]:
+      draw.line([frame.pixel(start), frame.pixel(end)], fill=(*boundaryColor, 255), width=boundaryLineWidth)
+
+
+def drawZoneLines(draw, frame, zoneLines):
+  """Zone lines in plan: their boxes filled faintly green and outlined."""
+  for line in zoneLines:
+    (x0, y0), (x1, y1) = line["corners"]
+    points = [frame.pixel(point) for point in ((x0, y0), (x1, y0), (x1, y1), (x0, y1))]
+    draw.polygon(points, fill=(*zoneLineColor, 90), outline=(*zoneLineColor, 255), width=2)
+
+
+def boundaryLabelSpot(frame, boundary):
+  """Where a boundary is named in plan: the middle of its middle wall line, or of its areas."""
+  if boundary["lines"]:
+    start, end = boundary["lines"][len(boundary["lines"]) // 2]
+    return frame.pixel(((start[0] + end[0]) / 2, (start[1] + end[1]) / 2))
+  return centroidOf([frame.pixel(point) for area in boundary["areas"] for point in area])
+
+
 def drawRegions(draw, frame, regions):
   for region in regions:
     points = [frame.pixel(point) for point in region["outline"]]
@@ -364,10 +392,11 @@ labelOrder = ("point", "footprint", "note", "path", "area")
 
 
 def drawPlan(basePath, outputPath, center, width, overlays):
-  """Lay the overlays over the base render, scaled up so lines and labels stay crisp, and save the drawing: water, swim volumes, regions,
-  then every sheet's area fills, footprint fills and path widths each composited in turn, then every line and mark, then the labels:
-  swim volumes' names inside them first, then the sketch's, the plots', and the regions', each set beside the ground's spot heights
-  where it can be, and the spot heights giving way to them where it cannot."""
+  """Lay the overlays over the base render, scaled up so lines and labels stay crisp, and save the drawing: water, swim volumes,
+  boundaries, zone lines, regions, then every sheet's area fills, footprint fills and path widths each composited in turn, then every
+  line and mark, then the labels: swim volumes' names inside them first, then the sketch's, the plots', the boundaries', the zone
+  lines', and the regions', each set beside the ground's spot heights where it can be, and the spot heights giving way to them where it
+  cannot."""
   with Image.open(basePath) as base:
     size = (round(base.width * planScale), round(base.height * planScale))
     image = base.convert("RGB").resize(size, Image.Resampling.BICUBIC).convert("RGBA")
@@ -385,6 +414,8 @@ def drawPlan(basePath, outputPath, center, width, overlays):
   overlay(lambda draw: drawGrid(draw, frame))
   overlay(lambda draw: drawWater(draw, frame, overlays["water"]))
   overlay(lambda draw: drawSwim(draw, frame, overlays["swim"]))
+  overlay(lambda draw: drawBoundaries(draw, frame, overlays["boundaries"]))
+  overlay(lambda draw: drawZoneLines(draw, frame, overlays["zoneLines"]))
   overlay(lambda draw: drawRegions(draw, frame, overlays["regions"]))
   for kinds in (("area",), ("footprint", "path")):
     for shape, color in shapes:
@@ -416,6 +447,10 @@ def drawPlan(basePath, outputPath, center, width, overlays):
           labelShape(board, frame, shape, color)
     for plot in overlays["plots"]:
       board.place(centroidOf([frame.pixel(point) for point in plot["corners"]]), plot["address"], plotColor, 12)
+    for boundary in overlays["boundaries"]:
+      board.place(boundaryLabelSpot(frame, boundary), boundary["name"], boundaryColor, 13)
+    for line in overlays["zoneLines"]:
+      board.place(centroidOf([frame.pixel(point) for point in line["corners"]]), line["name"], zoneLineColor, 13)
     for region in overlays["regions"]:
       board.place(centroidOf([frame.pixel(point) for point in region["outline"]]), region["name"], regionColor, 13)
     drawSpots(board, spots)
@@ -458,9 +493,10 @@ def clippedSegment(segment, length, bottom, top):
 
 
 def drawSection(outputPath, cuts, start, end, bottom, top):
-  """Draw a section's cuts, clipped to its frame: the ground's profile, water surfaces, swim volumes as boxes, sketch massing, sketch
-  area floors (dashed) and paths in their sheets' colors, and plot pads with their entrances, at one scale across and up, with a
-  height grid, the distance along the line, and its two ends named by their coordinates; each label just above what it names."""
+  """Draw a section's cuts, clipped to its frame: the ground's profile, water surfaces, swim volumes and zone lines as boxes, sketch
+  massing, sketch area floors (dashed) and paths in their sheets' colors, plot pads with their entrances, and boundaries in red, at one
+  scale across and up, with a height grid, the distance along the line, and its two ends named by their coordinates; each label just
+  above what it names."""
   width, height = sectionSize
   padX, padY = sectionPadding
   length = cuts["length"]
@@ -525,7 +561,13 @@ def drawSection(outputPath, cuts, start, end, bottom, top):
     outline = [corners[0], (corners[1][0], corners[0][1]), corners[1], (corners[0][0], corners[1][1])]
     dashedLine(draw, outline + outline[:1], (*color, 255), 2)
     labels.append((((corners[0][0] + corners[1][0]) / 2, corners[1][1] - 9), box["name"], color, 11))
+  for box in cuts["zoneLines"]:
+    corners = [pixel(box["s"][0], box["z"][1]), pixel(box["s"][1], box["z"][0])]
+    draw.rectangle([corners[0], corners[1]], fill=(*zoneLineColor, 70), outline=(*zoneLineColor, 255), width=2)
+    labels.append((((corners[0][0] + corners[1][0]) / 2, corners[0][1] - sectionLabelLift), box["name"], zoneLineColor, 12))
   lines(cuts["ground"], groundColor, 3)
+  for entry in cuts["boundaries"]:
+    nameAbove(lines(entry["segments"], boundaryColor, boundaryLineWidth), entry["name"], boundaryColor, 12, True)
   for entry in cuts["massing"]:
     kept = lines(entry["segments"], massingColor, 3)
     if kept:

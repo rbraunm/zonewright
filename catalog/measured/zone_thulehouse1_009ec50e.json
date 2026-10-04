@@ -63321,7 +63321,7 @@
      "vertical": 0.597
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 8.1
    },
@@ -63777,7 +63777,8 @@
      "vertical": 0.732
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.429,
+     "solid": 0.571
     },
     "unitsPerRepeat": 14.6
    },
@@ -65249,7 +65250,7 @@
      "vertical": 0.673
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 9.7
    },
@@ -66374,7 +66375,7 @@
      "vertical": 0.434
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 9.3
    },
@@ -66481,7 +66482,7 @@
      "vertical": 0.58
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 5.5
    },
@@ -67179,7 +67180,7 @@
      "vertical": 0.572
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 28.4
    },
@@ -67286,7 +67287,7 @@
      "vertical": 0.833
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 20.9
    },
@@ -67732,7 +67733,8 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.974,
+     "solid": 0.026
     },
     "unitsPerRepeat": 27.4
    },
@@ -68253,7 +68255,8 @@
      "vertical": 0.982
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.043,
+     "solid": 0.957
     },
     "unitsPerRepeat": 33.1
    },
@@ -69040,7 +69043,8 @@
      "vertical": 0.647
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.331,
+     "solid": 0.669
     },
     "unitsPerRepeat": 23.4
    },
@@ -69490,7 +69494,8 @@
      "vertical": 0.259
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.012,
+     "solid": 0.988
     },
     "unitsPerRepeat": 5.5
    },
@@ -73383,7 +73388,7 @@
      "vertical": 1.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 30.1
    },
@@ -74248,7 +74253,8 @@
      "vertical": 0.039
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.022,
+     "solid": 0.978
     },
     "unitsPerRepeat": 11.5
    },
@@ -74542,7 +74548,8 @@
      "vertical": 0.635
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.047,
+     "solid": 0.953
     },
     "unitsPerRepeat": 8.5
    },
@@ -75470,7 +75477,8 @@
      "vertical": 0.293
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.011,
+     "solid": 0.989
     },
     "unitsPerRepeat": 17.3
    },
@@ -76613,6 +76621,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:thulehouse1",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "thulehouse1"
 }

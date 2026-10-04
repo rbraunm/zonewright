@@ -146,7 +146,7 @@ def testBoxesLeftWithoutWaterAndBoxesOfABodyNoOneSwimsInAreReported(stageBlender
     placing = await session.expectError("placeSwimVolume", {"name": "fountainPool", "liquid": "water", "minimum": [120, 120, -10], "maximum": [140, 140, -5], "body": "fountain"})
     await session.expectSuccess("runPython", {"code": markOlderNotSwimmable})
     older = await session.expectSuccess("getSwimVolumes", {})
-    exporting = await session.expectError("exportZone", {"path": str(tmp_path / "swimtest.eqg")})
+    exporting = await session.expectError("exportZone", {"path": str(tmp_path / "swimtest.eqg"), "purpose": "test"})
     return built, volumes, halved, moved, marking, placing, older, exporting
 
   built, volumes, halved, moved, marking, placing, older, exporting = stageBlenderServer.session(steps)

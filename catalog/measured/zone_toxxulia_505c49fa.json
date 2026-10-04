@@ -4097,7 +4097,8 @@
      "vertical": 0.873
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0,
+     "solid": 0.0
     },
     "unitsPerRepeat": 7.8
    },
@@ -6157,7 +6158,7 @@
      "vertical": 0.637
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 34.1
    },
@@ -6264,7 +6265,7 @@
      "vertical": 0.833
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 23.2
    },
@@ -7845,7 +7846,7 @@
      "vertical": 0.857
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 2.2
    },
@@ -9786,7 +9787,7 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 0.9
    },
@@ -10319,7 +10320,7 @@
      "vertical": 0.164
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.8
    },
@@ -10814,6 +10815,6 @@
   "This EQ terrain zone's lights are not read"
  ],
  "source": "zone:toxxulia",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "toxxulia"
 }

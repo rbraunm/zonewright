@@ -2530,7 +2530,8 @@
      "vertical": 0.392
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.485,
+     "solid": 0.515
     },
     "unitsPerRepeat": 0.8
    },
@@ -2641,7 +2642,7 @@
      "vertical": 0.502
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 4.8
    },
@@ -3025,7 +3026,8 @@
      "vertical": 0.352
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.053,
+     "solid": 0.947
     },
     "unitsPerRepeat": 4.5
    },
@@ -5881,7 +5883,8 @@
      "vertical": 0.022
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.128,
+     "solid": 0.872
     },
     "unitsPerRepeat": 1.7
    },
@@ -6190,7 +6193,8 @@
      "vertical": 0.903
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.097,
+     "solid": 0.903
     },
     "unitsPerRepeat": 3.6
    },
@@ -6493,7 +6497,8 @@
      "vertical": 0.563
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.029,
+     "solid": 0.971
     },
     "unitsPerRepeat": 4.0
    },
@@ -6724,6 +6729,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:oldkaesorab",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "oldkaesorab"
 }

@@ -73583,7 +73583,7 @@
      "vertical": 0.436
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.3
    },
@@ -73800,6 +73800,7 @@
      "vertical": 0.002
     },
     "surfaces": {
+     "passable": 0.0,
      "solid": 1.0
     },
     "unitsPerRepeat": 32.7
@@ -74439,7 +74440,8 @@
      "vertical": 0.889
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.01,
+     "solid": 0.99
     },
     "unitsPerRepeat": 3.9
    },
@@ -74799,7 +74801,8 @@
      "vertical": 0.833
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.046,
+     "solid": 0.954
     },
     "unitsPerRepeat": 2.7
    },
@@ -75768,7 +75771,8 @@
      "vertical": 0.001
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.001,
+     "solid": 0.999
     },
     "unitsPerRepeat": 2.0
    },
@@ -76427,7 +76431,8 @@
      "vertical": 0.696
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.074,
+     "solid": 0.926
     },
     "unitsPerRepeat": 5.2
    },
@@ -76667,7 +76672,8 @@
      "vertical": 0.013
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.001,
+     "solid": 0.999
     },
     "unitsPerRepeat": 4.2
    },
@@ -76970,7 +76976,8 @@
      "vertical": 0.212
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.036,
+     "solid": 0.964
     },
     "unitsPerRepeat": 4.4
    },
@@ -77374,7 +77381,8 @@
      "vertical": 0.837
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.006,
+     "solid": 0.994
     },
     "unitsPerRepeat": 1.2
    },
@@ -77563,7 +77571,7 @@
      "vertical": 0.995
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.2
    },
@@ -82169,7 +82177,8 @@
      "vertical": 0.113
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.001,
+     "solid": 0.999
     },
     "unitsPerRepeat": 3.7
    },
@@ -82828,6 +82837,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:chapterhouse",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "chapterhouse"
 }

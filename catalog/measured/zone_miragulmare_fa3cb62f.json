@@ -24831,7 +24831,7 @@
      "vertical": 1.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 12.0
    },
@@ -26057,7 +26057,7 @@
      "vertical": 0.11
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 0.9
    },
@@ -26807,6 +26807,7 @@
      "vertical": 0.47
     },
     "surfaces": {
+     "passable": 0.0,
      "solid": 1.0
     },
     "unitsPerRepeat": 20.6
@@ -26822,6 +26823,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:miragulmare",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "miragulmare"
 }

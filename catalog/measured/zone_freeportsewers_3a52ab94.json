@@ -3044,7 +3044,8 @@
      "vertical": 0.427
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.171,
+     "solid": 0.829
     },
     "unitsPerRepeat": 1.3
    },
@@ -3311,7 +3312,7 @@
      "vertical": 0.941
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 0.6
    },
@@ -4017,7 +4018,8 @@
      "vertical": 0.628
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.006,
+     "solid": 0.994
     },
     "unitsPerRepeat": 4.0
    },
@@ -4453,7 +4455,8 @@
      "vertical": 0.312
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.003,
+     "solid": 0.997
     },
     "unitsPerRepeat": 8.7
    },
@@ -6355,6 +6358,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:freeportsewers",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "freeportsewers"
 }

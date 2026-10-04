@@ -146,5 +146,5 @@ def testPreviewsDrawTheZonesSkyAndTakeItsLight(stageBlenderServer, tmp_path):
     assert numpy.abs(measuredColor - expectedColor).max() <= 2 / 255
   assert numpy.abs(measured[0] - measured[1]).max() > 20 / 255
   assert numpy.allclose(measured[2], state["environment"]["fogColor"], atol=1 / 255)
-  assert "sky" not in removed["zone"] and removed["sky"] is None
+  assert removed["zone"]["sky"] == "none" and removed["sky"] is None
   assert "Zone properties missing" in unlit and "ambientColor" in unlit

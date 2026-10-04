@@ -11992,7 +11992,7 @@
      "vertical": 0.87
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 5.0
    },
@@ -12220,7 +12220,7 @@
      "vertical": 0.72
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 8.9
    },
@@ -13111,7 +13111,7 @@
      "vertical": 0.313
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 27.4
    },
@@ -14380,7 +14380,7 @@
      "vertical": 0.667
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 8.7
    },
@@ -15992,7 +15992,8 @@
      "vertical": 0.861
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.423,
+     "solid": 0.577
     },
     "unitsPerRepeat": 9.0
    },
@@ -16704,6 +16705,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:broodlands",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "broodlands"
 }

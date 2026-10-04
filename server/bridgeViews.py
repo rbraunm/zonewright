@@ -8,7 +8,9 @@ import bpy
 import mathutils
 import numpy
 
+import bridgeBoundaries
 import bridgeClientLight
+import bridgeExportChecks
 import bridgeMeshAccess
 import bridgeModels
 import bridgeSwim
@@ -44,7 +46,7 @@ figureStepDrop = 4.0
 figureMinimumDistance = 3.0
 figureSideOffset = 1.5
 mapClearance = 100.0
-viewShadings = ("client", "layout", "relief")
+viewShadings = ("client", "layout", "relief", "coverage")
 # The sky is soft everywhere, so an equirectangular image at about a fifth of a degree a pixel draws it.
 skyImageHeight = 1024
 # Layout shading lights from the northwest, as relief maps do, so slopes read the same whatever the zone's sun.
@@ -53,6 +55,11 @@ layoutAmbient = 0.3
 # Swim volumes tint a view: cyan for water and magenta for lava, which shows over lava's oranges.
 swimColors = {"water": (0.1, 0.85, 1.0), "lava": (1.0, 0.15, 0.85)}
 swimAlpha = 0.3
+boundaryColor = (1.0, 0.12, 0.08)
+zoneLineColor = (0.2, 1.0, 0.25)
+guideAlpha = 0.4
+boundaryThickness = 1.0
+mapBoundaryPixels = 3
 layoutHeightColors = ((0.0, (0.22, 0.36, 0.26)), (0.35, (0.58, 0.56, 0.36)), (0.7, (0.62, 0.45, 0.32)), (1.0, (0.92, 0.9, 0.87)))
 # Relief shading is the layout drawing in quiet greys, for a plan's lines and labels to stand out over.
 reliefHeightColors = ((0.0, (0.5, 0.5, 0.48)), (1.0, (0.93, 0.93, 0.91)))
@@ -73,6 +80,7 @@ class PreviewScene:
   def __init__(self, sourceScene, zone, guides=True, sky=None):
     requireZone(zone)
     self.zone = zone
+    self.guides = guides
     self.sky = sky
     self.skyImage = None
     self.createdObjects = []
@@ -161,15 +169,19 @@ class PreviewScene:
     figure = bridgeModels.modelObject(figureModel["folder"], previewName + "Figure", figureModel["scale"], origin, 90 - facingHeadingDegrees)
     return self.addObject(figure)
 
-  def tintSwimVolumes(self, viewPath):
-    """Tint a rendered view where the swim volumes stand, from a render of the boxes alone with the ground held out and the water left out."""
-    # A box's top lies at the surface it was built under or a little below it (on a sloping river); drawn in one render with the water,
-    # the two fight for depth or the surface hides the top. Rendered apart, the ground still hides what lies behind or under it.
+  def tint(self, viewPath, overlays):
+    """Tint a rendered view with see-through overlays, each (alpha, place) where place adds its blocks: rendered apart, alone with the
+    ground held out and the water left out, each laid over the view at its alpha where it stands, whatever the shading."""
+    # A swim box's top lies at the surface it was built under or a little below it (on a sloping river); drawn in one render with the
+    # water, the two fight for depth or the surface hides the top. Layout and relief shading override every material, so a guide drawn
+    # with the ground would draw as ground. Rendered apart, the ground still hides what lies behind or under each.
     holdout = bpy.data.collections.new(previewName + "Holdout")
     self.scene.collection.children.link(holdout)
     viewLayer = self.scene.view_layers[0]
     override = viewLayer.material_override
     render = self.scene.render
+    view = readImagePixels(viewPath)
+    overlayPath = os.path.splitext(viewPath)[0] + "_overlay.png"
     try:
       for sceneObject in list(self.scene.collection.objects):
         if sceneObject is not self.camera:
@@ -178,39 +190,65 @@ class PreviewScene:
             holdout.objects.link(sceneObject)
       viewLayer.layer_collection.children[holdout.name].holdout = True
       viewLayer.material_override = None
-      materials = {}
-      for box in bridgeSwim.swimBoxes():
-        liquid = bridgeSwim.readBox(box)["liquid"]
-        if liquid not in materials:
-          materials[liquid] = self.swimMaterial(liquid)
-        (low, high) = bridgeSwim.boxCorners(box)
-        corners = [(x, y, z) for z in (low[2], high[2]) for y in (low[1], high[1]) for x in (low[0], high[0])]
-        faces = [(0, 2, 3, 1), (4, 5, 7, 6), (0, 1, 5, 4), (2, 6, 7, 3), (0, 4, 6, 2), (1, 3, 7, 5)]
-        mesh = bpy.data.meshes.new(previewName + "Swim")
-        mesh.from_pydata(corners, [], faces)
-        mesh.materials.append(materials[liquid])
-        self.addObject(bpy.data.objects.new(previewName + "Swim", mesh))
-      boxesPath = os.path.splitext(viewPath)[0] + "_swimVolumes.png"
       render.film_transparent = True
       render.image_settings.color_mode = "RGBA"
-      render.filepath = boxesPath
-      bpy.ops.render.render(write_still=True, scene=self.scene.name)
-      view, boxes = readImagePixels(viewPath), readImagePixels(boxesPath)
-      os.remove(boxesPath)
+      render.filepath = overlayPath
+      for alpha, place in overlays:
+        placed = place()
+        bpy.ops.render.render(write_still=True, scene=self.scene.name)
+        for block in placed:
+          self.scene.collection.objects.unlink(block)
+        drawn = readImagePixels(overlayPath)
+        cover = drawn[:, :, 3:] * alpha
+        view[:, :, :3] = view[:, :, :3] * (1 - cover) + drawn[:, :, :3] * cover
+      os.remove(overlayPath)
     finally:
       viewLayer.material_override = override
       bpy.data.collections.remove(holdout)
-    cover = boxes[:, :, 3:] * swimAlpha
-    view[:, :, :3] = view[:, :, :3] * (1 - cover) + boxes[:, :, :3] * cover
     writeImagePixels(view, viewPath)
 
-  def swimMaterial(self, liquid):
-    material = bpy.data.materials.new(previewName + "Swim" + liquid)
+  def placeSwimVolumes(self):
+    """Each swim volume as a block in its liquid's color."""
+    materials = {liquid: self.emissionMaterial("Swim" + liquid, color) for liquid, color in swimColors.items()}
+    return [self.addBlock("Swim", bridgeSwim.boxCorners(box), materials[bridgeSwim.readBox(box)["liquid"]]) for box in bridgeSwim.swimBoxes()]
+
+  def placeBoundaries(self, thickness):
+    """The boundaries (bridgeBoundaries) as red slabs `thickness` thick, so a wall shows from above too, and the zone lines as green
+    blocks: guides to design with, never what the client draws."""
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    wallMaterial = self.emissionMaterial("Boundary", boundaryColor)
+    placed = []
+    for boundary in bridgeBoundaries.boundaryObjects():
+      if boundary.type != "MESH":
+        continue
+      mesh = bpy.data.meshes.new_from_object(boundary.evaluated_get(depsgraph))
+      mesh.materials.clear()
+      mesh.materials.append(wallMaterial)
+      slab = self.addObject(bpy.data.objects.new(previewName + "Boundary", mesh))
+      slab.matrix_world = boundary.matrix_world
+      solidify = slab.modifiers.new("thickness", "SOLIDIFY")
+      solidify.thickness = thickness
+      solidify.offset = 0.0
+      placed.append(slab)
+    lineMaterial = self.emissionMaterial("ZoneLine", zoneLineColor)
+    return placed + [self.addBlock("ZoneLine", bridgeBoundaries.boxCorners(line), lineMaterial) for line in bridgeBoundaries.zoneLineObjects()]
+
+  def addBlock(self, label, corners, material):
+    low, high = corners
+    points = [(x, y, z) for z in (low[2], high[2]) for y in (low[1], high[1]) for x in (low[0], high[0])]
+    faces = [(0, 2, 3, 1), (4, 5, 7, 6), (0, 1, 5, 4), (2, 6, 7, 3), (0, 4, 6, 2), (1, 3, 7, 5)]
+    mesh = bpy.data.meshes.new(previewName + label)
+    mesh.from_pydata(points, [], faces)
+    mesh.materials.append(material)
+    return self.addObject(bpy.data.objects.new(previewName + label, mesh))
+
+  def emissionMaterial(self, label, color):
+    material = bpy.data.materials.new(previewName + label)
     material.use_nodes = True
     nodes, links = material.node_tree.nodes, material.node_tree.links
     nodes.clear()
     emission = nodes.new("ShaderNodeEmission")
-    emission.inputs["Color"].default_value = (*swimColors[liquid], 1.0)
+    emission.inputs["Color"].default_value = (*color, 1.0)
     output = nodes.new("ShaderNodeOutputMaterial")
     links.new(emission.outputs[0], output.inputs["Surface"])
     self.createdMaterials.append(material)
@@ -444,11 +482,24 @@ def placeFrameCamera(preview, frame):
   return {"eye": list(camera.location), "target": list(center), "forward": list(forward), "framedRadius": radius, "figure": None}
 
 
-def placeMapCamera(preview, mapView):
-  """Straight down from above everything, orthographic, north (+Y) up and east (+X) right."""
+def requireMapView(mapView):
   if not isinstance(mapView, dict) or set(mapView) != {"center", "width"} or len(mapView["center"]) != 2 or mapView["width"] <= 0:
     raise ValueError(f"A map view is {{\"map\": {{\"center\": [x, y], \"width\": w}}}} with a positive width, got {mapView!r}")
+  return mapView
+
+
+def guideThickness(view):
+  """How thick boundary guides draw: a few pixels across in a map, so a wall shows from straight above, else a unit."""
+  return requireMapView(view["map"])["width"] / renderWidth * mapBoundaryPixels if "map" in view else boundaryThickness
+
+
+def placeMapCamera(preview, mapView):
+  """Straight down from above everything, orthographic, north (+Y) up and east (+X) right."""
+  requireMapView(mapView)
   bottom, top = sceneHeightRange(preview)
+  if preview.guides:
+    heights = [corner[2] for corner in bridgeBoundaries.guideCorners()]
+    bottom, top = min([bottom, *heights]), max([top, *heights])
   camera = preview.camera
   camera.data.type = "ORTHO"
   camera.data.sensor_fit = "HORIZONTAL"
@@ -493,22 +544,30 @@ def roundVector(vector, digits=3):
 def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes):
   if shading not in viewShadings:
     raise ValueError(f"shading must be one of {list(viewShadings)}, got '{shading}'")
-  # A map or a layout or relief drawing is for reading the shape, so none is fogged nor has a sky.
+  # A map, or a layout, relief, or coverage drawing, is for reading shape or coverage, so none is fogged nor has a sky.
   shapeOnly = "map" in view or shading != "client"
   preview = PreviewScene(sourceScene, zone | {"fogOn": False} if shapeOnly else zone, guides, None if shapeOnly else sky)
   try:
     description = placeCamera(preview, view, figureModel)
     preview.drawSky()
-    if shading != "client":
+    if shading == "coverage":
+      description["coverage"] = bridgeExportChecks.drawCoverage(preview)
+    elif shading != "client":
       description["heightRange"] = list(applyLayoutShading(preview, bandHeight, layoutHeightColors if shading == "layout" else reliefHeightColors))
       description["bandHeight"] = bandHeight
+    if shading != "client":
       if preview.camera.data.type != "ORTHO":
         preview.camera.data.clip_end = max((corner - preview.camera.location).length for corner in sceneCorners(preview)) + mapClearance
     preview.scene.render.filepath = outputPath
     start = time.perf_counter()
     bpy.ops.render.render(write_still=True, scene=preview.scene.name)
+    overlays = []
     if swimVolumes and bridgeSwim.swimBoxes():
-      preview.tintSwimVolumes(outputPath)
+      overlays.append((swimAlpha, preview.placeSwimVolumes))
+    if guides and bridgeBoundaries.guideCorners():
+      overlays.append((guideAlpha, lambda: preview.placeBoundaries(guideThickness(view))))
+    if overlays:
+      preview.tint(outputPath, overlays)
     renderSeconds = time.perf_counter() - start
   finally:
     preview.remove()

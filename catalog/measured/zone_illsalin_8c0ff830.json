@@ -5759,7 +5759,8 @@
      "vertical": 0.291
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.001,
+     "solid": 0.999
     },
     "unitsPerRepeat": 12.3
    },
@@ -6052,7 +6053,8 @@
      "vertical": 0.722
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.002,
+     "solid": 0.998
     },
     "unitsPerRepeat": 11.7
    },
@@ -6278,7 +6280,8 @@
      "vertical": 0.725
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.004,
+     "solid": 0.996
     },
     "unitsPerRepeat": 12.1
    },
@@ -7666,7 +7669,7 @@
      "vertical": 0.492
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.0
    },
@@ -7774,7 +7777,7 @@
      "vertical": 0.279
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 6.5
    },
@@ -8397,7 +8400,7 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 6.1
    },
@@ -8512,7 +8515,7 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 8.6
    },
@@ -8626,7 +8629,7 @@
      "vertical": 0.061
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 2.7
    },
@@ -8839,7 +8842,7 @@
      "vertical": 0.539
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 7.5
    },
@@ -8952,7 +8955,7 @@
      "vertical": 0.506
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 5.3
    },
@@ -9065,7 +9068,7 @@
      "vertical": 0.419
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 7.0
    },
@@ -10213,6 +10216,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:illsalin",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "illsalin"
 }

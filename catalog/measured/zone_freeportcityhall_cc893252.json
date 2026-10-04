@@ -1005,7 +1005,7 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 2.4
    },
@@ -2304,7 +2304,7 @@
      "vertical": 0.536
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.5
    },
@@ -2549,7 +2549,7 @@
      "vertical": 0.959
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.1
    },
@@ -2814,7 +2814,7 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 2.7
    },
@@ -2924,7 +2924,7 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 5.0
    },
@@ -3031,7 +3031,8 @@
      "vertical": 0.539
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.16,
+     "solid": 0.84
     },
     "unitsPerRepeat": 11.5
    },
@@ -3138,7 +3139,7 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 0.8
    },
@@ -3293,7 +3294,8 @@
      "vertical": 0.681
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.245,
+     "solid": 0.755
     },
     "unitsPerRepeat": 4.0
    },
@@ -4022,6 +4024,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:freeportcityhall",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "freeportcityhall"
 }

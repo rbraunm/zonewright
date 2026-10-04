@@ -3250,7 +3250,7 @@
      "vertical": 0.942
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 9.8
    },
@@ -3415,7 +3415,7 @@
      "vertical": 0.941
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 11.6
    },
@@ -6009,7 +6009,8 @@
      "vertical": 0.461
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.999,
+     "solid": 0.001
     },
     "unitsPerRepeat": 7.1
    },
@@ -9250,7 +9251,7 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 10.0
    },
@@ -11567,6 +11568,6 @@
   "This EQ terrain zone's lights are not read"
  ],
  "source": "zone:northro",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "northro"
 }

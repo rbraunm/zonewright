@@ -3963,7 +3963,8 @@
      "vertical": 0.528
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.004,
+     "solid": 0.996
     },
     "unitsPerRepeat": 4.2
    },
@@ -5923,7 +5924,8 @@
      "vertical": 0.695
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.148,
+     "solid": 0.852
     },
     "unitsPerRepeat": 0.9
    },
@@ -6776,6 +6778,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:freeporttheater",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "freeporttheater"
 }

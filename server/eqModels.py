@@ -386,10 +386,10 @@ def staticEQGUVs(uvs):
   return uvs * (1, -1) + (0, 1)
 
 
-def meshPart(vertices, triangles, uvs, textures, alphaModes, lighting=None, liquids=None):
+def meshPart(vertices, triangles, uvs, textures, alphaModes, lighting=None, liquids=None, passable=None):
   """Drawn triangles only; triangles with non-finite vertices are dropped and counted. lighting is the file's per-vertex normals and
   RGBA colors as the client lights them ({normals, colors}), or None for a mesh lit without them; liquids, each triangle's liquid
-  (eqgLiquid) or None."""
+  (eqgLiquid) or None; passable, whether the file lets players through each triangle, or None for a model that does not say."""
   finite = triangleKeep(vertices, triangles)
   keep = numpy.array([texture is not None for texture in textures], dtype=bool) & finite
   keptTextures = [texture for texture, kept in zip(textures, keep) if kept]
@@ -397,6 +397,7 @@ def meshPart(vertices, triangles, uvs, textures, alphaModes, lighting=None, liqu
     "vertices": vertices, "triangles": triangles[keep], "uvs": uvs, "textures": keptTextures, "alphaModes": [mode for mode, kept in zip(alphaModes, keep) if kept],
     "tints": [eqLooks.untinted] * len(keptTextures), "dropped": int((~finite).sum()), "lighting": lighting,
     "liquids": [None] * len(keptTextures) if liquids is None else [liquid for liquid, kept in zip(liquids, keep) if kept],
+    "passable": None if passable is None else numpy.asarray(passable, dtype=bool)[keep],
   }
 
 
@@ -857,12 +858,14 @@ def buildModel(clientRoot, cacheRoot, modelName, zoneName, source=None, appearan
 
 def writePartsCache(modelFolder, parts, textureHolders, label):
   """Write parts as one mesh (model.npz) with its textures into a cache folder; returns where each texture came from, the missing
-  ones, dropped triangles, and bounds. Lighting is written when every part carries it."""
-  vertexChunks, triangleChunks, uvChunks, textures, alphaModes, tints, liquids = [], [], [], [], [], [], []
+  ones, dropped triangles, and bounds. Lighting is written when every part carries it, and which triangles players pass through when
+  any does."""
+  vertexChunks, triangleChunks, uvChunks, textures, alphaModes, tints, liquids, passableChunks = [], [], [], [], [], [], [], []
   offset = 0
   for part in parts:
     vertexChunks.append(part["vertices"])
     triangleChunks.append(part["triangles"] + offset)
+    passableChunks.append(part["passable"] if part.get("passable") is not None else numpy.zeros(len(part["triangles"]), dtype=bool))
     uvChunks.append(part["uvs"])
     textures += part["textures"]
     alphaModes += part["alphaModes"]
@@ -915,6 +918,7 @@ def writePartsCache(modelFolder, parts, textureHolders, label):
     found = {key: fileNames[name] for key, name in liquid["textures"].items() if name in fileNames}
     return json.dumps(liquid | {"textures": found}, sort_keys=True)
 
+  passable = numpy.concatenate(passableChunks)
   palette, triangleMaterials = {}, numpy.empty(len(textures), dtype=numpy.int32)
   for index, key in enumerate(zip(textures, alphaModes, tints, (liquidKey(liquid) for liquid in liquids))):
     triangleMaterials[index] = palette.setdefault(key, len(palette))
@@ -924,6 +928,7 @@ def writePartsCache(modelFolder, parts, textureHolders, label):
     materialTints=numpy.array([tint for _, _, tint, _ in palette], dtype=numpy.uint32), materialLiquids=numpy.array([liquid for _, _, _, liquid in palette], dtype=str),
     triangleMaterials=triangleMaterials, missingTextures=numpy.array(missingTextures, dtype=str),
     **{key: value.astype(numpy.float32) if value.dtype == numpy.float64 else value for key, value in (lighting | terrainAttributes).items()},
+    **({"trianglePassable": passable} if passable.any() else {}),
   )
   return {
     "textureSources": textureSources, "missingTextures": missingTextures, "droppedTriangles": sum(part["dropped"] for part in parts), "lit": bool(litParts),

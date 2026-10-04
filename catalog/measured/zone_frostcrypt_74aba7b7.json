@@ -18994,7 +18994,8 @@
      "vertical": 0.002
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.005,
+     "solid": 0.995
     },
     "unitsPerRepeat": 49.3
    },
@@ -19249,7 +19250,7 @@
      "vertical": 0.52
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 20.5
    },
@@ -19511,7 +19512,8 @@
      "vertical": 0.652
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.011,
+     "solid": 0.989
     },
     "unitsPerRepeat": 11.7
    },
@@ -19926,7 +19928,8 @@
      "vertical": 0.072
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.012,
+     "solid": 0.988
     },
     "unitsPerRepeat": 30.8
    },
@@ -20152,7 +20155,8 @@
      "vertical": 0.922
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.002,
+     "solid": 0.998
     },
     "unitsPerRepeat": 11.2
    },
@@ -20393,7 +20397,8 @@
      "vertical": 0.788
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.001,
+     "solid": 0.999
     },
     "unitsPerRepeat": 18.1
    },
@@ -22483,12 +22488,13 @@
     "slopeShares": {
      "flat": 0.2,
      "overhang": 0.132,
-     "slope": 0.019,
+     "slope": 0.018,
      "steep": 0.022,
      "vertical": 0.627
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.001,
+     "solid": 0.999
     },
     "unitsPerRepeat": 9.8
    },
@@ -24311,8 +24317,8 @@
     "slopeShares": {
      "flat": 0.069,
      "overhang": 0.131,
-     "slope": 0.009,
-     "steep": 0.032,
+     "slope": 0.008,
+     "steep": 0.033,
      "vertical": 0.758
     },
     "surfaces": {
@@ -24703,6 +24709,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:frostcrypt",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "frostcrypt"
 }

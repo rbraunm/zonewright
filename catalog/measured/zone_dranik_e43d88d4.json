@@ -16525,7 +16525,7 @@
      "vertical": 0.628
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 3.6
    },
@@ -17948,7 +17948,7 @@
      "vertical": 1.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 39.4
    },
@@ -20530,7 +20530,8 @@
      "vertical": 0.173
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.892,
+     "solid": 0.108
     },
     "unitsPerRepeat": 14.6
    },
@@ -21679,6 +21680,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:dranik",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "dranik"
 }

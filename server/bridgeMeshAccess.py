@@ -39,6 +39,10 @@ plotBorderProperty = "zonewrightPlotBorder"
 # export yet, and imported zones are reference.
 clientContentProperty = "zonewrightClientContent"
 clientContentKinds = ("spawn", "door", "object", "zone", "zoneFile")
+boundaryProperty = "zonewrightBoundary"
+zoneLineProperty = "zonewrightZoneLine"
+passableProperty = "zonewrightPassable"
+passableAttribute = "zonewrightPassable"
 waterReach = 100000.0
 up = mathutils.Vector((0.0, 0.0, 1.0))
 down = mathutils.Vector((0.0, 0.0, -1.0))
@@ -111,9 +115,14 @@ def isCollectionInstance(sceneObject):
   return sceneObject.type == "EMPTY" and sceneObject.instance_type == "COLLECTION" and sceneObject.instance_collection is not None
 
 
-def isPlayerSolid(sceneObject):
+def isPlayerSolid(sceneObject, collision=False):
   """Whether players stand on and are blocked by an object: rendered meshes and collection instances, but not guides, plot borders,
-  regions, water bodies (swum, not stood on), spawns (players pass through them), or doors (taken as open)."""
+  regions, water bodies (swum, not stood on), spawns (players pass through them), or doors (taken as open). With collision, as the
+  client collides: boundaries, never drawn, block too, and objects marked passable do not."""
+  if collision and boundaryProperty in sceneObject:
+    return sceneObject.type == "MESH"
+  if collision and passableProperty in sceneObject:
+    return False
   if sceneObject.hide_render or isDesignAid(sceneObject) or regionIntentProperty in sceneObject or waterProperty in sceneObject:
     return False
   if sceneObject.get(clientContentProperty) in ("spawn", "door"):
@@ -137,11 +146,11 @@ def worldBoundsCorners(sceneObject, depsgraph):
   return [matrix @ mathutils.Vector(corner) for part, matrix in objectParts(sceneObject) for corner in part.evaluated_get(depsgraph).bound_box]
 
 
-def playerSolidObjects(excluding=()):
-  """The objects players stand on and are blocked by, leaving out the objects named in excluding."""
+def playerSolidObjects(excluding=(), collision=False):
+  """The objects players stand on and are blocked by (isPlayerSolid), leaving out the objects named in excluding."""
   # An object moved or made since the last evaluation still holds its old world matrix until the scene is evaluated.
   bpy.context.view_layer.update()
-  return [sceneObject for sceneObject in bpy.context.scene.objects if isPlayerSolid(sceneObject) and sceneObject.name not in excluding]
+  return [sceneObject for sceneObject in bpy.context.scene.objects if isPlayerSolid(sceneObject, collision) and sceneObject.name not in excluding]
 
 
 def playerSolidParts(excluding=()):
@@ -161,16 +170,16 @@ class Footing(typing.NamedTuple):
 
 
 class PlayerSurfaces:
-  """Ray casts against what players stand on and are blocked by: playerSolidObjects but excluding, or only objects."""
+  """Ray casts against what players stand on and are blocked by: playerSolidObjects but excluding, or only objects, or given (object
+  name, world matrix, BVH tree) trees."""
 
-  def __init__(self, excluding=(), objects=None):
-    owners = playerSolidObjects(excluding) if objects is None else [sceneObject for sceneObject in objects if sceneObject.name not in excluding]
-    bpy.context.view_layer.update()
-    depsgraph = bpy.context.evaluated_depsgraph_get()
-    self.members = [
-      (owner.name, matrix, matrix.inverted(), mathutils.bvhtree.BVHTree.FromObject(part, depsgraph))
-      for owner in owners for part, matrix in objectParts(owner)
-    ]
+  def __init__(self, excluding=(), objects=None, trees=None):
+    if trees is None:
+      owners = playerSolidObjects(excluding) if objects is None else [sceneObject for sceneObject in objects if sceneObject.name not in excluding]
+      bpy.context.view_layer.update()
+      depsgraph = bpy.context.evaluated_depsgraph_get()
+      trees = [(owner.name, matrix, mathutils.bvhtree.BVHTree.FromObject(part, depsgraph)) for owner in owners for part, matrix in objectParts(owner)]
+    self.members = [(name, matrix, matrix.inverted(), tree) for name, matrix, tree in trees]
     if not self.members:
       what = "the named objects have no meshes" if objects is not None else "the scene has nothing players stand on besides water, guides, regions, spawns, and doors"
       raise ValueError(f"Nothing to cast against: {what}" + (f" once {sorted(excluding)} are left out" if excluding else ""))

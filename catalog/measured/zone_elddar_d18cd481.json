@@ -3094,7 +3094,8 @@
      "vertical": 0.615
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.973,
+     "solid": 0.027
     },
     "unitsPerRepeat": 25.0
    },
@@ -7882,6 +7883,6 @@
   "This EQ terrain zone's lights are not read"
  ],
  "source": "zone:elddar",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "elddar"
 }

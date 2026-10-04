@@ -18265,7 +18265,8 @@
      "vertical": 0.251
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.889,
+     "solid": 0.111
     },
     "unitsPerRepeat": 5.8
    },
@@ -18729,7 +18730,8 @@
      "vertical": 0.947
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.894,
+     "solid": 0.106
     },
     "unitsPerRepeat": 1.3
    },
@@ -19179,7 +19181,8 @@
      "vertical": 0.141
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.001,
+     "solid": 0.999
     },
     "unitsPerRepeat": 13.3
    },
@@ -19617,6 +19620,7 @@
      "vertical": 0.67
     },
     "surfaces": {
+     "passable": 0.0,
      "solid": 1.0
     },
     "unitsPerRepeat": 14.3
@@ -19853,7 +19857,8 @@
      "vertical": 0.652
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.006,
+     "solid": 0.994
     },
     "unitsPerRepeat": 17.1
    },
@@ -20059,8 +20064,8 @@
     "slopeShares": {
      "flat": 0.211,
      "overhang": 0.782,
-     "slope": 0.001,
-     "steep": 0.001,
+     "slope": 0.0,
+     "steep": 0.002,
      "vertical": 0.005
     },
     "surfaces": {
@@ -20487,7 +20492,8 @@
      "vertical": 0.912
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.003,
+     "solid": 0.997
     },
     "unitsPerRepeat": 11.3
    },
@@ -21572,7 +21578,8 @@
      "vertical": 0.497
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.033,
+     "solid": 0.967
     },
     "unitsPerRepeat": 8.0
    },
@@ -21743,7 +21750,8 @@
      "vertical": 0.37
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.008,
+     "solid": 0.992
     },
     "unitsPerRepeat": 8.3
    },
@@ -22486,7 +22494,8 @@
      "vertical": 0.231
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.964,
+     "solid": 0.036
     },
     "unitsPerRepeat": 1.8
    },
@@ -23844,7 +23853,7 @@
      "vertical": 0.556
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 8.3
    },
@@ -24508,7 +24517,8 @@
      "vertical": 0.677
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.014,
+     "solid": 0.986
     },
     "unitsPerRepeat": 8.3
    },
@@ -24816,6 +24826,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:thuledream",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "thuledream"
 }

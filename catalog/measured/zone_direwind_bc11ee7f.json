@@ -2936,7 +2936,7 @@
      "vertical": 0.072
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 7.1
    },
@@ -2996,7 +2996,7 @@
      "vertical": 0.386
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 5.7
    },
@@ -3056,7 +3056,7 @@
      "vertical": 0.268
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 5.9
    },
@@ -6007,7 +6007,8 @@
      "vertical": 0.461
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.07,
+     "solid": 0.93
     },
     "unitsPerRepeat": 11.3
    },
@@ -7275,6 +7276,6 @@
   "This EQ terrain zone's lights are not read"
  ],
  "source": "zone:direwind",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "direwind"
 }

@@ -3168,7 +3168,7 @@
      "vertical": 0.923
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 2.8
    },
@@ -3349,7 +3349,8 @@
      "vertical": 0.445
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.234,
+     "solid": 0.766
     },
     "unitsPerRepeat": 5.3
    },
@@ -4970,7 +4971,7 @@
      "vertical": 0.447
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.0
    },
@@ -5595,7 +5596,7 @@
      "vertical": 0.702
     },
     "surfaces": {
-     "solid": 0.346,
+     "passable": 0.346,
      "translucent": 0.654
     },
     "unitsPerRepeat": 88.4
@@ -5699,7 +5700,7 @@
      "vertical": 0.669
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 26.7
    },
@@ -5802,7 +5803,7 @@
      "vertical": 0.413
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 3.2
    },
@@ -7182,6 +7183,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:fhalls",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "fhalls"
 }

@@ -24521,7 +24521,7 @@
      "vertical": 0.706
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 46.4
    },
@@ -24860,7 +24860,8 @@
      "vertical": 0.259
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.139,
+     "solid": 0.861
     },
     "unitsPerRepeat": 18.8
    },
@@ -26109,7 +26110,7 @@
      "vertical": 0.021
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 90.7
    },
@@ -26760,7 +26761,7 @@
      "vertical": 0.246
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 943.6
    },
@@ -27688,6 +27689,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:thevoidg",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "thevoidg"
 }

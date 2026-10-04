@@ -25327,8 +25327,8 @@
     "slopeShares": {
      "flat": 0.284,
      "overhang": 0.242,
-     "slope": 0.056,
-     "steep": 0.031,
+     "slope": 0.055,
+     "steep": 0.032,
      "vertical": 0.388
     },
     "surfaces": {
@@ -32658,7 +32658,8 @@
      "vertical": 0.013
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.002,
+     "solid": 0.998
     },
     "unitsPerRepeat": 60.7
    },
@@ -33543,6 +33544,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:anguish",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "anguish"
 }

@@ -5,6 +5,8 @@ import zlib
 
 import numpy
 
+import eqgFiles
+
 pfsVersion = 0x20000
 directoryCRC = 0x61580AC9
 blockBytes = 8192
@@ -135,19 +137,25 @@ def materialProperties(material):
   return properties + [(name, propertyFloat, value) for name, value in zip(("e_fSlide1X", "e_fSlide1Y", "e_fSlide2X", "e_fSlide2Y"), values["slides"])]
 
 
-def modelBytes(kind, materials, positions, normals, uvs, triangles, triangleMaterials):
+def modelBytes(kind, materials, positions, normals, uvs, triangles, triangleMaterials, triangleFlags):
   """An EQGM (.mod) or EQGT (.ter) model, version 2: materials as shader and texture properties, then vertices (position, normal, v-up
-  texture coordinate as the file keeps it) and triangles with no flags."""
+  texture coordinate as the file keeps it) and triangles, each with its material (eqgFiles.noMaterial for an invisible wall) and its flags (0
+  or eqgFiles.passableFlag; an invisible wall blocks, so it takes 0)."""
   magic = {"mod": b"EQGM", "ter": b"EQGT"}[kind]
   positions, normals, uvs = (numpy.asarray(array, dtype=numpy.float32) for array in (positions, normals, uvs))
   triangles = numpy.asarray(triangles, dtype=numpy.uint32)
   triangleMaterials = numpy.asarray(triangleMaterials, dtype=numpy.int32)
+  triangleFlags = numpy.asarray(triangleFlags, dtype=numpy.uint32)
   if not (positions.shape == normals.shape and positions.ndim == 2 and positions.shape[1] == 3 and uvs.shape == (len(positions), 2)):
     raise ValueError(f"Model arrays disagree: positions {positions.shape}, normals {normals.shape}, uvs {uvs.shape}")
   if len(triangles) and int(triangles.max()) >= len(positions):
     raise ValueError(f"Triangle index {int(triangles.max())} exceeds {len(positions)} vertices")
-  if len(triangleMaterials) != len(triangles) or (len(triangles) and not 0 <= int(triangleMaterials.min()) <= int(triangleMaterials.max()) < len(materials)):
-    raise ValueError(f"{len(triangles)} triangles need one material each among {len(materials)}")
+  if len(triangleMaterials) != len(triangles) or (len(triangles) and not eqgFiles.noMaterial <= int(triangleMaterials.min()) <= int(triangleMaterials.max()) < len(materials)):
+    raise ValueError(f"{len(triangles)} triangles need one material each among {len(materials)}, or {eqgFiles.noMaterial} for none")
+  if triangleFlags.shape != (len(triangles),) or not numpy.isin(triangleFlags, (0, eqgFiles.passableFlag)).all():
+    raise ValueError(f"{len(triangles)} triangles need flags 0 or {eqgFiles.passableFlag} each, got {sorted(set(triangleFlags.ravel().tolist()))[:8]}")
+  if (triangleFlags[triangleMaterials == eqgFiles.noMaterial] != 0).any():
+    raise ValueError("A triangle without a material is an invisible wall, which players cannot pass; it takes flag 0")
   strings = StringTable()
   materialRecords = bytearray()
   for index, material in enumerate(materials):
@@ -165,7 +173,7 @@ def modelBytes(kind, materials, positions, normals, uvs, triangles, triangleMate
   vertices["position"], vertices["normal"], vertices["uv"] = positions, normals, uvs
   triangleType = numpy.dtype([("indices", "<u4", 3), ("material", "<i4"), ("flags", "<u4")])
   triangleRecords = numpy.zeros(len(triangles), dtype=triangleType)
-  triangleRecords["indices"], triangleRecords["material"] = triangles, triangleMaterials
+  triangleRecords["indices"], triangleRecords["material"], triangleRecords["flags"] = triangles, triangleMaterials, triangleFlags
   counts = (modelVersion, len(strings.data), len(materials), len(positions), len(triangles))
   header = magic + struct.pack("<6I", *counts, 0) if kind == "mod" else magic + struct.pack("<5I", *counts)
   return header + bytes(strings.data) + bytes(materialRecords) + vertices.tobytes() + triangleRecords.tobytes()

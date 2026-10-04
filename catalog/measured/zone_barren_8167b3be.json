@@ -2852,7 +2852,7 @@
      "vertical": 0.624
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 14.7
    },
@@ -5082,7 +5082,7 @@
      "vertical": 0.707
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.6
    },
@@ -11421,6 +11421,6 @@
   "This EQ terrain zone's lights are not read"
  ],
  "source": "zone:barren",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "barren"
 }

@@ -5636,7 +5636,8 @@
      "vertical": 0.201
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.594,
+     "solid": 0.406
     },
     "unitsPerRepeat": 9.8
    },
@@ -5700,7 +5701,8 @@
      "vertical": 0.37
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.001,
+     "solid": 0.999
     },
     "unitsPerRepeat": 15.0
    },
@@ -5813,7 +5815,7 @@
      "vertical": 0.723
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 51.3
    },
@@ -7102,7 +7104,7 @@
      "vertical": 0.394
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 5.3
    },
@@ -7166,7 +7168,8 @@
      "vertical": 0.031
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.531,
+     "solid": 0.469
     },
     "unitsPerRepeat": 6.3
    },
@@ -9369,7 +9372,7 @@
      "vertical": 0.235
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 2.5
    },
@@ -10013,7 +10016,8 @@
      "vertical": 0.505
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.017,
+     "solid": 0.983
     },
     "unitsPerRepeat": 3.2
    },
@@ -10139,6 +10143,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:bertoxtemple",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "bertoxtemple"
 }

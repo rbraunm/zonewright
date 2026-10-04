@@ -20964,7 +20964,8 @@
      "vertical": 0.958
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.989,
+     "solid": 0.011
     },
     "unitsPerRepeat": 17.3
    },
@@ -22174,6 +22175,7 @@
      "vertical": 0.51
     },
     "surfaces": {
+     "passable": 0.0,
      "solid": 1.0
     },
     "unitsPerRepeat": 0.7
@@ -22287,7 +22289,8 @@
      "vertical": 0.827
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.001,
+     "solid": 0.999
     },
     "unitsPerRepeat": 1.6
    },
@@ -23124,7 +23127,7 @@
      "vertical": 0.646
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 0.5
    },
@@ -25100,7 +25103,7 @@
      "vertical": 1.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 0.3
    },
@@ -26573,7 +26576,7 @@
      "vertical": 0.712
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 0.3
    },
@@ -27040,7 +27043,7 @@
      "vertical": 0.467
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 7.6
    },
@@ -29611,7 +29614,8 @@
      "vertical": 0.812
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.458,
+     "solid": 0.542
     },
     "unitsPerRepeat": 29.0
    },
@@ -29863,6 +29867,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:xorbb",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "xorbb"
 }

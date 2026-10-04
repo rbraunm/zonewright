@@ -12,8 +12,7 @@ archiveHashPrefix = "sha256:"
 
 def resolveExtension(extensionID, blenderVersion):
   query = urllib.parse.urlencode({"blender_version": blenderVersion, "platform": catalogPlatform})
-  with toolingSync.openURL(f"{catalogURL}?{query}") as response:
-    catalog = json.loads(response.read())
+  catalog = toolingSync.fetchWithRetries(f"{catalogURL}?{query}", lambda response: json.loads(response.read()))
   matches = [entry for entry in catalog["data"] if entry["id"] == extensionID]
   if len(matches) != 1:
     raise ToolError(f"extensions.blender.org lists {len(matches)} entries for '{extensionID}' compatible with Blender {blenderVersion} on {catalogPlatform}")

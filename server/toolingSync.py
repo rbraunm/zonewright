@@ -1,7 +1,9 @@
 import hashlib
+import http.client
 import logging
 import shutil
 import tempfile
+import time
 import urllib.error
 import urllib.request
 import zipfile
@@ -19,33 +21,56 @@ downloadChunkBytes = 1024 * 1024
 downloadProgressSteps = 50
 # download.blender.org answers 403 to urllib's default Python-urllib User-Agent.
 httpUserAgent = "zonewright"
+# Each connect and each read; without it a stalled server holds a tool call for as long as the connection lives.
+networkTimeoutSeconds = 60
+networkAttempts = 3
+networkRetryPauseSeconds = 2
 
 
-def openURL(url):
+def isTransient(error):
+  """A reset, a stall, a cut-off body, or a server error; not a missing file, a refused request, or a bad address."""
+  if isinstance(error, urllib.error.HTTPError):
+    return error.code >= 500
+  if isinstance(error, urllib.error.URLError):
+    return isinstance(error.reason, (ConnectionError, TimeoutError))
+  return isinstance(error, (ConnectionError, TimeoutError, http.client.IncompleteRead))
+
+
+def fetchWithRetries(url, attempt):
+  """attempt(response) on a fresh response, again after a transient network failure, networkAttempts times in all."""
   request = urllib.request.Request(url, headers={"User-Agent": httpUserAgent})
-  try:
-    return urllib.request.urlopen(request)
-  except urllib.error.URLError as error:
-    raise ToolError(f"{url}: download failed: {error}") from error
+  for number in range(1, networkAttempts + 1):
+    try:
+      with urllib.request.urlopen(request, timeout=networkTimeoutSeconds) as response:
+        return attempt(response)
+    except (urllib.error.URLError, ConnectionError, TimeoutError, http.client.IncompleteRead) as error:
+      if not isTransient(error) or number == networkAttempts:
+        raise ToolError(f"{url}: download failed{f' after {number} attempts' if number > 1 else ''}: {error!r}") from error
+      logger.warning("%s: attempt %s of %s failed (%r); trying again", url, number, networkAttempts, error)
+      time.sleep(networkRetryPauseSeconds * number)
 
 
 def downloadVerified(url, expectedSha256, destinationPath, reportProgress, label):
-  digest = hashlib.sha256()
   logger.info("downloading %s from %s", label, url)
-  with openURL(url) as response, destinationPath.open("wb") as destination:
+
+  def attempt(response):
+    digest = hashlib.sha256()
     totalBytes = int(response.headers["Content-Length"])
     receivedBytes = 0
     nextReportBytes = 0
-    while chunk := response.read(downloadChunkBytes):
-      digest.update(chunk)
-      destination.write(chunk)
-      receivedBytes += len(chunk)
-      if receivedBytes >= nextReportBytes:
-        reportProgress(receivedBytes, totalBytes, f"downloading {label}")
-        nextReportBytes += totalBytes // downloadProgressSteps
-  if receivedBytes != totalBytes:
-    raise ToolError(f"{url}: received {receivedBytes} bytes, expected {totalBytes}")
-  actualSha256 = digest.hexdigest()
+    with destinationPath.open("wb") as destination:
+      while chunk := response.read(downloadChunkBytes):
+        digest.update(chunk)
+        destination.write(chunk)
+        receivedBytes += len(chunk)
+        if receivedBytes >= nextReportBytes:
+          reportProgress(receivedBytes, totalBytes, f"downloading {label}")
+          nextReportBytes += totalBytes // downloadProgressSteps
+    if receivedBytes != totalBytes:
+      raise http.client.IncompleteRead(b"", totalBytes - receivedBytes)
+    return digest.hexdigest()
+
+  actualSha256 = fetchWithRetries(url, attempt)
   if actualSha256 != expectedSha256:
     raise ToolError(f"{url}: SHA-256 {actualSha256} does not match pinned {expectedSha256}")
 

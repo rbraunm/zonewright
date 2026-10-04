@@ -35823,7 +35823,7 @@
      "vertical": 0.479
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.9
    },
@@ -39825,7 +39825,8 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0,
+     "solid": 0.0
     },
     "unitsPerRepeat": 200.9
    },
@@ -40559,7 +40560,7 @@
      "vertical": 0.299
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.7
    },
@@ -42580,6 +42581,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:grelleth",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "grelleth"
 }

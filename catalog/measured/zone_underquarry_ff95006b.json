@@ -31857,7 +31857,7 @@
      "vertical": 0.542
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 2.3
    },
@@ -32125,7 +32125,7 @@
      "vertical": 0.902
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 31.8
    },
@@ -32236,7 +32236,7 @@
      "vertical": 0.328
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 7.9
    },
@@ -32511,7 +32511,7 @@
      "vertical": 0.652
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 39.4
    },
@@ -33751,7 +33751,8 @@
      "vertical": 0.468
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.017,
+     "solid": 0.983
     },
     "unitsPerRepeat": 16.7
    },
@@ -34710,7 +34711,8 @@
      "vertical": 0.062
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.004,
+     "solid": 0.996
     },
     "unitsPerRepeat": 5.2
    },
@@ -35258,7 +35260,7 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 3.6
    },
@@ -36819,7 +36821,7 @@
      "vertical": 0.342
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 12.8
    },
@@ -37477,7 +37479,8 @@
      "vertical": 0.99
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.008,
+     "solid": 0.992
     },
     "unitsPerRepeat": 9.8
    },
@@ -37808,7 +37811,7 @@
      "vertical": 0.152
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 13.0
    },
@@ -38415,6 +38418,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:underquarry",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "underquarry"
 }

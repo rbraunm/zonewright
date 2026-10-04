@@ -3066,7 +3066,8 @@
      "vertical": 0.676
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.994,
+     "solid": 0.006
     },
     "unitsPerRepeat": 2.1
    },
@@ -3692,7 +3693,7 @@
      "vertical": 0.78
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 66.3
    },
@@ -4194,7 +4195,7 @@
      "vertical": 0.334
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 52.7
    },
@@ -4410,7 +4411,7 @@
      "vertical": 0.053
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 373.6
    },
@@ -15033,6 +15034,6 @@
   "This EQ terrain zone's lights are not read"
  ],
  "source": "zone:steamfontmts",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "steamfontmts"
 }

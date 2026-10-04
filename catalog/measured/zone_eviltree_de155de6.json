@@ -42467,7 +42467,8 @@
      "vertical": 0.054
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.392,
+     "solid": 0.608
     },
     "unitsPerRepeat": 14.3
    },
@@ -42585,7 +42586,8 @@
      "vertical": 0.518
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.52,
+     "solid": 0.48
     },
     "unitsPerRepeat": 119.6
    },
@@ -43613,7 +43615,7 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 17168.1
    },
@@ -44220,7 +44222,8 @@
      "vertical": 0.494
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.007,
+     "solid": 0.993
     },
     "unitsPerRepeat": 21.2
    },
@@ -45032,7 +45035,8 @@
      "vertical": 0.294
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.014,
+     "solid": 0.986
     },
     "unitsPerRepeat": 53.7
    },
@@ -47205,6 +47209,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:eviltree",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "eviltree"
 }

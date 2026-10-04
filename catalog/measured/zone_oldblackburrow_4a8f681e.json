@@ -32650,7 +32650,8 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.356,
+     "solid": 0.644
     },
     "unitsPerRepeat": 5.2
    },
@@ -32869,7 +32870,8 @@
      "vertical": 0.66
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.876,
+     "solid": 0.124
     },
     "unitsPerRepeat": 12.7
    },
@@ -33043,7 +33045,8 @@
      "vertical": 0.913
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.12,
+     "solid": 0.88
     },
     "unitsPerRepeat": 5.7
    },
@@ -33556,7 +33559,7 @@
      "vertical": 0.546
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 10.2
    },
@@ -34082,7 +34085,8 @@
      "vertical": 0.643
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.18,
+     "solid": 0.82
     },
     "unitsPerRepeat": 8.6
    },
@@ -34195,7 +34199,8 @@
      "vertical": 0.629
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.058,
+     "solid": 0.942
     },
     "unitsPerRepeat": 12.5
    },
@@ -34308,7 +34313,8 @@
      "vertical": 0.693
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.498,
+     "solid": 0.502
     },
     "unitsPerRepeat": 1.5
    },
@@ -34692,7 +34698,8 @@
      "vertical": 0.534
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.111,
+     "solid": 0.889
     },
     "unitsPerRepeat": 1.2
    },
@@ -34805,7 +34812,8 @@
      "vertical": 0.312
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.567,
+     "solid": 0.433
     },
     "unitsPerRepeat": 2.6
    },
@@ -34918,7 +34926,8 @@
      "vertical": 0.099
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.016,
+     "solid": 0.984
     },
     "unitsPerRepeat": 20.1
    },
@@ -35031,7 +35040,8 @@
      "vertical": 0.057
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.001,
+     "solid": 0.999
     },
     "unitsPerRepeat": 19.6
    },
@@ -35144,7 +35154,8 @@
      "vertical": 0.619
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.156,
+     "solid": 0.844
     },
     "unitsPerRepeat": 11.4
    },
@@ -35486,7 +35497,8 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.005,
+     "solid": 0.995
     },
     "unitsPerRepeat": 33.4
    },
@@ -36463,7 +36475,8 @@
      "vertical": 0.278
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.001,
+     "solid": 0.999
     },
     "unitsPerRepeat": 35.0
    },
@@ -36640,6 +36653,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:oldblackburrow",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "oldblackburrow"
 }

@@ -10,6 +10,11 @@ modelVertexTypes = {
   3: numpy.dtype([("position", "<f4", 3), ("normal", "<f4", 3), ("color", "<u4"), ("uv", "<f4", 2), ("secondUV", "<f4", 2)]),
 }
 modelTriangleType = numpy.dtype([("indices", "<u4", 3), ("material", "<i4"), ("flags", "<u4")])
+# A triangle's flags: 0x1 lets players through it (the client's collision tests skip it, EQGraphicsDX9.dll 0x100c6bfd), as the
+# client's own zones flag liquid surfaces and cutout cards. Material -1 is no material: never drawn (the draw batches skip it,
+# 0x100621a3) but still collided with, an invisible wall.
+passableFlag = 0x1
+noMaterial = -1
 boneType = numpy.dtype([
   ("name", "<u4"), ("next", "<i4"), ("childCount", "<u4"), ("firstChild", "<i4"),
   ("position", "<f4", 3), ("rotation", "<f4", 4), ("scale", "<f4", 3),
@@ -81,15 +86,19 @@ def parseModel(modelBytes, sourceName):
       raise ValueError(f"{sourceName}: {boneCount} bones and {vertexCount} weight records do not fill its {len(modelBytes) - position} remaining bytes")
     bones = readBones(modelBytes, position, boneCount, stringTable)
     weights = numpy.frombuffer(modelBytes, dtype=weightType, count=vertexCount, offset=position + boneCount * boneType.itemsize)
-  # Material -1 marks triangles with no material.
-  if triangleCount and not (-1 <= int(triangles["material"].min()) and int(triangles["material"].max()) < materialCount):
-    raise ValueError(f"{sourceName}: triangle materials span {int(triangles['material'].min())}..{int(triangles['material'].max())} with {materialCount} materials")
+  # The client draws no material index at or past the material count, so a collision-only model without materials whose triangles
+  # name 0 has none.
+  triangleMaterials = triangles["material"].astype(numpy.int64)
+  if materialCount == 0 and triangleCount and set(numpy.unique(triangleMaterials).tolist()) <= {noMaterial, 0}:
+    triangleMaterials = numpy.full(triangleCount, noMaterial, dtype=numpy.int64)
+  if triangleCount and not (noMaterial <= int(triangleMaterials.min()) and int(triangleMaterials.max()) < materialCount):
+    raise ValueError(f"{sourceName}: triangle materials span {int(triangleMaterials.min())}..{int(triangleMaterials.max())} with {materialCount} materials")
   return {
     "vertices": vertices["position"].astype(numpy.float64),
     "normals": vertices["normal"].astype(numpy.float64),
     "uvs": vertices["uv"].astype(numpy.float64),
     "triangles": triangles["indices"].astype(numpy.int64),
-    "triangleMaterials": triangles["material"].astype(numpy.int64),
+    "triangleMaterials": triangleMaterials,
     "triangleFlags": triangles["flags"],
     "materials": materials,
     "bones": bones,

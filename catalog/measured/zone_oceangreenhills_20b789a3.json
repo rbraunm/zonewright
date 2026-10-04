@@ -2062,7 +2062,7 @@
      "vertical": 0.681
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 3.5
    },
@@ -2123,7 +2123,7 @@
      "vertical": 1.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 7.0
    },
@@ -2541,7 +2541,7 @@
      "vertical": 1.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 7.2
    },
@@ -2603,7 +2603,7 @@
      "vertical": 0.846
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 15.6
    },
@@ -16742,6 +16742,6 @@
   "This EQ terrain zone's lights are not read"
  ],
  "source": "zone:oceangreenhills",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "oceangreenhills"
 }

@@ -1,15 +1,22 @@
 import base64
+import contextlib
+import functools
 import hashlib
 import json
+import msvcrt
+import os
 import shutil
 import struct
+import subprocess
 import sys
+import time
 import urllib.request
 import zipfile
 import zlib
 from pathlib import Path
 
 import anyio
+import anyio.from_thread
 import pytest
 from mcp import Client, StdioServerParameters
 
@@ -18,6 +25,9 @@ downloadCachePath = repositoryRoot / "tests" / ".cache"
 repositoryManifest = json.loads((repositoryRoot / "toolingManifest.json").read_text(encoding="ascii"))
 pinnedBlender = repositoryManifest["blender"]
 everquestClient = json.loads((repositoryRoot / ".mcp.json").read_text(encoding="utf-8"))["mcpServers"]["zonewright"]["env"]["EVERQUEST_CLIENT"]
+# One install of each pinned Blender in the user's profile, shared by every test session in every worktree.
+sharedLocalAppDataPath = Path(os.environ["LOCALAPPDATA"]) / "zonewrightTests" / pinnedBlender["sha256"][:16]
+sharedInstallLockSeconds = 900
 
 
 class ToolSession:
@@ -56,12 +66,28 @@ class ToolSession:
 
 
 class StagedServer:
+  """A copy of the server with its own tooling root. Its tool calls share one server process, as a client's calls do, until close;
+  each session gets a process of its own."""
+
   def __init__(self, rootPath, manifest, localAppData=None):
     self.repositoryPath = rootPath / "repository"
     self.localAppData = localAppData if localAppData is not None else rootPath / "localAppData"
     self.toolingRoot = self.localAppData / "zonewright"
     shutil.copytree(repositoryRoot / "server", self.repositoryPath / "server", ignore=shutil.ignore_patterns("__pycache__"))
     self.writeManifest(manifest)
+    self.openContexts = contextlib.ExitStack()
+    self.portal = None
+    self.client = None
+
+  def connectedClient(self):
+    if self.client is None:
+      self.portal = self.openContexts.enter_context(anyio.from_thread.start_blocking_portal())
+      self.client = self.openContexts.enter_context(self.portal.wrap_async_context_manager(Client(self.serverParameters())))
+    return self.client
+
+  def close(self):
+    self.openContexts.close()
+    self.portal = self.client = None
 
   @property
   def manifestPath(self):
@@ -96,7 +122,11 @@ class StagedServer:
       async with Client(self.serverParameters(environment)) as client:
         return await client.call_tool(toolName, arguments, progress_callback=recordProgress)
 
-    result = anyio.run(call)
+    if environment is None:
+      client = self.connectedClient()
+      result = self.portal.call(functools.partial(client.call_tool, toolName, arguments, progress_callback=recordProgress))
+    else:
+      result = anyio.run(call)
     assert len(result.content) == 1
     return result, progressMessages
 
@@ -156,23 +186,97 @@ def buildExtensionPin(tmp_path):
 
 @pytest.fixture
 def stageServer(tmp_path):
+  staged = []
+
   def stage(manifest):
-    return StagedServer(tmp_path, manifest)
-  return stage
+    staged.append(StagedServer(tmp_path, manifest))
+    return staged[-1]
+  yield stage
+  for server in staged:
+    server.close()
+
+
+@contextlib.contextmanager
+def exclusiveLock(lockPath):
+  """Held by one process at a time; the system releases it if the holder dies."""
+  deadline = time.monotonic() + sharedInstallLockSeconds
+  with lockPath.open("a+b") as lockFile:
+    while True:
+      try:
+        msvcrt.locking(lockFile.fileno(), msvcrt.LK_NBLCK, 1)
+        break
+      except OSError:
+        if time.monotonic() > deadline:
+          raise TimeoutError(f"Another test session held {lockPath} for {sharedInstallLockSeconds} s")
+        time.sleep(1)
+    try:
+      yield
+    finally:
+      msvcrt.locking(lockFile.fileno(), msvcrt.LK_UNLCK, 1)
 
 
 @pytest.fixture(scope="session")
-def installedLocalAppData(tmp_path_factory, blenderArchivePin):
-  """A tooling root with the pinned Blender synced once per test session, shared by every bridge test."""
-  rootPath = tmp_path_factory.mktemp("installed")
-  server = StagedServer(rootPath, {"blender": blenderArchivePin, "extensions": {}})
-  server.callToolExpectingSuccess("syncTooling")
-  return server.localAppData
+def sharedLocalAppData(request, tmp_path_factory):
+  """The pinned Blender and this machine's profile, synced into the shared install only when it lacks them."""
+  sharedLocalAppDataPath.mkdir(parents=True, exist_ok=True)
+  with exclusiveLock(sharedLocalAppDataPath / "install.lock"):
+    probe = StagedServer(tmp_path_factory.mktemp("sharedProbe"), {"blender": pinnedBlender, "extensions": {}}, sharedLocalAppDataPath)
+    status = probe.callToolExpectingSuccess("getToolingStatus")[0]
+    probe.close()
+    if status["blender"]["state"] != "installed" or status["machineProfile"]["state"] != "current":
+      installer = StagedServer(tmp_path_factory.mktemp("sharedInstall"), {"blender": request.getfixturevalue("blenderArchivePin"), "extensions": {}}, sharedLocalAppDataPath)
+      installer.callToolExpectingSuccess("syncTooling")
+      installer.close()
+  return sharedLocalAppDataPath
+
+
+@pytest.fixture(scope="session")
+def installedLocalAppData(tmp_path_factory, sharedLocalAppData):
+  """A tooling root of this session's own, so logs and counters stay apart, whose Blender is the shared install."""
+  localAppData = tmp_path_factory.mktemp("installed") / "localAppData"
+  toolingRoot = localAppData / "zonewright"
+  toolingRoot.mkdir(parents=True)
+  shutil.copy(sharedLocalAppData / "zonewright" / "machineProfile.json", toolingRoot / "machineProfile.json")
+  subprocess.run(["cmd", "/c", "mklink", "/J", str(toolingRoot / "blender"), str(sharedLocalAppData / "zonewright" / "blender")], check=True, capture_output=True)
+  return localAppData
+
+
+class WarmServer:
+  """The session's one staged server, kept running with its Blender between tests."""
+
+  def __init__(self, staged, portal, client):
+    self.staged = staged
+    self.portal = portal
+    self.client = client
+
+  @property
+  def toolingRoot(self):
+    return self.staged.toolingRoot
+
+  def session(self, steps):
+    return self.portal.call(steps, ToolSession(self.client))
+
+
+@pytest.fixture(scope="session")
+def warmServer(tmp_path_factory, installedLocalAppData):
+  staged = StagedServer(tmp_path_factory.mktemp("warmServer"), {"blender": pinnedBlender, "extensions": {}}, installedLocalAppData)
+  with anyio.from_thread.start_blocking_portal() as portal, portal.wrap_async_context_manager(Client(staged.serverParameters())) as client:
+    yield WarmServer(staged, portal, client)
 
 
 @pytest.fixture
-def stageBlenderServer(tmp_path, blenderArchivePin, installedLocalAppData):
-  return StagedServer(tmp_path, {"blender": blenderArchivePin, "extensions": {}}, installedLocalAppData)
+def stageBlenderServer(warmServer):
+  """The warm server, its Blender on an empty file as a fresh one starts."""
+  warmServer.session(lambda session: session.expectSuccess("newFile", {"discardUnsavedChanges": True}))
+  return warmServer
+
+
+@pytest.fixture
+def freshBlenderServer(tmp_path, installedLocalAppData):
+  """A server and Blender of the test's own, for what a new process or its files decide: crashes, code changes, the profile."""
+  server = StagedServer(tmp_path, {"blender": pinnedBlender, "extensions": {}}, installedLocalAppData)
+  yield server
+  server.close()
 
 
 def writePNG(path, width, height, rgba):

@@ -1028,7 +1028,8 @@
      "vertical": 0.443
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.071,
+     "solid": 0.929
     },
     "unitsPerRepeat": 8.0
    },
@@ -1541,7 +1542,7 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 82.0
    },
@@ -1650,7 +1651,8 @@
      "vertical": 0.308
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.667,
+     "solid": 0.333
     },
     "unitsPerRepeat": 3.3
    },
@@ -1876,7 +1878,8 @@
      "vertical": 0.885
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.86,
+     "solid": 0.14
     },
     "unitsPerRepeat": 3.1
    },
@@ -1989,7 +1992,8 @@
      "vertical": 0.813
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.042,
+     "solid": 0.958
     },
     "unitsPerRepeat": 5.4
    },
@@ -2114,6 +2118,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:brellsarena",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "brellsarena"
 }

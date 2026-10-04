@@ -10,6 +10,7 @@ import mathutils
 import mathutils.bvhtree
 import numpy
 
+import bridgeBoundaries
 import bridgeExport
 import bridgeMeshAccess
 from playerScale import playerHeight, stepHeight, walkableNormalZ
@@ -191,11 +192,19 @@ def sideClearance(surfaces, footing, side):
   return None
 
 
+def boundaryAcross(boundaries, footing, spot):
+  """Where a boundary (bridgeBoundaries) stands across the way from footing to spot's [x, y] at half a player's height, or None."""
+  if boundaries is None:
+    return None
+  run = mathutils.Vector((spot.x - footing.x, spot.y - footing.y, 0.0))
+  return boundaries.cast(footing + up * (playerHeight / 2), run.normalized(), run.length)
+
+
 class RouteWalk:
   """A player's walk along a route stride by stride; a rise or a drop stops it until the route's own heights find footing again."""
 
-  def __init__(self, surfaces, water):
-    self.surfaces, self.water = surfaces, water
+  def __init__(self, surfaces, water, boundaries):
+    self.surfaces, self.water, self.boundaries = surfaces, water, boundaries
     self.footing, self.slope, self.headroom = None, None, None
     self.travelled = 0.0
     self.problems, self.oneWay, self.rows = [], [], []
@@ -217,20 +226,27 @@ class RouteWalk:
     if self.footing is None:
       self.takeUp(spot)
       return
+    across = boundaryAcross(self.boundaries, self.footing, spot)
+    if across is not None:
+      self.stop({"kind": "blocked", "at": roundVector(self.footing), "boundary": roundVector(across)})
+      return
     outcome = stepAcross(self.surfaces, self.footing, spot, direction, routeFootingReach)
-    if outcome["kind"] in ("rise", "drop"):
-      self.stopped = {"kind": outcome["kind"], "at": roundVector(self.footing)}
-      if outcome["kind"] == "rise":
-        height = riseHeight(self.surfaces, self.footing, outcome, direction)
-        self.stopped["height"] = None if height is None else round(height, 1)
-      self.stopped["resumesAt"] = None
-      self.problems.append(self.stopped)
-      self.footing, self.runs = None, {}
+    if outcome["kind"] == "rise":
+      height = riseHeight(self.surfaces, self.footing, outcome, direction)
+      self.stop({"kind": "rise", "at": roundVector(self.footing), "height": None if height is None else round(height, 1)})
+      return
+    if outcome["kind"] == "drop":
+      self.stop({"kind": "drop", "at": roundVector(self.footing)})
       return
     if outcome["kind"] == "ledge":
       self.oneWay.append({"kind": "ledge", "at": roundVector(self.footing), "height": round(outcome["height"], 1)})
     self.travelled += outcome["run"]
     self.stand(outcome["landing"], outcome["slope"], outcome["ceiling"], outcome["climbing"] if outcome["kind"] == "steep" else None)
+
+  def stop(self, problem):
+    self.stopped = problem | {"resumesAt": None}
+    self.problems.append(self.stopped)
+    self.footing, self.runs = None, {}
 
   def takeUp(self, spot):
     standing = self.footingAt(spot)
@@ -277,7 +293,7 @@ def walkRoute(path, sampleSpacing):
     raise ValueError(f"A route is at least two [x, y, z] points, got {path!r}")
   if sampleSpacing <= 0:
     raise ValueError(f"sampleSpacing must be positive, got {sampleSpacing}")
-  walk = RouteWalk(bridgeMeshAccess.PlayerSurfaces(), bridgeMeshAccess.swimSurfaces())
+  walk = RouteWalk(bridgeBoundaries.collisionSurfaces(), bridgeMeshAccess.swimSurfaces(), bridgeBoundaries.boundarySurfaces())
   points, directions = routeSamples(path, sampleSpacing)
   walk.start(points[0], directions[0])
   walk.record(directions[0])

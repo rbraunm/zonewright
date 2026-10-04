@@ -105793,7 +105793,7 @@
      "vertical": 0.249
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 4.9
    },
@@ -105859,7 +105859,8 @@
      "vertical": 0.539
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.691,
+     "solid": 0.309
     },
     "unitsPerRepeat": 7.0
    },
@@ -105966,7 +105967,7 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 4.1
    },
@@ -106077,7 +106078,7 @@
      "vertical": 0.489
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 3.9
    },
@@ -106188,7 +106189,7 @@
      "vertical": 0.493
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 75.4
    },
@@ -106327,17 +106328,18 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0406,
-    "objectShare": 0.968,
+    "areaShare": 0.0404,
+    "objectShare": 0.967,
     "slopeShares": {
-     "flat": 0.186,
+     "flat": 0.187,
      "overhang": 0.154,
      "slope": 0.024,
      "steep": 0.01,
-     "vertical": 0.626
+     "vertical": 0.625
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.202,
+     "solid": 0.798
     },
     "unitsPerRepeat": 13.0
    },
@@ -106455,7 +106457,8 @@
      "vertical": 0.651
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.652,
+     "solid": 0.348
     },
     "unitsPerRepeat": 8.9
    },
@@ -106730,7 +106733,8 @@
      "vertical": 0.915
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.849,
+     "solid": 0.151
     },
     "unitsPerRepeat": 18.7
    },
@@ -107043,7 +107047,8 @@
      "vertical": 0.41
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.935,
+     "solid": 0.065
     },
     "unitsPerRepeat": 1.9
    },
@@ -107368,7 +107373,7 @@
      "vertical": 0.012
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 58.6
    },
@@ -107424,18 +107429,18 @@
    "transparentShare": 0.0,
    "uses": {
     "areaShare": 0.0002,
-    "objectShare": 0.121,
+    "objectShare": 0.119,
     "slopeShares": {
-     "flat": 0.879,
+     "flat": 0.881,
      "overhang": 0.0,
      "slope": 0.0,
      "steep": 0.0,
-     "vertical": 0.121
+     "vertical": 0.119
     },
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 65.0
+    "unitsPerRepeat": 65.6
    },
    "width": 512
   },
@@ -107773,7 +107778,8 @@
      "vertical": 0.118
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.847,
+     "solid": 0.153
     },
     "unitsPerRepeat": 48.8
    },
@@ -107831,8 +107837,8 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0868,
-    "objectShare": 0.981,
+    "areaShare": 0.0864,
+    "objectShare": 0.98,
     "slopeShares": {
      "flat": 0.055,
      "overhang": 0.259,
@@ -107841,7 +107847,8 @@
      "vertical": 0.612
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.055,
+     "solid": 0.945
     },
     "unitsPerRepeat": 13.3
    },
@@ -108004,7 +108011,7 @@
    "tiles": false,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0113,
+    "areaShare": 0.0112,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.013,
@@ -108014,7 +108021,8 @@
      "vertical": 0.946
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.121,
+     "solid": 0.879
     },
     "unitsPerRepeat": 16.8
    },
@@ -108070,7 +108078,7 @@
    "transparentShare": 0.0,
    "uses": {
     "areaShare": 0.0026,
-    "objectShare": 0.839,
+    "objectShare": 0.836,
     "slopeShares": {
      "flat": 0.032,
      "overhang": 0.056,
@@ -108081,7 +108089,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 18.0
+    "unitsPerRepeat": 18.1
    },
    "width": 256
   },
@@ -108144,7 +108152,8 @@
      "vertical": 0.932
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.811,
+     "solid": 0.189
     },
     "unitsPerRepeat": 17.1
    },
@@ -108278,7 +108287,8 @@
      "vertical": 0.93
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.007,
+     "solid": 0.993
     },
     "unitsPerRepeat": 17.1
    },
@@ -108341,7 +108351,7 @@
      "vertical": 0.438
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 4.1
    },
@@ -108646,7 +108656,8 @@
      "vertical": 0.437
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.991,
+     "solid": 0.009
     },
     "unitsPerRepeat": 4.1
    },
@@ -108839,7 +108850,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0948,
+    "areaShare": 0.0943,
     "objectShare": 0.997,
     "slopeShares": {
      "flat": 0.221,
@@ -108849,7 +108860,8 @@
      "vertical": 0.424
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.314,
+     "solid": 0.686
     },
     "unitsPerRepeat": 12.7
    },
@@ -109137,19 +109149,19 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0221,
-    "objectShare": 0.164,
+    "areaShare": 0.0224,
+    "objectShare": 0.161,
     "slopeShares": {
-     "flat": 0.086,
+     "flat": 0.087,
      "overhang": 0.3,
      "slope": 0.094,
-     "steep": 0.232,
+     "steep": 0.231,
      "vertical": 0.288
     },
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 10.9
+    "unitsPerRepeat": 11.0
    },
    "width": 256
   },
@@ -109309,7 +109321,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0129,
+    "areaShare": 0.0128,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.007,
@@ -109319,7 +109331,8 @@
      "vertical": 0.514
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.977,
+     "solid": 0.023
     },
     "unitsPerRepeat": 13.6
    },
@@ -109432,8 +109445,8 @@
    "tiles": false,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0753,
-    "objectShare": 0.994,
+    "areaShare": 0.075,
+    "objectShare": 0.993,
     "slopeShares": {
      "flat": 0.617,
      "overhang": 0.292,
@@ -109442,7 +109455,8 @@
      "vertical": 0.011
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.255,
+     "solid": 0.745
     },
     "unitsPerRepeat": 12.0
    },
@@ -109549,7 +109563,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0207,
+    "areaShare": 0.021,
     "objectShare": 0.0,
     "slopeShares": {
      "flat": 0.475,
@@ -109561,7 +109575,7 @@
     "surfaces": {
      "lava": 1.0
     },
-    "unitsPerRepeat": 47.2
+    "unitsPerRepeat": 47.7
    },
    "width": 256
   },
@@ -109795,7 +109809,8 @@
      "vertical": 0.168
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.978,
+     "solid": 0.022
     },
     "unitsPerRepeat": 17.0
    },
@@ -109907,7 +109922,7 @@
      "vertical": 0.277
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 9.7
    },
@@ -110018,7 +110033,7 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 4.6
    },
@@ -110127,7 +110142,7 @@
      "vertical": 0.524
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 27.1
    },
@@ -110422,7 +110437,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.227,
+    "areaShare": 0.2258,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.0,
@@ -110628,7 +110643,7 @@
      "vertical": 0.162
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 5.0
    },
@@ -110721,7 +110736,8 @@
      "vertical": 0.126
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.752,
+     "solid": 0.248
     },
     "unitsPerRepeat": 11.5
    },
@@ -110965,19 +110981,19 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.1198,
-    "objectShare": 0.14,
+    "areaShare": 0.1213,
+    "objectShare": 0.137,
     "slopeShares": {
-     "flat": 0.121,
-     "overhang": 0.385,
+     "flat": 0.122,
+     "overhang": 0.386,
      "slope": 0.117,
      "steep": 0.142,
-     "vertical": 0.235
+     "vertical": 0.234
     },
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 13.5
+    "unitsPerRepeat": 13.6
    },
    "width": 256
   },
@@ -111665,7 +111681,8 @@
      "vertical": 0.297
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.95,
+     "solid": 0.05
     },
     "unitsPerRepeat": 34.7
    },
@@ -112075,7 +112092,8 @@
      "vertical": 0.388
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.712,
+     "solid": 0.288
     },
     "unitsPerRepeat": 10.0
    },
@@ -112363,7 +112381,8 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.893,
+     "solid": 0.107
     },
     "unitsPerRepeat": 18.3
    },
@@ -112424,7 +112443,7 @@
      "vertical": 0.135
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 5.3
    },
@@ -112488,7 +112507,8 @@
      "vertical": 0.271
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.103,
+     "solid": 0.897
     },
     "unitsPerRepeat": 4.4
    },
@@ -112598,7 +112618,7 @@
      "vertical": 0.334
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 6.5
    },
@@ -112915,7 +112935,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 18.9
+    "unitsPerRepeat": 19.1
    },
    "width": 256
   },
@@ -113028,7 +113048,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 17.2
+    "unitsPerRepeat": 17.3
    },
    "width": 256
   },
@@ -113129,19 +113149,19 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0924,
-    "objectShare": 0.066,
+    "areaShare": 0.0937,
+    "objectShare": 0.064,
     "slopeShares": {
      "flat": 0.023,
      "overhang": 0.154,
      "slope": 0.077,
      "steep": 0.166,
-     "vertical": 0.579
+     "vertical": 0.58
     },
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 16.4
+    "unitsPerRepeat": 16.5
    },
    "width": 256
   },
@@ -113242,7 +113262,7 @@
    "tiles": true,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0127,
+    "areaShare": 0.0129,
     "objectShare": 0.0,
     "slopeShares": {
      "flat": 0.977,
@@ -113254,7 +113274,7 @@
     "surfaces": {
      "solid": 1.0
     },
-    "unitsPerRepeat": 12.3
+    "unitsPerRepeat": 12.4
    },
    "width": 256
   },
@@ -113470,8 +113490,8 @@
    "tiles": false,
    "transparentShare": 1.0,
    "uses": {
-    "areaShare": 0.1155,
-    "objectShare": 0.893,
+    "areaShare": 0.1152,
+    "objectShare": 0.891,
     "slopeShares": {
      "flat": 0.205,
      "overhang": 0.227,
@@ -113480,8 +113500,9 @@
      "vertical": 0.528
     },
     "surfaces": {
-     "solid": 0.111,
-     "water": 0.889
+     "passable": 0.103,
+     "solid": 0.007,
+     "water": 0.89
     },
     "unitsPerRepeat": 15.7
    },
@@ -113806,7 +113827,7 @@
    "tiles": false,
    "transparentShare": 1.0,
    "uses": {
-    "areaShare": 0.0121,
+    "areaShare": 0.012,
     "objectShare": 1.0,
     "slopeShares": {
      "flat": 0.0,
@@ -113908,7 +113929,8 @@
      "vertical": 1.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.001,
+     "solid": 0.999
     },
     "unitsPerRepeat": 4.6
    },
@@ -114000,7 +114022,8 @@
      "vertical": 0.144
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.006,
+     "solid": 0.994
     },
     "unitsPerRepeat": 8.5
    },
@@ -114277,8 +114300,8 @@
    "tiles": false,
    "transparentShare": 0.0,
    "uses": {
-    "areaShare": 0.0159,
-    "objectShare": 0.982,
+    "areaShare": 0.0158,
+    "objectShare": 0.981,
     "slopeShares": {
      "flat": 0.0,
      "overhang": 0.004,
@@ -114287,7 +114310,8 @@
      "vertical": 0.985
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.361,
+     "solid": 0.639
     },
     "unitsPerRepeat": 14.4
    },
@@ -114360,6 +114384,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:crystallos",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "crystallos"
 }

@@ -4,6 +4,7 @@ import functools
 import inspect
 import io
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -19,6 +20,7 @@ import assetCatalog
 import assetSheets
 import assetSurvey
 import blenderBridge
+import checkpoints
 import eqCalibration
 import eqEmitters
 import eqgExport
@@ -30,6 +32,7 @@ import eqZones
 import extensionCatalog
 import machineProfile
 import planDrawing
+import skyDrawing
 import toolingLog
 import viewSheets
 import toolingManifest
@@ -55,7 +58,8 @@ server = MCPServer(
     " stroke (paintSurface) and shape its edges deliberately (editSurface). Building a zone is visual iteration: iterate rough to fine and judge"
     " every pass and every review in pictures (renderView at eye height, from above, and close on the part being worked from several sides);"
     " measure, walkRoute, compareWithClientZones, and scripts check what a picture shows and never replace it. Take back what does not work"
-    " (passes, resetRegion, rebuildRegion, clearRegion, eraseSurface): removing is a way of adding."
+    " (passes, resetRegion, rebuildRegion, clearRegion, eraseSurface): removing is a way of adding. Before a risky change, keep a"
+    " recovery point (saveCheckpoint); restoreCheckpoint is for recovering from a wreck, not for iterating."
     " Steer by the EQ worlds: compareWithClientZones against reference zones, and the catalog's measured use of each asset. The"
     " author-zone skill and docs/zoneWorkflow.md in the zonewright repository hold the procedure."
   ),
@@ -200,8 +204,8 @@ async def resolveSky(sky):
 
 
 async def zoneSky(zone):
-  """The open zone's sky state for a preview, or None when it has no sky."""
-  return await resolveSky(zone["sky"]) if "sky" in zone else None
+  """The open zone's sky state for a preview, or None when it draws none."""
+  return await resolveSky(zone["sky"]) if zone.get("sky", skyDrawing.noSky) != skyDrawing.noSky else None
 
 
 def newRenderPath():
@@ -390,7 +394,7 @@ findHelp = (
 )
 
 
-def catalogCall(function, *arguments):
+def callReportingFailures(function, *arguments):
   try:
     return function(*arguments)
   except (OSError, ValueError) as error:
@@ -431,7 +435,7 @@ async def surveyAssets(
   clientRoot = zoneSources.resolveClientRoot()
   if zones is not None or allZones:
     zoneNames = sorted({variant["zone"] for variant in zoneSources.discoverZones(clientRoot).values()}) if allZones else [zone.lower() for zone in zones]
-    outcomes = await anyio.to_thread.run_sync(catalogCall, catalog.surveyZones, clientRoot, toolingRoot / "models", zoneNames, refresh, progressReporter(context))
+    outcomes = await anyio.to_thread.run_sync(callReportingFailures, catalog.surveyZones, clientRoot, toolingRoot / "models", zoneNames, refresh, progressReporter(context))
     if len(zoneNames) == 1 and "error" not in outcomes[zoneNames[0]]:
       key = f"zone:{zoneNames[0]}"
       return sourceSummary(key, json.loads(catalog.sourcePath(key).read_text(encoding="utf-8")))
@@ -440,7 +444,7 @@ async def surveyAssets(
       "errors": {zoneName: outcome["error"] for zoneName, outcome in outcomes.items() if "error" in outcome},
     }
   if folder is not None:
-    key, sourcePaths = f"folder:{folder}", catalogCall(assetSurvey.looseFolderPaths, clientRoot, folder)
+    key, sourcePaths = f"folder:{folder}", callReportingFailures(assetSurvey.looseFolderPaths, clientRoot, folder)
     surveyFunction = lambda: assetSurvey.surveyLooseFolder(clientRoot, catalog.cacheRoot, folder)
   else:
     archivePath = Path(path)
@@ -450,7 +454,7 @@ async def surveyAssets(
     surveyFunction = lambda: assetSurvey.surveyZoneFile(clientRoot, catalog.cacheRoot, archivePath)
   reportProgress = progressReporter(context)
   await anyio.to_thread.run_sync(reportProgress, 0, 1, f"surveying {key}")
-  surveyed = await anyio.to_thread.run_sync(catalogCall, catalog.survey, surveyFunction, key, sourcePaths, refresh)
+  surveyed = await anyio.to_thread.run_sync(callReportingFailures, catalog.survey, surveyFunction, key, sourcePaths, refresh)
   await anyio.to_thread.run_sync(reportProgress, 1, 1, f"surveyed {key}")
   return sourceSummary(key, surveyed)
 
@@ -461,13 +465,13 @@ def findAssets(
   described: bool | None = None, colors: list[str] | None = None, minimumSide: int | None = None, tiles: bool | None = None,
   usedOn: list[str] | None = None, sortBy: str = "relevance", limit: int = 40,
 ):
-  return catalogCall(catalog.find, kind, text, categories, tags, source, described, sortBy, limit, colors, minimumSide, tiles, usedOn)
+  return callReportingFailures(catalog.find, kind, text, categories, tags, source, described, sortBy, limit, colors, minimumSide, tiles, usedOn)
 
 
 @guardedTool()
 def getAsset(id: str):
   """Everything the catalog holds for one asset: its measured facts, what differs in each source that holds it, and its description."""
-  return catalogCall(catalog.entry, id)
+  return callReportingFailures(catalog.entry, id)
 
 
 @guardedTool()
@@ -480,7 +484,7 @@ def getAssetVocabulary():
 @guardedTool()
 def extendAssetVocabulary(group: str, term: str, meaning: str):
   """Add a term to the vocabulary when no existing one fits: group is a tag group's name or category:<kind>; term is one camelCase word."""
-  return catalogCall(catalog.extendVocabulary, group, term, meaning)
+  return callReportingFailures(catalog.extendVocabulary, group, term, meaning)
 
 
 @guardedTool()
@@ -489,21 +493,21 @@ def describeAssets(descriptions: list[dict]):
   (where and how to use it: surfaces, scale, pairings, what to avoid), worldUnitsPerRepeat (textures: the repeat that reads right; the
   measured unitsPerRepeat is how the source zone used it), pairsWith (ids of assets it goes with: its normal map, transitions)}], in
   getAssetVocabulary's words. Each replaces its asset's earlier description."""
-  return {"described": catalogCall(catalog.describe, descriptions)}
+  return {"described": callReportingFailures(catalog.describe, descriptions)}
 
 
 def sheetEntries(ids, kind, text, categories, tags, source, described, sortBy, limit, measuredFilters=(None, None, None, None)):
   if ids is not None and any(value is not None for value in (text, categories, tags, source, described, *measuredFilters)):
     raise ToolError("Give ids or filters, not both")
   if ids is not None:
-    return [catalogCall(catalog.requireAsset, assetID) for assetID in ids]
-  found = catalogCall(catalog.find, kind, text, categories, tags, source, described, sortBy, limit, *measuredFilters)["assets"]
+    return [callReportingFailures(catalog.requireAsset, assetID) for assetID in ids]
+  found = callReportingFailures(catalog.find, kind, text, categories, tags, source, described, sortBy, limit, *measuredFilters)["assets"]
   return [catalog.assets()[entry["id"]] for entry in found]
 
 
 def writeSheetImage(cells, columns, legend, cellSide):
   outputPath = newRenderPath().with_suffix(".jpg")
-  size = catalogCall(assetSheets.writeSheet, cells, columns, outputPath, cellSide)
+  size = callReportingFailures(assetSheets.writeSheet, cells, columns, outputPath, cellSide)
   return [Image(data=outputPath.read_bytes(), format="jpeg"), {"outputPath": str(outputPath)} | size | {"cells": legend}]
 
 
@@ -582,9 +586,66 @@ async def openFile(context: Context, path: str, discardUnsavedChanges: bool = Fa
 
 
 @guardedTool()
-async def saveFile(context: Context, path: str | None = None):
-  """Save the open file, or save it as an absolute path. Textures and libraries become relative paths; packed or generated images are refused."""
-  return await callBridge(context, "saveFile", {"path": path})
+async def saveFile(context: Context, path: str | None = None, replaceExisting: bool = False):
+  """Save the open file, or save it as an absolute path; a path holding another file is written over only with replaceExisting. Textures and libraries become relative paths; packed or generated images are refused."""
+  return await callBridge(context, "saveFile", {"path": path, "replaceExisting": replaceExisting})
+
+
+async def openWorkFilePath(context, toolName):
+  """The open work file's path; a scene never saved has no work file to keep checkpoints of."""
+  status = await callBridge(context, "getStatus", {})
+  if status["filePath"] is None:
+    raise ToolError(f"{toolName} works on the open work file, and no work file is open: open it (openFile), or save this scene as a new work file (saveFile with a path)")
+  return status["filePath"]
+
+
+async def checkpointOpenFile(context, label):
+  callReportingFailures(checkpoints.validateLabel, label)
+  workFile = await openWorkFilePath(context, "saveCheckpoint")
+  await callBridge(context, "saveFile", {"path": None, "replaceExisting": False})
+  return await anyio.to_thread.run_sync(callReportingFailures, checkpoints.saveCheckpoint, toolingRoot, workFile, label)
+
+
+@guardedTool()
+async def saveCheckpoint(context: Context, label: str):
+  """Save the open work file, then keep a copy of it as a recovery point under the tooling root (never beside the work file), named for the UTC time and `label`. Refuses a scene never saved or one that cannot be saved. For recovering from a wreck, not for iterating: passes, layers, and the region tools take work back."""
+  return await checkpointOpenFile(context, label)
+
+
+@guardedTool()
+async def listCheckpoints(context: Context, path: str | None = None):
+  """The checkpoints of the open work file, or of the work file at `path` (absolute; it need not exist now): name, label, UTC time, and size, and their total size."""
+  workFile = path if path is not None else await openWorkFilePath(context, "listCheckpoints")
+  return await anyio.to_thread.run_sync(callReportingFailures, checkpoints.listCheckpoints, toolingRoot, workFile)
+
+
+@guardedTool()
+async def restoreCheckpoint(context: Context, name: str, discardUnsavedChanges: bool = False):
+  """Put a checkpoint back over the work file it was saved from, then open that file. The open file must be that work file, or nothing (as after a reconnect or a crash). Its unsaved changes are saved first unless discardUnsavedChanges; then the work file as it stands on disk is kept as a checkpoint labelled "before restore <time of the checkpoint restored>" (restore that to take the restore back). The copy goes in under a temporary name, so a failed restore leaves the work file as it was."""
+  checkpointPath, workFile = callReportingFailures(checkpoints.findCheckpoint, toolingRoot, name)
+  status = await callBridge(context, "getStatus", {})
+  if status["filePath"] is not None and not checkpoints.samePath(status["filePath"], workFile):
+    raise ToolError(f"Checkpoint '{name}' was saved from '{workFile}', but the open file is '{status['filePath']}'; a checkpoint is restored only over its own work file, whose textures are on paths relative to it: open '{workFile}' first")
+  if status["unsavedChanges"] and not discardUnsavedChanges:
+    if status["filePath"] is None:
+      raise ToolError("The open scene was never saved and has changes the restore would drop: save it as a new work file (saveFile with a path), or pass discardUnsavedChanges true")
+    try:
+      await callBridge(context, "saveFile", {"path": None, "replaceExisting": False})
+    except ToolError as error:
+      raise ToolError(f"restoreCheckpoint saves the open work file's changes before keeping it, and saving failed; pass discardUnsavedChanges true to give those changes up.\n\n{error}") from error
+  stamp = callReportingFailures(checkpoints.checkpointNameParts, checkpointPath)[0]
+  beforeRestore = None
+  if os.path.isfile(workFile):
+    beforeRestore = await anyio.to_thread.run_sync(callReportingFailures, checkpoints.saveCheckpoint, toolingRoot, workFile, f"before restore {stamp}")
+  await anyio.to_thread.run_sync(callReportingFailures, checkpoints.restoreOver, checkpointPath, workFile)
+  reopened = await callBridge(context, "openFile", {"path": workFile, "discardUnsavedChanges": True})
+  return reopened | {"restored": name, "beforeRestore": beforeRestore["name"] if beforeRestore is not None else None}
+
+
+@guardedTool()
+def deleteCheckpoints(names: list[str]):
+  """Delete the named checkpoints, and only those; none is ever deleted otherwise. Refuses, deleting none, when any name is unknown."""
+  return callReportingFailures(checkpoints.deleteCheckpoints, toolingRoot, names)
 
 
 @guardedTool()
@@ -611,6 +672,8 @@ async def setZoneProperties(
   maxClip: float | None = None,
   newEngineZone: bool | None = None,
   sky: dict | str | None = None,
+  safePoint: list[float] | None = None,
+  underworld: float | None = None,
 ):
   """Set the zone's EQ properties stored in the .blend, in the client's lighting terms (docs/clientRendering.md): ambient, special
   ambient, bounce, and sun colors (0-1, raw as the client uses them); the direction toward the sun (azimuth 0 = +Y, clockwise;
@@ -624,19 +687,22 @@ async def setZoneProperties(
   every zone without its own does. weather defaults to the type's DefaultWeather. hour and minute place the sun, at its highest at
   12:00 (a midday screenshot after the server's '#set time 12' matches 13:00). Previews draw the sky behind the zone and take the
   ambient, bounce, sun color and direction, and fog color from it, so those cannot be set by hand while it is set, and setting it
-  drops any set before; sky "none" removes it. The result gives how the client resolves the sky and the light it supplies."""
+  drops any set before; sky "none" states that the zone draws no sky (its zone row's sky 0, as about a third of the client's EQG
+  zones have), so previews show the fog color where nothing is drawn and the light and fog color are set by hand. safePoint [x, y, z, headingDegrees] is where players arrive in the zone (the zone
+  row's safe point; heading 0 = +Y, clockwise) and underworld the height below it under which the client puts a falling player back;
+  a game export needs both, with ground under the safe point above the underworld. The result gives how the client resolves the sky
+  and the light it supplies."""
   updates = {
     "ambientColor": ambientColor, "specialAmbientColor": specialAmbientColor, "bounceColor": bounceColor, "sunColor": sunColor,
     "sunAzimuthDegrees": sunAzimuthDegrees, "sunElevationDegrees": sunElevationDegrees, "fogColor": fogColor, "fogStart": fogStart,
     "fogEnd": fogEnd, "fogDensity": fogDensity, "fogOn": fogOn, "minClip": minClip, "maxClip": maxClip, "newEngineZone": newEngineZone, "sky": sky,
+    "safePoint": safePoint, "underworld": underworld,
   }
   given = {key: value for key, value in updates.items() if value is not None}
   if not given:
     raise ToolError(f"setZoneProperties needs at least one of {list(updates)}")
-  if isinstance(sky, str):
-    if sky != "none":
-      raise ToolError(f"sky is {{type, weather, hour, minute}} or \"none\", got '{sky}'")
-    given["sky"] = None
+  if isinstance(sky, str) and sky != skyDrawing.noSky:
+    raise ToolError(f"sky is {{type, weather, hour, minute}} or \"{skyDrawing.noSky}\", got '{sky}'")
   stored = await callBridge(context, "setZoneProperties", {"updates": given})
   resolved = await zoneSky(stored["zone"])
   return stored | {"sky": None if resolved is None else {key: resolved[key] for key in ("chain", "dayFraction", "lightFrom", "environment")}}
@@ -644,7 +710,7 @@ async def setZoneProperties(
 
 @guardedTool()
 async def renderView(context: Context, view: dict, shading: str = "client", bandHeight: float = 50.0, guides: bool = True, swimVolumes: bool = False):
-  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], or with z on the ground found from 3 above z down to 50 below it, for caves, under overhangs, and on ledges; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera, or stood by hand facing the camera with "figureAt": [x,y] or [x,y,z] in the view, its ground found as standAt's is, on a ledge or ramp too narrow to walk her ahead on), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog. {"frame": {"objects": [names], "headingDegrees": h, "pitchDegrees": p}} looks at the named meshes or collection instances from that heading and pitch, standing back so they fit (its result's eye and target reproduce that camera). shading "client" draws the zone as the client does; "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout. Guides (plot outlines, sketch massing) draw unless guides is false; with swimVolumes, the view is tinted where the swim volumes stand (cyan water, magenta lava), each box seen through the water, so its top shows evenly under a surface it meets or lies just below, but hidden behind and under the ground."""
+  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], or with z on the ground found from 3 above z down to 50 below it, for caves, under overhangs, and on ledges; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera, or stood by hand facing the camera with "figureAt": [x,y] or [x,y,z] in the view, its ground found as standAt's is, on a ledge or ramp too narrow to walk her ahead on), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog. {"frame": {"objects": [names], "headingDegrees": h, "pitchDegrees": p}} looks at the named meshes or collection instances from that heading and pitch, standing back so they fit (its result's eye and target reproduce that camera). shading "client" draws the zone as the client does; "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout; "coverage" draws only what exportZone would export, each face in the color of its export check status (checkExport): black where it cannot export, red for zero texture area, brown for a blockout material, yellow for texture stretched or squeezed, orange where the base material shows, magenta along a ground border without a transition strip, grey when fine, and blue wherever a face is seen from its back, lit from the northwest as layout is, softer so no shaded face reads as black, and without fog; the result counts the exported faces by status. Guides (plot outlines, sketch massing) draw unless guides is false, and with them, in every shading, the view is tinted red where the boundaries (walls, lids, floors) stand, which the client never draws, a wall as a slab thick enough to show from above, and green where the zone lines stand, seen through the water but hidden behind and under the ground; with swimVolumes, the view is tinted where the swim volumes stand (cyan water, magenta lava), each box seen through the water, so its top shows evenly under a surface it meets or lies just below, but hidden behind and under the ground."""
   outputPath = newRenderPath()
   figureModel = None
   zone = await callBridge(context, "getZoneProperties", {})
@@ -835,7 +901,10 @@ zoneFileSourceKeys = ("zoneCacheFormat", "modelCacheFormat", "sha256", "textureS
 async def importZoneFile(context: Context, path: str, collection: str | None = None):
   """Bring an EQG zone archive outside the client, such as one exportZone wrote, into the open scene as one object named for its zone
   (the file name), drawn as importZone draws the client's EQG zones: its terrain and placed models, with baked light where its count
-  fits each model; and its lights and the emitters of the <zone>_EnvironmentEmitters.txt beside it, as importZone brings them."""
+  fits each model, and the triangles it lets players through marked so walkRoute passes them; its lights and the emitters of the
+  <zone>_EnvironmentEmitters.txt beside it, as importZone brings them; and its player boundaries as reference: the terrain's invisible
+  walls as one boundary in "<zone> boundaries" and its ATP_ regions as zone lines in "<zone> zone lines" (the archive holds no
+  targets; regions it turns are listed, not placed). The result counts each model's passable triangles."""
   archivePath = Path(path)
   if not archivePath.is_absolute() or archivePath.suffix.lower() != ".eqg" or not archivePath.is_file():
     raise ToolError(f"'{path}' is not an absolute path to an existing .eqg file")
@@ -853,7 +922,14 @@ async def importZoneFile(context: Context, path: str, collection: str | None = N
     raise ToolError(str(error)) from error
   emitters = readEmitterList(archivePath.parent / f"{archivePath.stem}_EnvironmentEmitters.txt")
   environment = await placeZoneEnvironment(context, archivePath.stem.lower(), lights, emitters, "zoneFile")
-  return placed | {"source": {key: value for key, value in details.items() if key not in zoneFileSourceKeys}} | environment
+  try:
+    boundaries = await anyio.to_thread.run_sync(eqZones.zoneFileBoundaries, archivePath)
+  except ValueError as error:
+    raise ToolError(str(error)) from error
+  placedBoundaries = await callBridge(context, "placeImportedBoundaries", {"zone": archivePath.stem.lower(), "walls": boundaries["walls"], "zoneLines": boundaries["zoneLines"]})
+  return placed | {"source": {key: value for key, value in details.items() if key not in zoneFileSourceKeys}} | environment | placedBoundaries | {
+    "zoneLinesTurned": boundaries["zoneLinesTurned"], "passableTriangles": boundaries["passableTriangles"],
+  }
 
 
 def groupedExclusions(excluded, shownPerReason=25):
@@ -864,58 +940,145 @@ def groupedExclusions(excluded, shownPerReason=25):
   return [{"reason": reason, "count": len(names), "objects": names[:shownPerReason]} for reason, names in sorted(groups.items())]
 
 
-@guardedTool()
-async def exportZone(context: Context, path: str):
-  """Write the open scene as an EQG zone archive at `path`, an absolute path ending in <zone>.eqg, the zone's short name in lowercase
-  letters and digits. The `terrain` collection's meshes become the zone's terrain; every other rendered mesh becomes a model placed at
-  its object's transform (copies sharing a mesh and without modifiers share one model) and every collection instance a model of its
-  collection's meshes; a placed object takes one uniform scale. Materials must come from createMaterial: diffuse and normal map export
-  as Opaque_MaxCB1.fx, diffuse only as Opaque_MaxC1.fx, a cutout (diffuse only) as Chroma_MPLBasicAT.fx. DDS textures are stored
-  unchanged, others as uncompressed DDS with power-of-two sides; createLiquidMaterial materials export as the client's water, waterfall,
-  and lava shaders with their values. The swim volumes go into the .zon as AWT_ (water) and ALV_ (lava) regions, as they stand (export
-  derives none and refuses boxes a zone file cannot hold, as getSwimVolumes lists them); `swim` lists the pools and rivers whose swimming is undecided (no boxes and not
-  marked not swimmable) or changed since their boxes were accepted. Point lights
-  placed with placeLight go into the .zon; emitters placed with placeEmitter go into <zone>_EnvironmentEmitters.txt beside the archive
-  (the client reads that list loose from its own folder). A zone with housing (setZoneHousing) also gets <zone>_housing.json beside the
-  archive, its plots as Peridot's plot content gives them (address, border door, center and heading in the server's axes, size across
-  and along, price, upkeep, item capacity, pets, features) with their border doors (OBP_LOTSQUARE or OBP_GUILDSQUARE, open type 160,
-  in the server's axes and EQ heading), and <zone>_assets.txt naming stonesquare.eqg, which holds the border models. What is not the
-  zone's own geometry is left out and listed by reason in `excluded`: guides, plot borders, regions, anything hidden from renders, and
-  placed client content (spawns and doors, which are the server's data; client objects, which do not export yet; imported zones,
-  which are reference). `toConfirm` lists shipped meshes with shaping passes off or surfacing layers muted, which leave the zone as if
-  never made. No baked light is written yet."""
+exportChecksHelp = (
+  " purpose is \"test\" (quick renders and test loads) or \"game\" (files for the EQ client and server). Both refuse the hard errors:"
+  " the file unsaved; objects export cannot take (a non-mesh in the terrain collection or among a placed collection's members, a placed"
+  " model scaled unevenly, model names that collide); faces with no material or a material createMaterial or createLiquidMaterial did not"
+  " make; a missing, packed, generated, or other-drive image, a non-DDS image whose sides are not powers of two, DDS data under another"
+  " extension, two images that would share one DDS name, a cutout with a normal map; meshes without texture coordinates; a liquid"
+  " material on anything but a water body; a mesh with surfacing layers whose modifiers change its faces; swim volumes a zone file"
+  " cannot hold (as getSwimVolumes lists them); boundaries that are not meshes or have no faces; zone lines a zone file cannot hold (a name not ATP_<number>_<label>,"
+  " a turned box, a box without size, region names that clash once lowercased); housing the server would refuse. A game export also"
+  " refuses blockout materials (createMaterial blockout) on exported faces, pools and rivers whose swimming is undecided or changed"
+  " since their boxes were accepted, missing view values (fogOn, minClip, maxClip, sky or sky \"none\" stated, and the fog's start, end, and density"
+  " when it is on), a missing safe point or underworld, a safe point over no ground above the underworld, zone lines without a target or sharing a"
+  " number, and, until reach mapping exists, any zone: containment cannot be checked yet. A test export lists all of these but"
+  " containment as findings. Findings, never refusals, for both: texture coverage, each with where it lies: the base material showing where no unmuted"
+  " surfacing layer covers a face; ground borders on the terrain where two ground materials meet, walkable ground on at least one side,"
+  " with no paintTransition strip between them, as a length per border and its stretches (each a center, bounds, and length); texture stretched or squeezed (a texel lying over 2x longer one way than the other"
+  " in the world, or world units per repeat over 2x off, either way, the material's area-weighted median, `usualRepeat`); zero texture"
+  " area; and back faces (faces wound against the rest of their surface: a closed surface faces out, a terrain sheet up)."
+  " Each failure and finding names the object (and the placed objects that place it), the material, the image, and the face count, with"
+  " the faces' connected pieces (center and face count, largest first); renderView shading \"coverage\" draws the same statuses."
+  " `coverage` counts the exported faces by status; `excluded` lists what is not the zone's own geometry by reason (guides, plot borders,"
+  " regions, anything hidden from renders, placed client content); `toConfirm` lists shipped meshes with shaping passes off or surfacing"
+  " layers muted, which leave the zone as if never made; `swim` the undecided and changed pools and rivers; `boundaries` and `zoneLines`"
+  " what goes into the terrain as invisible walls and into the .zon as zone lines."
+)
+
+
+def exportTarget(path):
   archivePath = Path(path)
   if not archivePath.is_absolute() or archivePath.suffix != ".eqg" or not archivePath.parent.is_dir():
     raise ToolError(f"'{path}' is not an absolute .eqg path in an existing folder")
   zone = archivePath.stem
   if not eqgExport.zoneNamePattern.match(zone):
     raise ToolError(f"Zone name '{zone}' must be lowercase letters and digits, as the client's zone short names are")
-  collected = await callBridge(context, "collectZoneExport", {"outputFolder": str(toolingRoot / "exports" / zone), "zoneName": zone})
+  return archivePath, zone
+
+
+def replaceExportFiles(archivePath, archiveBytes, sideContents):
+  """Put an export's files in the last export's places: each written whole under a temporary name, then the side files (removed where
+  the content is None) and the archive last. A failure at any point puts every file back as it was and leaves no temporary one."""
+  contents = sideContents | {archivePath: archiveBytes}
+  temporaries = {target: target.with_name(target.name + ".partial") for target, content in contents.items() if content is not None}
+  previous, placed = {}, []
+  try:
+    for target, temporary in temporaries.items():
+      temporary.write_bytes(contents[target])
+    for target in sideContents:
+      if target.exists():
+        previous[target] = target.with_name(target.name + ".previous")
+        target.replace(previous[target])
+    for target in sideContents:
+      if target in temporaries:
+        temporaries[target].replace(target)
+        placed.append(target)
+    temporaries[archivePath].replace(archivePath)
+  except OSError:
+    for target in placed:
+      target.unlink()
+    for target, kept in previous.items():
+      kept.replace(target)
+    raise
+  finally:
+    for temporary in temporaries.values():
+      temporary.unlink(missing_ok=True)
+  for kept in previous.values():
+    kept.unlink()
+
+
+def exportReport(report):
+  return {key: report[key] for key in ("purpose", "failures", "findings", "coverage")} | {
+    "excluded": groupedExclusions(report["excluded"]), "toConfirm": report["toConfirm"], "swim": report["swim"],
+    "boundaries": report["boundaries"], "zoneLines": report["zoneLines"],
+  }
+
+
+@guardedTool(description=(
+  "Run every check exportZone runs for a purpose on the open scene, writing nothing, and list every failure (what would stop the export)"
+  " and every finding at once. `path` is where the archive would go (an absolute <zone>.eqg path, the zone's short name in lowercase"
+  " letters and digits)." + exportChecksHelp
+))
+async def checkExport(context: Context, path: str, purpose: str):
+  archivePath, zone = exportTarget(path)
+  report = await callBridge(context, "checkZoneExport", {"purpose": purpose})
+  return {"path": str(archivePath), "zone": zone} | exportReport(report)
+
+
+@guardedTool(description=(
+  "Write the saved scene as an EQG zone archive at `path`, an absolute path ending in <zone>.eqg, the zone's short name in lowercase"
+  " letters and digits, after the checks for its purpose (checkExport): any failure refuses the export and lists them all, and nothing is"
+  " written. Every file is written whole under a temporary name first; then the side files take the last export's places and the"
+  " archive goes in last, and a failure at any point puts every file back as it was, so a refused or failed export never replaces the"
+  " last good archive or its side files and leaves no partial file. The `terrain` collection's meshes become the zone's terrain;"
+  " every other rendered mesh becomes a model placed at its object's transform (copies sharing a mesh and without modifiers share one"
+  " model) and every collection instance a model of its collection's meshes. createMaterial materials export as the client's shaders:"
+  " diffuse and normal map as Opaque_MaxCB1.fx, diffuse only as Opaque_MaxC1.fx, a cutout (diffuse only) as Chroma_MPLBasicAT.fx;"
+  " createLiquidMaterial materials as its water, waterfall, and lava shaders with their values. DDS textures are stored unchanged, others"
+  " as uncompressed DDS. The swim volumes go into the .zon as AWT_ (water) and ALV_ (lava) regions as they stand (export derives none)"
+  " and the zone lines as ATP_ regions, unturned. The boundaries (placeBoundaryWall, placeBoundaryPlane) go into the terrain as"
+  " triangles without a material, which the client never draws but collides with (flag 0), a wall's facing both ways and a lid's down"
+  " and a floor's up, as they face in the scene; triangles of liquid materials, cutout"
+  " materials, and objects marked passable (markPassable) are flagged 0x1, which the client lets players through."
+  " Point lights placed with placeLights go into the .zon; emitters placed with placeEmitters go into <zone>_EnvironmentEmitters.txt"
+  " beside the archive (the client reads that list loose from its own folder). A zone with housing (setZoneHousing) also gets"
+  " <zone>_housing.json beside the archive, its plots as Peridot's plot content gives them (address, border door, center and heading in"
+  " the server's axes, size across and along, price, upkeep, item capacity, pets, features) with their border doors (OBP_LOTSQUARE or"
+  " OBP_GUILDSQUARE, open type 160, in the server's axes and EQ heading), and <zone>_assets.txt naming stonesquare.eqg, which holds the"
+  " border models. Lists an earlier export left that this scene no longer has are removed. No baked light is written yet." + exportChecksHelp
+))
+async def exportZone(context: Context, path: str, purpose: str):
+  archivePath, zone = exportTarget(path)
+  checked = await callBridge(context, "collectZoneExport", {"outputFolder": str(toolingRoot / "exports" / zone), "zoneName": zone, "purpose": purpose})
+  report = checked["report"]
+  if report["failures"]:
+    raise ToolError(
+      f"exportZone ({purpose}) refused, nothing written: {len(report['failures'])} failure(s); checkExport lists the findings too\n"
+      + json.dumps(report["failures"], indent=1)
+    )
+  collected = checked["collected"]
   try:
     data, summary = await anyio.to_thread.run_sync(eqgExport.zoneArchive, collected)
-    emitterListPath = archivePath.parent / f"{zone}_EnvironmentEmitters.txt"
-    emitterList = eqEmitters.emitterListText(collected["emitters"]) if collected["emitters"] else None
-    housing = collected["housing"]
-    housingPath = archivePath.parent / f"{zone}_housing.json"
-    assetListPath = archivePath.parent / f"{zone}_assets.txt"
-    hasPlots = housing is not None and bool(housing["plots"])
-    archivePath.write_bytes(data)
-    # Lists left from an earlier export would place emitters or plots this scene no longer has.
-    if emitterList is None:
-      emitterListPath.unlink(missing_ok=True)
-    else:
-      emitterListPath.write_bytes(emitterList.encode("latin1"))
-    if hasPlots:
-      housingPath.write_text(json.dumps({"zone": zone} | housing, indent=1), encoding="ascii")
-      assetListPath.write_bytes("".join(f"{archive}\r\n" for archive in housing["assets"]).encode("latin1"))
-    else:
-      housingPath.unlink(missing_ok=True)
-      assetListPath.unlink(missing_ok=True)
   except (OSError, ValueError) as error:
     raise ToolError(f"{type(error).__name__}: {error}") from error
-  return summary | {
-    "path": str(archivePath), "excluded": groupedExclusions(collected["excluded"]), "toConfirm": collected["toConfirm"], "swim": collected["swim"],
-    "emitterList": str(emitterListPath) if emitterList is not None else None,
+  housing = collected["housing"]
+  hasPlots = housing is not None and bool(housing["plots"])
+  emitterListPath = archivePath.parent / f"{zone}_EnvironmentEmitters.txt"
+  housingPath = archivePath.parent / f"{zone}_housing.json"
+  assetListPath = archivePath.parent / f"{zone}_assets.txt"
+  # A list left from an earlier export would place emitters or plots this scene no longer has, so a list with nothing to say is removed.
+  sideContents = {
+    emitterListPath: eqEmitters.emitterListText(collected["emitters"]).encode("latin1") if collected["emitters"] else None,
+    housingPath: json.dumps({"zone": zone} | housing, indent=1).encode("ascii") if hasPlots else None,
+    assetListPath: "".join(f"{archive}\r\n" for archive in housing["assets"]).encode("latin1") if hasPlots else None,
+  }
+  try:
+    await anyio.to_thread.run_sync(replaceExportFiles, archivePath, data, sideContents)
+  except OSError as error:
+    raise ToolError(f"{type(error).__name__}: {error}") from error
+  return summary | {"path": str(archivePath)} | exportReport(report) | {
+    "emitterList": str(emitterListPath) if sideContents[emitterListPath] is not None else None,
     "housing": None if housing is None else {"role": housing["housing"]["role"], "plots": len(housing["plots"]), "file": str(housingPath) if hasPlots else None, "assetList": str(assetListPath) if hasPlots else None},
   }
 
@@ -1198,20 +1361,22 @@ async def measure(context: Context, points: list[list[float]], snapToSurface: bo
 
 @guardedTool()
 async def walkRoute(context: Context, path: list[list[float]], sampleSpacing: float = 4.0):
-  """Walk a route as a player would, over what players stand on (rendered meshes and collection instances; not water, which is waded
-  or swum, nor guides, regions, spawns, or doors, taken as open; ground inside a solid is no footing, ground under one-sided cover
-  such as a roof plane or leaf cards is): from its first point, following the footing underfoot past each point of `path`
-  [[x, y, z], ...], whose heights only need to be within a step of the footing (so a route can run over an arch or under it). Judged
-  for a player 6 units tall who walks slopes up to 60 degrees and steps up 2, in half-unit strides whatever `sampleSpacing`, which
-  sets only the profile's rows. Returns the length walked, the steepest face stood on, the narrowest footing (how far it runs to each
-  side before a drop of more than a player's height, a wall, a step too high, or a face too steep; null beyond 60), the lowest
-  headroom, the deepest water over the footing; `problems`, everything that stops a player, each once over the stretch it covers:
-  rise (a wall or step over 2 in the way, its height, how far up its face stays steeper than 60, a plane's as much as a block's; null
-  past 60), drop (no footing within 60 below), steep (a face over 60 climbed, its steepest), headroom (under 6, its lowest); after a
-  rise or a drop the walk takes up again where the route's own heights find footing (resumesAt, null if never); `oneWay`, ways down a
-  player cannot climb back: ledge (a drop over a step, its height) and steep (a face over 60 descended); walkable when there are no
-  problems; and a profile along the way (each row with the water depth over its footing, or null). Use it on decks, ramps, ledges,
-  and the ways into an area."""
+  """Walk a route as a player would, over what the client collides with (rendered meshes and collection instances, and the
+  boundaries, never drawn; not water, which is waded or swum, nor faces players pass through: liquid and cutout materials, objects
+  marked passable, faces an imported zone file flags passable; nor guides, regions, spawns, or doors, taken as open; ground inside a
+  solid is no footing, ground under one-sided cover such as a roof plane is): from its first point, following the footing underfoot
+  past each point of `path` [[x, y, z], ...], whose heights only need to be within a step of the footing (so a route can run over an
+  arch or under it). Judged for a player 6 units tall who walks slopes up to 60 degrees and steps up 2, in half-unit strides whatever
+  `sampleSpacing`, which sets only the profile's rows. Returns the length walked, the steepest face stood on, the narrowest footing
+  (how far it runs to each side before a drop of more than a player's height, a wall, a step too high, or a face too steep; null
+  beyond 60), the lowest headroom, the deepest water over the footing; `problems`, everything that stops a player, each once over the
+  stretch it covers: blocked (a boundary across the way at half a player's height, where it stands), rise (a wall or step over 2 in
+  the way, its height, how far up its face stays steeper than 60, a plane's as much as a block's; null past 60), drop (no footing
+  within 60 below), steep (a face over 60 climbed, its steepest), headroom (under 6, its lowest); after a boundary, a rise, or a drop
+  the walk takes up again where the route's own heights find footing (resumesAt, null if never); `oneWay`, ways down a player cannot
+  climb back: ledge (a drop over a step, its height) and steep (a face over 60 descended); walkable when there are no problems; and a
+  profile along the way (each row with the water depth over its footing, or null). Use it on decks, ramps, ledges, and the ways into
+  an area."""
   return await callBridge(context, "walkRoute", {"path": path, "sampleSpacing": sampleSpacing})
 
 
@@ -1504,7 +1669,7 @@ async def getSketch(context: Context, sheet: str | None = None):
 
 @guardedTool()
 async def renderSketch(
-  context: Context, center: list[float], width: float, sheets: list[str] | None = None, layers: list[str] = ["regions", "plots", "water"],
+  context: Context, center: list[float], width: float, sheets: list[str] | None = None, layers: list[str] = ["regions", "plots", "water", "boundaries", "zoneLines"],
   bandHeight: float = 25.0, spotHeights: bool = True,
 ):
   """Draw a plan: the zone from straight above in quiet grey relief (lighter higher, a step every bandHeight units, slopes shaded
@@ -1513,10 +1678,11 @@ async def renderSketch(
   those named) in their own colors (areas dashed and faintly filled, footprints filled with their facing arrows and heights, paths at
   their widths, points, notes; every shape shows, inside an area or under another sheet's), and the plan's own layers: regions
   (dashed, named), plots (outlined, by address, with a mark pointing out of the entrance side), water (as players see it, not where a
-  surface runs on tucked under its banks: blue, lava orange), and swim (the swim volumes, dashed, cyan water and magenta lava, each
+  surface runs on tucked under its banks: blue, lava orange), swim (the swim volumes, dashed, cyan water and magenta lava, each
   named inside itself where its name fits clear of the other labels, else by its number; `unnamedSwimVolumes` lists those in the
-  drawing left unnamed, to see closer). Labels are placed clear of one another, and beside the spot heights rather than over them
-  where they can be; an area is named only where it reaches into the drawing."""
+  drawing left unnamed, to see closer), boundaries (red, named: walls as lines along their foot, lids and floors faintly filled), and
+  zoneLines (their boxes faintly green, named). Labels are placed clear of one another, and beside the spot heights rather than over
+  them where they can be; an area is named only where it reaches into the drawing."""
   if len(center) != 2 or width <= 0:
     raise ToolError(f"center is [x, y] and width positive, got {center} and {width}")
   zone = await callBridge(context, "getZoneProperties", {})
@@ -1579,17 +1745,18 @@ async def renderOrbit(
 @guardedTool()
 async def renderSection(
   context: Context, start: list[float], end: list[float], bottom: float, top: float,
-  layers: list[str] = ["ground", "water", "swim", "massing", "sketch", "plots"],
+  layers: list[str] = ["ground", "water", "swim", "massing", "sketch", "plots", "boundaries", "zoneLines"],
 ):
   """Draw a section: where the vertical plane through the line from start [x, y] to end [x, y] cuts the zone, seen from the line's right
   so start is on the left, from bottom to top at one scale across and up, clipped to that frame: the ground players stand on (brown;
   caves, overhangs, and arches show as the shapes they are), water surfaces where players see them (blue; not where they run on
   tucked under the banks), swim volumes (dashed boxes, cyan water and magenta lava), sketch massing (grey), sketch areas' floors
   (dashed) and paths in their sheets' colors (a path's rise and fall where it runs along the line, level across its width where it
-  crosses it), and plot pads (orange, level at the plot's height across its footprint, with a mark on its entrance side pointing out),
-  each named just above, with a height grid and the distance along the line. For judging what plans cannot show: swim volumes against
-  the surface and the bed, a cave's headroom, a plot's pad against the slope, stacked floors and the stairs between them, an arch's
-  span. The result also gives the cuts as numbers (s along the line, z height)."""
+  crosses it), plot pads (orange, level at the plot's height across its footprint, with a mark on its entrance side pointing out),
+  boundaries (red: a wall from under the ground to its top, a lid or a floor at its height), and zone lines (green boxes), each named
+  just above, with a height grid and the distance along the line. For judging what plans cannot show: swim volumes against the
+  surface and the bed, a cave's headroom, a plot's pad against the slope, stacked floors and the stairs between them, an arch's span,
+  a wall's height over the ground and a lid's over a path. The result also gives the cuts as numbers (s along the line, z height)."""
   if len(start) != 2 or len(end) != 2:
     raise ToolError(f"start and end are [x, y], got {start} and {end}")
   cuts = await callBridge(context, "sectionCuts", {"start": start, "end": end, "bottom": bottom, "top": top, "layers": layers})
@@ -1603,6 +1770,8 @@ async def renderSection(
     "massing": [{"name": entry["name"], "label": entry["label"]} for entry in cuts["massing"]],
     "sketch": [{"sheet": entry["sheet"], "shape": entry["shape"], "pieces": entry["pieces"]} for entry in cuts["sketch"]],
     "plots": [{key: entry[key] for key in ("name", "s", "z", "entrance")} for entry in cuts["plots"]],
+    "boundaries": [{"name": entry["name"], "kind": entry["kind"], "segments": entry["segments"]} for entry in cuts["boundaries"]],
+    "zoneLines": cuts["zoneLines"],
   }
   return [Image(data=outputPath.read_bytes(), format="png"), summary]
 
@@ -1643,6 +1812,65 @@ async def getSwimVolumes(context: Context, name: str | None = None):
   water over it); and any errors a zone file cannot hold (a box turned or without size, names that clash once lowercased, a prefix
   against its liquid, a body gone, a box of a body marked not swimmable), which export refuses."""
   return await callBridge(context, "getSwimVolumes", {"name": name})
+
+
+@guardedTool()
+async def placeBoundaryWall(context: Context, name: str, path: list[list[float]], height: float):
+  """Place an invisible wall players cannot pass, as the client's own walls run: a ribbon along `path` [[x, y], ...] from 5 under the
+  ground players stand on to `height` above it, following the ground every 4 units; a path ending where it began closes into a ring.
+  It faces to the left of the path's direction (inward for a ring drawn counterclockwise), and export writes it facing both ways, so it
+  blocks from either side whichever way it faces. Boundaries are never drawn in the client's view, block walkRoute, tint views with
+  guides red in every shading and draw red in plans and sections, and export as triangles without a material in the terrain, which the
+  client collides with but never draws. Place it again by name to redraw it against the ground as it is now; deleteObjects
+  removes it. Walls go at the foot of a rim players should not climb, along an open edge, across a gap beside a zone line."""
+  return await callBridge(context, "placeBoundaryWall", {"name": name, "path": path, "height": height})
+
+
+@guardedTool()
+async def placeBoundaryPlane(context: Context, name: str, kind: str, outline: list[list[float]], height: float):
+  """Place a flat invisible boundary over a closed `outline` [[x, y], ...] at `height`: kind "lid" (facing down: over a canyon path or a
+  gap, so players cannot climb or float out over the rim) or "floor" (facing up: under a drop players must not fall out of the world
+  through). Like a wall it is never drawn, blocks walkRoute, shows red with guides and in plans and sections, and exports into the
+  terrain without a material, facing as it faces in the scene.
+  Place it again by name to redraw it."""
+  return await callBridge(context, "placeBoundaryPlane", {"name": name, "kind": kind, "outline": outline, "height": height})
+
+
+@guardedTool()
+async def markPassable(context: Context, objects: list[str], passable: bool = True):
+  """Mark meshes or collection instances players pass through (art that carries its own collision shell, hanging moss, a bead curtain),
+  or take the mark off with passable false. Export flags every triangle of a marked object 0x1, which the client lets players through,
+  as it flags liquid surfaces (water, waterfall, lava) and cutout (alpha-tested) cards on its own; walkRoute passes through them all."""
+  return await callBridge(context, "markPassable", {"objects": objects, "passable": passable})
+
+
+@guardedTool()
+async def getBoundaries(context: Context):
+  """Every boundary (walls with their path, height, and length; lids and floors with their outline, height, and area; those an imported
+  zone archive brought), each with its triangles and world bounds; every object marked passable with its triangles; and what export
+  cannot merge into the terrain."""
+  return await callBridge(context, "getBoundaries", {})
+
+
+@guardedTool()
+async def placeZoneLine(context: Context, number: int, label: str, minimum: list[float], maximum: list[float], target: dict):
+  """Place a zone line: an axis-aligned box from corner `minimum` to `maximum` [x, y, z] named ATP_<number>_<label>, the .zon region the
+  client zones players through when they enter it (it reads the number right after ATP_; the server's zone_points row for it is
+  number x 10). target is where it leads: {zone, x, y, z, headingDegrees}, zone a short name (this zone's own for a same-zone teleport
+  or a fall catcher), x, y, z in the zone file's axes (as /loc prints them, y, x, z of the server's), headingDegrees 0 = +Y,
+  clockwise; each coordinate and the heading may be "keep" (the player's own). Zone lines sit in gaps of the boundary walls, tint
+  views with guides green in every shading, draw green in plans and sections, and export as ATP_ regions; the server's rows are not written yet. A line placed
+  with a number already in use replaces that line; adjust a box with transformObjects, remove it with deleteObjects."""
+  if not isinstance(target, dict) or not isinstance(target.get("zone"), str) or not eqgExport.zoneNamePattern.match(target["zone"]):
+    raise ToolError(f"target zone is a zone short name, lowercase letters and digits, got {target.get('zone') if isinstance(target, dict) else target!r}")
+  return await callBridge(context, "placeZoneLine", {"number": number, "label": label, "minimum": minimum, "maximum": maximum, "target": target})
+
+
+@guardedTool()
+async def getZoneLines(context: Context):
+  """Every zone line (its name, number, label, corners, and target; those an imported archive brought carry no target), what a zone
+  file cannot hold among them, and what a game export still needs (a target for each, each number used once)."""
+  return await callBridge(context, "getZoneLines", {})
 
 
 @guardedTool()
@@ -1810,18 +2038,22 @@ def catalogTexturePath(texture):
   """A texture given as an absolute path, or as a catalog texture id (texture/<name>@<hash>), which uses the catalog's extracted file."""
   if texture is None or not texture.startswith("texture/"):
     return texture
-  asset = catalogCall(catalog.requireAsset, texture)
+  asset = callReportingFailures(catalog.requireAsset, texture)
   if "file" not in asset["measured"]:
     raise ToolError(f"{texture} has no readable file: {asset['measured'].get('problem')}")
   return asset["measured"]["file"]
 
 
 @guardedTool()
-async def createMaterial(context: Context, name: str, diffuseTexture: str, normalTexture: str | None = None, cutout: bool = False, alphaThreshold: float = 0.5):
+async def createMaterial(context: Context, name: str, diffuseTexture: str, normalTexture: str | None = None, cutout: bool = False, alphaThreshold: float = 0.5, blockout: bool = False):
   """A Phase 1 material: diffuse texture, optional normal map, no shine; cutout makes the diffuse alpha a hard alpha test for foliage
-  cards. A texture is an absolute path or a catalog texture id (texture/<name>@<hash>), which uses the catalog's extracted file. The
-  material is kept in the file whether or not anything uses it yet."""
-  return await callBridge(context, "createMaterial", {"name": name, "diffuseTexture": catalogTexturePath(diffuseTexture), "normalTexture": catalogTexturePath(normalTexture), "cutout": cutout, "alphaThreshold": alphaThreshold})
+  cards. blockout marks a layout stand-in (a grey to block out with): a game export refuses it on exported faces, a test export lists
+  it, and coverage views draw it brown. A texture is an absolute path or a catalog texture id (texture/<name>@<hash>), which uses the
+  catalog's extracted file. The material is kept in the file whether or not anything uses it yet."""
+  return await callBridge(context, "createMaterial", {
+    "name": name, "diffuseTexture": catalogTexturePath(diffuseTexture), "normalTexture": catalogTexturePath(normalTexture), "cutout": cutout,
+    "alphaThreshold": alphaThreshold, "blockout": blockout,
+  })
 
 
 @guardedTool(description="Assign a material to the selected faces of a mesh without surfacing layers, adding a material slot if needed: for objects and blockout. A zone's terrain is surfaced by painting into layers (addSurfaceLayer, paintSurface)." + selectorHelp)

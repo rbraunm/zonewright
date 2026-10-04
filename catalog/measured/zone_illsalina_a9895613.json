@@ -4707,7 +4707,8 @@
      "vertical": 0.333
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.001,
+     "solid": 0.999
     },
     "unitsPerRepeat": 9.5
    },
@@ -4820,7 +4821,8 @@
      "vertical": 0.819
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.053,
+     "solid": 0.947
     },
     "unitsPerRepeat": 11.7
    },
@@ -5309,7 +5311,8 @@
      "vertical": 0.528
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.01,
+     "solid": 0.99
     },
     "unitsPerRepeat": 11.0
    },
@@ -5885,7 +5888,7 @@
      "vertical": 0.492
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.0
    },
@@ -6104,7 +6107,7 @@
      "vertical": 0.322
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 4.8
    },
@@ -6168,7 +6171,7 @@
      "vertical": 0.433
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 7.0
    },
@@ -6842,7 +6845,7 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 6.4
    },
@@ -6906,7 +6909,7 @@
      "vertical": 0.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 5.9
    },
@@ -6970,7 +6973,7 @@
      "vertical": 0.079
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 4.7
    },
@@ -7034,7 +7037,7 @@
      "vertical": 0.183
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 5.7
    },
@@ -7149,7 +7152,7 @@
      "vertical": 0.191
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 5.3
    },
@@ -7213,7 +7216,7 @@
      "vertical": 0.594
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 4.9
    },
@@ -7326,7 +7329,7 @@
      "vertical": 0.542
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 3.5
    },
@@ -7439,7 +7442,7 @@
      "vertical": 0.318
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 5.2
    },
@@ -7549,7 +7552,7 @@
      "vertical": 0.066
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 1.8
    },
@@ -9164,6 +9167,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:illsalina",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "illsalina"
 }

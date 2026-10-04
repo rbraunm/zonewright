@@ -19403,7 +19403,7 @@
      "flat": 0.17,
      "overhang": 0.567,
      "slope": 0.218,
-     "steep": 0.002,
+     "steep": 0.003,
      "vertical": 0.042
     },
     "surfaces": {
@@ -19467,7 +19467,7 @@
      "vertical": 0.575
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 6.5
    },
@@ -20461,7 +20461,7 @@
      "vertical": 0.662
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 7.6
    },
@@ -20638,7 +20638,8 @@
      "vertical": 0.015
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.016,
+     "solid": 0.984
     },
     "unitsPerRepeat": 12.8
    },
@@ -24285,7 +24286,8 @@
      "vertical": 0.596
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.004,
+     "solid": 0.996
     },
     "unitsPerRepeat": 10.5
    },
@@ -24963,7 +24965,7 @@
      "vertical": 0.687
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 13.1
    },
@@ -25186,7 +25188,7 @@
      "vertical": 1.0
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 10.9
    },
@@ -25252,7 +25254,8 @@
      "vertical": 0.894
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.17,
+     "solid": 0.83
     },
     "unitsPerRepeat": 5.7
    },
@@ -25909,7 +25912,7 @@
      "vertical": 0.727
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 1.0
     },
     "unitsPerRepeat": 4.0
    },
@@ -26075,7 +26078,8 @@
      "vertical": 0.542
     },
     "surfaces": {
-     "solid": 1.0
+     "passable": 0.942,
+     "solid": 0.058
     },
     "unitsPerRepeat": 2.7
    },
@@ -26367,6 +26371,6 @@
  "format": "eqgz",
  "problems": [],
  "source": "zone:theatera",
- "surveyVersion": 4,
+ "surveyVersion": 5,
  "zone": "theatera"
 }
