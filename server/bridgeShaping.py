@@ -38,6 +38,10 @@ diagonalSweeps = 4
 contourTolerance = 1e-6
 # Halvings that place a cut on a distance level along its edge: 2 to the -20th of the edge.
 contourBisections = 20
+# An edge whose ends lie on one side of a distance level is sampled at most this share of the level apart to find where the distance
+# passes the level between them; splitting there and triangulating repeats at most this many times.
+contourSampleShare = 0.25
+contourPeakRounds = 4
 # Two neighbors on either side of one break both snap onto it unless they would land closer than this share of an edge apart along
 # it (where a warp squeezed the grid); then only the nearer snaps, as both would fold the faces between them. A rim slide that would
 # land this close to a neighbor (one snapped onto a break lying on the rim) is not made either.
@@ -611,13 +615,51 @@ def followContours(objectName, selector):
   return triangulateAlongContours(sceneObject, positions, mask) | bridgeMeshAccess.meshCounts(sceneObject)
 
 
-def cutContours(objectName, levels, distanceFrom, selector):
+def splitAtPeaks(meshEditor, cutting, values, points, tree, level):
+  """Split each edge of the cut faces whose ends lie on one side of a distance level that the distance between them passes (an edge
+  up a wall one cell wide, both ends on the border, passes a level below half the wall's height) where it lies farthest past the
+  level, and triangulate the faces around the new vertex, so the level crosses each edge at most once. Returns how many it split."""
+  splits = []
+  for edge in sorted({edge for face in cutting for edge in face.edges}, key=lambda edge: edge.index):
+    start, end = edge.verts
+    first, second = values[start.index] - level, values[end.index] - level
+    if not (math.isfinite(first) and math.isfinite(second)) or first * second <= 0:
+      continue
+    length = float(numpy.linalg.norm(points[end.index] - points[start.index]))
+    # Distance changes no faster than one moves along the edge, so it reaches the level only on an edge at least this long.
+    if abs(first) + abs(second) >= length:
+      continue
+    count = max(2, math.ceil(length / (contourSampleShare * level)))
+    fractions = numpy.arange(1, count) / count
+    past = numpy.array([tree.nearest(points[start.index] + fraction * (points[end.index] - points[start.index]))[0] for fraction in fractions]) - level
+    farthest = int(numpy.argmax(-numpy.sign(first) * past))
+    if numpy.sign(past[farthest]) != numpy.sign(first):
+      splits.append((edge, start, float(fractions[farthest]), float(past[farthest]) + level))
+  touched = set()
+  for edge, start, fraction, distance in splits:
+    end = edge.other_vert(start)
+    _, vertex = bmesh.utils.edge_split(edge, start, fraction)
+    vertex.index = len(values)
+    values.append(distance)
+    points.append(points[start.index] + fraction * (points[end.index] - points[start.index]))
+    touched.update(vertex.link_faces)
+  if touched:
+    triangulated = bmesh.ops.triangulate(meshEditor, faces=sorted(touched, key=lambda face: face.index), quad_method="BEAUTY", ngon_method="BEAUTY")
+    cutting.update(triangulated["faces"])
+    cutting.difference_update([face for face in cutting if not face.is_valid])
+  return len(splits)
+
+
+def cutContours(objectName, levels, distanceFrom, selector, onlyAbove):
   """Cut the selected faces along level lines, as an artist adds an edge loop: lines of equal height, or with distanceFrom, of equal
-  distance from the border of the faces it picks. Each crossed edge splits where the line crosses it (the new vertex placed alike in
-  every shaping pass, with UVs and face paint carried over) and each crossed face splits along the line."""
+  distance from the border of the faces it picks (with onlyAbove, only from where the faces beyond it rise above them: a wall's foot,
+  not its lip). Each crossed edge splits where the line crosses it (the new vertex placed alike in every shaping pass, with UVs and face
+  paint carried over), an edge the line crosses twice first splits between (splitAtPeaks), and each crossed face splits along the line."""
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   if not levels or len(set(levels)) != len(levels):
     raise ValueError(f"levels is a list of different values, got {levels!r}")
+  if onlyAbove and distanceFrom is None:
+    raise ValueError("onlyAbove measures distance from where the faces beyond distanceFrom's rise above them; it needs distanceFrom")
   within = bridgeMeshAccess.evaluateSelector(selector, sceneObject, "faces")
   bridgeMeshAccess.requireSelection(within, selector, sceneObject, "faces")
   positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
@@ -629,9 +671,12 @@ def cutContours(objectName, levels, distanceFrom, selector):
       raise ValueError(f"Distances from a border are positive, got {levels!r}")
     picked = bridgeMeshAccess.evaluateSelector(distanceFrom, sceneObject, "faces")
     bridgeMeshAccess.requireSelection(picked, distanceFrom, sceneObject, "faces")
-    border = bridgeMeshAccess.faceBorderEdges(sceneObject, picked, ~picked)
+    border, pickedFaces, beyondFaces = bridgeMeshAccess.faceBorders(sceneObject, picked, ~picked)
+    if onlyAbove:
+      heights = bridgeMeshAccess.readFaceArrays(sceneObject)[0][:, 2]
+      border = border[heights[beyondFaces] > heights[pickedFaces]]
     if not len(border):
-      raise ValueError(f"The faces {distanceFrom!r} picks have no border on '{objectName}'")
+      raise ValueError(f"The faces {distanceFrom!r} picks have no border{' below the faces beyond them' if onlyAbove else ''} on '{objectName}'")
     edges = bridgeMeshAccess.meshEdges(sceneObject.data)
     tree = bridgeMeshAccess.BorderDistance(positions[edges[border, 0]], positions[edges[border, 1]])
     loopTotals, loopVertices = bridgeMeshAccess.faceLoops(sceneObject)
@@ -642,8 +687,19 @@ def cutContours(objectName, levels, distanceFrom, selector):
   points = list(positions)
   meshEditor = bridgeMeshAccess.loadBMesh(sceneObject)
   cutting = {meshEditor.faces[index] for index in numpy.flatnonzero(within)}
-  splitEdges = splitFaces = 0
+  splitEdges = splitFaces = doubleCrossings = 0
   for level in sorted(levels):
+    if tree is not None:
+      for _ in range(contourPeakRounds + 1):
+        split = splitAtPeaks(meshEditor, cutting, values, points, tree, level)
+        meshEditor.edges.index_update()
+        meshEditor.faces.index_update()
+        doubleCrossings += split
+        if not split:
+          break
+      else:
+        meshEditor.free()
+        raise ValueError(f"Edges the distance level {level} crosses twice remained after {contourPeakRounds} rounds of splitting them on '{objectName}'; nothing was changed")
     onLevel = set()
     for edge in sorted({edge for face in cutting for edge in face.edges}, key=lambda edge: edge.index):
       start, end = edge.verts
@@ -676,7 +732,7 @@ def cutContours(objectName, levels, distanceFrom, selector):
   meshEditor.to_mesh(sceneObject.data)
   meshEditor.free()
   sceneObject.data.update()
-  return {"splitEdges": splitEdges, "splitFaces": splitFaces} | bridgeMeshAccess.meshCounts(sceneObject)
+  return {"splitEdges": splitEdges, "splitFaces": splitFaces, "doubleCrossings": doubleCrossings} | bridgeMeshAccess.meshCounts(sceneObject)
 
 
 def maskWeights(sceneObject, selector, fadeDistance, positions):

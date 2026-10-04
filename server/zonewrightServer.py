@@ -1590,23 +1590,29 @@ async def removeSurfaceLayer(context: Context, objectName: str, name: str):
   "Paint a material into a surfacing layer where the selector says, as an artist paints by intent: a region, a stroke along a path"
   " (nearPath with a radius), around a point (sphere), or masks combined with them. A slope or height mask inside a region is a recipe"
   " as the client's terrain ecosystems use them (rock on that region's steep ground, a band of ground at chosen heights); one hard rule"
-  " across the whole zone is not. edgeNoise {featureSize, amplitude, seed} moves the"
-  " painted edge in and out by smooth noise so it wanders as a painted edge does instead of tracing a circle, a line, or the grid." + selectorHelp))
+  " across the whole zone is not. edgeNoise {featureSize, amplitude, seed} moves the painted edge along the ground by smooth noise, up"
+  " to `amplitude` units, so it wanders as a painted edge does instead of tracing a circle, a line, or the grid; the ground on both"
+  " sides of the edge moves alike, so a stroke bends as a whole and stays in one piece while the amplitude is no more than about half"
+  " its radius. The noise is laid out in plan: the same edgeNoise on the same selector picks the same faces again (eraseSurface,"
+  " clearRegion)." + selectorHelp))
 async def paintSurface(context: Context, objectName: str, layer: str, material: str, selector: dict, edgeNoise: dict | None = None):
   return await callBridge(context, "paintSurface", {"objectName": objectName, "layer": layer, "material": material, "selector": selector, "edgeNoise": edgeNoise})
 
 
-@guardedTool(description="Erase a surfacing layer where the selector says, with the same edgeNoise as paintSurface, so the layers beneath show again." + selectorHelp)
+@guardedTool(description="Erase a surfacing layer where the selector says, with the same edgeNoise as paintSurface, so the layers beneath show again, each with its own mapping (a transition erased leaves the mapping beneath it as it was)." + selectorHelp)
 async def eraseSurface(context: Context, objectName: str, layer: str, selector: dict, edgeNoise: dict | None = None):
   return await callBridge(context, "eraseSurface", {"objectName": objectName, "layer": layer, "selector": selector, "edgeNoise": edgeNoise})
 
 
 @guardedTool(description=(
   "Edit a surfacing layer's painted area at its edges, within the selector, `steps` faces at a time: grow it outward, shrink it inward,"
-  " or smooth it (each face takes the value most of itself and its neighbours hold, which absorbs islands and evens ragged edges); or"
-  " clean it, as an artist picks off the stray specks they see: every speck of a material and every hole in one smaller than"
-  " `minimumArea` square units, as the surface shows it with every layer, is taken over in this layer by the material it borders most,"
-  " where this layer or one beneath it decides what shows." + selectorHelp))
+  " or smooth it (each face takes the value that holds most of the surface around its corners, itself included, which absorbs islands"
+  " and rounds off ragged notches and teeth a face or two across; a straight edge stays, and the grid's own stair-steps along a smooth"
+  " edge are conformSurfaceEdges' work); or clean it, as an artist picks off the stray specks they see: every speck of a material and"
+  " every hole in one smaller than `minimumArea` square units, as the surface shows it with every layer, is taken over by the material it"
+  " borders most. Clean only lifts this layer's own paint off (where what lies beneath shows that material, or the speck is this"
+  " layer's) or fills a hole in it with its own paint; it never copies another layer's material into it, so a speck that a lower layer"
+  " paints amid another lower layer's paint is left for cleaning that layer." + selectorHelp))
 async def editSurface(
   context: Context, objectName: str, layer: str, operation: str, steps: int = 1, selector: dict = allSelector, minimumArea: float | None = None,
 ):
@@ -1615,10 +1621,13 @@ async def editSurface(
 
 @guardedTool(description=(
   "Bring a surfacing layer's edges onto the mesh's own edges along a smooth line, as the client's zones run material borders along"
-  " edges their artists modeled: the layer's coverage is evened out over about `smoothing` world units (a cell or two of the mesh"
-  " takes out saw teeth; more rounds the edge further), the vertex nearest where each mesh edge crosses the evened line slides along"
-  " that edge onto it, in every shaping pass alike and carrying its UVs, and faces take the side they now lie on. Run it again to"
-  " even the line further. Within the selector only; faces that would turn over keep their vertices (keptInPlace)." + selectorHelp))
+  " edges their artists modeled: each border is evened out along its length over about `smoothing` world units (a cell or two of the"
+  " mesh takes out saw teeth; more rounds bends further), keeping the area a closed border encloses, so a narrow stroke keeps its"
+  " width; the vertex nearest where each mesh edge crosses the evened line slides along that edge onto it, in every shaping pass alike"
+  " and carrying its UVs; and faces near it take the side of the line their middle lies on. Running it again on a border it evened"
+  " leaves it as it is. Borders on creases (a cliff's foot or lip) already run on modeled edges and stay; a piece whose whole outline is"
+  " shorter than about three times `smoothing` is left as it is (editSurface clean takes specks off). Within the selector only; faces"
+  " that would turn over keep their vertices (keptInPlace)." + selectorHelp))
 async def conformSurfaceEdges(context: Context, objectName: str, layer: str, smoothing: float, selector: dict = allSelector):
   return await callBridge(context, "conformSurfaceEdges", {"objectName": objectName, "layer": layer, "smoothing": smoothing, "selector": selector})
 
@@ -1626,21 +1635,30 @@ async def conformSurfaceEdges(context: Context, objectName: str, layer: str, smo
 @guardedTool(description=(
   "Cut the selected faces along level lines, as an artist adds an edge loop where a material, a ledge, or a band should begin: lines of"
   " equal height at each of `levels`, or with distanceFrom (a selector), lines at each distance in `levels` from the border of the"
-  " faces it picks. Each crossed edge splits where the line crosses it, the new vertex placed alike in every shaping pass with UVs and"
-  " surfacing paint carried over, and each crossed face splits along the line, so a height band, a stratum, or a transition strip"
-  " ends on a modeled edge instead of zigzagging across the triangles." + selectorHelp))
-async def cutContours(context: Context, objectName: str, levels: list[float], distanceFrom: dict | None = None, selector: dict = allSelector):
-  return await callBridge(context, "cutContours", {"objectName": objectName, "levels": levels, "distanceFrom": distanceFrom, "selector": selector})
+  " faces it picks; with onlyAbove, only from the border where the faces beyond the picked ones rise above them (a wall's foot, not its"
+  " lip), as paintTransition's onlyAbove measures its strip. Each crossed edge splits where the line crosses it, the new vertex placed"
+  " alike in every shaping pass with UVs and surfacing paint carried over, and each crossed face splits along the line, so a height"
+  " band, a stratum, or a transition strip ends on a modeled edge instead of zigzagging across the triangles. An edge the line crosses"
+  " twice (up a wall one cell wide, both ends on the border) is first split where it lies farthest past the level, so both crossings"
+  " are cut (doubleCrossings)." + selectorHelp))
+async def cutContours(
+  context: Context, objectName: str, levels: list[float], distanceFrom: dict | None = None, selector: dict = allSelector, onlyAbove: bool = False,
+):
+  return await callBridge(context, "cutContours", {"objectName": objectName, "levels": levels, "distanceFrom": distanceFrom, "selector": selector, "onlyAbove": onlyAbove})
 
 
 @guardedTool(description=(
   "Paint a transition texture where two grounds meet, as the client's zones blend one into the next: a strip `width` units wide"
   " along the border between the faces `selector` picks and those `toward` picks, on the selector's side, painted with `material`"
   " into `layer` and mapped so the texture's bottom edge lies on the border and its top `width` away, repeating along the border every"
-  " worldUnitsPerRepeat units. For a texture that tiles across but not down, such as sand blending up into rock at a wall's foot. Only"
-  " faces lying wholly within `width` are painted; those straddling it are counted (straddlingFaces): cut a contour at `width` first"
-  " (cutContours with distanceFrom) so the strip ends on a modeled edge. With onlyAbove, only faces lying above the border are painted:"
-  " the foot of a wall, where rock rises from the ground, and not the lip of a ledge, where ground ends above rock falling away." + selectorHelp))
+  " worldUnitsPerRepeat units (around a closed border, the nearest whole number of repeats, so the strip has no seam). For a texture"
+  " that tiles across but not down, such as sand blending up into rock at a wall's foot. The strip keeps its own mapping in its layer:"
+  " erasing, muting, or removing it shows the mapping beneath again. Only faces lying wholly within `width`, over which the distance runs"
+  " evenly and along one stretch of border, are painted; the faces the strip wants but cannot paint are counted"
+  " (straddlingFaces): cut a contour at `width` first (cutContours with distanceFrom the toward faces and the same onlyAbove) so the strip"
+  " ends on a modeled edge. With onlyAbove, the strip runs only from the border where the selector's faces rise above the toward faces"
+  " and up from it: the foot of a wall, where rock rises from the ground, and not the lip of a ledge, where ground ends above rock"
+  " falling away." + selectorHelp))
 async def paintTransition(
   context: Context, objectName: str, layer: str, material: str, selector: dict, toward: dict, width: float, worldUnitsPerRepeat: float,
   onlyAbove: bool = False,
@@ -1654,25 +1672,37 @@ async def paintTransition(
 @guardedTool(description=(
   "Take shaping back inside the selector (usually a region): each named shaping pass, or every pass, loses what it moved there, faded"
   " out over fadeDistance from the edge so the area rejoins its surroundings. Removing is a way of adding: take an area back to its"
-  " earlier form, then shape it again." + selectorHelp))
+  " earlier form, then shape it again. Passes hold moves, not shapes: a pass kept that also moved the area (stillShapedBy) keeps its"
+  " moves, so a level it raised the ground to (a fill's plateau on a hill) now stands off it by what the passes taken back lifted under"
+  " it, a dished plateau where a hill is taken back; level it again (rebuildRegion height) or take that pass back too." + selectorHelp))
 async def resetRegion(context: Context, objectName: str, selector: dict, passes: list[str] | None = None, fadeDistance: float = 0.0):
   return await callBridge(context, "resetRegion", {"objectName": objectName, "selector": selector, "passes": passes, "fadeDistance": fadeDistance})
 
 
 @guardedTool(description=(
   "Give the selector's area (usually a region) a fresh start: mode surroundings spans its heights smoothly from the ground around it,"
-  " a blank slate already joined to its surroundings; mode height levels it to `height`. Faded in over fadeDistance from the edge;"
-  " with shaping passes, the change goes into the active pass." + selectorHelp))
+  " a blank slate already joined to its surroundings; mode height levels it to `height`. Faded in over fadeDistance from the edge."
+  " With shaping passes, its vertices also go back to where the base lays them out in plan, so sideways moves of earlier passes (a"
+  " roughened or faceted wall, contours a fill snapped onto) leave no creases, and the change goes into the active pass; without"
+  " passes nothing records where they lay, and they keep their places in plan." + selectorHelp))
 async def rebuildRegion(context: Context, objectName: str, selector: dict, mode: str, height: float | None = None, fadeDistance: float = 0.0):
   return await callBridge(context, "rebuildRegion", {"objectName": objectName, "selector": selector, "mode": mode, "height": height, "fadeDistance": fadeDistance})
 
 
 @guardedTool()
-async def clearRegion(context: Context, region: str, terrainObject: str, shaping: str = "keep", surfacing: bool = False, objects: bool = False, fadeDistance: float = 0.0):
-  """Take a region back to start it again, in one stroke: its shaping kept, reset (passes taken back), or rebuilt (spanned from the
-  ground around it), faded over fadeDistance; its surfacing erased from every layer of the terrain; and the objects placed in it
-  (models, lights, emitters) deleted."""
-  return await callBridge(context, "clearRegion", {"region": region, "terrainObject": terrainObject, "shaping": shaping, "surfacing": surfacing, "objects": objects, "fadeDistance": fadeDistance})
+async def clearRegion(
+  context: Context, region: str, terrainObject: str, shaping: str = "keep", surfacing: bool = False, objects: bool = False, fadeDistance: float = 0.0,
+  edgeNoise: dict | None = None,
+):
+  """Take a region back to start it again, in one stroke: its surfacing erased from every layer of the terrain over the region's faces,
+  or with edgeNoise {featureSize, amplitude, seed} over them as paintSurface's edgeNoise moves their edge, so passing the edgeNoise the
+  region was painted with also takes back the paint that spilled past its edge (without it, that spill stays); its shaping kept, reset
+  (passes taken back), or rebuilt (spanned from the ground around it), faded over fadeDistance; and the objects placed in it (models,
+  lights, emitters) deleted."""
+  return await callBridge(context, "clearRegion", {
+    "region": region, "terrainObject": terrainObject, "shaping": shaping, "surfacing": surfacing, "objects": objects, "fadeDistance": fadeDistance,
+    "edgeNoise": edgeNoise,
+  })
 
 
 def catalogTexturePath(texture):
@@ -1698,7 +1728,7 @@ async def assignMaterial(context: Context, objectName: str, materialName: str, s
   return await callBridge(context, "assignMaterial", {"objectName": objectName, "materialName": materialName, "selector": selector})
 
 
-@guardedTool(description="Project UVs onto the selected faces from world positions so one texture repeat spans `worldUnitsPerRepeat` units: `planar` along `direction`, or `box`, which projects each face along its dominant axis so steep faces do not stretch." + selectorHelp)
+@guardedTool(description="Project UVs onto the selected faces from world positions so one texture repeat spans `worldUnitsPerRepeat` units: `planar` along `direction`, or `box`, which projects each face along its dominant axis so steep faces do not stretch. On terrain whose layers hold transitions (paintTransition), this sets the mapping beneath them; the transitions keep theirs." + selectorHelp)
 async def projectUVs(context: Context, objectName: str, method: str, worldUnitsPerRepeat: float, selector: dict = allSelector, direction: list[float] | None = None):
   return await callBridge(context, "projectUVs", {"objectName": objectName, "method": method, "worldUnitsPerRepeat": worldUnitsPerRepeat, "selector": selector, "direction": direction})
 

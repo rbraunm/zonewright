@@ -500,16 +500,24 @@ def meshEdges(mesh):
   return edges.reshape(-1, 2)
 
 
-def faceBorderEdges(sceneObject, side, other):
-  """The mesh edges where a face of one face mask meets a face of the other."""
-  mesh = sceneObject.data
+def sharedEdges(mesh):
+  """Edges two faces share, each once: the edge and the two faces."""
   loopEdges = numpy.empty(len(mesh.loops), dtype=numpy.int64)
   mesh.loops.foreach_get("edge_index", loopEdges)
-  loopTotals, _ = faceLoops(sceneObject)
-  loopFaces = numpy.repeat(numpy.arange(len(loopTotals)), loopTotals)
-  edgeSide = numpy.bincount(loopEdges, weights=side[loopFaces], minlength=len(mesh.edges))
-  edgeOther = numpy.bincount(loopEdges, weights=other[loopFaces], minlength=len(mesh.edges))
-  return numpy.flatnonzero((edgeSide > 0) & (edgeOther > 0))
+  loopTotals = numpy.empty(len(mesh.polygons), dtype=numpy.int64)
+  mesh.polygons.foreach_get("loop_total", loopTotals)
+  loopFaces = numpy.repeat(numpy.arange(len(mesh.polygons)), loopTotals)
+  order = numpy.argsort(loopEdges, kind="stable")
+  matching = numpy.flatnonzero(loopEdges[order][1:] == loopEdges[order][:-1])
+  return loopEdges[order[matching]], loopFaces[order[matching]], loopFaces[order[matching + 1]]
+
+
+def faceBorders(sceneObject, side, other):
+  """The mesh edges where a face of one face mask meets a face of the other, with the face on each side."""
+  edges, first, second = sharedEdges(sceneObject.data)
+  forward = side[first] & other[second]
+  backward = side[second] & other[first] & ~forward
+  return numpy.r_[edges[forward], edges[backward]], numpy.r_[first[forward], second[backward]], numpy.r_[second[forward], first[backward]]
 
 
 class BorderDistance:

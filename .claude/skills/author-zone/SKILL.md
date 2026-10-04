@@ -54,7 +54,7 @@ Over the 52 EQ terrain zones: a median of 5 painted ecosystems per zone (10th to
 
 - `resetRegion`: take shaping passes back in an area, faded at its edge.
 - `rebuildRegion`: span the area's heights from its surroundings (a blank slate that already fits), or level it.
-- `clearRegion`: all at once, with its surfacing erased and the objects placed in it removed.
+- `clearRegion`: all at once, with its surfacing erased (pass the edgeNoise it was painted with to take back the paint that spilled past its edge) and the objects placed in it removed.
 - `eraseSurface`, `setSurfaceLayer` (mute), `removeSurfaceLayer`: take surfacing decisions back.
 
 ## What not to do
