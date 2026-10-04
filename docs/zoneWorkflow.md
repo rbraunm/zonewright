@@ -88,7 +88,7 @@ Planned; today placeOnSurface, duplicateObjects, and scatterInRegion cover part 
 
 ### Review
 
-Views come first: renderView at eye height, from above, and close; plans (renderSketch) and sections (renderSection). Checks confirm what the views show: walkRoute for slope, footing, and headroom along a route, compareWithClientZones for construction against the client's zones. Planned: views framed on given objects, walk views along a route, before-and-after comparisons of the same view, and checks for props floating above or buried in the ground, texture stretch, and uneven texture scale.
+Views come first: renderView at eye height, from above, close, and framed on given objects; views all the way round them (renderOrbit); plans (renderSketch) and sections (renderSection); and the same view before and after a change with what changed (compareRenders). Checks confirm what the views show: walkRoute for slope, footing, and headroom along a route, compareWithClientZones for construction against the client's zones. Planned: walk views along a route, and checks for props floating above or buried in the ground, texture stretch, and uneven texture scale.
 
 ### Surfacing and lighting from the catalog
 

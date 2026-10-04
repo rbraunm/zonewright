@@ -30,6 +30,9 @@ verticalFieldOfViewDegrees = 46.5
 eyeHeight = 5.5
 cameraClipStart = 0.5
 groundSearchDistance = 50.0
+# A frame view stands back so the framed objects' bounding sphere fits the view with this much to spare.
+frameMargin = 1.1
+frameMinimumRadius = 0.5
 figureDistance = 15.0
 figureStep = 1.0
 figureClearance = 1.5
@@ -236,6 +239,8 @@ def placeCamera(preview, view, figureModel):
     return {"eye": list(eye), "forward": list((target - eye).normalized()), "figure": None}
   if viewKeys == {"map"}:
     return placeMapCamera(preview, view["map"])
+  if viewKeys == {"frame"}:
+    return placeFrameCamera(preview, view["frame"])
   if viewKeys == {"standAt", "headingDegrees", "pitchDegrees"}:
     standAt = view["standAt"]
     surfaces = bridgeMeshAccess.PlayerSurfaces()
@@ -338,6 +343,46 @@ def applyLayoutShading(preview, bandHeight, heightColors):
   links.new(emission.outputs["Emission"], output.inputs["Surface"])
   preview.scene.view_layers[0].material_override = material
   return bottom, top
+
+
+def subjectCorners(preview, names):
+  """World bounding-box corners of named objects as evaluated: meshes, and collection instances by their collection's meshes."""
+  depsgraph = preview.depsgraph()
+  corners = []
+  for name in names:
+    sceneObject = bpy.data.objects.get(name)
+    if sceneObject is None:
+      raise ValueError(f"No object named '{name}'")
+    if sceneObject.type == "MESH":
+      corners += [sceneObject.matrix_world @ mathutils.Vector(corner) for corner in sceneObject.evaluated_get(depsgraph).bound_box]
+    elif bridgeMeshAccess.isCollectionInstance(sceneObject):
+      collection = sceneObject.instance_collection
+      placement = sceneObject.matrix_world @ mathutils.Matrix.Translation(-collection.instance_offset)
+      corners += [placement @ member.matrix_world @ mathutils.Vector(corner) for member in collection.all_objects if member.type == "MESH" for corner in member.bound_box]
+    else:
+      raise ValueError(f"'{name}' is a {sceneObject.type}; a frame view frames meshes and collection instances")
+  if not corners:
+    raise ValueError(f"{names} have nothing to frame")
+  return corners
+
+
+def placeFrameCamera(preview, frame):
+  """Looking at named objects from a heading and pitch, far enough back that all of them fit in the view."""
+  if not isinstance(frame, dict) or set(frame) != {"objects", "headingDegrees", "pitchDegrees"} or not frame["objects"]:
+    raise ValueError(f"A frame view is {{\"frame\": {{objects: [names], headingDegrees, pitchDegrees}}}}, got {frame!r}")
+  corners = subjectCorners(preview, frame["objects"])
+  low = mathutils.Vector([min(corner[axis] for corner in corners) for axis in range(3)])
+  high = mathutils.Vector([max(corner[axis] for corner in corners) for axis in range(3)])
+  center = (low + high) / 2
+  radius = max((high - low).length / 2, frameMinimumRadius)
+  forward = headingPitchForward(frame["headingDegrees"], frame["pitchDegrees"])
+  distance = radius / math.sin(math.radians(verticalFieldOfViewDegrees / 2)) * frameMargin
+  camera = preview.camera
+  camera.location = center - forward * distance
+  camera.rotation_quaternion = lookRotation(forward)
+  camera.data.clip_end = max(camera.data.clip_end, distance + 2 * radius)
+  # The eye and target reproduce this camera exactly; a frame view taken again re-frames on the objects as they then are.
+  return {"eye": list(camera.location), "target": list(center), "forward": list(forward), "framedRadius": radius, "figure": None}
 
 
 def placeMapCamera(preview, mapView):

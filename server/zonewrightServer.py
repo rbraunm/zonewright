@@ -31,6 +31,7 @@ import extensionCatalog
 import machineProfile
 import planDrawing
 import toolingLog
+import viewSheets
 import toolingManifest
 import toolingStatus
 import toolingSync
@@ -643,7 +644,7 @@ async def setZoneProperties(
 
 @guardedTool()
 async def renderView(context: Context, view: dict, shading: str = "client", bandHeight: float = 50.0, guides: bool = True, swimVolumes: bool = False):
-  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], or with z on the ground within 50 units below it, for caves and under overhangs; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog. shading "client" draws the zone as the client does; "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout. Guides (plot outlines, sketch massing) draw unless guides is false; with swimVolumes, each swim volume draws as a see-through block (cyan water, orange lava)."""
+  """Render the EQ preview of a view: {"camera": name}, {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], or with z on the ground within 50 units below it, for caves and under overhangs; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, north (+Y) up, `width` units across, without fog. {"frame": {"objects": [names], "headingDegrees": h, "pitchDegrees": p}} looks at the named meshes or collection instances from that heading and pitch, standing back so they fit (its result's eye and target reproduce that camera). shading "client" draws the zone as the client does; "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout. Guides (plot outlines, sketch massing) draw unless guides is false; with swimVolumes, each swim volume draws as a see-through block (cyan water, orange lava)."""
   outputPath = newRenderPath()
   figureModel = None
   zone = await callBridge(context, "getZoneProperties", {})
@@ -1456,6 +1457,45 @@ async def renderSketch(
     "bandHeight": bandHeight, "gridStep": drawn["gridStep"], "sheetColors": drawn["sheetColors"],
     "shapes": {sheet["sheet"]: len(sheet["shapes"]) for sheet in overlays["sheets"]},
   }]
+
+
+@guardedTool()
+def compareRenders(before: str, after: str, beforeLabel: str = "before", afterLabel: str = "after"):
+  """Two renders of the same view (renderView's outputPath before and after a change) side by side, with a change map: the after view
+  dimmed and every changed pixel in red; and how much of the view changed and where (pixel bounds [left, top, right, bottom]).
+  Identical input renders byte-identical, so red marks real change, as long as both used one camera: render the second with the
+  first's eye and target (a frame view re-frames on objects that changed size, and a standAt view stands on ground that moved)."""
+  outputPath = newRenderPath().with_suffix(".jpg")
+  try:
+    compared = viewSheets.compareSheet(before, after, outputPath, [beforeLabel, afterLabel])
+  except ValueError as error:
+    raise ToolError(str(error)) from error
+  return [Image(data=outputPath.read_bytes(), format="jpeg"), {"outputPath": str(outputPath)} | compared]
+
+
+@guardedTool()
+async def renderOrbit(
+  context: Context, objects: list[str], pitchDegrees: float = -25.0, views: int = 8, shading: str = "client", guides: bool = True,
+):
+  """Look all the way round named objects: `views` frame views (2 to 12) at headings evenly round them, the first looking north (+Y),
+  from pitchDegrees (negative looks down), each framed so the objects fit, on one sheet labeled by heading. For judging a form from
+  every side, and which sides need work."""
+  if not 2 <= views <= 12:
+    raise ToolError(f"views is 2 to 12, got {views}")
+  zone = await callBridge(context, "getZoneProperties", {})
+  sky = await zoneSky(zone)
+  cells = []
+  for index in range(views):
+    heading = 360 * index / views
+    outputPath = newRenderPath()
+    await callBridge(context, "renderView", {
+      "view": {"frame": {"objects": objects, "headingDegrees": heading, "pitchDegrees": pitchDegrees}}, "outputPath": str(outputPath),
+      "figureModel": None, "shading": shading, "bandHeight": 50.0, "guides": guides, "sky": sky, "swimVolumes": False,
+    })
+    cells.append((viewSheets.openRender(outputPath), f"looking {heading:g} degrees"))
+  sheetPath = newRenderPath().with_suffix(".jpg")
+  size = viewSheets.writeGrid(cells, 4 if views > 4 else views, sheetPath)
+  return [Image(data=sheetPath.read_bytes(), format="jpeg"), {"outputPath": str(sheetPath), "views": views} | size]
 
 
 @guardedTool()
