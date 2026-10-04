@@ -6,6 +6,7 @@ import os
 import platform
 import subprocess
 import time
+import winreg
 from pathlib import Path
 
 from mcp.server.mcpserver.exceptions import ToolError
@@ -33,8 +34,15 @@ def profilePath(toolingRoot):
   return toolingRoot / "machineProfile.json"
 
 
+def processorIdentity():
+  # platform.processor() asks WMI, which times out under load, and then falls back to PROCESSOR_IDENTIFIER, a variable the MCP client
+  # leaves out of the server's environment: the fingerprint would change with the machine's load.
+  with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\CentralProcessor\0") as key:
+    return f"{winreg.QueryValueEx(key, 'Identifier')[0]}, {winreg.QueryValueEx(key, 'VendorIdentifier')[0]}"
+
+
 def hardwareFingerprint():
-  return {"logicalProcessors": os.cpu_count(), "processor": platform.processor(), "machine": platform.machine()}
+  return {"logicalProcessors": os.cpu_count(), "processor": processorIdentity(), "machine": platform.machine()}
 
 
 def benchmarkBackend(executablePath, backend):
