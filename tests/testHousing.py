@@ -60,15 +60,21 @@ def testPlotBorderOpensTowardItsStreetAndItsPriceFollowsTheRules(stageBlenderSer
     await session.expectSuccess("setZoneHousing", decision)
     placed = await session.expectSuccess("placePlot", {"address": "101 Test Street", "center": [0, 0], "facingDegrees": 90, "items": 120, "pets": 6, "features": ["view"]})
     lowTier = await session.expectSuccess("placePlot", {"address": "103 Test Street", "center": [0, 300], "facingDegrees": 90, "items": 90, "pets": 4})
+    guide = (await session.expectSuccess("runPython", {"code": "result = [list(vertex.co) for vertex in bpy.data.objects['103 Test Street'].data.vertices]"}))["result"]
     border = (await session.expectSuccess("runPython", {"code": "plotName = '101 Test Street'\n" + readBorder}))["result"]
     overridden = await session.expectSuccess("editPlot", {"address": "101 Test Street", "pricePlatinum": 200})
     restored = await session.expectSuccess("editPlot", {"address": "101 Test Street", "pricePlatinum": 0})
     smaller = await session.expectSuccess("editPlot", {"address": "101 Test Street", "size": [120, 120]})
     smallerBorder = (await session.expectSuccess("runPython", {"code": "plotName = '101 Test Street'\n" + readBorder}))["result"]
     overlapping = await session.expectSuccess("placePlot", {"address": "102 Test Street", "center": [60, 0], "facingDegrees": 90})
-    return placed, lowTier, border, overridden, restored, smaller, smallerBorder, overlapping
+    return placed, lowTier, guide, border, overridden, restored, smaller, smallerBorder, overlapping
 
-  placed, lowTier, border, overridden, restored, smaller, smallerBorder, overlapping = stageBlenderServer.session(steps)
+  placed, lowTier, guide, border, overridden, restored, smaller, smallerBorder, overlapping = stageBlenderServer.session(steps)
+  # The guide stays inside the plot: its entrance mark is a chevron set 6 in from the entrance side (local +y), pointing out.
+  guide = numpy.array(guide)
+  assert numpy.isclose(guide[:, 1].max(), 170.1 / 2) and numpy.isclose(numpy.abs(guide[:, 0]).max(), 169.1 / 2)
+  tips = guide[numpy.isclose(guide[:, 0], 0)]
+  assert numpy.isclose(tips[:, 1].max(), 170.1 / 2 - 6) and len(guide) == 14
   # Facing east (+X), the border's open side (the model's -x wall) opens east, and the border's middle stands on the plot's center.
   assert numpy.allclose(border["openSide"], [1, 0, 0], atol=1e-6)
   assert numpy.allclose(border["middle"][:2], [0, 0], atol=1e-3) and border["name"] == "101 Test Street border"
