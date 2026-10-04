@@ -51,7 +51,7 @@ Each item says what it looks like and where it shows. Severity: **blocking** bre
 
 | Problem | What it looks like | Where it shows |
 |---|---|---|
-| Wrong scale against the player | Doors, steps, paths, ledges, plots, or props too big or too small beside the scale figure (5 units tall) | Eye-level views with the figure; review cameras that keep her |
+| Wrong scale against the player | Doors, steps, paths, ledges, plots, or props too big or too small beside the scale figure: a player of the default height as the client draws her in the zone, about 6.5 units tall where the zone lacks NewEngineZone (as EQEmu serves every zone) and 5 where it has it | Eye-level views with the figure; review cameras that keep her |
 | No landmark anchoring the view | A view with nothing to orient by: no distinct silhouette, structure, fall, or light to steer toward | Zone-in, hub, and route views |
 | Unreadable routes | Nowhere obvious to go; paths that vanish, dead ends without a reason, a climb that looks walkable and is not | `renderRouteStrip`; eye level at forks |
 | The edge of the world | The rim below eye level, the void or bare sky under the horizon, the zone's end in plain sight | Eye level looking out from high ground and toward the edges |
@@ -71,7 +71,8 @@ After each authoring step (`author-zone`), and before showing work to the owner,
 - the concept art's paths;
 - the layout: the plan's path, and each region's name and intent;
 - reference screenshots of client zones of the same kind (`getZoneSurvey` interpretations' screenshots or `importZone` views), with what each shows;
-- each render's path, its view name, its note (what to judge there), and its view (the `view` renderView took), so it can `pick` what it names.
+- each render's path, its view name, its note (what to judge there), and its view (the `view` renderView took), so it can `pick` what it names;
+- how tall the scale figure is drawn in the zone (see the checklist's scale item).
 
 Never give it your reasoning about the work, what you expect it to find, or what you already fixed. A fresh critic runs each time, so it is never anchored by its own last verdict.
 
