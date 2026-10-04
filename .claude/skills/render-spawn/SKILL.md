@@ -91,7 +91,7 @@ Common race defaults in the dumps: DAF 5, ELF 5, HUF 6, HUM 6, IKM 6.5, DKF 5.7.
 
 ## Scale figure
 
-Every eye-level `renderView` (`standAt`) stands a dark elf female of height 5, drawn at the client's scale for the zone's `newEngineZone`, about 15 units ahead, walked along the ground like a player so walls, drops, and climbs stop her, facing the camera.
+Every eye-level `renderView` (`standAt`) stands a dark elf female of height 5, drawn at the client's scale for the zone's `newEngineZone`, about 15 units ahead, walked along the ground like a player so walls, drops, and climbs stop her, facing the camera. On ground too narrow to walk her ahead on (a ledge, a ramp seen from its side), `figureAt` [x, y, z] in the view stands her there by hand.
 
 ## Limits
 

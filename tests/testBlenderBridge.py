@@ -210,6 +210,30 @@ def testEyeLevelViewPlacesFigureAndPickMeasuresTheGround(stageBlenderServer):
   assert sky["hit"] is False
 
 
+def testStandAtFindsAFloorFromJustUnderItAndFigureAtStandsTheFigureByHand(stageBlenderServer):
+  # A ramp 20 wide rising 0.4 a unit over the ground plane: its floor at y 50 is 20 high, at y 60 24.
+  rampCode = """
+mesh = bpy.data.meshes.new('ramp')
+mesh.from_pydata([(-10, 0, 0), (10, 0, 0), (10, 100, 40), (-10, 100, 40)], [], [(0, 1, 2, 3)])
+bpy.context.scene.collection.objects.link(bpy.data.objects.new('ramp', mesh))
+"""
+
+  async def steps(session):
+    await buildGroundScene(session)
+    await session.expectSuccess("runPython", {"code": rampCode})
+    _, underFloor = await session.expectImage("renderView", {"view": {"standAt": [0, 50, 18], "headingDegrees": 0, "pitchDegrees": 0}})
+    noRoom = await session.expectError("renderView", {"view": {"standAt": [9, 50, 20], "headingDegrees": 90, "pitchDegrees": 0}})
+    _, byHand = await session.expectImage("renderView", {"view": {"standAt": [9, 50, 20], "headingDegrees": 90, "pitchDegrees": 0, "figureAt": [0, 60, 23]}})
+    return underFloor, noRoom, byHand
+
+  underFloor, noRoom, byHand = stageBlenderServer.session(steps)
+  assert underFloor["ground"][:2] == [0.0, 50.0] and abs(underFloor["ground"][2] - 20.0) <= 0.01
+  assert abs(underFloor["eye"][2] - (20.0 + eyeHeight)) <= 0.01
+  assert "No room for the scale figure" in noRoom and "figureAt" in noRoom
+  assert byHand["figure"][:2] == [0.0, 60.0] and abs(byHand["figure"][2] - 24.0) <= 0.01
+  assert abs(byHand["ground"][2] - 20.0) <= 0.01
+
+
 def testMapViewLooksStraightDownWithoutFogAndPicksWhereItShows(stageBlenderServer):
   async def steps(session):
     await buildGroundScene(session)

@@ -29,6 +29,9 @@ renderSamples = 4
 verticalFieldOfViewDegrees = 46.5
 eyeHeight = 5.5
 cameraClipStart = 0.5
+# A point given with its height finds the ground from this far above it, so a height read off a floor or a little under it still
+# stands on that floor, down to groundSearchDistance below it.
+groundSearchAbove = 3.0
 groundSearchDistance = 50.0
 # A frame view stands back so the framed objects' bounding sphere fits the view with this much to spare.
 frameMargin = 1.1
@@ -293,20 +296,9 @@ def placeCamera(preview, view, figureModel):
     return placeMapCamera(preview, view["map"])
   if viewKeys == {"frame"}:
     return placeFrameCamera(preview, view["frame"])
-  if viewKeys == {"standAt", "headingDegrees", "pitchDegrees"}:
-    standAt = view["standAt"]
+  if viewKeys - {"figureAt"} == {"standAt", "headingDegrees", "pitchDegrees"}:
     surfaces = bridgeMeshAccess.PlayerSurfaces()
-    if len(standAt) == 2:
-      bottom, top = sceneHeightRange(preview)
-      ground = surfaces.footingBelow(mathutils.Vector((*standAt, top + mapClearance)), top - bottom + 2 * mapClearance)
-      if ground is None:
-        raise ValueError(f"No ground below {list(standAt)}")
-    elif len(standAt) == 3:
-      ground = surfaces.footingBelow(mathutils.Vector(standAt) + mathutils.Vector((0, 0, 1)), groundSearchDistance)
-      if ground is None:
-        raise ValueError(f"No ground within {groundSearchDistance} units below {list(standAt)}")
-    else:
-      raise ValueError(f"standAt is [x, y] or [x, y, z], got {standAt!r}")
+    ground = standingGround(preview, surfaces, view["standAt"], "standAt")
     # Where the water stands over the eye, the player swims, eye at the surface.
     waterDepth = bridgeMeshAccess.waterDepthAt(bridgeMeshAccess.swimSurfaces(), ground)
     swimming = waterDepth is not None and waterDepth > eyeHeight - swimEyeAboveSurface
@@ -317,10 +309,32 @@ def placeCamera(preview, view, figureModel):
       "eye": list(eye), "forward": list(forward), "ground": list(ground), "waterDepth": None if waterDepth is None else round(waterDepth, 2),
       "swimming": swimming, "figure": None,
     }
-    if figureModel is not None:
+    if figureModel is not None and "figureAt" in view:
+      footing = standingGround(preview, surfaces, view["figureAt"], "figureAt")
+      toEye = eye - footing
+      facing = view["headingDegrees"] + 180 if toEye.xy.length < 1e-6 else math.degrees(math.atan2(toEye.x, toEye.y))
+      preview.addFigure(footing, figureModel, facing)
+      description["figure"] = list(footing)
+    elif figureModel is not None:
       description["figure"] = list(placeScaleFigure(preview, surfaces, ground, view["headingDegrees"], figureModel))
     return description
-  raise ValueError(f"A view is {{camera}}, {{eye, target}}, {{map}}, or {{standAt, headingDegrees, pitchDegrees}}; got keys {sorted(viewKeys)}")
+  raise ValueError(f"A view is {{camera}}, {{eye, target}}, {{map}}, {{frame}}, or {{standAt, headingDegrees, pitchDegrees}} with an optional figureAt; got keys {sorted(viewKeys)}")
+
+
+def standingGround(preview, surfaces, point, name):
+  """The ground players stand on at [x, y] (the highest there) or at [x, y, z] (from groundSearchAbove over z down to groundSearchDistance below it)."""
+  if len(point) == 2:
+    bottom, top = sceneHeightRange(preview)
+    ground = surfaces.footingBelow(mathutils.Vector((*point, top + mapClearance)), top - bottom + 2 * mapClearance)
+    if ground is None:
+      raise ValueError(f"No ground below {name} {list(point)}")
+    return ground
+  if len(point) == 3:
+    ground = surfaces.footingBelow(mathutils.Vector(point) + mathutils.Vector((0, 0, groundSearchAbove)), groundSearchAbove + groundSearchDistance)
+    if ground is None:
+      raise ValueError(f"No ground at {name} {list(point)}: none from {groundSearchAbove:g} above it to {groundSearchDistance:g} below it")
+    return ground
+  raise ValueError(f"{name} is [x, y] or [x, y, z], got {point!r}")
 
 
 def sceneCorners(preview):
@@ -467,7 +481,7 @@ def placeScaleFigure(preview, surfaces, ground, headingDegrees, figureModel):
     position = nextGround
     walked += figureStep
   if walked < figureMinimumDistance:
-    raise ValueError(f"No room for the scale figure: the ground ahead stops after {walked:.0f} units")
+    raise ValueError(f"No room for the scale figure: the ground ahead stops after {walked:.0f} units; stand her by hand with figureAt [x, y, z] in the view")
   preview.addFigure(position, figureModel, headingDegrees + 180)
   return position
 
