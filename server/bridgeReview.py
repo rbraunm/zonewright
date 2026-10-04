@@ -26,10 +26,13 @@ routeProfileRows = 60
 routeStride = 0.5
 # Casts start this far short of each spot and this far above a footing, so geometry built on round numbers (a block's face exactly on
 # a spot) is not met edge on.
-castNudge = 0.01
+castNudge = bridgeMeshAccess.castNudge
+# What blocks a step is climbed in rises this tall, then its top found within a thirty-second of one.
+obstacleClimb = 1.0
+obstacleRefinements = 5
 steepestWalkableDegrees = math.degrees(math.acos(walkableNormalZ))
-up = mathutils.Vector((0.0, 0.0, 1.0))
-down = mathutils.Vector((0.0, 0.0, -1.0))
+up = bridgeMeshAccess.up
+down = bridgeMeshAccess.down
 
 
 def triangulated(sceneObject, depsgraph, matrix):
@@ -102,48 +105,58 @@ def slopeOf(normal):
 
 
 def standingBelow(surfaces, origin, distance):
-  """The first surface below origin within distance that a player stands on: facing up and not inside a solid, whose top would then
-  be the first face above it; undersides and the insides of solids are passed through. Returns the footing, the normal of its face,
-  and the ceiling over it within routeHeadroomReach (or None); None when there is no such surface."""
-  while distance > 0:
-    hit = surfaces.castWithNormal(origin, down, distance)
-    if hit is None:
-      return None
-    point, normal = hit
-    if normal.z > 0:
-      over = surfaces.castWithNormal(point + up * castNudge, up, bridgeMeshAccess.waterReach)
-      if over is None or over[1].z <= 0:
-        return point, normal, over[0] if over is not None and over[0].z - point.z <= routeHeadroomReach else None
-    distance -= origin.z - point.z + castNudge
-    origin = point + down * castNudge
-  return None
+  """The footing below origin (PlayerSurfaces.footingOn) with its face's normal and the ceiling over it within reach, or None."""
+  footing = surfaces.footingOn(origin, distance)
+  if footing is None:
+    return None
+  overhead = footing.overhead
+  return footing.point, footing.normal, overhead[0] if overhead is not None and overhead[0].z - footing.point.z <= routeHeadroomReach else None
 
 
 def passageBlocker(surfaces, footing, end):
-  """The first thing in a player's way above a step's height going from footing to end: along the slope up to a higher end, otherwise
-  level with the footing; None when the way is clear."""
+  """The first thing above a step's height in the way from footing to end, along the slope to a higher end; None when clear."""
   start = footing + up * (stepHeight + castNudge)
   span = mathutils.Vector((end.x, end.y, max(footing.z, end.z) + stepHeight + castNudge)) - start
-  return surfaces.cast(start, span.normalized(), span.length + castNudge)
+  return surfaces.cast(start, span.normalized(), span.length)
 
 
 def obstacleHeight(surfaces, footing, blocker, direction):
-  """How far the top of what blocks a step stands above the footing, or None when it reaches past routeHeadroomReach."""
-  probe = blocker + direction * 0.1
-  hit = surfaces.castWithNormal(mathutils.Vector((probe.x, probe.y, footing.z + routeHeadroomReach)), down, routeHeadroomReach)
-  return None if hit is None or hit[1].z <= 0 else hit[0].z - footing.z
+  """How far above the footing what blocks a step stays steeper than walkable, or None when it goes on past routeHeadroomReach."""
+  # Level casts from over the footing climb the blocker's face for as long as each finds it no further back than a walkable slope
+  # would lean from the last; past its top, a plane's as much as a block's, they find nothing so near.
+  lean = 1 / math.tan(math.radians(steepestWalkableDegrees))
+
+  def faceDistance(height, low, nearest):
+    hit = surfaces.cast(mathutils.Vector((footing.x, footing.y, footing.z + height)), direction, nearest + lean * (height - low) + castNudge)
+    return None if hit is None else math.hypot(hit.x - footing.x, hit.y - footing.y)
+
+  low, nearest = blocker.z - footing.z, math.hypot(blocker.x - footing.x, blocker.y - footing.y)
+  while True:
+    high = low + obstacleClimb
+    if high > routeHeadroomReach:
+      return None
+    found = faceDistance(high, low, nearest)
+    if found is None:
+      break
+    low, nearest = high, found
+  for _ in range(obstacleRefinements):
+    middle = (low + high) / 2
+    found = faceDistance(middle, low, nearest)
+    if found is None:
+      high = middle
+    else:
+      low, nearest = middle, found
+  return (low + high) / 2
 
 
 def stepAcross(surfaces, footing, target, direction, reach):
-  """What a player standing on footing comes to stepping across to target's [x, y] in the given direction, searching reach below for
-  footing: a step onto walkable ground within a step's height of where its slope carries it; a ledge, down further; steep, a face
-  steeper than walkable (climbing or descending); a rise, a wall or step too high in the way; or a drop, no footing within reach."""
+  """What stepping from footing to target's [x, y] comes to, searching reach below: step, ledge, steep, rise, or drop (walkRoute)."""
   run = math.hypot(target.x - footing.x, target.y - footing.y)
   climb = max(stepHeight, run * math.tan(math.radians(steepestWalkableDegrees)))
   standing = standingBelow(surfaces, mathutils.Vector((target.x, target.y, footing.z + climb + castNudge)), reach + climb + castNudge)
   blocker = passageBlocker(surfaces, footing, standing[0] if standing is not None else mathutils.Vector((target.x, target.y, footing.z)))
   if blocker is not None:
-    return {"kind": "rise", "height": obstacleHeight(surfaces, footing, blocker, direction)}
+    return {"kind": "rise", "blocker": blocker}
   if standing is None:
     return {"kind": "drop"}
   landing, normal, ceiling = standing
@@ -154,15 +167,21 @@ def stepAcross(surfaces, footing, target, direction, reach):
   allowance = stepHeight + run * math.tan(math.radians(slope))
   rise = landing.z - footing.z
   if rise > allowance:
-    return {"kind": "rise", "height": rise}
+    return outcome | {"kind": "rise"}
   if -rise > allowance:
     return outcome | {"kind": "ledge", "height": -rise}
   return outcome | {"kind": "step"}
 
 
+def riseHeight(surfaces, footing, outcome, direction):
+  """How high a rise stepAcross met stands over the footing: its landing's height, or the height of what blocked the way."""
+  if "landing" in outcome:
+    return outcome["landing"].z - footing.z
+  return obstacleHeight(surfaces, footing, outcome["blocker"], direction)
+
+
 def sideClearance(surfaces, footing, side):
-  """How far to one side the footing runs, stepped across as a player steps, before a drop of more than a player's height, a wall, a
-  step too high, or a face too steep to stand on; None when it runs on past routeSideReach."""
+  """How far to one side footing runs, stepped across, before a drop over a player's height, a rise, or a steep face; None past reach."""
   current = footing
   for offset in numpy.arange(routeSideStep, routeSideReach + routeSideStep / 2, routeSideStep):
     outcome = stepAcross(surfaces, current, footing + side * (float(offset) - castNudge), side, playerHeight)
@@ -173,8 +192,7 @@ def sideClearance(surfaces, footing, side):
 
 
 class RouteWalk:
-  """A player's walk along a route stride by stride: the footing, what it has met, and the profile rows taken along the way. A rise or
-  a drop stops the walk; it takes up again where the route's own heights find footing beyond."""
+  """A player's walk along a route stride by stride; a rise or a drop stops it until the route's own heights find footing again."""
 
   def __init__(self, surfaces, water):
     self.surfaces, self.water = surfaces, water
@@ -203,7 +221,8 @@ class RouteWalk:
     if outcome["kind"] in ("rise", "drop"):
       self.stopped = {"kind": outcome["kind"], "at": roundVector(self.footing)}
       if outcome["kind"] == "rise":
-        self.stopped["height"] = None if outcome["height"] is None else round(outcome["height"], 1)
+        height = riseHeight(self.surfaces, self.footing, outcome, direction)
+        self.stopped["height"] = None if height is None else round(height, 1)
       self.stopped["resumesAt"] = None
       self.problems.append(self.stopped)
       self.footing, self.runs = None, {}

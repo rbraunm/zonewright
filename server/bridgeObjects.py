@@ -42,23 +42,29 @@ def requireNewName(name):
 
 
 def objectDimensions(sceneObject):
-  """The object's size along its own axes, scaled: its mesh's, or a collection instance's instanced meshes' together."""
+  """The object's scaled size along its own axes: its mesh's, a collection instance's meshes' together, or None when it instances none."""
   if not bridgeMeshAccess.isCollectionInstance(sceneObject):
-    return sceneObject.dimensions
+    return roundVector(sceneObject.dimensions)
   inverse = sceneObject.matrix_world.inverted()
   corners = numpy.array([list(inverse @ corner) for corner in bridgeMeshAccess.worldBoundsCorners(sceneObject, bpy.context.evaluated_depsgraph_get())])
   if len(corners) == 0:
-    return [0.0, 0.0, 0.0]
-  return (corners.max(0) - corners.min(0)) * numpy.abs(numpy.array(sceneObject.scale))
+    return None
+  return roundVector((corners.max(0) - corners.min(0)) * numpy.abs(numpy.array(sceneObject.scale)))
+
+
+def rotationDegrees(sceneObject):
+  """The object's rotation as XYZ Euler angles in degrees, whatever its rotation mode."""
+  rotation = sceneObject.rotation_euler if sceneObject.rotation_mode == "XYZ" else sceneObject.matrix_basis.decompose()[1].to_euler("XYZ")
+  return roundVector([math.degrees(angle) for angle in rotation], 2)
 
 
 def describeTransform(sceneObject):
   return {
     "name": sceneObject.name,
     "location": roundVector(sceneObject.location),
-    "rotationDegrees": roundVector([math.degrees(angle) for angle in sceneObject.rotation_euler], 2),
+    "rotationDegrees": rotationDegrees(sceneObject),
     "scale": roundVector(sceneObject.scale),
-    "dimensions": roundVector(objectDimensions(sceneObject)),
+    "dimensions": objectDimensions(sceneObject),
   }
 
 
@@ -312,8 +318,7 @@ def transformObjects(names, translate, rotateDegrees, scale, location, rotationD
 
 
 def duplicateObjects(names, offset, linkData):
-  """Copy objects with everything parented under them, each copy's children under the copy as the originals' are under the original;
-  a named object under another named one comes along with it rather than twice."""
+  """Copy objects with everything parented under them, once each: an object named under another named one comes with that one."""
   sources = [bridgeMeshAccess.requireObject(name) for name in names]
   roots = [source for source in sources if not any(ancestor in sources for ancestor in ancestorsOf(source))]
   copies = {}
@@ -337,8 +342,7 @@ def duplicateObjects(names, offset, linkData):
 
 
 def nameOwnMesh(sceneObject):
-  """A mesh only one object uses carries that object's name, which zone export writes as its model's name; a mesh linked copies share
-  keeps its own."""
+  """Name a mesh only this object uses after the object, as zone export names its model; a mesh linked copies share keeps its own."""
   if isinstance(sceneObject.data, bpy.types.Mesh) and sceneObject.data.users == 1:
     sceneObject.data.name = sceneObject.name
 
@@ -418,22 +422,22 @@ def uvDensity(sceneObject):
   areas = bridgeMeshAccess.textureAreas(sceneObject)
   if areas is None:
     return None
-  density = bridgeMeshAccess.worldUnitsPerRepeat(areas[0].sum(), areas[1].sum())
+  density = bridgeMeshAccess.worldUnitsPerRepeat(areas.world.sum(), areas.uv.sum())
   return None if density is None else round(density, 3)
 
 
 def getObjectDetail(name):
   sceneObject = bridgeMeshAccess.requireObject(name)
   if sceneObject.type == "MESH" or bridgeMeshAccess.isCollectionInstance(sceneObject):
-    corners = bridgeMeshAccess.worldBoundsCorners(sceneObject, bpy.context.evaluated_depsgraph_get()) or [sceneObject.matrix_world.translation]
+    corners = bridgeMeshAccess.worldBoundsCorners(sceneObject, bpy.context.evaluated_depsgraph_get())
   else:
     corners = [sceneObject.matrix_world @ mathutils.Vector(corner) for corner in sceneObject.bound_box]
   detail = describeTransform(sceneObject) | {
     "type": sceneObject.type,
     "parent": sceneObject.parent.name if sceneObject.parent else None,
     "collections": [collection.name for collection in sceneObject.users_collection],
-    "worldMinimum": roundVector([min(corner[axis] for corner in corners) for axis in range(3)]),
-    "worldMaximum": roundVector([max(corner[axis] for corner in corners) for axis in range(3)]),
+    "worldMinimum": roundVector([min(corner[axis] for corner in corners) for axis in range(3)]) if corners else None,
+    "worldMaximum": roundVector([max(corner[axis] for corner in corners) for axis in range(3)]) if corners else None,
     "modifiers": [{"name": modifier.name, "type": modifier.type} for modifier in sceneObject.modifiers],
   }
   if sceneObject.type == "MESH":

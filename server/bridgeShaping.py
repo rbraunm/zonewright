@@ -1,4 +1,5 @@
 """Shaping meshes: vertex moves, sculpting, and topology edits, all addressed by selectors in world units. Runs under Blender's Python."""
+import collections
 import math
 
 import bmesh
@@ -411,41 +412,45 @@ def deleteFaces(objectName, selector):
 
 
 def materialDensities(sceneObject):
-  """World units per texture repeat of each material slot's faces as the object's UVs map them now (None for a slot whose faces have
-  no UV area); None when the mesh has no UV layer."""
+  """Each material slot's world units per repeat as box projection would map its faces as they are now; None without a UV layer."""
+  # Measured against box projection's own areas, not the faces' true areas, so a mesh box-projected at d reads exactly d however its
+  # faces slope away from the axes, and faces mapped from it continue its texture without a jump in scale.
   areas = bridgeMeshAccess.textureAreas(sceneObject)
   if areas is None:
     return None
-  worldAreas, uvAreas, materialIndices = areas
-  return {int(slot): bridgeMeshAccess.worldUnitsPerRepeat(worldAreas[materialIndices == slot].sum(), uvAreas[materialIndices == slot].sum()) for slot in numpy.unique(materialIndices)}
+  return {int(slot): bridgeMeshAccess.worldUnitsPerRepeat(areas.box[areas.materials == slot].sum(), areas.uv[areas.materials == slot].sum()) for slot in numpy.unique(areas.materials)}
 
 
 def mapNewFaces(meshEditor, sceneObject, faces, densities):
-  """Map faces a topology edit made as projectUVs' box projection maps them, each at the density its material had on the object
-  before the edit (materialDensities), so they repeat as the faces they grew from; a material that had none leaves its faces as they
-  are. Returns what was mapped, per material."""
+  """Box-map the faces an edit made at their material's density before it (materialDensities): (mapped, unmapped and why) by material."""
+  slots = sceneObject.material_slots
+
+  def materialName(slot):
+    return slots[slot].material.name if slot < len(slots) and slots[slot].material else None
+
+  if densities is None:
+    counts = collections.Counter(face.material_index for face in faces)
+    return [], [{"material": materialName(slot), "faces": count, "reason": "the mesh has no UV layer"} for slot, count in sorted(counts.items())]
   uvLayer = meshEditor.loops.layers.uv.active
-  if densities is None or uvLayer is None:
-    return []
   meshEditor.normal_update()
   matrix = sceneObject.matrix_world
   normalMatrix = matrix.to_3x3().inverted().transposed()
   boxAxes = [bridgeSurfacing.planarAxes(numpy.eye(3)[axis]) for axis in range(3)]
-  mapped = {}
+  mapped, unmapped = collections.Counter(), collections.Counter()
   for face in faces:
     density = densities.get(face.material_index)
     if density is None:
+      unmapped[face.material_index] += 1
       continue
     across, along = boxAxes[int(numpy.abs(numpy.array(normalMatrix @ face.normal)).argmax())]
     for loop in face.loops:
       point = numpy.array(matrix @ loop.vert.co)
       loop[uvLayer].uv = (float(point @ across) / density, float(point @ along) / density)
-    mapped[face.material_index] = mapped.get(face.material_index, 0) + 1
-  slots = sceneObject.material_slots
-  return [{
-    "material": slots[slot].material.name if slot < len(slots) and slots[slot].material else None, "faces": count,
-    "worldUnitsPerRepeat": round(densities[slot], 3),
-  } for slot, count in sorted(mapped.items())]
+    mapped[face.material_index] += 1
+  return (
+    [{"material": materialName(slot), "faces": count, "worldUnitsPerRepeat": round(densities[slot], 3)} for slot, count in sorted(mapped.items())],
+    [{"material": materialName(slot), "faces": count, "reason": "the material's faces on the mesh had no UV area to take a density from"} for slot, count in sorted(unmapped.items())],
+  )
 
 
 def extrudeFaces(objectName, selector, distance, direction):
@@ -465,9 +470,9 @@ def extrudeFaces(objectName, selector, distance, direction):
   newVertices = [element for element in extruded["geom"] if isinstance(element, bmesh.types.BMVert)]
   bmesh.ops.translate(meshEditor, verts=newVertices, vec=mathutils.Vector(bridgeMeshAccess.localDirection(sceneObject, worldDirection)))
   bmesh.ops.delete(meshEditor, geom=faces, context="FACES")
-  mapped = mapNewFaces(meshEditor, sceneObject, [face for face in meshEditor.faces if face not in existing and face not in moved], densities)
+  mapped, unmapped = mapNewFaces(meshEditor, sceneObject, [face for face in meshEditor.faces if face not in existing and face not in moved], densities)
   bridgeMeshAccess.storeBMesh(meshEditor, sceneObject)
-  return {"extrudedFaces": len(faces), "mappedFaces": mapped} | bridgeMeshAccess.meshCounts(sceneObject)
+  return {"extrudedFaces": len(faces), "mappedFaces": mapped, "unmappedFaces": unmapped} | bridgeMeshAccess.meshCounts(sceneObject)
 
 
 def insetFaces(objectName, selector, thickness, depth):
@@ -476,9 +481,9 @@ def insetFaces(objectName, selector, thickness, depth):
   meshEditor = bridgeMeshAccess.loadBMesh(sceneObject)
   faces, _ = selectedFaces(meshEditor, sceneObject, selector)
   rim = bmesh.ops.inset_region(meshEditor, faces=faces, thickness=thickness, depth=depth, use_even_offset=True, use_interpolate=True)["faces"]
-  mapped = mapNewFaces(meshEditor, sceneObject, rim, densities)
+  mapped, unmapped = mapNewFaces(meshEditor, sceneObject, rim, densities)
   bridgeMeshAccess.storeBMesh(meshEditor, sceneObject)
-  return {"insetFaces": len(faces), "mappedFaces": mapped} | bridgeMeshAccess.meshCounts(sceneObject)
+  return {"insetFaces": len(faces), "mappedFaces": mapped, "unmappedFaces": unmapped} | bridgeMeshAccess.meshCounts(sceneObject)
 
 
 def bevelEdges(objectName, selector, width, segments, minimumAngleDegrees):
@@ -553,8 +558,7 @@ def faceValues(mesh):
 
 
 def booleanCut(objectName, cutterName, operation, keepCutter):
-  """Cut with the exact solver; the faces the cut makes take every face attribute (material, surfacing layers, shading) of the nearest
-  face the cutter crosses and are mapped at that material's density (mapNewFaces)."""
+  """Cut with the exact solver; each face it makes takes the face attributes of the nearest face the cutter crosses, and is box-mapped."""
   if operation not in booleanOperations:
     raise ValueError(f"operation must be one of {list(booleanOperations)}, got '{operation}'")
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
@@ -604,14 +608,25 @@ def booleanCut(objectName, cutterName, operation, keepCutter):
     mesh.materials.pop()
   mesh.update()
   meshEditor = bridgeMeshAccess.loadBMesh(sceneObject)
-  mapped = mapNewFaces(meshEditor, sceneObject, [meshEditor.faces[int(face)] for face in made], densities)
+  mapped, unmapped = mapNewFaces(meshEditor, sceneObject, [meshEditor.faces[int(face)] for face in made], densities)
   bridgeMeshAccess.storeBMesh(meshEditor, sceneObject)
   if not keepCutter:
     cutterMesh = cutter.data
     bpy.data.objects.remove(cutter)
     if cutterMesh.users == 0:
       bpy.data.meshes.remove(cutterMesh)
-  return {"before": before, "after": bridgeMeshAccess.meshCounts(sceneObject), "cutterKept": keepCutter, "madeFaces": len(made), "mappedFaces": mapped}
+  result = {
+    "before": before, "after": bridgeMeshAccess.meshCounts(sceneObject), "cutterKept": keepCutter, "madeFaces": len(made), "mappedFaces": mapped,
+    "unmappedFaces": unmapped,
+  }
+  if operation == "DIFFERENCE" and len(made) == 0:
+    result["warning"] = (
+      f"The cut left an opening in '{objectName}' with nothing lining it: no face of '{cutterName}' was kept, because '{objectName}' encloses"
+      " nothing where the cutter crosses it (an open surface such as a terrain sheet or a plane), so the opening shows through to whatever"
+      " lies beyond. That is right for a window in a one-sided wall; to dig a pit into open ground, shape the ground instead (sculptAtPoint"
+      " lower, sculptAlongPath carve)."
+    )
+  return result
 
 
 def decimate(objectName, ratio):

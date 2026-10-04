@@ -30,8 +30,7 @@ def withDescendants(sceneObject):
 
 
 def landingSurfaces(surfaceObjects, carried):
-  """What dressing lands on: the named objects, or what players stand on (water, guides, regions, spawns, and doors left out), never
-  the objects being placed and what they carry."""
+  """What dressing lands on: surfaceObjects, or else what players stand on; never what is being placed or carried."""
   excluding = {sceneObject.name for sceneObject in carried}
   if surfaceObjects is None:
     return bridgeMeshAccess.PlayerSurfaces(excluding)
@@ -66,17 +65,17 @@ def placeOnSurface(objectNames, at, alignToNormal, surfaceObjects, offset):
     bpy.context.view_layer.update()
     origin = sceneObject.matrix_world.translation
     start = mathutils.Vector(at[index]) + up * castLift if at is not None else mathutils.Vector((origin.x, origin.y, topOf(withDescendants(sceneObject)) + castLift))
-    hit = surfaces.footingOn(start, maximumCastDistance)
-    if hit is None:
+    footing = surfaces.footingOn(start, maximumCastDistance)
+    if footing is None:
       raise ValueError(f"No surface below {bridgeObjects.roundVector(start)} for '{sceneObject.name}'" + ("" if at is not None else ", cast from just above its top"))
-    location, normal, surfaceName = hit
+    location, normal = footing.point, footing.normal
     _, rotation, scale = sceneObject.matrix_world.decompose()
     if alignToNormal:
       rotation = alignedRotation(normal, worldHeading(rotation))
     sceneObject.matrix_world = mathutils.Matrix.LocRotScale(location + (normal if alignToNormal else up) * offset, rotation, scale)
     bpy.context.view_layer.update()
     placements.append({
-      "object": sceneObject.name, "location": bridgeObjects.roundVector(sceneObject.matrix_world.translation), "surface": surfaceName,
+      "object": sceneObject.name, "location": bridgeObjects.roundVector(sceneObject.matrix_world.translation), "surface": footing.objectName,
       "normal": bridgeObjects.roundVector(normal), "slopeDegrees": round(slopeDegrees(normal), 2),
     })
   return {"placements": placements}
@@ -147,15 +146,15 @@ def scatterInRegion(sourceObject, region, density, minimumSpacing, yawRangeDegre
   landings = []
   depsgraph = bpy.context.evaluated_depsgraph_get()
   for point in candidates:
-    hit = surfaces.footingOn(mathutils.Vector((point[0], point[1], castHeight)), maximumCastDistance)
-    if hit is None:
+    footing = surfaces.footingOn(mathutils.Vector((point[0], point[1], castHeight)), maximumCastDistance)
+    if footing is None:
       rejected["noSurface"] += 1
-    elif slopeDegrees(hit[1]) > maximumSlopeDegrees:
+    elif slopeDegrees(footing.normal) > maximumSlopeDegrees:
       rejected["tooSteep"] += 1
-    elif any(distance <= avoidClearance or inside for distance, inside in (bridgeMeshAccess.closestOnObject(container, hit[0], depsgraph) for container in avoided)):
+    elif any(distance <= avoidClearance or inside for distance, inside in (bridgeMeshAccess.closestOnObject(container, footing.point, depsgraph) for container in avoided)):
       rejected["nearAvoidedObject"] += 1
     else:
-      landings.append(hit[:2])
+      landings.append((footing.point, footing.normal))
   placed = []
   for location, normal in landings:
     instance = source.copy()

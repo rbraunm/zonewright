@@ -163,7 +163,7 @@ def getSceneSummary(objectLimit):
       "type": sceneObject.type,
       "collections": [collection.name for collection in sceneObject.users_collection],
       "location": roundVector(sceneObject.matrix_world.translation),
-      "dimensions": roundVector(sceneObject.dimensions),
+      "dimensions": bridgeObjects.objectDimensions(sceneObject),
       "triangles": triangles,
       "materials": [slot.material.name if slot.material else None for slot in sceneObject.material_slots],
       "hiddenInRender": sceneObject.hide_render,

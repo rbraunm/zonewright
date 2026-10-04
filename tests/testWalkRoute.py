@@ -50,9 +50,10 @@ def testWalkRouteStopsAtEveryBlockAlikeAtAnySpacing(stageBlenderServer):
     fine = await session.expectSuccess("walkRoute", {"path": [[-190, 0, 0], [190, 0, 0]], "sampleSpacing": 1})
     offLedge = await session.expectSuccess("walkRoute", {"path": [[40, 0, 10], [80, 0, 0]]})
     underDeck = await session.expectSuccess("walkRoute", {"path": [[-40, -90, 0], [40, -90, 0]]})
-    return coarse, fine, offLedge, underDeck
+    insideRock = await session.expectError("measure", {"points": [[-90, 0, 5]], "snapToSurface": True})
+    return coarse, fine, offLedge, underDeck, insideRock
 
-  coarse, fine, offLedge, underDeck = stageBlenderServer.session(steps)
+  coarse, fine, offLedge, underDeck, insideRock = stageBlenderServer.session(steps)
   # Every block on the course stops a player, each listed once, and the walk takes up again on the ground beyond it: the 1-thick slab
   # 5 up leaves 5 of headroom, the rock sunk 2 into the ground stands 10 above it, the steps 5 and 10, and the chasm has no floor.
   for walked in (coarse, fine):
@@ -67,8 +68,9 @@ def testWalkRouteStopsAtEveryBlockAlikeAtAnySpacing(stageBlenderServer):
     assert near(stepTen["at"], 25) and near(stepTen["resumesAt"], 55)
     assert near(chasm["at"], 108) and near(chasm["resumesAt"], 152)
     assert all(row["at"][2] == 0.0 for row in walked["profile"])
-    # The length walked leaves out what the blocks and the chasm stand across, and at each stop the stride it stops in.
-    assert 256 - 4 <= walked["length"] <= 380 - 20 - 30 - 30 - 44
+    # The 380 walked leaves out what the rock, the two steps, and the chasm stand across (20, 30, 30, and 44), and at each stop the
+    # half-unit stride it stops in.
+    assert walked["length"] == 380 - (20 + 30 + 30 + 44) - 4 * 0.5
   # Stepping off the 10-high step is a way down a player cannot climb back, not a slope too steep to walk.
   assert offLedge["walkable"] and offLedge["problems"] == []
   assert len(offLedge["oneWay"]) == 1 and offLedge["oneWay"][0]["kind"] == "ledge" and offLedge["oneWay"][0]["height"] == 10.0
@@ -76,12 +78,55 @@ def testWalkRouteStopsAtEveryBlockAlikeAtAnySpacing(stageBlenderServer):
   # Under a deck with 9 of headroom the footing runs on to either side: the deck is no wall.
   assert underDeck["walkable"] and underDeck["lowestHeadroom"]["headroom"] == 9.0
   assert underDeck["narrowest"]["left"] is None and underDeck["narrowest"]["right"] is None
+  # measure stands where walkRoute does: the ground inside the rock is no footing.
+  assert "No surface players stand on below [-90.0, 0.0, 5.0]" in insideRock
+
+
+houseWalls = [
+  ("wallNorth", [30, 0.5, 10], [0, 95, 0]), ("wallSouth", [30, 0.5, 10], [0, 65, 0]),
+  ("wallWestA", [0.5, 11, 10], [-15, 70.5, 0]), ("wallWestB", [0.5, 11, 10], [-15, 89.5, 0]),
+  ("wallEastA", [0.5, 11, 10], [15, 70.5, 0]), ("wallEastB", [0.5, 11, 10], [15, 89.5, 0]),
+]
+coverRoutes = {
+  "house": [[-40, 78, 0], [40, 78, 0]], "wall": [[-40, 72, 0], [-5, 72, 0]], "deck": [[-235, 0, 0], [-165, 0, 0]],
+  "fence": [[-150, 0, 0], [-90, 0, 0]], "tree": [[60, 4, 0], [140, 4, 0]],
+}
+
+
+def testWalkRouteGoesUnderOneSidedCoverAndMeasuresPlaneWalls(stageBlenderServer):
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "field", "size": [560, 320], "spacing": 8, "location": [0, 0, 0], "collection": "terrain"})
+    for name, size, location in houseWalls:
+      await session.expectSuccess("createPrimitive", {"kind": "cube", "name": name, "size": size, "location": location})
+    for name, y, tilt in (("roofSouth", 80 - 7.794, 30), ("roofNorth", 80 + 7.794, -30)):
+      await session.expectSuccess("createPrimitive", {"kind": "plane", "name": name, "size": [32, 18, 0], "location": [0, y, 14.5], "rotationDegrees": [tilt, 0, 0]})
+    await session.expectSuccess("createPrimitive", {"kind": "plane", "name": "deck", "size": [40, 40, 0], "location": [-200, 0, 10]})
+    await session.expectSuccess("createPrimitive", {"kind": "plane", "name": "fence", "size": [15, 40, 0], "location": [-120, 0, 7.5], "rotationDegrees": [0, 90, 0]})
+    await session.expectSuccess("placeObject", {"zone": "neighborhood", "model": "OBJ_TREEM", "name": "tree", "location": [100, 0, 0], "headingDegrees": 0})
+    walked = {name: await session.expectSuccess("walkRoute", {"path": path, "sampleSpacing": 2}) for name, path in coverRoutes.items()}
+    inside = await session.expectSuccess("measure", {"points": [[0, 78, 5]], "snapToSurface": True})
+    return walked, inside
+
+  walked, inside = stageBlenderServer.session(steps)
+  # One-sided surfaces facing up overhead (a gable roof of two planes, a plane deck 10 up, a client tree's leaf cards) cover open
+  # ground: it is footing, walked under with the headroom they leave, and the ground under the deck runs on to either side.
+  house, wall, deck, fence, tree = (walked[name] for name in coverRoutes)
+  assert house["walkable"] and house["problems"] == [] and house["oneWay"] == [] and house["lowestHeadroom"]["headroom"] == 17.8
+  assert deck["walkable"] and deck["problems"] == [] and deck["lowestHeadroom"]["headroom"] == 10.0
+  assert all(row["left"] is None and row["right"] is None for row in deck["profile"])
+  assert tree["walkable"] and tree["problems"] == [] and tree["lowestHeadroom"]["headroom"] == 15.7
+  # Into the house's wall under its eave is a rise the height of the wall, and the walk takes up again inside.
+  assert wall["problems"] == [{"kind": "rise", "at": [-15.7, 72.0, 0.0], "height": 10.0, "resumesAt": [-14.7, 72.0, 0.0]}]
+  # A plane standing 15 tall, with no top to stand on, is a rise of 15.
+  assert fence["problems"] == [{"kind": "rise", "at": [-120.0, 0.0, 0.0], "height": 15.0, "resumesAt": [-119.0, 0.0, 0.0]}]
+  assert inside["points"] == [[0.0, 78.0, 0.0]]
 
 
 instancedStepCode = """
 kit = bpy.data.collections.new('kit')
 mesh = bpy.data.meshes.new('step')
-mesh.from_pydata([(-20, -20, 0), (20, -20, 0), (20, 20, 0), (-20, 20, 0), (-20, -20, 1.5), (20, -20, 1.5), (20, 20, 1.5), (-20, 20, 1.5)], [],
+mesh.from_pydata([(-20, -20, 0), (20, -20, 0), (20, 20, 0), (-20, 20, 0), (-20, -20, 3), (20, -20, 3), (20, 20, 3), (-20, 20, 3)], [],
   [(0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)])
 kit.objects.link(bpy.data.objects.new('step', mesh))
 instance = bpy.data.objects.new('stepInstance', None)
@@ -110,19 +155,23 @@ def testPlayersStandOnTheBedUnderWaterAndOnInstancesButNotOnGuides(stageBlenderS
     })
     across = await session.expectSuccess("walkRoute", {"path": [[-150, 0, 0], [150, 0, 0]]})
     overStep = await session.expectSuccess("walkRoute", {"path": [[-100, 150, 0], [100, 150, 0]]})
+    offStep = await session.expectSuccess("walkRoute", {"path": [[0, 150, 3], [100, 150, 0]]})
     _, deep = await session.expectImage("renderView", {"view": {"standAt": [0, 0], "headingDegrees": 90, "pitchDegrees": 0}, "guides": False})
     _, shallow = await session.expectImage("renderView", {"view": {"standAt": [70, 0], "headingDegrees": 90, "pitchDegrees": 0}, "guides": False})
-    return across, overStep, deep, shallow
+    return across, overStep, offStep, deep, shallow
 
-  across, overStep, deep, shallow = stageBlenderServer.session(steps)
+  across, overStep, offStep, deep, shallow = stageBlenderServer.session(steps)
   # The route starts under the guide board at 2 and keeps to the ground at 0; through the pool its footing is the bed, which falls 20
   # in 100 to the middle: the samples 2 either side of it stand 19.6 down under 14.6 of water.
   assert across["profile"][0]["at"][2] == 0.0
   assert across["deepestWater"]["depth"] == 14.6 and abs(across["deepestWater"]["at"][0]) == 2.0
   assert min(row["at"][2] for row in across["profile"]) <= -19.5
-  # The instanced step, 1.5 high, is footing like any mesh, stepped up onto and down from.
-  assert overStep["walkable"] and overStep["oneWay"] == []
-  assert max(row["at"][2] for row in overStep["profile"]) == 1.5 and overStep["deepestWater"] is None
+  # The instanced step, 3 high, blocks a player like any mesh and is stood on like one: walked into from the ground it is a rise of 3,
+  # and from its top the way off is a ledge 3 down.
+  assert [(problem["kind"], problem["height"]) for problem in overStep["problems"]] == [("rise", 3.0)]
+  assert near(overStep["problems"][0]["at"], -20) and near(overStep["problems"][0]["resumesAt"], 20.5)
+  assert offStep["walkable"] and offStep["profile"][0]["at"][2] == 3.0
+  assert offStep["oneWay"] == [{"kind": "ledge", "at": [20.0, 150.0, 3.0], "height": 3.0}]
   # In the middle a player swims, eye a unit over the surface; at 70 out the water is 1 deep and the player stands on the bed.
   assert deep["swimming"] is True and deep["waterDepth"] == 15.0 and abs(deep["eye"][2] - (-4.0)) < 1e-3
   assert shallow["swimming"] is False and abs(shallow["waterDepth"] - 1.0) < 0.1 and abs(shallow["eye"][2] - (shallow["ground"][2] + 5.5)) < 1e-3

@@ -239,6 +239,78 @@ def testExtrudedAndInsetFacesRepeatAsTheFacesTheyGrewFrom(stageBlenderServer, tm
   # A patch of ground 8 cells square raised 12: its 32 sides repeat at the ground's 64.
   assert raised["mappedFaces"] == [{"material": "rock", "faces": 32, "worldUnitsPerRepeat": 64.0}]
   assert yard["worldUnitsPerTextureRepeat"] == 64.0
+  assert extruded["unmappedFaces"] == inset["unmappedFaces"] == raised["unmappedFaces"] == []
+
+
+seamCode = """
+column = bpy.data.objects['column']
+mesh = column.data
+layer = mesh.uv_layers.active.data
+seam = {}
+for polygon in mesh.polygons:
+  if abs(polygon.normal.z) > 0.5:
+    continue
+  side = (round(polygon.normal.x, 4), round(polygon.normal.y, 4))
+  for index in polygon.loop_indices:
+    vertex = mesh.loops[index].vertex_index
+    if abs((column.matrix_world @ mesh.vertices[vertex].co).z - 10) < 1e-4:
+      seam.setdefault(str((vertex, side)), []).append([round(value, 5) for value in layer[index].uv])
+result = seam
+"""
+
+
+def testExtrudedFacesOfARoundMeshContinueItsBoxMapping(stageBlenderServer, tmp_path):
+  texture = writePNG(tmp_path / "rock.png", 8, 8, (100, 96, 90, 255))
+
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createMaterial", {"name": "rock", "diffuseTexture": str(texture)})
+    for name, height, x in (("column", 10, 0), ("tallColumn", 30, 20)):
+      await session.expectSuccess("createPrimitive", {"kind": "cylinder", "name": name, "size": [12, 12, height], "location": [x, 0, 0], "segments": 16})
+      await session.expectSuccess("assignMaterial", {"objectName": name, "materialName": "rock"})
+      await session.expectSuccess("projectUVs", {"objectName": name, "method": "box", "worldUnitsPerRepeat": 6})
+    extruded = await session.expectSuccess("extrudeFaces", {"objectName": "column", "selector": upFacing, "distance": 20})
+    column = await session.expectSuccess("getObjectDetail", {"name": "column"})
+    tallColumn = await session.expectSuccess("getObjectDetail", {"name": "tallColumn"})
+    seam = (await session.expectSuccess("runPython", {"code": seamCode}))["result"]
+    return extruded, column, tallColumn, seam
+
+  extruded, column, tallColumn, seam = stageBlenderServer.session(steps)
+  # Box projection at 6 maps the column's slanted sides at more than 6 world units a repeat of their true area, so the column measures
+  # 6.19 before the edit; the 16 new sides are mapped at the projection's own 6, not at that measure, so the column grown 20 maps
+  # exactly as one projected 30 tall.
+  assert extruded["mappedFaces"] == [{"material": "rock", "faces": 16, "worldUnitsPerRepeat": 6.0}] and extruded["unmappedFaces"] == []
+  assert column["worldUnitsPerTextureRepeat"] == tallColumn["worldUnitsPerTextureRepeat"] > 6.1
+  # At the old top edge each corner has one UV in the side below and the side grown above it: the texture runs on without a seam.
+  assert len(seam) == 32 and all(len(uvs) == 2 and uvs[0] == uvs[1] for uvs in seam.values())
+
+
+blankLayerCode = """
+layer = bpy.data.objects['blank'].data.uv_layers.new(name='blank')
+layer.data.foreach_set('uv', [0.0] * (2 * len(layer.data)))
+result = layer.name
+"""
+
+
+def testFacesAnEditCannotMapAreListedWithWhy(stageBlenderServer, tmp_path):
+  texture = writePNG(tmp_path / "stone.png", 8, 8, (120, 110, 100, 255))
+
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "plain", "size": [10, 10, 10], "location": [0, 0, 0]})
+    unmapped = await session.expectSuccess("extrudeFaces", {"objectName": "plain", "selector": upFacing, "distance": 5})
+    await session.expectSuccess("createMaterial", {"name": "stone", "diffuseTexture": str(texture)})
+    await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "blank", "size": [10, 10, 10], "location": [30, 0, 0]})
+    await session.expectSuccess("assignMaterial", {"objectName": "blank", "materialName": "stone"})
+    await session.expectSuccess("runPython", {"code": blankLayerCode})
+    blank = await session.expectSuccess("insetFaces", {"objectName": "blank", "selector": upFacing, "thickness": 2, "depth": -1})
+    return unmapped, blank
+
+  unmapped, blank = stageBlenderServer.session(steps)
+  # A mesh with no UV layer has nothing to map its new faces on; a material whose faces have no UV area gives no density to map at.
+  assert unmapped["mappedFaces"] == [] and unmapped["unmappedFaces"] == [{"material": None, "faces": 4, "reason": "the mesh has no UV layer"}]
+  assert blank["mappedFaces"] == []
+  assert blank["unmappedFaces"] == [{"material": "stone", "faces": 4, "reason": "the material's faces on the mesh had no UV area to take a density from"}]
 
 
 caveFacesCode = """
@@ -282,9 +354,12 @@ def testBooleanCutLinesTheOpeningWithTheMaterialItCutsThrough(stageBlenderServer
     cave = await session.expectSuccess("booleanCut", {"objectName": "plot", "cutterName": "caveCutter"})
     plotAfter = await session.expectSuccess("getObjectDetail", {"name": "plot"})
     lining = (await session.expectSuccess("runPython", {"code": caveFacesCode}))["result"]
-    return doorway, wall, plotBefore, cave, plotAfter, lining
+    await session.expectSuccess("createTerrainGrid", {"name": "lawn", "size": [160, 160], "spacing": 8, "location": [0, 300, 0]})
+    await session.expectSuccess("createPrimitive", {"kind": "cylinder", "name": "pitCutter", "size": [30, 30, 30], "location": [0, 300, -15], "segments": 16})
+    pit = await session.expectSuccess("booleanCut", {"objectName": "lawn", "cutterName": "pitCutter"})
+    return doorway, wall, plotBefore, cave, plotAfter, lining, pit
 
-  doorway, wall, plotBefore, cave, plotAfter, lining = stageBlenderServer.session(steps)
+  doorway, wall, plotBefore, cave, plotAfter, lining, pit = stageBlenderServer.session(steps)
   # The doorway's jambs and lintel are stone at the wall's 20 a repeat, and the wall gains no empty material slot.
   assert doorway["madeFaces"] > 0 and doorway["mappedFaces"] == [{"material": "stone", "faces": doorway["madeFaces"], "worldUnitsPerRepeat": 20.0}]
   assert [entry["material"] for entry in wall["materials"]] == ["stone"]
@@ -294,11 +369,17 @@ def testBooleanCutLinesTheOpeningWithTheMaterialItCutsThrough(stageBlenderServer
   assert [entry["material"] for entry in plotAfter["materials"]] == ["grass", "cliff"]
   assert plotAfter["materials"][0]["faces"] == plotBefore["materials"][0]["faces"]
   assert len(lining) >= 16 and all(name == "cliff" for name, _, _ in lining)
-  # Box projection maps each lining face along its nearest axis, at most 45 degrees off it round the cave's axis: between the cliff's
-  # density and that over the square root of cos 45.
+  # The cliff was box-projected at 64, and the lining is too: each face along its nearest axis, at most 45 degrees off it round the
+  # cave's axis, so its true area repeats between every 64 and 64 over the square root of cos 45.
   density = cave["mappedFaces"][0]["worldUnitsPerRepeat"]
-  assert abs(density - 64) < 3
+  assert density == 64.0
   assert all(uvArea > 0 and density - 0.01 <= (area / uvArea) ** 0.5 <= density / 0.5 ** 0.25 + 0.01 for _, area, uvArea in lining)
+  assert "warning" not in doorway and "warning" not in cave
+  # A cylinder through flat open ground keeps none of its faces: the ground encloses nothing below it, so the opening is a bare hole
+  # into the void, and the result says so.
+  assert pit["madeFaces"] == 0 and pit["mappedFaces"] == [] and pit["after"]["faces"] != pit["before"]["faces"]
+  assert pit["warning"].startswith("The cut left an opening in 'lawn' with nothing lining it: no face of 'pitCutter' was kept")
+  assert "to dig a pit into open ground, shape the ground instead (sculptAtPoint lower, sculptAlongPath carve)" in pit["warning"]
 
 
 def testDecimateHalvesTriangles(stageBlenderServer):
@@ -483,6 +564,61 @@ def testPlaceOnSurfaceCastsFromAboveTheObjectAndNeverLandsOnWhatItCarries(stageB
   assert "No surface below" in buried and "cast from just above its top" in buried
 
 
+wedgeCode = """
+wedge = bpy.data.objects['quaternionWedge']
+wedge.rotation_mode = 'QUATERNION'
+result = [round(value, 4) for value in wedge.rotation_quaternion]
+"""
+
+
+def testObjectsReportTheRotationTheyHaveInAnyRotationMode(stageBlenderServer):
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "ramp", "size": [60, 60, 4], "location": [0, 0, 0], "rotationDegrees": [20, 0, 0]})
+    for name, x in (("eulerWedge", -6), ("quaternionWedge", 6)):
+      await session.expectSuccess("createPrimitive", {"kind": "cube", "name": name, "size": [2, 2, 2], "location": [x, 0, 40], "rotationDegrees": [0, 0, 30]})
+    quaternion = (await session.expectSuccess("runPython", {"code": wedgeCode}))["result"]
+    placed = await session.expectSuccess("placeOnSurface", {"objectNames": ["eulerWedge", "quaternionWedge"], "alignToNormal": True})
+    details = [await session.expectSuccess("getObjectDetail", {"name": name}) for name in ("eulerWedge", "quaternionWedge")]
+    return quaternion, placed, details
+
+  quaternion, placed, (eulerWedge, quaternionWedge) = stageBlenderServer.session(steps)
+  # The same turn of 30 held as a quaternion; both wedges tilt 20 onto the ramp keeping that heading: a turn of 20 about x after 30
+  # about z, which as XYZ Euler angles is (x, y, z) below.
+  assert quaternion == [round(math.cos(math.radians(15)), 4), 0.0, 0.0, round(math.sin(math.radians(15)), 4)]
+  assert [placement["slopeDegrees"] for placement in placed["placements"]] == [20.0, 20.0]
+  tilt, turn = math.radians(20), math.radians(30)
+  expected = [
+    math.degrees(math.atan2(math.sin(tilt) * math.cos(turn), math.cos(tilt))), math.degrees(math.asin(-math.sin(tilt) * math.sin(turn))),
+    math.degrees(math.atan2(math.cos(tilt) * math.sin(turn), math.cos(turn))),
+  ]
+  for wedge in (eulerWedge, quaternionWedge):
+    assert all(abs(reported - angle) <= 0.01 for reported, angle in zip(wedge["rotationDegrees"], expected)), (wedge["rotationDegrees"], expected)
+
+
+emptyInstanceCode = """
+instance = bpy.data.objects.new('emptyInstance', None)
+instance.instance_type = 'COLLECTION'
+instance.instance_collection = bpy.data.collections.new('emptyKit')
+bpy.context.scene.collection.objects.link(instance)
+result = instance.name
+"""
+
+
+def testAnInstanceOfNoMeshesHasNoSizeOrBounds(stageBlenderServer):
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("runPython", {"code": emptyInstanceCode})
+    detail = await session.expectSuccess("getObjectDetail", {"name": "emptyInstance"})
+    summary = await session.expectSuccess("getSceneSummary")
+    return detail, summary
+
+  detail, summary = stageBlenderServer.session(steps)
+  assert detail["instanceCollection"] == "emptyKit"
+  assert detail["dimensions"] is None and detail["worldMinimum"] is None and detail["worldMaximum"] is None
+  assert [sceneObject["dimensions"] for sceneObject in summary["objects"] if sceneObject["name"] == "emptyInstance"] == [None]
+
+
 def testScatteredCopiesScaleFromTheSourcesOwnScale(stageBlenderServer):
   scatter = {"sourceObject": "shrub", "region": {"circle": {"center": [0, 0], "radius": 30}}, "density": 20, "minimumSpacing": 6, "seed": 3}
 
@@ -574,11 +710,13 @@ def testKitInstancesAreMeasuredSizedAndLitAsTheFilesOwnMeshes(stageBlenderServer
     measured = await session.expectSuccess("measure", {"points": [[-10, 0, 100], [10, 0, 100], [0, 25, 100]], "snapToSurface": True})
     kitFace = await renderedPixel(session, {"eye": [-10, -20, 4], "target": [-10, 0, 4]})
     localFace = await renderedPixel(session, {"eye": [10, -20, 4], "target": [10, 0, 4]})
-    return linked, instance, measured, kitFace, localFace
+    summary = await session.expectSuccess("getSceneSummary")
+    return linked, instance, measured, kitFace, localFace, summary
 
-  linked, instance, measured, kitFace, localFace = stageBlenderServer.session(steps)
-  # The instance's size is its boulder's, scaled, where an empty's own size reads 0.
+  linked, instance, measured, kitFace, localFace, summary = stageBlenderServer.session(steps)
+  # The instance's size is its boulder's, scaled, where an empty's own size reads 0, in its detail and the scene's summary alike.
   assert linked["dimensions"] == [8.0, 8.0, 9.0] and instance["dimensions"] == [8.0, 8.0, 9.0]
+  assert [sceneObject["dimensions"] for sceneObject in summary["objects"] if sceneObject["name"] == "boulderA"] == [[8.0, 8.0, 9.0]]
   assert instance["worldMinimum"] == [-14.0, -4.0, 0.0] and instance["worldMaximum"] == [-6.0, 4.0, 9.0]
   # Players stand on the instance, as walkRoute has them, and pass through the spawn to the ground.
   assert [point[2] for point in measured["points"]] == [9.0, 6.0, 0.0]

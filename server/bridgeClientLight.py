@@ -8,7 +8,7 @@ import bpy
 
 groupName = "eqClientLight"
 # Raised whenever buildGroup changes, so a group saved in an older .blend is rebuilt in place.
-groupVersion = 7
+groupVersion = 8
 bakedAttribute = "eqColor"
 normalAttribute = "eqNormal"
 tintAttribute = "eqTint"
@@ -73,8 +73,9 @@ class GroupBuilder:
 
 
 def buildGroup(tree):
-  """Build the group's nodes. Its sockets are kept and only missing ones added: clearing them would drop every saved material's links
-  into the group, and a material saved before an input existed takes that input's default (added light: none)."""
+  """Build the group's nodes, adding the sockets it lacks, and set the inputs its materials' own nodes decide (markStoredNormals)."""
+  # Sockets are kept, not rebuilt: clearing them would drop every saved material's links into the group, and a material saved before
+  # an input existed takes that input's default (added light: none).
   tree.nodes.clear()
   tree["eqVersion"] = groupVersion
   sockets = {(item.in_out, item.name) for item in tree.interface.items_tree if item.item_type == "SOCKET"}
@@ -138,7 +139,20 @@ def buildGroup(tree):
     tree.links.new(passOutput, colorInputs[1])
     selected = next(socket for socket in choose.outputs if socket.type == "RGBA")
   tree.links.new(selected, build.node("NodeGroupOutput").inputs["Color"])
+  markStoredNormals(tree)
   return tree
+
+
+def markStoredNormals(tree):
+  """Set Stored on each material's use of the group from its own nodes: 1 where it lights by a lit mesh's stored normal, else 0."""
+  for material in bpy.data.materials:
+    if material.node_tree is None:
+      continue
+    nodes = material.node_tree.nodes
+    stored = any(node.type == "ATTRIBUTE" and node.attribute_name == normalAttribute for node in nodes)
+    for node in nodes:
+      if node.type == "GROUP" and node.node_tree == tree:
+        node.inputs["Stored"].default_value = float(stored)
 
 
 def selectPass(name):
@@ -157,9 +171,7 @@ def group():
 
 
 def groups():
-  """The file's own group and each kit library's copy, which that kit's linked materials use. A kit's copy is drawn as the file's own:
-  rebuilt when its kit saved an older one and given the zone's environment. Linked data is never saved back, so this holds for the
-  session only and is redone for every render."""
+  """The file's own group and each kit's linked copy, a kit saved with an older one rebuilt for this session (linked data never saves)."""
   linked = [tree for tree in bpy.data.node_groups if tree.name == groupName and tree.library is not None]
   for tree in linked:
     if tree.get("eqVersion") != groupVersion:

@@ -143,6 +143,6 @@ def testAKitInstanceSettlesOnTheGroundNotOnItself(stageBlenderServer):
     return await session.expectSuccess("generateCopies", {"source": "stepInstance", "pattern": {"row": {"from": [-100, -100], "to": [100, -100], "count": 3}}})
 
   generated = stageBlenderServer.session(steps)
-  # The kit's step is 1.5 tall from its base; each copy stands on the flat ground, not on its own step or the one it was copied from.
+  # The kit's step is 3 tall from its base; each copy stands on the flat ground, not on its own step or the one it was copied from.
   assert [copy["location"][2] for copy in generated["copies"]] == [0.0, 0.0, 0.0]
-  assert [copy["spans"] for copy in generated["copies"]] == [[0.0, 1.5]] * 3
+  assert [copy["spans"] for copy in generated["copies"]] == [[0.0, 3.0]] * 3
