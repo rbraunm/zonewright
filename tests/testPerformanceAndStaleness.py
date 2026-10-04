@@ -115,7 +115,7 @@ def testSurveyReusesHashesAndDiscoveryUntilFilesChange(stageServer):
 
   server.callToolExpectingSuccess("surveyZones", {"zones": ["befallen"]})
   memoUsed = json.loads(cachePath.read_text(encoding="utf-8"))["variants"]["befallen:wld"]["fileHashes"]["befallen.s3d"]
-  discoveryUsed = server.callToolExpectingError("surveyZones", {"zones": ["unrest"]})
+  discoveryUsed, _ = server.callToolExpectingSuccess("surveyZones", {"zones": ["unrest"]})
 
   server.callToolExpectingSuccess("surveyZones", {"zones": ["befallen"], "verifyHashes": True})
   verified = json.loads(cachePath.read_text(encoding="utf-8"))
@@ -124,6 +124,6 @@ def testSurveyReusesHashesAndDiscoveryUntilFilesChange(stageServer):
   rediscovered, _ = server.callToolExpectingSuccess("surveyZones", {"zones": ["unrest"]})
 
   assert memoUsed == "f" * 64
-  assert "Not zones in" in discoveryUsed and "unrest" in discoveryUsed
+  assert discoveryUsed["unknownZones"] == ["unrest"] and discoveryUsed["rows"] == []
   assert verified["variants"]["befallen:wld"]["fileHashes"]["befallen.s3d"] == realHash
   assert [row["variant"] for row in rediscovered["rows"]] == ["unrest:wld"]
