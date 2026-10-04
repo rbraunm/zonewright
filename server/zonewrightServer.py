@@ -1522,8 +1522,11 @@ async def cutCave(
   between their heights; a room is a wide stretch of the path. A bend turns on an arc the width in radius (less where the points are
   close). `breakup` {featureSize, amplitude, seed} moves the walls and vault along their outward directions by noise, the floor kept
   flat, fading out within `mouthFade` (default twice edgeLength) of wherever the tube lies in the open, so the lip stays a clean arch.
-  Each end is open (its section in the open but for a sill a step deep: a mouth; two make a through tunnel) or blind (wholly inside the
-  rock, then closing as a dome on its floor over half its width beyond its last point).
+  Each end is open, some of its floor within a step of walkable ground (a mouth, its section in the open but for a sill a step deep;
+  two make a through tunnel; or a gallery's end on the ground beside a cliff, part in the rock), a ledge (part in the rock, its floor
+  running out over a drop beside it: a gallery's dead end up a cliff), or blind (wholly inside the rock); an end with rock in its
+  section closes as a dome on its floor over half its width beyond its last point. A floor whose middle hangs in the air (no rock under
+  it within a step) is refused, naming the stretch. traceLedge traces a gallery's path along a cliff.
   The ground within reach of the tube (half its width, three breakup amplitudes, and two edges) is closed into a solid, the tube taken
   out of it with the exact boolean, and the result spliced into the same mesh keeping every shaping pass: the ground faces the cut
   changed (the plug) are recorded and deleted as faces only, their vertices staying in every pass, so removeCave puts the ground back
@@ -1533,8 +1536,8 @@ async def cutCave(
   layer uncovered on them, box-mapped at `worldUnitsPerRepeat` and smooth shaded; ground faces the cut split keep their materials,
   paint, and mapping.
   Refused, changing nothing: a stretch of floor steeper than `maximumFloorDegrees` (naming it and the run it needs), a bend tighter than
-  half the width, an end part in the rock and part in the open, both ends inside the rock, the tube reaching the terrain's border or
-  another cave's reach, a mesh with modifiers or shared with another object, and caves that fail their integrity checks.
+  half the width, an end part in the rock with its floor buried more than a step under the ground, a floor hanging in the air, both
+  ends wholly inside the rock, the tube reaching the terrain's border or another cave's reach, a mesh with modifiers or shared with another object, and caves that fail their integrity checks.
   Returns the faces and vertices it made, the shortest edges of the lining, the pieces of ground at the mouth, and the seam, each end's
   kind, and the floor's level stretches (start, end, length, height, narrowest width: a stretch about 220 wide and long holds a stock
   player plot). The cave is kept with its definition: the ground within its reach is fingerprinted, getObjectDetail and exports flag it
@@ -1567,6 +1570,31 @@ async def removeCave(context: Context, objectName: str, name: str):
   return on their vertices with every shaping pass made since, each carrying the surfacing and mapping its largest piece of ground held
   (painted or mapped since the cut). Returns the cave's definition, to cut it again with cutCave, and the strokes kept with its lining."""
   return await callBridge(context, "removeCave", {"objectName": objectName, "name": name})
+
+
+@guardedTool()
+async def traceLedge(
+  context: Context, objectName: str, start: list[float], end: list[float], floorFrom: float, floorTo: float, width: float, height: float,
+  side: str, insideShare: float = 0.75, step: float = 20.0,
+):
+  """Trace a starting path for a covered gallery or a rock shelter along a cliff of a terrain (objectName), for cutCave; changes
+  nothing. Points every `step` or less from `start` to `end` ([x, y] in plan, along the cliff) each look toward `side` (left or right
+  of travel from start to end: the side the rock stands on), a step over the floor, for where the rock begins, and are set so
+  `insideShare` of the `width` lies inside the rock there; more than half keeps the floor's middle on rock and leaves its outer side
+  open under the rock above. A point with no rock beside it within three widths (past the cliff's top) keeps the offset from the line
+  of the nearest point that found the cliff, so the path runs on in line. The floor rises evenly from `floorFrom` to `floorTo` along the traced path. Start with the floor on the ground at the
+  cliff's foot (grade it first, gradeRoute) and end on open ground at the top or on another floor: cutCave takes an end beside the
+  cliff, part in the rock, when its floor is on the ground where it is open, and rounds it off. Returns `path`, `widths`, and
+  `heights` ready for cutCave; for each point the share of its width measured inside the rock and whether it found the cliff
+  (traced); for each segment its grade in degrees and whether it is covered (the rock over its floor's middle reaches above its
+  vault). Refused when the traced path bends tighter than cutCave takes at that width (a rough face traced at a short step): trace it
+  with a longer step. Between points the path runs straight while the cliff's face wanders, so a recess in the face takes a bite out
+  of the floor's outer edge; a shorter step follows the face closer. Cut it with wall and floor materials close in value to the
+  cliff's own rock, or the gallery reads as a stripe or a ribbon up the cliff; look at it from across the valley, at an angle, standing on it looking up and down, from above, and in sections across it."""
+  return await callBridge(context, "traceLedge", {
+    "objectName": objectName, "start": start, "end": end, "floorFrom": floorFrom, "floorTo": floorTo, "width": width, "height": height,
+    "side": side, "insideShare": insideShare, "step": step,
+  })
 
 
 @guardedTool(description=(

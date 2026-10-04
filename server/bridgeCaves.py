@@ -46,6 +46,12 @@ patchRounds = 8
 # A blind end's rows run round its quarter ellipse down to this share of the section, then close on an apex.
 endShrink = 0.3
 endRows = 16
+# traceLedge looks for a cliff's face, steeper than 45 degrees, this many widths to the side, settles each point's floor in this many
+# rounds, and measures the share of the width inside the rock at this many points across it.
+faceReachWidths = 3.0
+faceNormalZ = math.cos(math.radians(45.0))
+traceRounds = 3
+shareSamples = 81
 definitionDefaults = {"edgeLength": 16.0, "wallShare": 0.35, "breakup": None, "mouthFade": None, "maximumFloorDegrees": 30.0}
 definitionKeys = ("path", "widths", "heights", "wallMaterial", "floorMaterial", "worldUnitsPerRepeat") + tuple(definitionDefaults)
 up = mathutils.Vector((0.0, 0.0, 1.0))
@@ -229,15 +235,13 @@ def sectionPoints(shape, floors, directions, widths, heights):
 
 
 class TerrainSurface:
-  """The terrain as it is seen near a cave's path, for casts: which points lie under its surface and how deep. Only its triangles with a
-  corner within reach of the path's plan box are taken, so a large terrain costs no more than the ground the cave reaches."""
+  """The terrain as it is seen near a line in plan, for casts. Only its triangles with a corner within `margin` of the line's plan box
+  are taken, so a large terrain costs no more than the ground in reach."""
 
-  def __init__(self, sceneObject, shown, definition):
-    path = numpy.array(definition["path"])
-    amplitude = definition["breakup"]["amplitude"] if definition["breakup"] is not None else 0.0
-    margin = max(definition["widths"]) + max(definition["heights"]) + breakupReach * amplitude + patchEdges * definition["edgeLength"]
+  def __init__(self, sceneObject, shown, plan, margin):
+    plan = numpy.asarray(plan, dtype=numpy.float64)[:, :2]
     triangles = bridgeMeshAccess.meshTriangles(sceneObject)
-    near = ((shown[:, :2] >= path[:, :2].min(axis=0) - margin) & (shown[:, :2] <= path[:, :2].max(axis=0) + margin)).all(axis=1)
+    near = ((shown[:, :2] >= plan.min(axis=0) - margin) & (shown[:, :2] <= plan.max(axis=0) + margin)).all(axis=1)
     triangles = triangles[near[triangles].any(axis=1)]
     used, local = numpy.unique(triangles, return_inverse=True)
     self.tree = mathutils.bvhtree.BVHTree.FromPolygons(shown[used].tolist(), local.reshape(-1, 3).tolist())
@@ -251,34 +255,104 @@ class TerrainSurface:
         depths[index] = distance
     return depths
 
+  def drops(self, points):
+    """How far below each point the first surface lies: infinity where none does."""
+    drops = numpy.full(len(points), numpy.inf)
+    for index, point in enumerate(points.tolist()):
+      location, _, _, distance = self.tree.ray_cast(mathutils.Vector(point), down)
+      if location is not None:
+        drops[index] = distance
+    return drops
+
+  def onGround(self, points):
+    """Whether each point stands within a step of walkable ground: over it in the open by a step or less, or under it by a step or less
+    where the ground over it is walkable rather than a cliff's face."""
+    standing = numpy.zeros(len(points), dtype=bool)
+    for index, point in enumerate(points.tolist()):
+      origin = mathutils.Vector(point)
+      location, normal, _, distance = self.tree.ray_cast(origin, up)
+      if location is not None and normal.z > 0:
+        standing[index] = distance <= stepHeight and normal.z >= floorNormalZ
+      else:
+        location, _, _, distance = self.tree.ray_cast(origin, down)
+        standing[index] = location is not None and distance <= stepHeight
+    return standing
+
+  def faceBeside(self, point, toSide, reach):
+    """Where a cliff's face stands beside a point at its height, looking toward toSide: the point moved toward it onto the surface, or
+    back out onto the surface when it lies inside the rock; None when no face steeper than half upright lies within reach (a bump of
+    ground past a cliff's top is no face)."""
+    direction = -toSide if self.depths(point[None])[0] > 0 else toSide
+    location, normal, _, distance = self.tree.ray_cast(mathutils.Vector(point.tolist()), mathutils.Vector(direction.tolist()), reach)
+    return None if location is None or abs(normal.z) > faceNormalZ else point + direction * distance
+
+
+def caveSurface(sceneObject, shown, definition):
+  """The terrain around a cave's path out to everything its tube and breakup can reach."""
+  amplitude = definition["breakup"]["amplitude"] if definition["breakup"] is not None else 0.0
+  margin = max(definition["widths"]) + max(definition["heights"]) + breakupReach * amplitude + patchEdges * definition["edgeLength"]
+  return TerrainSurface(sceneObject, shown, definition["path"], margin)
+
+
+def roundedPoint(point):
+  return [round(float(value), 1) for value in point]
+
+
+def requireFloorOnRock(surface, floors):
+  """Refuse a floor hanging in the air: a sample of its middle neither inside the rock nor within a step above the ground."""
+  inOpen = numpy.flatnonzero(surface.depths(floors) <= 0)
+  gaps = numpy.zeros(len(floors))
+  gaps[inOpen] = surface.drops(floors[inOpen])
+  hanging = gaps > stepHeight
+  if not hanging.any():
+    return
+  first = int(numpy.argmax(hanging))
+  last = first + int(numpy.argmin(numpy.append(hanging[first:], False))) - 1
+  stretches = int((numpy.diff(hanging.astype(numpy.int8)) == 1).sum()) + int(hanging[0])
+  gap = float(gaps[first:last + 1].max())
+  raise ValueError(
+    f"The cave's floor hangs in the air from {roundedPoint(floors[first])} to {roundedPoint(floors[last])}"
+    + (f" and in {stretches - 1} more stretches" if stretches > 1 else "")
+    + f": no rock lies under its middle within a step ({stepHeight:g}), the ground {'nowhere' if math.isinf(gap) else f'up to {gap:.1f}'} below it."
+    " Keep the floor inside the rock or on the ground; a gallery along a cliff wants more of its width inside the rock (traceLedge insideShare)"
+  )
+
 
 def tubeRows(definition, line, surface):
   """The tube's rows (floor points, plan directions, widths, heights, and how much of the breakup each takes) and each end's kind:
-  open, its section in the open but for a sill a step deep, or blind, wholly inside the rock and rounded off beyond its last point,
-  closing over half its width beyond it on an apex at floor height, as a dome closes."""
+  open, some of its floor on the ground (a mouth wholly in the open but for a sill a step deep, or a gallery's end beside a cliff,
+  part in the rock); ledge, part in the rock with its floor running out over a drop beside it (a gallery's dead end up a cliff); or
+  blind, wholly inside the rock. An end with rock in its section is rounded off, closing over half its width beyond its last point on
+  an apex at floor height, as a dome closes."""
   edgeLength = definition["edgeLength"]
   shape = sectionShape(definition["wallShare"], sectionCounts(definition))
+  onFloor = numpy.array([point[0][1] == 0.0 for point in shape])
   candidates = numpy.unique(numpy.concatenate([numpy.arange(0.0, line.length, edgeLength * rowSampleShare), line.stations]))
   floors, directions, widths, heights = line.at(candidates)
-  ends = {}
+  requireFloorOnRock(surface, floors)
+  ends, rounded = {}, {}
   for end, row in (("start", 0), ("end", -1)):
     cap = sectionPoints(shape, floors[[row]], directions[[row]], widths[[row]], heights[[row]])[0]
     depths = surface.depths(cap)
     if (depths > 0).all():
-      ends[end] = "blind"
+      ends[end], rounded[end] = "blind", True
     elif depths.max() <= stepHeight:
-      ends[end] = "open"
+      ends[end], rounded[end] = "open", False
+    elif surface.onGround(cap[onFloor]).any():
+      ends[end], rounded[end] = "open", True
+    elif (depths[onFloor] <= 0).any():
+      ends[end], rounded[end] = "ledge", True
     else:
       raise ValueError(
-        f"The cave's {end} at {[round(float(value), 1) for value in floors[row]]} is part in the rock (up to {depths.max():.1f} into it) and"
-        " part in the open; end it on open ground in front of the mouth (its floor within a step of the ground) or wholly inside the rock"
+        f"The cave's {end} at {roundedPoint(floors[row])} is part in the rock (up to {depths.max():.1f} into it) and part in the open, its"
+        " floor buried more than a step under the ground; end it with its floor on the ground in front of it or beside it, or wholly inside the rock"
       )
-  if "open" not in ends.values():
+  if set(ends.values()) == {"blind"}:
     raise ValueError("Both ends of the cave lie wholly inside the rock, so nothing would open into it; start or end it on open ground in front of its mouth")
   rows = [(floors, directions, widths, heights, numpy.ones(len(candidates)), numpy.isin(candidates, line.stations))]
   apexes = {}
   for end, row, sign in (("start", 0, -1.0), ("end", -1, 1.0)):
-    if ends[end] != "blind":
+    if not rounded[end]:
       continue
     reach = widths[row] / 2
     # Rows by angle round a quarter ellipse bunch toward its tip; below endShrink an apex closes it, and the breakup shrinks with the
@@ -291,7 +365,7 @@ def tubeRows(definition, line, surface):
     )
     apexes[end] = numpy.array([*(floors[row, :2] + sign * reach * directions[row]), floors[row, 2]])
     depths = surface.depths(numpy.vstack([sectionPoints(shape, *extended[:4]).reshape(-1, 3), apexes[end] + [0.0, 0.0, stepHeight]]))
-    if not (depths > 0).all():
+    if ends[end] == "blind" and not (depths > 0).all():
       raise ValueError(f"The cave's blind {end} at {[round(float(value), 1) for value in floors[row]]} is rounded off over {reach:.1f} beyond it, which reaches out of the rock; end it deeper inside")
     if end == "start":
       rows.insert(0, tuple(numpy.flip(part, axis=0) for part in extended))
@@ -305,7 +379,7 @@ def tubeRows(definition, line, surface):
       kept.append(index)
   return {
     "shape": shape, "floors": floors[kept], "directions": directions[kept], "widths": widths[kept], "heights": heights[kept],
-    "breakupScales": scales[kept], "ends": ends, "apexes": apexes,
+    "breakupScales": scales[kept], "ends": ends, "rounded": rounded, "apexes": apexes,
   }
 
 
@@ -681,7 +755,7 @@ def splice(sceneObject, name, definition, strokes):
   matrix = bridgeMeshAccess.matrixArray(sceneObject.matrix_world)
   inverse = numpy.linalg.inv(matrix)
   shown, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
-  surface = TerrainSurface(sceneObject, shown, definition)
+  surface = caveSurface(sceneObject, shown, definition)
   line = CaveLine(definition)
   line.requireGrades(definition["maximumFloorDegrees"])
   rows = tubeRows(definition, line, surface)
@@ -723,7 +797,8 @@ def splice(sceneObject, name, definition, strokes):
   known[name] = {"definition": definition, "plug": report.pop("records"), "paint": strokes}
   bridgeCaveData.writeCaves(sceneObject, known)
   replayStrokes(sceneObject, name, strokes)
-  return report | {"ends": [{"end": end, "kind": kind} for end, kind in rows["ends"].items()], "levelStretches": line.levelStretches()}
+  ends = [{"end": end, "kind": kind, "rounded": rows["rounded"][end]} for end, kind in rows["ends"].items()]
+  return report | {"ends": ends, "levelStretches": line.levelStretches()}
 
 
 def spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, patch, tubeVertices, tubeFaces, wallSlot, floorSlot):
@@ -1123,6 +1198,71 @@ def removeCave(objectName, name):
   return {"object": objectName, "cave": name, "definition": record["definition"], "strokes": record["paint"]} | restored
 
 
+def traceLedge(objectName, start, end, floorFrom, floorTo, width, height, side, insideShare, step):
+  """A starting path for a gallery or rock shelter along a cliff, for cutCave; changes nothing."""
+  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  if len(start) != 2 or len(end) != 2:
+    raise ValueError(f"start and end are [x, y] points in plan, got {start!r} and {end!r}")
+  if width <= 0 or height <= 0 or step <= 0:
+    raise ValueError(f"width, height, and step are positive, got {width}, {height}, and {step}")
+  if side not in ("left", "right"):
+    raise ValueError(f"side is the side of travel from start to end the rock stands on, left or right, got {side!r}")
+  if not 0 < insideShare < 1:
+    raise ValueError(f"insideShare is the share of the width inside the rock, above 0 and under 1, got {insideShare}")
+  start, end = numpy.array(start, dtype=numpy.float64), numpy.array(end, dtype=numpy.float64)
+  length = float(numpy.linalg.norm(end - start))
+  if length < step:
+    raise ValueError(f"start and end are {length:.1f} apart, less than one step ({step:g})")
+  direction = (end - start) / length
+  toSide = numpy.array([-direction[1], direction[0], 0.0] if side == "left" else [direction[1], -direction[0], 0.0])
+  alongs = numpy.linspace(0.0, length, math.ceil(length / step) + 1)
+  line = start + alongs[:, None] * direction
+  reach = faceReachWidths * width
+  shown, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
+  surface = TerrainSurface(sceneObject, shown, numpy.vstack([start, end]), reach + width)
+  floors = floorFrom + (floorTo - floorFrom) * alongs / length
+  # A point's floor height follows its distance along the traced path, so the grade is even, and where its face lies depends on that
+  # height: a few rounds settle the two.
+  for _ in range(traceRounds):
+    offsets = numpy.full(len(line), numpy.nan)
+    for index, (point, floor) in enumerate(zip(line.tolist(), floors.tolist())):
+      face = surface.faceBeside(numpy.array([point[0], point[1], floor + stepHeight]), toSide, reach)
+      if face is not None:
+        offsets[index] = float((face[:2] - line[index]) @ toSide[:2]) + (insideShare - 0.5) * width
+    traced = ~numpy.isnan(offsets)
+    if not traced.any():
+      raise ValueError(f"No rock stands within {reach:g} to the {side} of the line from {start.tolist()} to {end.tolist()} at its floor's heights; trace along the cliff, with side toward its rock")
+    # Past the cliff's top no rock stands beside a point; it keeps the offset of the nearest point that found the cliff, so the path
+    # runs on in line rather than kinking back to the line from start to end.
+    found = numpy.flatnonzero(traced)
+    offsets = offsets[found[numpy.abs(numpy.arange(len(line))[:, None] - found[None, :]).argmin(axis=1)]]
+    centers = line + offsets[:, None] * toSide[:2]
+    distances = numpy.concatenate([[0.0], numpy.cumsum(numpy.linalg.norm(numpy.diff(centers, axis=0), axis=1))])
+    floors = floorFrom + (floorTo - floorFrom) * distances / distances[-1]
+  path = numpy.column_stack([centers, floors])
+  count = len(path)
+  try:
+    CaveLine({"path": path.tolist(), "widths": [float(width)] * count, "heights": [float(height)] * count})
+  except ValueError as error:
+    raise ValueError(f"Traced every {step:g} along the cliff, the path would not cut: {error}. Trace it with a longer step or a narrower width") from error
+  across = numpy.linspace(-0.5, 0.5, shareSamples)[:, None] * width * toSide
+  shares = [float((surface.depths(point + [0.0, 0.0, stepHeight] + across) > 0).mean()) for point in path]
+  segments = []
+  for index in range(count - 1):
+    run = float(numpy.linalg.norm(path[index + 1, :2] - path[index, :2]))
+    middle = (path[index] + path[index + 1]) / 2
+    segments.append({
+      "from": index, "to": index + 1, "gradeDegrees": round(math.degrees(math.atan2(path[index + 1, 2] - path[index, 2], run)), 2),
+      "covered": bool(surface.depths(middle[None])[0] >= height),
+    })
+  return {
+    "object": objectName, "path": [[round(float(value), 2) for value in point] for point in path], "widths": [float(width)] * count,
+    "heights": [float(height)] * count,
+    "points": [{"traced": bool(isTraced), "insideShare": round(share, 3)} for isTraced, share in zip(traced, shares)],
+    "segments": segments,
+  }
+
+
 def refitStaleCaves(sceneObject):
   """Cut again every cave whose ground moved since it was cut, so each fits the ground as it now is."""
   if not bridgeCaveData.holdsCaves(sceneObject):
@@ -1140,4 +1280,5 @@ commands = {
   "cutCave": (cutCave, True),
   "editCave": (editCave, True),
   "removeCave": (removeCave, True),
+  "traceLedge": (traceLedge, False),
 }
