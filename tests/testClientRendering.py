@@ -3,6 +3,7 @@ import math
 import sys
 from pathlib import Path
 
+import numpy
 from PIL import Image
 import pytest
 
@@ -262,7 +263,26 @@ def testImportZoneBringsATerrainZone(stageBlenderServer):
     "placements": 5730, "objectGroups": 5, "missingObjectGroups": ["drgbrownie"],
   }
   # Every tile placement is drawn, plus the merchant tent and the zone-out wall of the two object groups the archive holds; the wall's
-  # baked light file does not fit its model.
+  # baked light file does not fit its model. No quad is a hole and every map and baked light file the zone names is in its archive.
   assert source["placedObjects"] == 5732
   assert source["litFilesNotMatchingModels"] == ["zoneout_obj_zone_out.lit"]
   assert source["missingModels"] == [] and source["missingTextures"] == []
+  assert (source["holeQuads"], source["terrainMapsMissing"], source["litFilesMissing"], source["litFilesShorterThanTheirCount"]) == (0, {}, [], [])
+
+
+@pytest.mark.clientData("clientFiles")
+def testATerrainDetailMapTheArchiveLacksDrawsBlack(stageBlenderServer):
+  # cryptofshade.eqg names detail map di_hill_grass_muddy.dds and normal map ground_grass_10n.dds for the only layer of 'grass', the
+  # ecosystem on every tile, without holding either: the client's empty sampler reads black, so the ground draws black where no later
+  # ecosystem covers it, while its placed rocks draw with their textures.
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    imported = await session.expectSuccess("importZone", {"zone": "cryptofshade"})
+    await session.expectSuccess("setZoneProperties", environment | {"fogOn": False})
+    image, _ = await session.expectImage("renderView", {"view": {"map": {"center": [-300, 1300], "width": 2400}}, "guides": False})
+    return imported, image
+
+  imported, image = stageBlenderServer.session(steps)
+  assert imported["source"]["terrainMapsMissing"] == {"detailMaps": ["di_hill_grass_muddy.dds"], "normalMaps": ["ground_grass_10n.dds"]}
+  pixels = numpy.asarray(Image.open(io.BytesIO(image)).convert("RGB"), dtype=numpy.int64)
+  assert (pixels.max(axis=2) <= 2).mean() > 0.9 and pixels.max() > 40

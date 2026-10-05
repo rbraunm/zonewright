@@ -8,8 +8,11 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
 import eqArchive
 import eqgFiles
+import eqgTerrain
 import eqModels
+import eqZones
 import zoneGeometry
+import zoneSources
 
 repositoryRoot = Path(__file__).resolve().parent.parent
 everquestClient = Path(json.loads((repositoryRoot / ".mcp.json").read_text(encoding="utf-8"))["mcpServers"]["zonewright"]["env"]["EVERQUEST_CLIENT"])
@@ -82,3 +85,33 @@ def testClientArtPlayersPassThroughAndCollisionShellsWithoutMaterialsRead():
   raw = numpy.frombuffer(data, dtype=eqgFiles.modelTriangleType, count=176, offset=len(data) - 176 * eqgFiles.modelTriangleType.itemsize)
   shell = eqgFiles.parseModel(data, "obj_hutoutside_col.mod")
   assert raw["material"].tolist() == [0] * 176 and shell["materials"] == [] and shell["triangleMaterials"].tolist() == [-1] * 176
+
+
+@pytest.mark.clientData("clientFiles")
+def testALooseTerrainZoneFileStandsOverTheArchives():
+  # oldcommons.eqg holds commonlands.zon and .dat and an oldcommons.zon without its .dat; the loose oldcommons.zon beside it, an EQ
+  # terrain project named commonlands, is the one the client loads, and its *NAME picks the .dat.
+  variants = zoneSources.zoneVariants(everquestClient, "oldcommons")
+  assert {key: (source.get("zon"), source.get("zonPath"), source["dat"]) for key, source in variants.items()} == {
+    "oldcommons:eqtzp": ("commonlands.zon", None, "commonlands.dat"),
+    "oldcommons:eqtzp:loose": (None, everquestClient / "oldcommons.zon", "commonlands.dat"),
+  }
+  assert eqZones.drawnVariant(everquestClient, "oldcommons")[0] == "oldcommons:eqtzp:loose"
+  zonText, _ = zoneSources.terrainFiles(variants["oldcommons:eqtzp:loose"])
+  assert "*MIN_EXTENTS -2176.000 -5376.000 -136.563" in zonText
+
+
+@pytest.mark.clientData("clientFiles")
+def testAPlacementPastItsTilesEdgeTakesItsOwnTilesGround():
+  # Elddar Forest lists a bridge 396.406 units along y from its tile's origin, past that tile's 160-unit side: the client reads the
+  # ground at 76.406 in the listing tile, about 45 units above the ground under the bridge, which then spans its ravine.
+  source = eqZones.drawnVariant(everquestClient, "elddar")[1]
+  terrain = eqgTerrain.parseTerrain(*zoneSources.terrainFiles(source), "elddar")
+  tilesByOrigin = {(tile["x"], tile["y"]): tile for tile in terrain["tiles"]}
+  bridge = next(placement for placement in terrain["placements"] if placement["model"] == "obj_bridge.mod" and abs(placement["offset"][1] - 396.406) < 1e-3)
+  listing = tilesByOrigin[bridge["listingTile"]]
+  x, y, _ = bridge["position"]
+  under = tilesByOrigin[(x // terrain["tileSize"] * terrain["tileSize"], y // terrain["tileSize"] * terrain["tileSize"])]
+  placed = eqgTerrain.placedPosition(terrain, tilesByOrigin, bridge)
+  assert abs(placed[2] - (eqgTerrain.tileHeight(terrain, listing, bridge["offset"][0], 76.406) + bridge["offset"][2])) < 1e-3
+  assert placed[2] - (eqgTerrain.tileHeight(terrain, under, x - under["x"], y - under["y"]) + bridge["offset"][2]) > 40

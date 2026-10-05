@@ -6,6 +6,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 import eqArchive
 import eqgFiles
+import eqgTerrain
 
 listingExtensions = (".s3d", ".eqg", ".zon")
 
@@ -43,6 +44,12 @@ def wldVariants(archivePath):
   return {}
 
 
+def terrainDataFile(zonBytes, archive, sourceName):
+  """The .dat an EQ terrain .zon loads from the archive, or None when the archive lacks it and the project cannot load."""
+  dataName = eqgTerrain.dataFileName(zonBytes.decode("latin1"), sourceName)
+  return dataName if dataName in archive.entries else None
+
+
 def eqgVariants(archivePath):
   zoneName = archivePath.stem.lower()
   archive = eqArchive.EQArchive(archivePath)
@@ -51,19 +58,37 @@ def eqgVariants(archivePath):
     if not entryName.endswith(".zon"):
       continue
     zonBytes = archive.read(entryName)
-    if zonBytes[:5] == b"EQTZP" and entryName[:-4] + ".dat" in archive.entries:
-      variants[f"{zoneName}:eqtzp"] = {"zone": zoneName, "format": "eqtzp", "archive": archivePath, "zon": entryName}
+    if zonBytes[:5] == b"EQTZP":
+      dataName = terrainDataFile(zonBytes, archive, f"{archivePath.name}:{entryName}")
+      if dataName is not None:
+        variants[f"{zoneName}:eqtzp"] = {"zone": zoneName, "format": "eqtzp", "archive": archivePath, "zon": entryName, "dat": dataName}
     elif zonBytes[:4] == b"EQGZ":
       variants[f"{zoneName}:eqgz"] = {"zone": zoneName, "format": "eqgz", "archive": archivePath, "zon": entryName}
   return variants
 
 
 def looseVariants(clientRoot, zonPath):
+  """The zone a loose <archive>.zon makes, which the client loads over the archive's own (EQGraphicsDX9.dll 0x10066230): an EQG zone
+  (EQGZ), or an EQ terrain project (EQTZP) whose .dat its *NAME names in the archive."""
   zoneName = zonPath.stem.lower()
   archivePath = clientRoot / f"{zonPath.stem}.eqg"
-  if zonPath.read_bytes()[:4] == b"EQGZ" and archivePath.is_file():
+  if not archivePath.is_file():
+    return {}
+  zonBytes = zonPath.read_bytes()
+  if zonBytes[:4] == b"EQGZ":
     return {f"{zoneName}:eqgz:loose": {"zone": zoneName, "format": "eqgz", "archive": archivePath, "zonPath": zonPath}}
+  if zonBytes[:5] == b"EQTZP":
+    dataName = terrainDataFile(zonBytes, eqArchive.EQArchive(archivePath), zonPath.name)
+    if dataName is not None:
+      return {f"{zoneName}:eqtzp:loose": {"zone": zoneName, "format": "eqtzp", "archive": archivePath, "zonPath": zonPath, "dat": dataName}}
   return {}
+
+
+def terrainFiles(source):
+  """An EQ terrain variant's .zon text, the loose one when the client has it, and its .dat bytes."""
+  archive = eqArchive.EQArchive(source["archive"])
+  zonBytes = source["zonPath"].read_bytes() if "zonPath" in source else archive.read(source["zon"])
+  return zonBytes.decode("latin1"), archive.read(source["dat"])
 
 
 def discoverZones(clientRoot):
