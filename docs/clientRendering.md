@@ -65,7 +65,7 @@ Traced in `eqgame.exe` and `EQGraphicsDX9.dll`, checked across every classic zon
 
 The client parses a mesh (0x36, `0x100bfae0`) with a count for each array and builds its vertices by vertex index alone, whatever the array counts:
 
-- **Arrays longer than the vertices:** the first one per vertex is read. Thirteen drawn region meshes store more normals and colors than vertices (Acrylia's `R17` 128 for 120; Sebilis, Grimling, Halls of Honor, Tenebrous).
+- **Arrays longer than the vertices:** the first one per vertex is read. Thirteen drawn region meshes store more normals and colors than vertices (Acrylia's `R17` 128 for 120; Ssraeshza Temple, Grimling Forest, the Halls of Honor, Tenebrous Mountains).
 - **No UVs:** every vertex at (0, 0), so the whole mesh takes the texture's corner (regions `0x1001f630`, objects `0x10057060`, skins `0x1004ad50`). Six drawn meshes store none: the Plane of Innovation's clock hands (`BOX01`, `BOX02` skins of `POICLOCK500`), the Plane of Air's wine rack (`CYLINDER01` of `POAWINE500`), the Plane of Time's `TMTMNTNCOLID500`, and two character meshes.
 - **No normals:** zero normals (no drawn mesh in the client stores none).
 - **No colors:** a region vertex takes `0xFF1F1F1F` (`0x1001f7d2`, with a second color `0xFF808080` the region effect does not read), an object vertex `0xFFFFFFFF` (`0x10057060`). A skin has no color at all: the client builds skins as D3DX meshes of position, normal, and one texture coordinate (vertex format `0x112`, `0x1004ae5f`), and `SkinMeshOld` lights them by scene light alone, as a vertex with no baked light and the full share would be.
