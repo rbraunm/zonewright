@@ -2647,8 +2647,8 @@ async def swapKitPiece(context: Context, names: list[str], piece: str):
 # Structures
 
 structureHelp = (
-  " A structure is laid from its definition (its build tool's arguments) into a collection named for it under `collection` (by default"
-  " structures), holding its parts and nothing else; its parts are refused to the object, mesh, material, and UV tools (editStructure"
+  " A structure is laid from its definition (its build tool's arguments) into a collection named for it under `collection`"
+  " (structures), holding its parts and nothing else; its parts are refused to the object, mesh, material, and UV tools (editStructure"
   " changes it, removeStructure takes it back). Every lookup of the ground its lay made is kept, against what players collide with"
   " (no water, cutout or passable faces, guides, regions, spawns, doors, or boundaries), leaving out its own parts and every structure"
   " laid after it; it is stale when that ground moved, when a kit piece or prefab it was laid from changed, or when its kit is missing"
@@ -2711,7 +2711,7 @@ async def placePrefab(
   " changed): `changes` takes any keys of its definition, as its build tool takes them (a placed prefab's kitPath, prefab, location,"
   " facingDegrees, plinth, collection). Lay structures in the order getStructures lists them, so one standing on another follows it."
   " Whole or nothing: whatever its build refuses leaves it exactly as it was. Returns what its build tool returns, the changes, and"
-  " groundMoved: how its recorded lookups moved since its last lay (how many, the largest change and where)." + structureHelp
+  " probesMovedSinceLaid: how many of its recorded lookups moved since its last lay, and the largest change and where." + structureHelp
 ))
 async def editStructure(context: Context, name: str, changes: dict | None = None):
   if changes is not None and "kitPath" in changes:
@@ -2721,16 +2721,16 @@ async def editStructure(context: Context, name: str, changes: dict | None = None
 
 @guardedTool()
 async def removeStructure(context: Context, name: str):
-  """Take a structure back: its collection and parts (and a part's mesh no other object uses). Returns its name, kind, and definition as
-  its build tool's arguments, to build it again."""
+  """Take a structure back: its collection and parts (and a part's mesh no other object uses). Returns its name, kind, the parts
+  removed, and its definition as its build tool's arguments, to build it again."""
   return await callBridge(context, "removeStructure", {"name": name})
 
 
 @guardedTool(description=(
   "Every structure of the open file (or those named), in the order they were first laid: kind, order, definition (its build tool's"
-  " arguments), parts with their triangles and the export models they become, triangles, the objects its lookups stand on now, stale"
-  " and why (ground: how many lookups moved, the largest change and where; kit: the pieces or prefabs changed; missing: what cannot"
-  " be found), and its views; and the loose kit pieces placed, counted by kit and piece. Changes nothing." + structureHelp
+  " arguments), parts with their triangles and the export models they become, the objects its lookups stand on now, stale and why"
+  " (ground: how many lookups moved, the largest change and where; kitChanged: the pieces or prefabs changed; missing: what cannot be"
+  " found), and its views; and the loose kit pieces placed by hand, counted by kit and piece. Changes nothing." + structureHelp
 ))
 async def getStructures(context: Context, names: list[str] | None = None):
   return await callBridge(context, "getStructures", {"names": names})

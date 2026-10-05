@@ -1,10 +1,10 @@
-"""Structures laid from their definitions, as one artist action on one thing the artist defined: its parts made whole or not at all
-from the definition, its kit, and the ground; every lookup of the ground kept as a probe row, so a structure is stale when its ground
-or its kit changed since, and lays again from its definition. Kinds register their definition, lay, and views here at import. Runs
-under Blender's Python."""
+"""Defined structures: one artist action placing kit pieces or a building where the artist gave, kept with its definition and laid again
+from it. The ground a lay stands on (StructureGround), every lookup it made (probes, replayed to tell when the ground moved), the kit
+fingerprints it was laid from, the whole-or-nothing lay, staleness, and the views each kind is judged from; the commands that edit, take
+back, and list structures. Kinds register their lays here (bridgePrefabs). Runs under Blender's Python."""
 import math
+import numbers
 import os
-import typing
 
 import bpy
 import mathutils
@@ -17,143 +17,80 @@ import bridgeMeshAccess
 import bridgeObjects
 import bridgeReviewGuides
 import bridgeStructureData
-import playerScale
+from playerScale import stepHeight
 
-# The kit pieces and prefabs a structure was laid from, held by reference so a linked one stays in the file while the structure does.
-sourcesProperty = "zonewrightStructureSources"
+structuresCollectionName = "structures"
+placeCollections = (structuresCollectionName, bridgeExport.terrainCollectionName)
+layingSuffix = "Laying"
+# Two lookups of one probe agree when this close; a probe that moves further makes its structure stale.
 probeTolerance = 0.01
-# Lookups from above the scene start this far over its top; footing is looked for this far below a step over a point, as walkRoute does.
+# Posts, legs, anchors, and floors find the ground within this far below them.
+groundReach = 300.0
 overheadLift = 10.0
-footingReach = 60.0
-reservedCollections = (bridgeExport.terrainCollectionName,)
-up = bridgeMeshAccess.up
-down = bridgeMeshAccess.down
 castNudge = bridgeMeshAccess.castNudge
+up = mathutils.Vector((0.0, 0.0, 1.0))
+down = mathutils.Vector((0.0, 0.0, -1.0))
+# What each kind is, as placed parts rather than ground, refused in the terrain collection.
+placedKinds = {"prefab": "A building is placed parts"}
+# Each kind: the build tool that makes it, its definition's keys, its lay, its walk line (or None), its views, and what it reports once
+# laid (or None).
 kinds = {}
 
 
-class Kind(typing.NamedTuple):
-  """A structure kind: define(arguments) checks a build tool's arguments and gives the definition kept; lay(laying) makes the parts and
-  gives the build result; views(structure) gives renderView views derived from it."""
-  definitionKeys: tuple
-  define: typing.Callable
-  lay: typing.Callable
-  views: typing.Callable
+class Kind:
+  def __init__(self, tool, keys, lay, walkLine, views, indexKeys=(), finish=None):
+    self.tool, self.keys, self.lay, self.walkLine, self.views, self.indexKeys, self.finish = tool, keys, lay, walkLine, views, indexKeys, finish
 
 
-def registerKind(kind, definitionKeys, define, lay, views):
-  kinds[kind] = Kind(tuple(definitionKeys), define, lay, views)
+def registerKind(kind, tool, keys, lay, walkLine, views, indexKeys=(), finish=None):
+  kinds[kind] = Kind(tool, keys, lay, walkLine, views, indexKeys, finish)
 
 
-class StructureGround:
-  """What a structure stands on, as players collide with it (no water, cutout or passable faces, guides, regions, spawns, doors, or
-  boundaries), leaving out the objects named in skipping (the structure's own parts and every structure laid after it); each lookup is
-  recorded as a probe row [kind, origin, direction, reach, found]."""
-
-  def __init__(self, trees, skipping):
-    kept = [tree for tree in trees if tree[0] not in skipping]
-    self.surfaces = bridgeMeshAccess.PlayerSurfaces(trees=kept) if kept else None
-    self.top = None
-    self.rows, self.standsOn = [], set()
-
-  def record(self, kind, origin, direction, reach, found, owner):
-    row = [float(bridgeStructureData.probeKinds.index(kind))] + [float(value) for value in origin] + [float(value) for value in direction]
-    self.rows.append(row + [float(reach), numpy.nan if found is None else float(found)])
-    if owner is not None:
-      self.standsOn.add(owner)
-    return found
-
-  def lookDown(self, origin, reach):
-    footing = None if self.surfaces is None else self.surfaces.footingOn(mathutils.Vector(origin), reach)
-    return (None, None) if footing is None else (footing.point.z, footing.objectName)
-
-  def lookAlong(self, origin, direction, reach):
-    hit = None if self.surfaces is None else self.surfaces.castOn(mathutils.Vector(origin), mathutils.Vector(direction), reach)
-    return (None, None) if hit is None else ((hit[0] - mathutils.Vector(origin)).length, hit[2])
-
-  def lookFromAbove(self, origin, reach):
-    hit = None if self.surfaces is None else self.surfaces.castOn(mathutils.Vector(origin), down, reach)
-    return (None, None) if hit is None else (hit[0].z, hit[2])
-
-  def lookAtLevel(self, x, y, level):
-    """The ground for a player at a level, as plots find it (PlayerSurfaces.groundAtLevel): where a step over the level lies inside a
-    solid, the top of it; otherwise the footing under that point."""
-    if self.surfaces is None:
-      return None, None
-    origin = mathutils.Vector((x, y, level + playerScale.stepHeight))
-    above = self.surfaces.castOn(origin, up, bridgeMeshAccess.waterReach)
-    if above is not None and above[1].z > 0 and self.surfaces.enclosedAround(origin):
-      return above[0].z, above[2]
-    return self.lookDown(origin, bridgeMeshAccess.waterReach)
-
-  def footing(self, point):
-    """The footing under a point, looked for from a step over it (walkRoute's footingAt); its height or None."""
-    origin = mathutils.Vector(point) + up * (playerScale.stepHeight + castNudge)
-    reach = footingReach + playerScale.stepHeight + castNudge
-    return self.record("footing", origin, down, reach, *self.lookDown(origin, reach))
-
-  def below(self, point, reach):
-    """The first up-facing surface below a point within reach; its height or None."""
-    return self.record("below", point, down, reach, *self.lookDown(point, reach))
-
-  def beside(self, point, direction, reach):
-    """How far a level direction from a point meets a face, within reach; None for none."""
-    return self.record("beside", point, direction, reach, *self.lookAlong(point, direction, reach))
-
-  def overhead(self, x, y):
-    """Looking down at [x, y] from above the scene: the height of what is met first (None for nothing), and where rock lies over
-    ground there, the heights of its top, its underside, and that ground (bridgeMeshAccess.rockOverGround)."""
-    if self.top is None:
-      self.top = bridgeMeshAccess.sceneTopHeight() + overheadLift
-    origin = (x, y, self.top)
-    found = self.record("overhead", origin, down, bridgeMeshAccess.waterReach, *self.lookFromAbove(origin, bridgeMeshAccess.waterReach))
-    levels = None if self.surfaces is None else bridgeMeshAccess.rockOverGround(self.surfaces.castWithNormal, x, y, self.top)
-    return found, levels
-
-  def level(self, x, y, level):
-    """The ground at [x, y] for a floor at level (lookAtLevel); its height or None."""
-    return self.record("level", (x, y, level), (0.0, 0.0, 0.0), bridgeMeshAccess.waterReach, *self.lookAtLevel(x, y, level))
-
-  def replay(self, rows):
-    """What each recorded lookup finds now, and the objects met."""
-    found, owners = numpy.full(len(rows), numpy.nan), set()
-    for index, row in enumerate(rows):
-      kind = bridgeStructureData.probeKinds[int(row[0])]
-      origin, direction, reach = row[1:4], row[4:7], row[7]
-      if kind in ("footing", "below"):
-        value, owner = self.lookDown(origin, reach)
-      elif kind == "beside":
-        value, owner = self.lookAlong(origin, direction, reach)
-      elif kind == "overhead":
-        value, owner = self.lookFromAbove(origin, reach)
-      else:
-        value, owner = self.lookAtLevel(*origin)
-      if value is not None:
-        found[index] = value
-      if owner is not None:
-        owners.add(owner)
-    return found, owners
+def isNumber(value):
+  return isinstance(value, numbers.Real) and not isinstance(value, bool) and math.isfinite(value)
 
 
-def groundChange(rows, found):
-  """How the ground moved under recorded probes: how many moved, the largest change and where, and those found before and not now or
-  the other way."""
-  recorded = rows[:, 8]
-  lost, gained = numpy.isnan(found) & ~numpy.isnan(recorded), ~numpy.isnan(found) & numpy.isnan(recorded)
-  both = ~numpy.isnan(found) & ~numpy.isnan(recorded)
-  changes = numpy.where(both, numpy.abs(found - recorded), 0.0)
-  moved = (changes > probeTolerance) | lost | gained
-  largest = int(numpy.argmax(changes)) if len(changes) else None
-  return {
-    "moved": int(moved.sum()), "probes": len(rows),
-    "largestChange": round(float(changes[largest]), 3) if largest is not None and changes[largest] > probeTolerance else 0.0,
-    "at": bridgeKitData.roundVector([rows[largest, 1], rows[largest, 2], recorded[largest]], 2) if largest is not None and changes[largest] > probeTolerance else None,
-    "lost": int(lost.sum()), "found": int(gained.sum()),
-  }
+def requirePoint(label, point, sizes=(3,)):
+  if not isinstance(point, (list, tuple)) or len(point) not in sizes or not all(isNumber(value) for value in point):
+    shapes = " or ".join("[" + ", ".join("xyz"[:size]) + "]" for size in sizes)
+    raise ValueError(f"{label} is {shapes}, got {point!r}")
+  return [float(value) for value in point]
 
 
-def laterParts(order):
-  return {part.name for collection in bridgeStructureData.structureCollections() if bridgeStructureData.readStructure(collection)["order"] > order for part in collection.objects}
+def requirePositive(label, value):
+  if not isNumber(value) or value <= 0:
+    raise ValueError(f"{label} must be a positive number, got {value!r}")
+  return float(value)
+
+
+def requireNonNegative(label, value):
+  if not isNumber(value) or value < 0:
+    raise ValueError(f"{label} must be 0 or more, got {value!r}")
+  return float(value)
+
+
+def requireKeys(label, given, required, optional=()):
+  if not isinstance(given, dict) or not set(required) <= set(given) or not set(given) <= set(required) | set(optional):
+    shown = ", ".join(list(required) + [f"{key} (optional)" for key in optional])
+    raise ValueError(f"{label} is {{{shown}}}, got {given!r}")
+  return given
+
+
+def roundVector(vector, digits=3):
+  return [bridgeKitData.plain(round(float(component), digits)) for component in vector]
+
+
+def floated(value, indexKeys, key=None):
+  """A definition's numbers as floats (indices kept whole), as JSON keeps them."""
+  if key in indexKeys:
+    return value
+  if isinstance(value, dict):
+    return {name: floated(item, indexKeys, name) for name, item in value.items()}
+  if isinstance(value, list):
+    return [floated(item, indexKeys) for item in value]
+  if isinstance(value, numbers.Real) and not isinstance(value, bool):
+    return float(value)
+  return value
 
 
 def keptKitPath(kitPath):
@@ -164,241 +101,400 @@ def absoluteKitPath(kept):
   return None if kept is None else os.path.normpath(bpy.path.abspath(kept))
 
 
-def requireNewStructureName(name):
-  if not isinstance(name, str) or not name:
-    raise ValueError(f"name is the structure's name, got {name!r}")
-  if bridgeStructureData.structureNamed(name) is not None:
-    raise ValueError(f"'{name}' is already a structure: editStructure changes it")
-  for kind, found in (("a collection", bpy.data.collections.get(name)), ("an object", bpy.data.objects.get(name))):
-    if found is not None:
-      raise ValueError(f"'{name}' is already the name of {kind} in this file")
+def shownDefinition(definition):
+  """A definition as a build tool takes it again: its kit path absolute."""
+  return definition | {"kitPath": absoluteKitPath(definition["kitPath"])}
 
 
-def requireStructureCollection(collection):
-  if collection in reservedCollections:
-    raise ValueError(f"A structure of this kind is not ground; lay it in another collection than '{collection}' (by default 'structures')")
-  if not isinstance(collection, str) or not collection:
-    raise ValueError(f"collection names the collection the structure goes in, got {collection!r}")
+class Kit:
+  """What a lay takes from one kit (None: the open file's own), each read once and fingerprinted."""
 
+  def __init__(self, kitPath):
+    self.kitPath = kitPath
+    self.used = {}
 
-class Laying:
-  """A lay in progress: its definition, its ground, and the parts it makes, kept in a temporary collection until every part is made and
-  every check passed."""
-
-  def __init__(self, name, definition, ground, collection, ownParts):
-    self.name, self.definition, self.ground, self.collection, self.ownParts = name, definition, ground, collection, ownParts
-    self.parts, self.sources = [], {}
-
-  def addPart(self, sceneObject, finalName):
-    taken = bpy.data.objects.get(finalName)
-    if taken is not None and taken != sceneObject and taken.name not in self.ownParts:
-      raise ValueError(f"'{finalName}' is already the name of an object, so structure '{self.name}' cannot name a part so")
-    if sceneObject.type == "MESH":
-      takenMesh = bpy.data.meshes.get(finalName)
-      ownMeshes = {bpy.data.objects[part].data for part in self.ownParts if bpy.data.objects[part].type == "MESH"}
-      if takenMesh is not None and takenMesh != sceneObject.data and takenMesh not in ownMeshes:
-        raise ValueError(f"'{finalName}' is already the name of a mesh, so structure '{self.name}' cannot name a part's mesh so")
-    self.collection.objects.link(sceneObject)
-    sceneObject[bridgeStructureData.partProperty] = self.name
-    self.parts.append((sceneObject, finalName))
-    return sceneObject
-
-  def useSource(self, collection):
-    self.sources[collection.name] = collection
+  def prefab(self, name):
+    if not isinstance(name, str):
+      raise ValueError(f"prefab names a prefab of the kit, got {name!r}")
+    collection = bridgeKitData.requirePrefab(self.kitPath, name)
+    self.used[name] = bridgeKitData.prefabFingerprint(collection)
     return collection
 
 
-def parentsOf(collection):
-  return [parent for parent in [bpy.context.scene.collection] + list(bpy.data.collections) if collection.name in parent.children]
+class StructureGround:
+  """What players collide with but the boundaries, built once; each lay or check casts against it leaving out a structure's own parts
+  and every structure laid after it."""
+
+  def __init__(self):
+    self.members = bridgeBoundaries.collisionSurfaces(boundaries=False).members
+
+  def without(self, skipped):
+    return bridgeMeshAccess.PlayerSurfaces(trees=[(name, matrix, tree) for name, matrix, _, tree in self.members if name not in skipped])
 
 
-def commit(laying, existing, kind, order):
-  parentName = laying.definition["collection"]
-  if existing is None:
-    structure = bpy.data.collections.new(laying.name)
-    bridgeObjects.targetCollection(parentName).children.link(structure)
-  else:
-    structure = existing
-    parent = bridgeObjects.targetCollection(parentName)
-    if parent not in parentsOf(structure):
-      for old in parentsOf(structure):
-        old.children.unlink(structure)
-      parent.children.link(structure)
-    for part in list(structure.objects):
-      data = part.data
-      bpy.data.objects.remove(part)
-      if isinstance(data, bpy.types.Mesh) and data.users == 0:
-        bpy.data.meshes.remove(data)
-  for part, finalName in laying.parts:
-    laying.collection.objects.unlink(part)
-    structure.objects.link(part)
-    part.name = finalName
-    if part.type == "MESH" and part.data.users == 1:
-      part.data.name = finalName
-  bpy.data.collections.remove(laying.collection)
-  bridgeStructureData.writeStructure(structure, {
-    "kind": kind, "order": order, "definition": laying.definition,
-    "kit": {name: bridgeKitData.sourceFingerprint(source) for name, source in sorted(laying.sources.items())},
-  })
-  bridgeStructureData.writeProbes(structure, laying.ground.rows)
-  structure[sourcesProperty] = dict(laying.sources)
-  bpy.context.view_layer.update()
-  return structure
+def runProbe(surfaces, row):
+  """A probe row [kind, x, y, z, dx, dy, dz, reach, found] looked up again: what it finds now and the object it finds it on."""
+  kind, origin, direction, reach = int(row[0]), mathutils.Vector(row[1:4]), mathutils.Vector(row[4:7]), float(row[7])
+  if kind == bridgeStructureData.probeKinds["footing"]:
+    footing = surfaces.footingOn(origin + up * (stepHeight + castNudge), reach + stepHeight + castNudge)
+    return (math.nan, None) if footing is None else (footing.point.z, footing.objectName)
+  if kind == bridgeStructureData.probeKinds["below"]:
+    above = surfaces.castOn(origin, up, bridgeMeshAccess.waterReach)
+    if above is not None and above[1].z > 0:
+      return above[0].z, above[2]
+    footing = surfaces.footingOn(origin, reach)
+    return (math.nan, None) if footing is None else (footing.point.z, footing.objectName)
+  if kind == bridgeStructureData.probeKinds["beside"]:
+    hit = surfaces.castOn(origin, direction, reach)
+    return (math.nan, None) if hit is None else ((hit[0] - origin).length, hit[2])
+  if bridgeMeshAccess.rockOverGround(surfaces.castWithNormal, origin.x, origin.y, origin.z) is not None:
+    return math.nan, None
+  hit = surfaces.castOn(origin, down, bridgeMeshAccess.waterReach)
+  return (math.nan, None) if hit is None else (hit[0].z, hit[2])
 
 
-def layStructure(name, kind, definition):
-  """Lay a structure from its definition, whole or not at all: on any refusal its new parts and anything linked for them go, and an
-  existing structure stays exactly as it was."""
-  existing = bridgeStructureData.structureNamed(name)
-  order = bridgeStructureData.readStructure(existing)["order"] if existing is not None else bridgeStructureData.nextOrder()
-  ownParts = {part.name for part in existing.objects} if existing is not None else set()
-  trees = bridgeBoundaries.collisionTrees(boundaries=False)
-  ground = StructureGround(trees, ownParts | laterParts(order))
-  moved = None
-  if existing is not None:
-    rows = bridgeStructureData.readProbes(existing)
-    moved = groundChange(rows, ground.replay(rows)[0])
-  with bridgeKitData.linkingUndone():
-    layingCollection = bpy.data.collections.new(f"{name}Laying")
-    bpy.context.scene.collection.children.link(layingCollection)
-    laying = Laying(name, definition, ground, layingCollection, ownParts)
-    result = kinds[kind].lay(laying)
-    structure = commit(laying, existing, kind, order)
-  return describeStructure(structure) | result | {"standsOn": sorted(ground.standsOn), "views": kinds[kind].views(structure)} | (
-    {"groundMoved": moved} if moved is not None else {}
-  )
+class GroundLookups:
+  """A lay's lookups against its ground, each recorded as a probe with what it found, and the objects found."""
+
+  def __init__(self, surfaces):
+    self.surfaces = surfaces
+    self.rows, self.standsOn = [], set()
+
+  def look(self, kind, origin, direction, reach):
+    row = [float(bridgeStructureData.probeKinds[kind]), *map(float, origin), *map(float, direction), float(reach), math.nan]
+    found, owner = runProbe(self.surfaces, row)
+    row[8] = found
+    self.rows.append(row)
+    if owner is not None:
+      self.standsOn.add(owner)
+    return None if math.isnan(found) else found
+
+  def footing(self, point, reach=stepHeight):
+    """The footing within reach under a point, found from a step over it, or None."""
+    return self.look("footing", point, (0.0, 0.0, -1.0), reach)
+
+  def below(self, point, reach=groundReach):
+    """The ground at a point: the top of the ground it lies in, or the first footing below it within reach; None for neither."""
+    return self.look("below", point, (0.0, 0.0, -1.0), reach)
+
+  def beside(self, point, direction, reach):
+    """How far a level direction from a point meets something, or None within reach."""
+    return self.look("beside", point, direction, reach)
+
+  def overhead(self, x, y):
+    """The highest ground at [x, y], looked for from over the whole scene; refused where rock lies over ground there."""
+    top = bridgeMeshAccess.sceneTopHeight() + overheadLift
+    levels = bridgeMeshAccess.rockOverGround(self.surfaces.castWithNormal, x, y, top)
+    if levels is not None:
+      raise ValueError(f"At [{x:g}, {y:g}] {bridgeMeshAccess.describeRockOverGround([x, y], [round(level, 1) for level in levels])}, so which ground is a choice: give z")
+    return self.look("overhead", (x, y, top), (0.0, 0.0, -1.0), bridgeMeshAccess.waterReach)
+
+
+class Laying:
+  """What one lay makes, kept apart until every part is made and every check passed: parts under temporary names in a collection of
+  their own outside the scene."""
+
+  def __init__(self, name, definition, kit, lookups):
+    self.name, self.definition, self.kit, self.lookups = name, definition, kit, lookups
+    self.collection = bpy.data.collections.new(name + layingSuffix)
+    self.parts = []
+
+  def link(self, sceneObject, finalName):
+    self.collection.objects.link(sceneObject)
+    self.parts.append((sceneObject, finalName))
+    return sceneObject
+
+  def addInstance(self, finalName, collection, location, facingDegrees):
+    instance = bpy.data.objects.new(finalName + layingSuffix, None)
+    instance.instance_type = "COLLECTION"
+    instance.instance_collection = collection
+    instance.location = location
+    instance.rotation_euler = (0.0, 0.0, math.radians(-facingDegrees))
+    return self.link(instance, finalName)
+
+  def addMeshObject(self, finalName, mesh, location, facingDegrees):
+    meshObject = bpy.data.objects.new(finalName + layingSuffix, mesh)
+    meshObject.location = location
+    meshObject.rotation_euler = (0.0, 0.0, math.radians(-facingDegrees))
+    return self.link(meshObject, finalName)
+
+  def discard(self):
+    bpy.data.collections.remove(self.collection)
+
+
+def requireNewStructureName(name):
+  if not isinstance(name, str) or not name:
+    raise ValueError(f"name names the structure, got {name!r}")
+  if bridgeStructureData.findStructure(name) is not None:
+    raise ValueError(f"'{name}' is already a structure (editStructure changes it, removeStructure takes it back)")
+  if any(collection.name == name and collection.library is None for collection in bpy.data.collections):
+    raise ValueError(f"'{name}' is already the name of a collection in this file")
+  if localObject(name) is not None:
+    raise ValueError(f"'{name}' is already the name of an object in this file")
+
+
+def localObject(name):
+  """The open file's own object of a name; a kit's linked objects (a prefab's placed pieces) keep names of their own."""
+  return next((found for found in bpy.data.objects if found.name == name and found.library is None), None)
+
+
+def skippedNames(order):
+  """The parts of every structure laid at or after an order: a structure's ground leaves out its own and later ones."""
+  return {part.name for collection in bridgeStructureData.structureCollections() if bridgeStructureData.readStructure(collection)["order"] >= order for part in bridgeStructureData.partsOf(collection)}
 
 
 def partRole(structureName, part):
-  role = part.name[len(structureName):] if part.name.startswith(structureName) else part.name
-  return role[:1].lower() + role[1:] if role else "whole"
+  """What a part is to its structure: the rest of its name after the structure's (a building's exterior or plinth)."""
+  rest = part.name[len(structureName):] if part.name.startswith(structureName) else part.name
+  return rest[:1].lower() + rest[1:] if rest else "whole"
 
 
-def describeParts(structure):
-  parts = []
-  for part in bridgeStructureData.partsOf(structure):
-    role = "mesh" if part.type == "MESH" else "instance"
-    parts.append({
-      "name": part.name, "role": partRole(structure.name, part), "triangles": sum(bridgeMeshAccess.triangleCount(mesh) for mesh, _ in bridgeMeshAccess.objectParts(part)),
-      "model": f"obj_{bridgeExport.modelStem(bridgeExport.modelKey(part, role))}.mod",
-    })
-  return parts
+def partTriangles(part):
+  return sum(bridgeMeshAccess.triangleCount(mesh) for mesh, _ in bridgeMeshAccess.objectParts(part))
 
 
-def describeStructure(structure):
-  record = bridgeStructureData.readStructure(structure)
-  parts = describeParts(structure)
-  return {"structure": {"name": structure.name, "kind": record["kind"], "order": record["order"]}, "parts": parts, "triangles": sum(part["triangles"] for part in parts)}
+def isGround(collection):
+  terrain = bpy.data.collections.get(bridgeExport.terrainCollectionName)
+  return terrain is not None and collection.name in terrain.children
 
 
-def argumentsOf(definition):
-  """A definition as its build tool's arguments, its kit path absolute again."""
-  return definition | ({"kitPath": absoluteKitPath(definition["kitPath"])} if "kitPath" in definition else {})
+def exportModel(part, collection):
+  """The model file an export writes a part into, or None for a structure laid as ground (its triangles go into the terrain)."""
+  if isGround(collection):
+    return None
+  role = "mesh" if part.type == "MESH" else "instance"
+  return f"obj_{bridgeExport.modelStem(bridgeExport.modelKey(part, role))}.mod"
 
 
-def sourceState(structure):
-  """The kit pieces and prefabs a structure was laid from that are missing (their kit file, library, or collection), and those whose
-  fingerprint changed since."""
-  record = bridgeStructureData.readStructure(structure)
-  sources = structure.get(sourcesProperty) or {}
-  missing, changed = [], []
-  for name, recorded in record["kit"].items():
-    source = sources.get(name)
-    library = None if source is None else source.library
-    if source is None or source.is_missing or (library is not None and (library.is_missing or not os.path.isfile(bpy.path.abspath(library.filepath)))):
-      missing.append(name)
-    elif bridgeKitData.sourceFingerprint(source) != recorded:
-      changed.append(name)
-  return missing, changed
+def describeParts(collection):
+  return [{"name": part.name, "role": partRole(collection.name, part), "triangles": partTriangles(part), "model": exportModel(part, collection)} for part in bridgeStructureData.partsOf(collection)]
 
 
-def staleness(structure, trees):
-  """Why a structure is stale (ground, kit, missing), each with its detail, and the objects its probes stand on now."""
-  record = bridgeStructureData.readStructure(structure)
-  ground = StructureGround(trees, {part.name for part in structure.objects} | laterParts(record["order"]))
-  rows = bridgeStructureData.readProbes(structure)
-  found, owners = ground.replay(rows)
-  why = {}
-  change = groundChange(rows, found)
-  if change["moved"]:
-    why["ground"] = change
-  missing, changed = sourceState(structure)
-  if changed:
-    why["kit"] = {"changed": changed}
-  if missing:
-    why["missing"] = {"sources": missing, "kit": record["definition"].get("kitPath")}
-  return why, sorted(owners)
+def placeCollection(collection, collectionName):
+  """The structure's collection under structures (or terrain), and under nothing else."""
+  parent = bridgeObjects.targetCollection(collectionName)
+  for other in bpy.data.collections:
+    if other is not parent and collection.name in other.children:
+      other.children.unlink(collection)
+  if collection.name in bpy.context.scene.collection.children:
+    bpy.context.scene.collection.children.unlink(collection)
+  if collection.name not in parent.children:
+    parent.children.link(collection)
 
 
-def editStructure(name, changes):
-  structure = bridgeStructureData.requireStructure(name)
-  record = bridgeStructureData.readStructure(structure)
-  kind = kinds[record["kind"]]
-  changes = changes or {}
-  if not isinstance(changes, dict):
-    raise ValueError(f"changes is an object of definition keys, got {changes!r}")
-  unknown = sorted(set(changes) - set(kind.definitionKeys))
-  if unknown:
-    raise ValueError(f"A {record['kind']} has no {unknown} to change; its definition's keys: {list(kind.definitionKeys)}")
-  definition = kind.define(argumentsOf(record["definition"]) | changes)
-  return layStructure(name, record["kind"], definition) | {"changes": changes}
-
-
-def removeStructure(name):
-  structure = bridgeStructureData.requireStructure(name)
-  record = bridgeStructureData.readStructure(structure)
-  for part in list(structure.objects):
+def removeParts(parts):
+  meshes = []
+  for part in parts:
     data = part.data
     bpy.data.objects.remove(part)
     if isinstance(data, bpy.types.Mesh) and data.users == 0:
-      bpy.data.meshes.remove(data)
-  bpy.data.collections.remove(structure)
+      meshes.append(data)
+  if meshes:
+    bpy.data.batch_remove(meshes)
+
+
+def commit(laying, kind, order, existing):
+  """Swap the old parts for the new, name them, and keep the record: only once the whole lay has been made."""
+  name = laying.name
+  oldParts = bridgeStructureData.partsOf(existing) if existing is not None else []
+  oldNames = {part.name for part in oldParts}
+  for _, finalName in laying.parts:
+    taken = localObject(finalName)
+    if taken is not None and taken.name not in oldNames:
+      raise ValueError(f"Part name '{finalName}' is taken by an object outside structure '{name}'; rename it (organize) or name the structure otherwise")
+  removeParts(oldParts)
+  collection = existing if existing is not None else bpy.data.collections.new(name)
+  placeCollection(collection, laying.definition["collection"])
+  for sceneObject, finalName in laying.parts:
+    laying.collection.objects.unlink(sceneObject)
+    collection.objects.link(sceneObject)
+    sceneObject.name = finalName
+    if sceneObject.type == "MESH":
+      sceneObject.data.name = finalName
+    sceneObject[bridgeStructureData.partProperty] = name
+  laying.discard()
+  bridgeStructureData.writeStructure(collection, {"kind": kind, "order": order, "definition": laying.definition, "kit": laying.kit.used})
+  bridgeStructureData.writeProbes(collection, laying.lookups.rows)
   bpy.context.view_layer.update()
-  return {"name": name, "kind": record["kind"], "definition": argumentsOf(record["definition"])}
+  return collection
 
 
-def looseKitPieces():
-  counts = {}
-  for placement in bridgeKitData.placedPieces():
-    if bridgeStructureData.structureOf(placement) is not None:
+def layStructure(name, kind, definition, existing):
+  """Lay a structure from its definition against the ground and kit as they now are, whole or not at all."""
+  spec = kinds[kind]
+  if definition["collection"] not in placeCollections:
+    raise ValueError(f"collection is one of {list(placeCollections)} (terrain for a span exported as ground), got {definition['collection']!r}")
+  order = bridgeStructureData.readStructure(existing)["order"] if existing is not None else bridgeStructureData.nextOrder()
+  with bridgeKitData.linkingUndone():
+    ground = StructureGround()
+    laying = Laying(name, definition, Kit(absoluteKitPath(definition["kitPath"])), GroundLookups(ground.without(skippedNames(order))))
+    report = spec.lay(laying)
+    collection = commit(laying, kind, order, existing)
+  result = {"structure": {"name": name, "kind": kind, "order": order}} | report | {
+    "parts": describeParts(collection), "standsOn": sorted(laying.lookups.standsOn), "views": spec.views(definition, groundHeight) | orbitView(collection),
+  }
+  if spec.finish is not None:
+    result |= spec.finish(collection, report)
+  return result
+
+
+def requireCollectionArgument(collection, kind):
+  if collection not in placeCollections:
+    raise ValueError(f"collection is one of {list(placeCollections)}, got {collection!r}")
+  if kind in placedKinds and collection == bridgeExport.terrainCollectionName:
+    raise ValueError(f"{placedKinds[kind]}, not ground; lay it in '{structuresCollectionName}'")
+
+
+def buildStructure(kind, name, arguments):
+  requireNewStructureName(name)
+  spec = kinds[kind]
+  requireCollectionArgument(arguments["collection"], kind)
+  definition = floated({key: arguments[key] for key in spec.keys}, spec.indexKeys) | {"kitPath": keptKitPath(arguments["kitPath"])}
+  return layStructure(name, kind, definition, None)
+
+
+def replayProbes(collection, ground):
+  """The structure's probes looked up again on the ground as it now is: how many moved, the largest change and where, and what they
+  find now."""
+  record = bridgeStructureData.readStructure(collection)
+  surfaces = ground.without(skippedNames(record["order"]))
+  moved, largest, standsOn = 0, None, set()
+  for row in bridgeStructureData.readProbes(collection):
+    found, owner = runProbe(surfaces, row)
+    if owner is not None:
+      standsOn.add(owner)
+    before = row[8]
+    if math.isnan(found) and math.isnan(before):
       continue
-    collection = placement.instance_collection
-    key = (bridgeKitData.kitPathOf(collection), collection.name)
-    counts[key] = counts.get(key, 0) + 1
+    change = math.inf if math.isnan(found) != math.isnan(before) else abs(found - before)
+    if change > probeTolerance:
+      moved += 1
+      if largest is None or change > largest["change"]:
+        largest = {"change": change, "at": roundVector(row[1:4]), "probe": bridgeStructureData.probeKindNames[int(row[0])], "before": None if math.isnan(before) else round(float(before), 3), "now": None if math.isnan(found) else round(float(found), 3)}
+  if largest is not None:
+    largest["change"] = None if math.isinf(largest["change"]) else round(largest["change"], 3)
+  return {"moved": moved, "largest": largest}, sorted(standsOn)
+
+
+def kitState(record):
+  """The pieces and prefabs whose fingerprints differ from the lay's, and what cannot be found."""
+  changed, missing = [], []
+  kitPath = absoluteKitPath(record["definition"]["kitPath"])
+  for source, fingerprint in sorted(record["kit"].items()):
+    try:
+      collection = bridgeKitData.requireSource(kitPath, source)
+      if collection.library is not None and collection.library.is_missing:
+        raise FileNotFoundError(f"Kit '{kitPath}' is missing")
+      if bridgeKitData.sourceFingerprint(collection) != fingerprint:
+        changed.append(source)
+    except (FileNotFoundError, ValueError) as error:
+      missing.append({"piece": source, "why": str(error)})
+  return changed, missing
+
+
+def describeStaleness(collection, ground):
+  record = bridgeStructureData.readStructure(collection)
+  groundState, standsOn = replayProbes(collection, ground)
+  changed, missing = kitState(record)
+  why = []
+  if groundState["moved"]:
+    why.append("ground")
+  if changed:
+    why.append("kit")
+  if missing:
+    why.append("missing")
+  return {"stale": bool(why), "why": why, "ground": groundState, "kitChanged": changed, "missing": missing}, standsOn
+
+
+def groundHeight(x, y):
+  """The highest ground players stand on at [x, y], for placing a view's eye (a view is not a probe), or None."""
+  top = bridgeMeshAccess.sceneTopHeight() + overheadLift
+  footing = bridgeMeshAccess.PlayerSurfaces().footingBelow(mathutils.Vector((x, y, top)), top + bridgeMeshAccess.waterReach)
+  return None if footing is None else footing.z
+
+
+def headingOf(direction):
+  return round(math.degrees(math.atan2(direction[0], direction[1])) % 360.0, 3)
+
+
+def standView(at, direction, pitch=-5.0):
+  return {"standAt": roundVector(at), "headingDegrees": headingOf(direction), "pitchDegrees": pitch}
+
+
+def orbitView(collection):
+  """orbit: the structure's parts, for renderOrbit."""
+  return {"orbit": {"objects": [part.name for part in bridgeStructureData.partsOf(collection)]}}
+
+
+def editStructure(name, changes):
+  collection = bridgeStructureData.requireStructure(name)
+  record = bridgeStructureData.readStructure(collection)
+  spec = kinds[record["kind"]]
+  changes = changes or {}
+  if not isinstance(changes, dict):
+    raise ValueError(f"changes is {{key: value}} of the structure's definition, got {changes!r}")
+  unknown = sorted(set(changes) - set(spec.keys))
+  if unknown:
+    raise ValueError(f"{unknown} are not in a {record['kind']}'s definition; its keys: {list(spec.keys)}")
+  if "collection" in changes:
+    requireCollectionArgument(changes["collection"], record["kind"])
+  definition = record["definition"] | floated(changes, spec.indexKeys)
+  if "kitPath" in changes:
+    definition["kitPath"] = keptKitPath(changes["kitPath"])
+  moved, _ = replayProbes(collection, StructureGround())
+  return layStructure(name, record["kind"], definition, collection) | {"changes": changes, "probesMovedSinceLaid": moved}
+
+
+def removeStructure(name):
+  collection = bridgeStructureData.requireStructure(name)
+  record = bridgeStructureData.readStructure(collection)
+  parts = [part.name for part in bridgeStructureData.partsOf(collection)]
+  removeParts(bridgeStructureData.partsOf(collection))
+  bpy.data.collections.remove(collection)
+  bpy.context.view_layer.update()
+  return {"name": name, "kind": record["kind"], "definition": shownDefinition(record["definition"]), "removedParts": parts}
+
+
+def loosePieces():
+  """Kit pieces placed by hand (not parts of a structure), counted by kit and piece."""
+  counts = {}
+  for sceneObject in bridgeKitData.placedPieces():
+    if bridgeStructureData.structureOf(sceneObject) is None:
+      key = (bridgeKitData.kitPathOf(sceneObject.instance_collection), sceneObject.instance_collection.name)
+      counts[key] = counts.get(key, 0) + 1
   return [{"kit": kit, "piece": piece, "placements": count} for (kit, piece), count in sorted(counts.items(), key=lambda item: (item[0][0] or "", item[0][1]))]
 
 
 def getStructures(names):
-  every = bridgeStructureData.structureCollections()
+  collections = bridgeStructureData.structureCollections()
   if names is not None:
-    unknown = sorted(set(names) - {structure.name for structure in every})
+    known = {collection.name for collection in collections}
+    unknown = [name for name in names if name not in known]
     if unknown:
-      raise ValueError(f"No structures named {unknown}; the structures: {[structure.name for structure in every]}")
-  trees = bridgeBoundaries.collisionTrees(boundaries=False)
+      raise ValueError(f"No structures named {unknown}; structures: {sorted(known)}")
+    collections = [collection for collection in collections if collection.name in names]
   described = []
-  for structure in every:
-    if names is not None and structure.name not in names:
-      continue
-    record = bridgeStructureData.readStructure(structure)
-    why, standsOn = staleness(structure, trees)
-    described.append(describeStructure(structure) | {
-      "definition": argumentsOf(record["definition"]), "standsOn": standsOn, "stale": bool(why), "why": why,
-      "views": {} if "missing" in why else kinds[record["kind"]].views(structure),
-    })
-  return {"structures": described, "looseKitPieces": looseKitPieces()}
+  with bridgeKitData.linkingUndone(always=True):
+    ground = StructureGround()
+    for collection in collections:
+      record = bridgeStructureData.readStructure(collection)
+      spec = kinds[record["kind"]]
+      state, standsOn = describeStaleness(collection, ground)
+      entry = {
+        "name": collection.name, "kind": record["kind"], "order": record["order"], "definition": shownDefinition(record["definition"]),
+        "parts": describeParts(collection), "standsOn": [owner for owner in standsOn if owner not in {part.name for part in bridgeStructureData.partsOf(collection)}],
+      } | state | {"views": ({} if state["missing"] else spec.views(record["definition"], groundHeight)) | orbitView(collection)}
+      described.append(entry)
+  return {"structures": described, "loosePieces": loosePieces()}
 
 
 def describePart(sceneObject):
-  """A structure part's structure, kind, and role, or None."""
+  """A part's structure, kind, and role, or None for an object that is not one."""
   owner = bridgeStructureData.structureOf(sceneObject)
   if owner is None:
     return None
-  structure = bridgeStructureData.structureNamed(owner)
-  return {"structure": owner, "kind": None if structure is None else bridgeStructureData.readStructure(structure)["kind"], "role": partRole(owner, sceneObject)}
-
-
-def turnAbout(facingDegrees):
-  return mathutils.Matrix.Rotation(math.radians(-facingDegrees), 3, "Z")
+  collection = bridgeStructureData.findStructure(owner)
+  return {"structure": owner, "kind": None if collection is None else bridgeStructureData.readStructure(collection)["kind"], "role": partRole(owner, sceneObject)}
 
 
 commands = {

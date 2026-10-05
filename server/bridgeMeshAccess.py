@@ -502,14 +502,8 @@ def requireMeshObject(name):
   return sceneObject
 
 
-def requireEditableObject(name, action):
-  """An object a tool changes by hand: not a structure's part, which its definition lays."""
-  sceneObject = requireObject(name)
-  bridgeStructureData.requireNotStructurePart(sceneObject, action)
-  return sceneObject
-
-
 def requireEditableMesh(name, action):
+  """A mesh the tool named by action may change: not part of a structure laid from its definition."""
   sceneObject = requireMeshObject(name)
   bridgeStructureData.requireNotStructurePart(sceneObject, action)
   return sceneObject

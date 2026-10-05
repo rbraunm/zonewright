@@ -1,46 +1,43 @@
 """Buildings from kit pieces, as the client splits its buildings into models placed together: placed pieces of a kit file gathered into
 a prefab's parts (assemblePrefab), and a prefab placed in a zone as a structure, one instance per part, seated on the ground under its
-footprint, on a plinth where the ground falls away (placePrefab, kind prefab). Runs under Blender's Python."""
+footprint, on a plinth where the ground falls away (placePrefab, kind prefab). Registered with bridgeStructures. Runs under Blender's
+Python."""
 import math
-import numbers
 import re
 
 import bpy
-import mathutils
 import numpy
 
 import bridgeKitData
+import bridgeKitGeometry
 import bridgeKits
 import bridgeMeshAccess
 import bridgeReview
-import bridgeStructureData
 import bridgeStructures
 import bridgeSurfacing
-import playerScale
+from bridgeStructures import isNumber, requireKeys, requireNonNegative, requirePoint, requirePositive, roundVector
+from playerScale import stepHeight
 
 partNamePattern = re.compile(r"[a-z][A-Za-z0-9]*")
 entranceKeys = {"name", "at", "facingDegrees"}
-plinthKeys = {"material", "worldUnitsPerRepeat", "sink", "margin"}
+prefabKeys = ("kitPath", "prefab", "location", "facingDegrees", "plinth", "collection")
 plinthDefaults = {"sink": 2.0, "margin": 0.0}
-definitionKeys = ("kitPath", "prefab", "location", "facingDegrees", "plinth", "collection")
 interiorPart = "interior"
 # The ground under a footprint is looked up this far apart across it and along its sides.
 sampleSpacing = 2.0
-# An entrance's walk runs from this far outside it to this far inside; its view stands this far out.
-entranceWalk = 10.0
+# An entrance's ground is looked for this far below a step outside it; its walk runs from this far outside it to this far inside; its
+# view stands this far out.
+entranceFootingReach = 60.0
+entranceWalkDistance = 10.0
 entranceViewDistance = 25.0
 walkSampleSpacing = 1.0
-stepHeight = playerScale.stepHeight
+# Footprint corners closer than this to the line between their neighbours are on it: a placement's float32 turn moves a piece's
+# corners by about a millionth.
 hullTolerance = 1e-3
 
 
-def isNumber(value):
-  return isinstance(value, numbers.Real) and not isinstance(value, bool) and math.isfinite(value)
-
-
 def convexHull(points):
-  """The convex hull of [x, y] points, counterclockwise from the lowest-leftmost, without points within hullTolerance of the line
-  between their neighbours (placements' float32 turns move a piece's corners by about a millionth)."""
+  """The convex hull of [x, y] points, counterclockwise from the lowest-leftmost, without points on the line between their neighbours."""
   ordered = sorted({(round(float(x), 4), round(float(y), 4)) for x, y in points})
   if len(ordered) < 3:
     raise ValueError(f"A footprint needs at least three points not in a line; the parts give {ordered}")
@@ -64,48 +61,37 @@ def convexHull(points):
   return numpy.array(hull)
 
 
-def offsetHull(hull, distance):
-  """A counterclockwise convex outline with each side moved out by distance, its corners mitered."""
-  if distance == 0:
-    return hull.copy()
-  return bridgeKits.offsetOutline(hull, distance)
+def sideNormals(hull):
+  sides = numpy.roll(hull, -1, axis=0) - hull
+  return sides, numpy.stack([sides[:, 1], -sides[:, 0]], axis=1) / numpy.linalg.norm(sides, axis=1)[:, None]
 
 
 def distanceOutside(hull, point):
   """How far a point lies outside a counterclockwise convex outline in plan, 0 inside it."""
-  sides = numpy.roll(hull, -1, axis=0) - hull
-  normals = numpy.stack([sides[:, 1], -sides[:, 0]], axis=1) / numpy.linalg.norm(sides, axis=1)[:, None]
-  outside = ((numpy.asarray(point) - hull) * normals).sum(axis=1)
-  if outside.max() <= 0:
+  sides, normals = sideNormals(hull)
+  if (((point - hull) * normals).sum(axis=1)).max() <= 0:
     return 0.0
-  nearest = []
-  for start, side in zip(hull, sides):
-    share = numpy.clip(numpy.dot(point - start, side) / numpy.dot(side, side), 0, 1)
-    nearest.append(numpy.linalg.norm(point - (start + share * side)))
-  return float(min(nearest))
+  shares = numpy.clip(((point - hull) * sides).sum(axis=1) / (sides * sides).sum(axis=1), 0, 1)
+  return float(numpy.linalg.norm(point - (hull + shares[:, None] * sides), axis=1).min())
 
 
 def exitDistance(hull, point, direction):
   """How far from a point inside a convex outline a ray in a plan direction leaves it, 0 for a point outside."""
   if distanceOutside(hull, point) > 0:
     return 0.0
-  sides = numpy.roll(hull, -1, axis=0) - hull
-  normals = numpy.stack([sides[:, 1], -sides[:, 0]], axis=1)
+  _, normals = sideNormals(hull)
   facing = normals @ direction
-  reaches = [numpy.dot(start - point, normal) / along for start, normal, along in zip(hull, normals, facing) if along > 1e-12]
-  return float(min(reaches))
+  return float(min(((start - point) @ normal) / along for start, normal, along in zip(hull, normals, facing) if along > 1e-12))
 
 
 def footprintSamples(hull):
   """Points across a footprint where its ground is looked up: its corners, along its sides, and a grid inside it."""
-  samples = [corner for corner in hull]
+  samples = list(hull)
   for start, end in zip(hull, numpy.roll(hull, -1, axis=0)):
     count = max(1, math.ceil(numpy.linalg.norm(end - start) / sampleSpacing))
     samples.extend(start + (end - start) * step / count for step in range(1, count))
   low, high = hull.min(0), hull.max(0)
-  xs = numpy.arange(low[0] + sampleSpacing / 2, high[0], sampleSpacing)
-  ys = numpy.arange(low[1] + sampleSpacing / 2, high[1], sampleSpacing)
-  grid = numpy.array([[x, y] for x in xs for y in ys]).reshape(-1, 2)
+  grid = numpy.array([[x, y] for x in numpy.arange(low[0] + sampleSpacing / 2, high[0], sampleSpacing) for y in numpy.arange(low[1] + sampleSpacing / 2, high[1], sampleSpacing)]).reshape(-1, 2)
   if len(grid):
     samples.extend(grid[bridgeMeshAccess.insidePolygon(grid, hull)])
   return numpy.array(samples)
@@ -113,18 +99,6 @@ def footprintSamples(hull):
 
 def capitalized(part):
   return part[0].upper() + part[1:]
-
-
-def prefabPartOf(sceneObject):
-  """The prefab and part an object is gathered into, or None."""
-  for collection in sceneObject.users_collection:
-    for prefab in bpy.data.collections:
-      if bridgeKitData.prefabProperty in prefab and collection.name in prefab.children:
-        record = bridgeKitData.readPrefab(prefab)
-        part = next((name for name in record["parts"] if bridgeKitData.partCollectionName(prefab.name, name) == collection.name), None)
-        if part is not None:
-          return prefab, part
-  return None
 
 
 def requireParts(name, parts):
@@ -147,9 +121,9 @@ def requireParts(name, parts):
       sceneObject = bridgeMeshAccess.requireObject(entry)
       if not bridgeKitData.isPlacedPiece(sceneObject) or sceneObject.instance_collection.library is not None:
         raise ValueError(f"'{entry}' is not an instance of one of this file's pieces (placeKitPiece with kitPath null places them); a prefab gathers placed pieces")
-      owner = prefabPartOf(sceneObject)
-      if owner is not None and owner[0].name != name:
-        raise ValueError(f"'{entry}' is part '{owner[1]}' of prefab '{owner[0].name}'; assemble that prefab again without it first")
+      owner = bridgeKitData.prefabPartOf(sceneObject)
+      if owner is not None and owner["prefab"] != name:
+        raise ValueError(f"'{entry}' is part '{owner['part']}' of prefab '{owner['prefab']}'; assemble that prefab again without it first")
       members.append(sceneObject)
     gathered[part] = members
   return gathered
@@ -160,8 +134,7 @@ def requireEntrances(entrances):
     return []
   if not isinstance(entrances, list):
     raise ValueError(f"entrances is a list of {{name, at [x, y, z], facingDegrees}}, got {entrances!r}")
-  names = set()
-  checked = []
+  names, checked = set(), []
   for entrance in entrances:
     if not isinstance(entrance, dict) or set(entrance) != entranceKeys:
       raise ValueError(f"An entrance is {{name, at [x, y, z] in this file, facingDegrees}}: a doorway's threshold middle and the way out of it; got {entrance!r}")
@@ -172,13 +145,8 @@ def requireEntrances(entrances):
     names.add(entrance["name"])
     if not isNumber(entrance["facingDegrees"]):
       raise ValueError(f"Entrance '{entrance['name']}''s facingDegrees is a number, got {entrance['facingDegrees']!r}")
-    checked.append({"name": entrance["name"], "at": bridgeKits.requirePoint(f"Entrance '{entrance['name']}''s at", entrance["at"]), "facingDegrees": float(entrance["facingDegrees"]) % 360.0})
+    checked.append({"name": entrance["name"], "at": requirePoint(f"Entrance '{entrance['name']}''s at", entrance["at"]), "facingDegrees": float(entrance["facingDegrees"]) % 360.0})
   return checked
-
-
-def worldVertices(sceneObject):
-  positions, _ = bridgeMeshAccess.partTriangles(bridgeMeshAccess.objectParts(sceneObject))
-  return positions
 
 
 def assemblePrefab(name, parts, entrances):
@@ -191,25 +159,22 @@ def assemblePrefab(name, parts, entrances):
   gathered = requireParts(name, parts)
   for part in gathered:
     partName = bridgeKitData.partCollectionName(name, part)
-    taken = bpy.data.collections.get(partName)
-    if taken is not None and (existing is None or partName not in existing.children):
+    if bpy.data.collections.get(partName) is not None and (existing is None or partName not in existing.children):
       raise ValueError(f"Part '{part}' would be collection '{partName}', which is already the name of another collection in this file")
   entrances = requireEntrances(entrances)
   if interiorPart in gathered and not entrances:
     raise ValueError("A building with an interior part is walked into, so it names at least one entrance {name, at, facingDegrees} at a doorway")
   bpy.context.view_layer.update()
-  floorers = gathered.get("exterior") or [member for members in gathered.values() for member in members]
-  floor = min(member.matrix_world.translation.z for member in floorers)
-  positions = numpy.concatenate([worldVertices(member) for members in gathered.values() for member in members])
-  standing = positions[positions[:, 2] <= floor + stepHeight]
-  hull = convexHull(standing[:, :2])
+  floor = min(member.matrix_world.translation.z for member in gathered.get("exterior") or [member for members in gathered.values() for member in members])
+  positions = numpy.concatenate([bridgeMeshAccess.partTriangles(bridgeMeshAccess.objectParts(member))[0] for members in gathered.values() for member in members])
+  hull = convexHull(positions[positions[:, 2] <= floor + stepHeight][:, :2])
   low, high = hull.min(0), hull.max(0)
   origin = numpy.array([(low[0] + high[0]) / 2, (low[1] + high[1]) / 2, floor])
   footprint = hull - origin[:2]
   for entrance in entrances:
     outside = distanceOutside(footprint, numpy.array(entrance["at"][:2]) - origin[:2])
     if outside > stepHeight:
-      raise ValueError(f"Entrance '{entrance['name']}' at {bridgeKitData.roundVector(entrance['at'], 3)} lies {outside:.2f} outside the building's footprint; an entrance is a doorway's threshold, within {stepHeight:g} of it")
+      raise ValueError(f"Entrance '{entrance['name']}' at {roundVector(entrance['at'])} lies {outside:.2f} outside the building's footprint; an entrance is a doorway's threshold, within {stepHeight:g} of it")
   if existing is None:
     existing = bpy.data.collections.new(name)
     bpy.context.scene.collection.children.link(existing)
@@ -239,11 +204,10 @@ def assemblePrefab(name, parts, entrances):
   existing.instance_offset = origin.tolist()
   if existing.asset_data is None:
     existing.asset_mark()
-  record = {
-    "parts": list(gathered), "footprint": [[bridgeKitData.plain(round(value, 4)) for value in point] for point in footprint],
-    "entrances": [{"name": entrance["name"], "at": bridgeKitData.roundVector(numpy.array(entrance["at"]) - origin, 4), "facingDegrees": entrance["facingDegrees"]} for entrance in entrances],
-  }
-  bridgeKitData.writePrefab(existing, record)
+  bridgeKitData.writePrefab(existing, {
+    "parts": list(gathered), "footprint": [roundVector(point, 4) for point in footprint],
+    "entrances": [{"name": entrance["name"], "at": roundVector(numpy.array(entrance["at"]) - origin, 4), "facingDegrees": entrance["facingDegrees"]} for entrance in entrances],
+  })
   bpy.context.view_layer.update()
   return describePrefab(existing)
 
@@ -261,43 +225,27 @@ def describePrefab(collection):
     parts.append({"part": part, "collection": partCollection.name, "instances": [member.name for member in members], "pieces": pieces, "triangles": triangles})
   footprint = numpy.array(record["footprint"])
   return {
-    "prefab": collection.name, "kit": bridgeKitData.kitPathOf(collection), "origin": bridgeKitData.roundVector(collection.instance_offset), "parts": parts,
-    "footprint": record["footprint"], "footprintSize": bridgeKitData.roundVector(footprint.max(0) - footprint.min(0)), "entrances": record["entrances"],
+    "prefab": collection.name, "kit": bridgeKitData.kitPathOf(collection), "origin": roundVector(collection.instance_offset), "parts": parts,
+    "footprint": record["footprint"], "footprintSize": roundVector(footprint.max(0) - footprint.min(0)), "entrances": record["entrances"],
     "triangles": sum(part["triangles"] for part in parts), "fingerprint": bridgeKitData.prefabFingerprint(collection),
   }
+
+
+def placePrefab(name, kitPath, prefab, location, facingDegrees, plinth, collection):
+  return bridgeStructures.buildStructure("prefab", name, {
+    "kitPath": kitPath, "prefab": prefab, "location": location, "facingDegrees": facingDegrees, "plinth": plinth, "collection": collection,
+  })
 
 
 def requirePlinth(plinth):
   if plinth is None:
     return None
-  if not isinstance(plinth, dict) or not {"material", "worldUnitsPerRepeat"} <= set(plinth) <= plinthKeys:
-    raise ValueError(f"plinth is {{material, worldUnitsPerRepeat, sink (2), margin (0)}}, got {plinth!r}")
-  bridgeKits.requireMaterial(plinth["material"])
-  checked = plinthDefaults | {key: value for key, value in plinth.items() if key != "material"}
-  bridgeKits.requirePositive("plinth worldUnitsPerRepeat", checked["worldUnitsPerRepeat"])
-  for key in ("sink", "margin"):
-    if not isNumber(checked[key]) or checked[key] < 0:
-      raise ValueError(f"plinth {key} is 0 or more, got {checked[key]!r}")
-  return {"material": plinth["material"]} | {key: float(checked[key]) for key in ("worldUnitsPerRepeat", "sink", "margin")}
-
-
-def definePrefab(arguments):
-  bridgeStructures.requireStructureCollection(arguments["collection"])
-  if not isinstance(arguments["prefab"], str) or not arguments["prefab"]:
-    raise ValueError(f"prefab names a prefab of the kit, got {arguments['prefab']!r}")
-  location = bridgeKits.requirePoint("location", arguments["location"], (2, 3))
-  if not isNumber(arguments["facingDegrees"]):
-    raise ValueError(f"facingDegrees is a number, got {arguments['facingDegrees']!r}")
+  requireKeys("plinth", plinth, ("material", "worldUnitsPerRepeat"), ("sink", "margin"))
+  given = plinthDefaults | plinth
   return {
-    "kitPath": bridgeStructures.keptKitPath(arguments["kitPath"]), "prefab": arguments["prefab"], "location": location,
-    "facingDegrees": float(arguments["facingDegrees"]) % 360.0, "plinth": requirePlinth(arguments["plinth"]), "collection": arguments["collection"],
+    "material": bridgeKits.requireMaterial(given["material"]), "worldUnitsPerRepeat": requirePositive("plinth worldUnitsPerRepeat", given["worldUnitsPerRepeat"]),
+    "sink": requireNonNegative("plinth sink", given["sink"]), "margin": requireNonNegative("plinth margin", given["margin"]),
   }
-
-
-def placePrefab(name, kitPath, prefab, location, facingDegrees, plinth, collection):
-  bridgeStructures.requireNewStructureName(name)
-  definition = definePrefab({"kitPath": kitPath, "prefab": prefab, "location": location, "facingDegrees": facingDegrees, "plinth": plinth, "collection": collection})
-  return bridgeStructures.layStructure(name, "prefab", definition)
 
 
 def requirePartCollection(prefab, part):
@@ -312,11 +260,13 @@ def headingVector(degrees):
 
 
 class Placement:
-  """Where a prefab stands: the building's [x, y] and floor, its facing, and points of its frame in the world."""
+  """Where a building stands: its [x, y], its floor, its facing, and points of its frame in the world."""
 
-  def __init__(self, x, y, floor, facingDegrees):
-    self.x, self.y, self.floor, self.facingDegrees = x, y, floor, facingDegrees
-    self.turn = numpy.array(bridgeStructures.turnAbout(facingDegrees))
+  def __init__(self, location, facingDegrees):
+    self.x, self.y = location[0], location[1]
+    self.floor = location[2] if len(location) == 3 else None
+    self.facingDegrees = facingDegrees
+    self.turn = numpy.array(bridgeKitGeometry.turnAbout(facingDegrees))
 
   def plan(self, points):
     return numpy.asarray(points, dtype=numpy.float64)[:, :2] @ self.turn[:2, :2].T + [self.x, self.y]
@@ -325,87 +275,67 @@ class Placement:
     return self.turn @ numpy.asarray(at, dtype=numpy.float64) + [self.x, self.y, self.floor]
 
 
-def roundPoint(values, digits=3):
-  return bridgeKitData.roundVector(values, digits)
-
-
-def seat(ground, placement, samples, given):
+def seat(lookups, placement, samples):
   """The floor's height (given, or the highest ground under the footprint found from above, refused where rock lies over ground) and
   the ground under each sample for a floor there."""
-  world = placement.plan(numpy.column_stack([samples, numpy.zeros(len(samples))]))
-  if given is None:
+  world = placement.plan(samples)
+  if placement.floor is None:
     tops = []
     for x, y in world:
-      top, levels = ground.overhead(float(x), float(y))
-      if levels is not None:
-        raise ValueError(f"At [{x:.1f}, {y:.1f}] under the footprint {bridgeMeshAccess.describeRockOverGround([round(float(x), 1), round(float(y), 1)], [round(level, 1) for level in levels])}, so which ground is a choice: give location [x, y, z]")
+      top = lookups.overhead(float(x), float(y))
       if top is None:
         raise ValueError(f"Nothing lies under the footprint at [{x:.1f}, {y:.1f}] to seat the building on")
       tops.append(top)
     placement.floor = max(tops)
   grounds = []
   for x, y in world:
-    found = ground.level(float(x), float(y), placement.floor)
+    found = lookups.below((float(x), float(y), placement.floor + stepHeight))
     if found is None:
-      raise ValueError(f"No ground under the footprint at [{x:.1f}, {y:.1f}] for a floor at {placement.floor:.2f}")
+      raise ValueError(f"No ground within {bridgeStructures.groundReach:g} under the footprint at [{x:.1f}, {y:.1f}] for a floor at {placement.floor:.2f}")
     grounds.append(found)
   return world, numpy.array(grounds)
 
 
-def plinthMesh(meshName, hull, top, bottom, material, repeat):
-  """A skirt down a counterclockwise outline from top to bottom (heights relative to the floor), one quad a side, no top or bottom,
-  mapped along its sides (u round the outline, v down from the floor) so its courses run level and round its corners."""
-  count = len(hull)
-  positions = [[x, y, top] for x, y in hull] + [[x, y, bottom] for x, y in hull]
-  faces = [[count + index, count + (index + 1) % count, (index + 1) % count, index] for index in range(count)]
+def plinthMesh(meshName, outline, bottom, material, repeat):
+  """A skirt down a counterclockwise outline from the floor (0) to bottom, one quad a side, no top or bottom, mapped along its sides (u
+  round the outline, v down from the floor) so its courses run level and round its corners."""
+  count = len(outline)
   mesh = bpy.data.meshes.new(meshName)
-  mesh.from_pydata(positions, [], faces)
+  mesh.from_pydata([[x, y, 0.0] for x, y in outline] + [[x, y, bottom] for x, y in outline], [], [[count + index, count + (index + 1) % count, (index + 1) % count, index] for index in range(count)])
   mesh.update()
   mesh.materials.append(material)
-  runs = numpy.concatenate([[0.0], numpy.cumsum(numpy.linalg.norm(numpy.roll(hull, -1, axis=0) - hull, axis=1))])
-  uvs = []
-  for index in range(count):
-    for along, height in ((runs[index], bottom), (runs[index + 1], bottom), (runs[index + 1], top), (runs[index], top)):
-      uvs.append([along / repeat, (height - top) / repeat])
+  runs = numpy.concatenate([[0.0], numpy.cumsum(numpy.linalg.norm(numpy.roll(outline, -1, axis=0) - outline, axis=1))])
+  uvs = [[along / repeat, height / repeat] for index in range(count) for along, height in ((runs[index], bottom), (runs[index + 1], bottom), (runs[index + 1], 0.0), (runs[index], 0.0))]
   mesh.uv_layers.new(name=bridgeSurfacing.uvLayerName).data.foreach_set("uv", numpy.array(uvs, dtype=numpy.float32).ravel())
   mesh.update()
   return mesh
 
 
-def entranceReport(laying, placement, footprint, entrance, walked):
+def entranceReport(lookups, placement, footprint, entrance):
   at = placement.point(entrance["at"])
   heading = placement.facingDegrees + entrance["facingDegrees"]
-  outward = headingVector(heading)
-  local = numpy.array(entrance["at"][:2])
-  leaving = exitDistance(footprint, local, headingVector(entrance["facingDegrees"]))
-  outside = numpy.append(at[:2] + outward * (leaving + stepHeight), at[2])
-  groundOutside = laying.ground.footing(outside)
-  report = {
-    "name": entrance["name"], "at": roundPoint(at), "facingDegrees": round(heading % 360.0, 4), "groundOutside": None if groundOutside is None else round(groundOutside, 3),
-    "stepUp": None if groundOutside is None else round(at[2] - groundOutside, 3),
+  leaving = exitDistance(footprint, numpy.array(entrance["at"][:2]), headingVector(entrance["facingDegrees"]))
+  outside = numpy.append(at[:2] + headingVector(heading) * (leaving + stepHeight), at[2])
+  groundOutside = lookups.footing(outside, entranceFootingReach)
+  return {
+    "name": entrance["name"], "at": roundVector(at), "facingDegrees": round(heading % 360.0, 4),
+    "groundOutside": None if groundOutside is None else round(groundOutside, 3), "stepUp": None if groundOutside is None else round(at[2] - groundOutside, 3),
   }
-  if walked:
-    start = numpy.append(at[:2] + outward * entranceWalk, at[2] if groundOutside is None else groundOutside)
-    end = numpy.append(at[:2] - outward * entranceWalk, at[2])
-    path = [[float(value) for value in start], [float(value) for value in end]]
-    try:
-      walk = bridgeReview.walkRoute(path, walkSampleSpacing, laying.ownParts)
-    except ValueError as refusal:
-      walk = {"walkable": False, "refused": str(refusal)}
-    report["walk"] = {"path": [roundPoint(point) for point in path]} | {key: walk[key] for key in ("walkable", "refused", "problems", "oneWay", "narrowest", "lowestHeadroom") if key in walk}
-  return report
 
 
 def layPrefab(laying):
   definition = laying.definition
-  prefab = laying.useSource(bridgeKitData.requirePrefab(bridgeStructures.absoluteKitPath(definition["kitPath"]), definition["prefab"]))
+  prefab = laying.kit.prefab(definition["prefab"])
   record = bridgeKitData.readPrefab(prefab)
   partCollections = [(part, requirePartCollection(prefab, part)) for part in record["parts"]]
-  location = definition["location"]
-  placement = Placement(location[0], location[1], location[2] if len(location) == 3 else None, definition["facingDegrees"])
+  location = requirePoint("location", definition["location"], (2, 3))
+  if not isNumber(definition["facingDegrees"]):
+    raise ValueError(f"facingDegrees is a number, got {definition['facingDegrees']!r}")
+  plinth = requirePlinth(definition["plinth"])
+  placement = Placement(location, definition["facingDegrees"] % 360.0)
   footprint = numpy.array(record["footprint"])
   samples = footprintSamples(footprint)
-  world, grounds = seat(laying.ground, placement, samples, placement.floor)
+  world, grounds = seat(laying.lookups, placement, samples)
   highest, lowest = int(numpy.argmax(grounds)), int(numpy.argmin(grounds))
   rise = grounds[highest] - placement.floor
   if rise > stepHeight + 1e-6:
@@ -414,70 +344,62 @@ def layPrefab(laying):
       f" so it would come up through the floor: grade the site, or raise the floor to at least {grounds[highest] - stepHeight:.2f}"
     )
   drop = placement.floor - grounds[lowest]
-  plinth = definition["plinth"]
   if plinth is None and drop > stepHeight + 1e-6:
     raise ValueError(
       f"The floor at {placement.floor:.2f} stands {drop:.2f} over the ground at [{world[lowest][0]:.1f}, {world[lowest][1]:.1f}] under the footprint,"
       f" so it would float: give a plinth, or lower the floor to {grounds[lowest] + stepHeight:.2f} or less"
     )
+  standing = (placement.x, placement.y, placement.floor)
   for part, partCollection in partCollections:
-    instance = bpy.data.objects.new(laying.name + capitalized(part), None)
-    instance.instance_type = "COLLECTION"
-    instance.instance_collection = partCollection
-    instance.location = (placement.x, placement.y, placement.floor)
-    instance.rotation_euler = (0.0, 0.0, math.radians(-placement.facingDegrees))
-    laying.addPart(instance, laying.name + capitalized(part))
+    laying.addInstance(laying.name + capitalized(part), partCollection, standing, placement.facingDegrees)
   plinthReport = None
   if plinth is not None:
-    outline = offsetHull(footprint, plinth["margin"])
     bottom = grounds[lowest] - plinth["sink"] - placement.floor
-    meshName = laying.name + "Plinth"
-    mesh = plinthMesh(meshName, outline, 0.0, bottom, bridgeKits.requireMaterial(plinth["material"]), plinth["worldUnitsPerRepeat"])
-    plinthObject = bpy.data.objects.new(meshName, mesh)
-    plinthObject.location = (placement.x, placement.y, placement.floor)
-    plinthObject.rotation_euler = (0.0, 0.0, math.radians(-placement.facingDegrees))
-    laying.addPart(plinthObject, meshName)
+    margin = plinth["margin"]
+    outline = footprint if margin == 0 else bridgeKits.offsetOutline(footprint, margin)
+    plinthObject = laying.addMeshObject(laying.name + "Plinth", plinthMesh(laying.name + "Plinth", outline, bottom, plinth["material"], plinth["worldUnitsPerRepeat"]), standing, placement.facingDegrees)
     plinthReport = {"top": round(placement.floor, 3), "bottom": round(placement.floor + bottom, 3), "triangles": bridgeMeshAccess.triangleCount(plinthObject)}
-  bpy.context.view_layer.update()
-  walked = interiorPart in record["parts"]
-  entrances = [entranceReport(laying, placement, footprint, entrance, walked) for entrance in record["entrances"]]
   return {
-    "prefab": {"kit": bridgeKitData.kitPathOf(prefab), "prefab": prefab.name, "parts": record["parts"], "fingerprint": bridgeKitData.prefabFingerprint(prefab)},
-    "location": roundPoint([placement.x, placement.y, placement.floor]), "facingDegrees": placement.facingDegrees, "floor": round(placement.floor, 3),
-    "ground": {"lowest": round(float(grounds[lowest]), 3), "lowestAt": roundPoint(world[lowest], 2), "highest": round(float(grounds[highest]), 3), "highestAt": roundPoint(world[highest], 2), "samples": len(samples)},
-    "plinth": plinthReport, "entrances": entrances,
+    "prefab": {"kit": bridgeKitData.kitPathOf(prefab), "prefab": prefab.name, "parts": record["parts"], "fingerprint": laying.kit.used[prefab.name]},
+    "location": roundVector(standing), "facingDegrees": placement.facingDegrees, "floor": round(placement.floor, 3),
+    "ground": {"lowest": round(float(grounds[lowest]), 3), "lowestAt": roundVector(world[lowest], 2), "highest": round(float(grounds[highest]), 3), "highestAt": roundVector(world[highest], 2), "samples": len(samples)},
+    "plinth": plinthReport, "entrances": [entranceReport(laying.lookups, placement, footprint, entrance) for entrance in record["entrances"]],
   }
 
 
-def placedFrame(structure):
-  """A placed prefab's prefab record and where it stands, from its parts as laid; None when its prefab is missing."""
-  sources = structure.get(bridgeStructures.sourcesProperty) or {}
-  definition = bridgeStructureData.readStructure(structure)["definition"]
-  prefab = sources.get(definition["prefab"])
-  instances = [part for part in bridgeStructureData.partsOf(structure) if bridgeMeshAccess.isCollectionInstance(part)]
-  if prefab is None or prefab.is_missing or not instances:
-    return None
-  location = instances[0].matrix_world.translation
-  return bridgeKitData.readPrefab(prefab), Placement(location.x, location.y, location.z, definition["facingDegrees"])
+def entranceWalk(entrance):
+  """A walk from entranceWalkDistance outside an entrance to as far inside, at its threshold's height (outside at the ground found there)."""
+  at, outward = numpy.array(entrance["at"]), headingVector(entrance["facingDegrees"])
+  start = numpy.append(at[:2] + outward * entranceWalkDistance, at[2] if entrance["groundOutside"] is None else entrance["groundOutside"])
+  end = numpy.append(at[:2] - outward * entranceWalkDistance, at[2])
+  path = [[float(value) for value in start], [float(value) for value in end]]
+  try:
+    walk = bridgeReview.walkRoute(path, walkSampleSpacing)
+  except ValueError as refusal:
+    return {"path": path, "walkable": False, "refused": str(refusal)}
+  return {"path": [roundVector(point) for point in path]} | {key: walk[key] for key in ("walkable", "problems", "oneWay", "narrowest", "lowestHeadroom")}
 
 
-def prefabViews(structure):
-  framed = placedFrame(structure)
+def finishPrefab(collection, report):
+  """A walk-in building's entrances walked, once its parts stand in the scene."""
+  if interiorPart not in report["prefab"]["parts"]:
+    return {}
+  return {"entrances": [entrance | {"walk": entranceWalk(entrance)} for entrance in report["entrances"]]}
+
+
+def prefabViews(definition, groundHeight):
+  """entrance<Name>: standing entranceViewDistance out from each entrance, looking at it."""
+  record = bridgeKitData.readPrefab(bridgeKitData.requirePrefab(bridgeStructures.absoluteKitPath(definition["kitPath"]), definition["prefab"]))
+  placement = Placement(definition["location"][:2] + [0.0], definition["facingDegrees"] % 360.0)
   views = {}
-  if framed is not None:
-    record, placement = framed
-    for entrance in record["entrances"]:
-      at = placement.point(entrance["at"])
-      heading = placement.facingDegrees + entrance["facingDegrees"]
-      standAt = at[:2] + headingVector(heading) * entranceViewDistance
-      views["entrance" + capitalized(entrance["name"])] = {
-        "standAt": roundPoint([standAt[0], standAt[1], at[2]]), "headingDegrees": round((heading + 180.0) % 360.0, 4), "pitchDegrees": 0.0,
-      }
-  views["orbit"] = {"objects": [part.name for part in bridgeStructureData.partsOf(structure)]}
+  for entrance in record["entrances"]:
+    heading = placement.facingDegrees + entrance["facingDegrees"]
+    standAt = placement.plan([entrance["at"]])[0] + headingVector(heading) * entranceViewDistance
+    views["entrance" + capitalized(entrance["name"])] = {"standAt": roundVector(standAt), "headingDegrees": round((heading + 180.0) % 360.0, 4), "pitchDegrees": 0.0}
   return views
 
 
-bridgeStructures.registerKind("prefab", definitionKeys, definePrefab, layPrefab, prefabViews)
+bridgeStructures.registerKind("prefab", "placePrefab", prefabKeys, layPrefab, None, prefabViews, finish=finishPrefab)
 
 commands = {
   "assemblePrefab": (assemblePrefab, True),

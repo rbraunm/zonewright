@@ -15,6 +15,7 @@ import numpy
 
 import bridgeMeshAccess
 import bridgeObjects
+import bridgeStructureData
 import bridgeSurfacing
 import bridgeSwim
 
@@ -80,16 +81,10 @@ def passableFaces(slots, flagged, materials):
   return slotPassable[numpy.minimum(slots, len(materials))] | flagged
 
 
-def collisionSurfaces(boundaries=True, excluding=()):
+def collisionSurfaces(boundaries=True):
   """Ray casts against what the client collides with: what players stand on, without faces they pass through (liquids, cutout cards,
-  objects marked passable, faces an imported zone file flags), and the boundaries unless boundaries is false; the objects named in
-  excluding left out."""
-  return bridgeMeshAccess.PlayerSurfaces(trees=collisionTrees(boundaries, excluding))
-
-
-def collisionTrees(boundaries=True, excluding=()):
-  """collisionSurfaces' trees: (owner name, world matrix, BVH tree) for each part players collide with."""
-  owners = [owner for owner in bridgeMeshAccess.playerSolidObjects(collision=True) if owner.name not in excluding]
+  objects marked passable, faces an imported zone file flags), and the boundaries unless boundaries is false."""
+  owners = bridgeMeshAccess.playerSolidObjects(collision=True)
   depsgraph = bpy.context.evaluated_depsgraph_get()
   trees = []
   for owner in owners:
@@ -104,7 +99,7 @@ def collisionTrees(boundaries=True, excluding=()):
         trees.append((owner.name, matrix, mathutils.bvhtree.BVHTree.FromObject(part, depsgraph)))
       elif kept.any():
         trees.append((owner.name, matrix, mathutils.bvhtree.BVHTree.FromPolygons(positions.tolist(), triangles[kept].tolist())))
-  return trees
+  return bridgeMeshAccess.PlayerSurfaces(trees=trees)
 
 
 def boundarySurfaces():
@@ -250,7 +245,8 @@ def markPassable(objects, passable):
     raise ValueError("objects names at least one mesh or collection instance")
   marked = []
   for name in objects:
-    sceneObject = bridgeMeshAccess.requireEditableObject(name, "mark passable or not")
+    sceneObject = bridgeMeshAccess.requireObject(name)
+    bridgeStructureData.requireNotStructurePart(sceneObject, "markPassable")
     if sceneObject.type != "MESH" and not bridgeMeshAccess.isCollectionInstance(sceneObject):
       raise ValueError(f"'{name}' is a {sceneObject.type}; only meshes and collection instances are passed through")
     if bridgeMeshAccess.boundaryProperty in sceneObject:

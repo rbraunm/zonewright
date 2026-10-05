@@ -209,8 +209,8 @@ def testPlacePrefabRefusesBuryingFloatingAndRockOverGround(stageBlenderServer, t
   assert f"inside the footprint stands {buriedBy:.2f} over the floor at 10.00" in refusals["buried"] and "-104.8] inside the footprint" in refusals["buried"]
   floatBy = 30 - structurePlots.slopeHeight(-80 + footprintHalf[1])
   assert f"stands {floatBy:.2f} over the ground at [" in refusals["floating"] and "-55.2]" in refusals["floating"] and "give a plinth" in refusals["floating"]
-  assert "rock lies over ground" in refusals["rock"] and "give location [x, y, z]" in refusals["rock"]
-  assert "not ground" in refusals["terrain"]
+  assert "rock lies over ground" in refusals["rock"] and "give z" in refusals["rock"]
+  assert "A building is placed parts, not ground" in refusals["terrain"]
   assert "holds no prefab 'testKitBarn'" in refusals["missing"] and prefab in refusals["missing"]
   assert "'overhang' is already the name of an object" in refusals["taken"]
   assert after["objects"] == before["objects"] and after["collections"] == before["collections"] and after["libraries"] == before["libraries"]
@@ -231,7 +231,7 @@ def testAWalkInBuildingIsWalkedIntoThroughEachEntrance(stageBlenderServer, tmp_p
   assert walk["path"] == [[28.75, 12.5, 0.0], [8.75, 12.5, 0.0]]
   assert walk["walkable"] is True, walk["problems"]
   assert walk["lowestHeadroom"]["headroom"] >= structurePlots.houseDoorHeight - 0.05
-  assert placed["views"]["entranceFront"] == {"standAt": [43.75, 12.5, 0.0], "headingDegrees": 270.0, "pitchDegrees": 0.0}
+  assert placed["views"]["entranceFront"] == {"standAt": [43.75, 12.5], "headingDegrees": 270.0, "pitchDegrees": 0.0}
   assert placed["views"]["orbit"] == {"objects": ["innExterior", "innInterior", "innRoof"]}
 
 
@@ -266,9 +266,9 @@ def testAPrefabFollowsItsKitAndGoesStaleWhenItsFootprintChanges(stageBlenderServ
   after = {part["name"]: part["triangles"] for part in followed["parts"]}
   assert after["houseExterior"] - before["houseExterior"] == wallsCut * added > 0
   assert after["houseRoof"] == before["houseRoof"] and after["houseInterior"] == before["houseInterior"]
-  assert followed["stale"] is False and followed["why"] == {}
+  assert followed["stale"] is False and followed["why"] == []
   assert wider["footprintSize"] == [62.0, 70.75]
-  assert stale["stale"] is True and stale["why"] == {"kit": {"changed": [prefab]}}
+  assert stale["stale"] is True and stale["why"] == ["kit"] and stale["kitChanged"] == [prefab]
 
 
 def testEditingAndRemovingAPlacedPrefab(stageBlenderServer, tmp_path):
@@ -292,8 +292,8 @@ def testEditingAndRemovingAPlacedPrefab(stageBlenderServer, tmp_path):
   highest = structurePlots.slopeHeight(-80 - footprintHalf[0])
   assert abs(edited["floor"] - highest) <= 0.01 and abs(low[2] - (structurePlots.slopeHeight(-80 + footprintHalf[0]) - 2)) <= 0.01
   assert edited["structure"] == placed["structure"]
-  assert "has no ['width'] to change" in unknown and "facingDegrees" in unknown
-  assert removed["kind"] == "prefab" and removed["definition"]["facingDegrees"] == 90.0 and removed["definition"]["plinth"] == plinth | {"margin": 0.0, "worldUnitsPerRepeat": 8.0, "sink": 2.0}
+  assert "['width'] are not in a prefab's definition" in unknown and "facingDegrees" in unknown
+  assert removed["kind"] == "prefab" and removed["definition"]["facingDegrees"] == 90.0 and removed["definition"]["plinth"] == {"material": "testPlotGround", "worldUnitsPerRepeat": 8.0, "sink": 2.0}
   assert not any(entry["name"].startswith("cottage") for entry in gone["objects"]) and "cottage" not in gone["collections"]
   assert [(part["name"], part["triangles"]) for part in rebuilt["parts"]] == [(part["name"], part["triangles"]) for part in edited["parts"]]
   assert rebuilt["floor"] == edited["floor"]
@@ -312,11 +312,11 @@ def testGroundMovedUnderAPlacedPrefabMakesItStaleAndLayingAgainSeatsIt(stageBlen
 
   placed, stale, relaid, fresh = stageBlenderServer.session(steps)
   assert placed["floor"] == 0.0
-  assert stale["stale"] is True and set(stale["why"]) == {"ground"}
-  change = stale["why"]["ground"]
-  assert change["moved"] > 0 and abs(change["largestChange"] - relaid["floor"]) <= 0.01
-  assert abs(change["at"][0] - 60) <= 4 and abs(change["at"][1] + 14) <= 4
-  assert relaid["groundMoved"]["moved"] == change["moved"] and relaid["floor"] > 2
+  assert stale["stale"] is True and stale["why"] == ["ground"]
+  change = stale["ground"]
+  assert change["moved"] > 0 and abs(change["largest"]["change"] - relaid["floor"]) <= 0.01 and change["largest"]["before"] == 0.0
+  assert abs(change["largest"]["at"][0] - 60) <= 4 and abs(change["largest"]["at"][1] + 14) <= 4
+  assert relaid["probesMovedSinceLaid"]["moved"] == change["moved"] and relaid["floor"] > 2
   assert relaid["plinth"]["bottom"] == -2.0
   assert fresh["stale"] is False
 

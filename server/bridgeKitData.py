@@ -109,63 +109,24 @@ def requirePiece(kitPath, piece):
   return collection
 
 
-def readPrefab(collection):
-  return json.loads(collection[prefabProperty]) if prefabProperty in collection else None
-
-
-def writePrefab(collection, record):
-  collection[prefabProperty] = json.dumps(record)
-
-
-def localPrefabs():
-  return sorted(collection.name for collection in bpy.data.collections if collection.library is None and prefabProperty in collection)
-
-
-def partCollectionName(prefab, part):
-  return prefab + part[0].upper() + part[1:]
-
-
-def requirePrefab(kitPath, prefab):
-  """A prefab's collection: the open file's own (kitPath None), or linked from the kit at kitPath (once; linking again finds it)."""
-  if kitPath is None:
-    collection = next((found for found in bpy.data.collections if found.name == prefab and found.library is None), None)
-    if collection is None or prefabProperty not in collection:
-      raise ValueError(f"'{prefab}' is not a prefab of this file; its prefabs: {localPrefabs()}")
-    return collection
-  if not os.path.isabs(kitPath) or not os.path.isfile(kitPath):
-    raise FileNotFoundError(f"Kit '{kitPath}' is not an existing absolute path to a .blend")
-  with bpy.data.libraries.load(kitPath, link=True, assets_only=True) as (dataFrom, dataTo):
-    if prefab not in dataFrom.collections:
-      raise ValueError(f"The kit {kitPath} holds no prefab '{prefab}'; its pieces and prefabs: {sorted(dataFrom.collections)}")
-    dataTo.collections = [prefab]
-  collection = dataTo.collections[0]
-  if collection is None or prefabProperty not in collection:
-    raise ValueError(f"'{prefab}' in {kitPath} is an asset but not a prefab (assemblePrefab makes them)")
-  return collection
-
-
-def prefabFingerprint(collection):
-  """Twelve hex digits of a sha1 over a prefab's record (parts, footprint, entrances): its parts are instances, so placements follow its
-  pieces' changes, and only a changed footprint or entrance, which seating and plinths were laid from, changes this."""
-  return hashlib.sha1(json.dumps(readPrefab(collection), sort_keys=True).encode()).hexdigest()[:12]
-
-
-def sourceFingerprint(collection):
-  """The fingerprint of a piece or prefab a structure was laid from."""
-  return prefabFingerprint(collection) if prefabProperty in collection else fingerprint(collection)
-
-
 @contextlib.contextmanager
-def linkingUndone():
-  """Whatever a refused step linked into the file is taken out again, so a refusal changes nothing."""
+def linkingUndone(always=False):
+  """Whatever a refused step linked or made in the file is taken out again, so a refusal changes nothing; with always, also after a
+  step that only read (a kit linked to be looked at)."""
   before = {kind: set(getattr(bpy.data, kind)) for kind in linkedKinds}
-  try:
-    yield
-  except Exception:
+
+  def takeBack():
     added = [item for kind in linkedKinds for item in set(getattr(bpy.data, kind)) - before[kind]]
     if added:
       bpy.data.batch_remove(added)
+
+  try:
+    yield
+  except Exception:
+    takeBack()
     raise
+  if always:
+    takeBack()
 
 
 def pieceMembers(collection):
@@ -305,3 +266,78 @@ def describeSockets(sceneObject):
 
 def roundVector(vector, digits=4):
   return [plain(round(float(component), digits)) for component in vector]
+
+
+def readPrefab(collection):
+  return json.loads(collection[prefabProperty]) if prefabProperty in collection else None
+
+
+def writePrefab(collection, record):
+  collection[prefabProperty] = json.dumps(record)
+
+
+def localPrefabs():
+  return sorted(collection.name for collection in bpy.data.collections if collection.library is None and prefabProperty in collection)
+
+
+def partCollectionName(prefab, part):
+  return prefab + part[0].upper() + part[1:]
+
+
+def requirePrefab(kitPath, prefab):
+  """A prefab's collection: the open file's own (kitPath None), or linked from the kit at kitPath (once; linking again finds it)."""
+  if kitPath is None:
+    collection = next((found for found in bpy.data.collections if found.name == prefab and found.library is None), None)
+    if collection is None or prefabProperty not in collection:
+      raise ValueError(f"'{prefab}' is not a prefab of this file; its prefabs: {localPrefabs()}")
+    return collection
+  if not os.path.isabs(kitPath) or not os.path.isfile(kitPath):
+    raise FileNotFoundError(f"Kit '{kitPath}' is not an existing absolute path to a .blend")
+  with bpy.data.libraries.load(kitPath, link=True, assets_only=True) as (dataFrom, dataTo):
+    if prefab not in dataFrom.collections:
+      raise ValueError(f"The kit {kitPath} holds no prefab '{prefab}'; its pieces and prefabs: {sorted(dataFrom.collections)}")
+    dataTo.collections = [prefab]
+  collection = dataTo.collections[0]
+  if collection is None or prefabProperty not in collection:
+    raise ValueError(f"'{prefab}' in {kitPath} is an asset but not a prefab (assemblePrefab makes them)")
+  return collection
+
+
+def prefabFingerprint(collection):
+  """Twelve hex digits of a sha1 over a prefab's record (parts, footprint, entrances): its parts are instances, so placements follow its
+  pieces' changes, and only a changed footprint or entrance, which seating and plinths were laid from, changes this."""
+  return hashlib.sha1(json.dumps(readPrefab(collection), sort_keys=True).encode()).hexdigest()[:12]
+
+
+def sourceFingerprint(collection):
+  """The fingerprint of a piece or prefab a structure was laid from."""
+  return prefabFingerprint(collection) if prefabProperty in collection else fingerprint(collection)
+
+def requireSource(kitPath, name):
+  """A kit piece's or prefab's collection a structure was laid from, linked as requirePiece and requirePrefab link them."""
+  if kitPath is None:
+    collection = next((found for found in bpy.data.collections if found.name == name and found.library is None), None)
+    if collection is None or (pieceProperty not in collection and prefabProperty not in collection):
+      raise ValueError(f"'{name}' is not a kit piece or prefab of this file")
+    return collection
+  if not os.path.isabs(kitPath) or not os.path.isfile(kitPath):
+    raise FileNotFoundError(f"Kit '{kitPath}' is not an existing absolute path to a .blend")
+  with bpy.data.libraries.load(kitPath, link=True, assets_only=True) as (dataFrom, dataTo):
+    if name not in dataFrom.collections:
+      raise ValueError(f"The kit {kitPath} holds no piece or prefab '{name}'")
+    dataTo.collections = [name]
+  collection = dataTo.collections[0]
+  if collection is None or (pieceProperty not in collection and prefabProperty not in collection):
+    raise ValueError(f"'{name}' in {kitPath} is not a kit piece or prefab")
+  return collection
+
+
+def prefabPartOf(sceneObject):
+  """The prefab and part an object of this file is gathered into ({prefab, part}), or None."""
+  for holder in sceneObject.users_collection:
+    for prefab in bpy.data.collections:
+      if prefabProperty in prefab and holder.name in prefab.children:
+        part = next((name for name in readPrefab(prefab)["parts"] if partCollectionName(prefab.name, name) == holder.name), None)
+        if part is not None:
+          return {"prefab": prefab.name, "part": part}
+  return None

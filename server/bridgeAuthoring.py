@@ -1164,7 +1164,7 @@ def squareOffEnds(positions, chainVertices, nearestAlong):
 
 def projectUVs(objectName, method, worldUnitsPerRepeat, selector, direction):
   """Project UVs onto the selector's faces; on a mesh whose layers map transitions, into its base mapping (compose)."""
-  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "project texture coordinates onto")
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "projectUVs")
   bridgeCaveData.refuseLiningMapping(sceneObject, selector, "projectUVs")
   faceMask, selectedLoops, projected = bridgeSurfacing.projectedUVs(sceneObject, method, worldUnitsPerRepeat, selector, direction)
   faceMask = bridgeCaveData.requireSurfaceSelection(sceneObject, selector, faceMask)
