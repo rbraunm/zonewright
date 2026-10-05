@@ -20,7 +20,7 @@ import eqTextures
 import eqWorldFile
 import zoneSources
 
-zoneCacheFormat = 8
+zoneCacheFormat = 9
 readFormats = ("wld", "eqtzp", "eqgz")
 # A model's vertex light where its file gives none: no baked light and the full share of scene light, an assumption until the client's
 # lighting of EQG objects is traced.

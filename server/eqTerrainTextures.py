@@ -1,6 +1,7 @@
 """The textures the client builds for each terrain tile (docs/clientRendering.md, EQ terrain): for every ecosystem on the tile, a color
 map (the layers' cover maps weighed by height and slope, alpha its coverage of the tile) and a detail mask (the weight of each detail
 layer), computed as EQGraphicsDX9.dll does at 0x100eeed0, 0x100ee790, 0x100f4690, and 0x100ac770."""
+import functools
 import io
 import math
 from fractions import Fraction
@@ -21,6 +22,8 @@ slopeTable = numpy.append(numpy.degrees(numpy.arccos(numpy.arange(1000, dtype=nu
 inverse255 = numpy.float32(1 / 255)
 inverse65535 = numpy.float32(1 / 65535)
 defaultMap = "default.bmp"
+# trunc(0.01 * t * t - 255) for each t as the FPU takes it: 0.01 as a double, slightly over a hundredth, and the product exact.
+blendThresholds = numpy.array([math.trunc(Fraction(0.01) * t * t - 255) for t in range(256)])
 
 
 def mipLevel(image, side, sourceName):
@@ -97,15 +100,19 @@ def layerFactor(layer, heights, slopes):
   return numpy.where(inside, factor, 0.0)
 
 
+@functools.cache
+def blendSlopes(softness):
+  """trunc(t * (100 - softness) * 0.001 + 1) for each t, the product of the client's single-precision factors exact (0x100ee879)."""
+  scale = Fraction(float(numpy.float32(float(100 - softness) * float(numpy.float32(0.001)))))
+  return numpy.array([math.trunc(scale * t + 1) for t in range(256)])
+
+
 def blendedFactor(factor, blend, softness):
   """A layer's factor through its blend map (0x100eec0d): where the factor is strictly between 0.02 and 0.98, t = (1 - factor) * 255
   truncated sets a threshold, and the blend value past it, times a slope that BLENDSOFTNESS flattens, becomes the factor; -1 where the
   blend value falls short, which leaves the texel out."""
-  scale = Fraction(float(numpy.float32(float(100 - softness) * float(numpy.float32(0.001)))))
-  thresholds = numpy.array([math.trunc(Fraction(0.01) * t * t - 255) for t in range(256)])
-  slopes = numpy.array([math.trunc(scale * t + 1) for t in range(256)])
   t = numpy.trunc((1 - factor) * 255).astype(numpy.int64) & 0xFF
-  value = (blend.astype(numpy.int64) - thresholds[t]) * slopes[t]
+  value = (blend.astype(numpy.int64) - blendThresholds[t]) * blendSlopes(softness)[t]
   blended = numpy.where(value < 0, -1.0, numpy.where(value > 255, 1.0, value * float(inverse255)))
   return numpy.where((factor > 0.02) & (factor < 0.98), blended, factor)
 
