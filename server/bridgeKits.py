@@ -406,6 +406,7 @@ def cutOpening(piece, kind, along, width, height, sill, archRise, archSegments, 
   originalSlots = numpy.empty(len(member.data.polygons), dtype=numpy.int32)
   member.data.polygons.foreach_get("material_index", originalSlots)
   cutters = []
+  original = member.data.copy()
   try:
     openingPrism = prismObject(f"{piece}OpeningCutter", outline, low[1] - depth - throughMargin, high[1] + depth + throughMargin, offset, openingSource)
     cutters.append(openingPrism)
@@ -419,6 +420,14 @@ def cutOpening(piece, kind, along, width, height, sill, archRise, archSegments, 
       cutters.append(framePrism)
       applyBoolean(member, framePrism, "UNION")
     applyBoolean(member, openingPrism, "DIFFERENCE")
+  except Exception:
+    cut, name = member.data, member.data.name
+    member.data = original
+    bpy.data.meshes.remove(cut)
+    original.name = name
+    raise
+  else:
+    bpy.data.meshes.remove(original)
   finally:
     for cutter in cutters:
       cutterMesh = cutter.data

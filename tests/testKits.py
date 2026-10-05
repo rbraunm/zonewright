@@ -75,6 +75,34 @@ def testAKitPieceIsModeledToSizeWithItsOriginAtItsBaseCenterAndItsRolesAtTheirRe
   assert pieces[wallPiece]["seams"] == []
 
 
+def testABarsGrainRunsAlongItsLengthAndAWallsAndPostsRunsUp(stageBlenderServer, tmp_path):
+  readGradients = """
+import numpy
+found = {}
+for name, normal in (('testKitBeam', (0, 1, 0)), ('testKitPlank', (0, 0, 1)), ('testKitRail', (0, 0, 1)), ('testKitPost', (0, 1, 0)), ('testKitWall25', (0, 1, 0))):
+  mesh = bpy.data.objects[name].data
+  polygon = next(polygon for polygon in mesh.polygons if numpy.dot(polygon.normal, normal) > 0.999)
+  points = numpy.array([list(mesh.vertices[mesh.loops[loop].vertex_index].co) for loop in polygon.loop_indices])
+  uvs = numpy.array([list(mesh.uv_layers.active.data[loop].uv) for loop in polygon.loop_indices])
+  inPlane = numpy.ptp(points, axis=0) > 1e-6
+  gradient = numpy.zeros((3, 2))
+  gradient[inPlane] = numpy.linalg.lstsq(numpy.column_stack([points[:, inPlane], numpy.ones(len(points))]), uvs, rcond=None)[0][:-1]
+  found[name] = [[round(float(value), 4) + 0.0 for value in row] for row in gradient.T]
+result = found
+"""
+
+  async def steps(session):
+    await structurePlots.testKit(session, tmp_path)
+    return (await session.expectSuccess("runPython", {"code": readGradients}))["result"]
+
+  gradients = stageBlenderServer.session(steps)
+  assert gradients["testKitBeam"] == [[0.0, 0.0, round(1 / 12, 4)], [round(1 / 12, 4), 0.0, 0.0]]
+  assert gradients["testKitPlank"] == [[0.0, 0.1, 0.0], [0.1, 0.0, 0.0]]
+  assert gradients["testKitRail"] == [[0.0, 0.08, 0.0], [0.08, 0.0, 0.0]]
+  assert gradients["testKitPost"] == [[0.1, 0.0, 0.0], [0.0, 0.0, 0.1]]
+  assert gradients["testKitWall25"] == [[0.08, 0.0, 0.0], [0.0, 0.0, 0.08]]
+
+
 def testKitPieceRefusals(stageBlenderServer, tmp_path):
   wall = {"kind": "wall", "size": [25, 10, 30], "location": [0, 0, 0], "materials": {"face": "testKitStone", "edge": "testKitTrim"}, "worldUnitsPerRepeat": {"face": 12.5, "edge": 5}}
   rope = {"kind": "ropeRail", "size": [25, 0, 1], "location": [0, 40, 0], "materials": {"rope": "testKitRope"}, "worldUnitsPerRepeat": {"rope": 4}}

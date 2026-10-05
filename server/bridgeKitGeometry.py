@@ -24,6 +24,8 @@ kindFaces = {
   "rail": {"front": "side", "back": "side", "top": "side", "bottom": "side", "left": "end", "right": "end"},
   "cap": {"front": "side", "back": "side", "left": "side", "right": "side", "top": "top"},
 }
+# Bars whose texture's grain (its v, as the client's wood textures run it) follows their length along X rather than up.
+grainKinds = ("beam", "plank", "rail")
 roofKinds = ("gable", "hip", "shed")
 roofRoles = {"gable": ("roof", "under", "gable", "edge"), "hip": ("roof", "under", "edge"), "shed": ("roof", "under", "gable", "edge")}
 # A repeat count this close to whole tiles without a seam.
@@ -76,7 +78,7 @@ def pieceShape(kind, size):
     shape.point(corner)
   outward = {"front": (0, 1, 0), "back": (0, -1, 0), "right": (1, 0, 0), "left": (-1, 0, 0), "top": (0, 0, 1), "bottom": (0, 0, -1)}
   for side, role in kindFaces[kind].items():
-    shape.face(boxFaces[side], role, "box", outward[side])
+    shape.face(boxFaces[side], role, "grain" if kind in grainKinds else "box", outward[side])
   return shape
 
 
@@ -150,10 +152,13 @@ def roofShape(kind, footprint, pitchDegrees, overhang, thickness, ridgeAlong):
   return shape, ridgeHeight, eaveHeight
 
 
-def boxMapping(points, normal, corner, repeat):
-  """Texture coordinates projected along the face's main axis, counted from the piece's corner: along X (or Y on an end) and up."""
-  axis = int(numpy.abs(normal).argmax())
-  across = {0: (1, 2), 1: (0, 2), 2: (0, 1)}[axis]
+boxAxes = {"box": {0: (1, 2), 1: (0, 2), 2: (0, 1)}, "grain": {0: (1, 2), 1: (2, 0), 2: (1, 0)}}
+
+
+def boxMapping(points, normal, corner, repeat, mapping="box"):
+  """Texture coordinates projected along the face's main axis, counted from the piece's corner: u along X (Y on an end) and v up;
+  with grain, v along X on every face but the ends."""
+  across = boxAxes[mapping][int(numpy.abs(normal).argmax())]
   return (points[:, across] - corner[list(across)]) / repeat
 
 
@@ -169,7 +174,9 @@ def slopeMapping(points, normal, corner, repeat):
 
 def mapFace(points, mapping, corner, repeat):
   normal = newellNormal(points)
-  return (boxMapping if mapping == "box" else slopeMapping)(points, normal, corner, repeat)
+  if mapping == "slope":
+    return slopeMapping(points, normal, corner, repeat)
+  return boxMapping(points, normal, corner, repeat, mapping)
 
 
 def buildMesh(name, shape, roleMaterials, roleRepeats):
