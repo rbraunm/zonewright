@@ -1,3 +1,4 @@
+import io
 import struct
 import zlib
 
@@ -7,11 +8,13 @@ maximumBlockBytes = 65536
 
 
 class EQArchive:
-  """Read-only view of a PFS archive (.s3d, .eqg); entry names are lowercased. Reads seek into the file on demand."""
+  """Read-only view of a PFS archive (.s3d, .eqg); entry names are lowercased. Reads seek into the file on demand, or into
+  archiveBytes, the archive's content, when given (archivePath then only names it)."""
 
-  def __init__(self, archivePath):
+  def __init__(self, archivePath, archiveBytes=None):
     self.archivePath = archivePath
-    with archivePath.open("rb") as archiveFile:
+    self.archiveBytes = archiveBytes
+    with self.openArchive() as archiveFile:
       header = archiveFile.read(12)
       if len(header) < 12 or header[4:8] != pfsMagic:
         raise ValueError(f"{archivePath}: not a PFS archive")
@@ -31,6 +34,9 @@ class EQArchive:
     if len(fileEntries) != len(names):
       raise ValueError(f"{archivePath}: {len(names)} filenames for {len(fileEntries)} file entries")
     self.entries = {name.lower(): (offset, size) for name, (_, offset, size) in zip(names, fileEntries)}
+
+  def openArchive(self):
+    return self.archivePath.open("rb") if self.archiveBytes is None else io.BytesIO(self.archiveBytes)
 
   def inflate(self, archiveFile, offset, size):
     archiveFile.seek(offset)
@@ -71,5 +77,5 @@ class EQArchive:
     if name.lower() not in self.entries:
       raise KeyError(f"{self.archivePath}: no entry '{name}'")
     offset, size = self.entries[name.lower()]
-    with self.archivePath.open("rb") as archiveFile:
+    with self.openArchive() as archiveFile:
       return self.inflate(archiveFile, offset, size)

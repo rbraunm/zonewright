@@ -125,8 +125,9 @@ def lightFields(position):
 
 
 def parseZone(zoneBytes, sourceName):
-  """EQGZ .zon: model names, object placements, regions (name, center, three turns, half extents), and lights (name, position, RGB 0-1,
-  radius). Version 2 appends per-vertex baked light to each object."""
+  """EQGZ .zon: model names (lowercased, as archives key them), object placements (each with its model's name and the .zon's own
+  spelling of it, which the server's .map keeps), regions (name, center, three turns, half extents), and lights (name, position, RGB
+  0-1, radius). Version 2 appends per-vertex baked light to each object."""
   if zoneBytes[:4] != b"EQGZ":
     raise ValueError(f"{sourceName}: not an EQGZ zone")
   version, stringLength, modelCount, objectCount, regionCount, lightCount = struct.unpack_from("<6I", zoneBytes, 4)
@@ -135,7 +136,8 @@ def parseZone(zoneBytes, sourceName):
   position = 28
   stringTable = zoneBytes[position:position + stringLength]
   position += stringLength
-  modelNames = [readString(stringTable, offset).lower() for offset in struct.unpack_from(f"<{modelCount}I", zoneBytes, position)]
+  modelFileNames = [readString(stringTable, offset) for offset in struct.unpack_from(f"<{modelCount}I", zoneBytes, position)]
+  modelNames = [name.lower() for name in modelFileNames]
   position += 4 * modelCount
   placements = []
   for _ in range(objectCount):
@@ -150,6 +152,7 @@ def parseZone(zoneBytes, sourceName):
       position += 4 + 4 * colorCount
     placements.append({
       "model": modelNames[modelIndex],
+      "modelFileName": modelFileNames[modelIndex],
       "name": readString(stringTable, nameOffset),
       "position": (x, y, z),
       "rotation": (heading, rotationY, rotationX),
