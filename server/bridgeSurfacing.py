@@ -9,6 +9,7 @@ import numpy
 import bridgeCaveData
 import bridgeClientLight
 import bridgeMeshAccess
+from bridgeState import state
 
 projectionMethods = ("planar", "box")
 uvLayerName = "UVMap"
@@ -23,6 +24,7 @@ normalNodeName = "zonewrightNormal"
 blockoutPropertyName = "zonewrightBlockout"
 transitionPropertyName = "zonewrightTransition"
 environmentNodeName = "zonewrightEnvironment"
+environmentLookupNodeName = "zonewrightEnvironmentLookup"
 secondDiffuseNodeName = "zonewrightDiffuse1"
 diffuseAlphaNodeName = "zonewrightDiffuseAlpha"
 # The client's effect time modulo 100, which a preview sets on its scene to draw liquids scrolled as at that moment; unset, it is 0.
@@ -35,6 +37,13 @@ liquidValues = {
   "waterfall": ("slides",), "lava": ("slides",),
 }
 colorValues = ("reflectionColor", "waterColor1", "waterColor2")
+# Water's scalar values where the effect's formula holds them, with the ranges the client's own water materials use (every .eqg
+# material surveyed): fresnel bias 0 to 1, power 1 to 10, reflection 0 to 2.
+scalarDomains = {
+  "fresnelBias": (lambda value: 0 <= value <= 1, "the share of the reflection seen straight down, 0 to 1 (the client's run 0 to 1)"),
+  "fresnelPower": (lambda value: value > 0, "how sharply the reflection grows toward grazing angles, above 0 (the client's run 1 to 10)"),
+  "reflectionAmount": (lambda value: value >= 0, "how strongly the environment mirrors, 0 or more (the client's run 0 to 2)"),
+}
 
 
 def loadImage(path, colorSpace):
@@ -88,14 +97,11 @@ def requireLiquidValues(liquid, values):
   for key in colorValues:
     if key in given and (len(values[key]) != 3 or not all(0 <= component <= 1 for component in values[key])):
       raise ValueError(f"{key} is three numbers from 0 to 1, got {values[key]!r}")
+  for key, (holds, meaning) in scalarDomains.items():
+    if key in given and not holds(values[key]):
+      raise ValueError(f"{key} is {meaning}, got {values[key]!r}")
   if len(values["slides"]) != 4:
     raise ValueError(f"slides is [first x, first y, second x, second y] in texture repeats a second, got {values['slides']!r}")
-  jumping = [slide for slide in values["slides"] if abs(100 * slide - round(100 * slide)) > 1e-9]
-  if jumping:
-    raise ValueError(
-      f"slides {jumping} jump every 100 seconds: the client's effects take time modulo 100, so a layer scrolls seamlessly only when 100"
-      f" times its slide is a whole number of repeats (0.07 or 0.08, not 0.075)"
-    )
   return {key: values[key] for key in liquidValues[liquid]}
 
 
@@ -146,8 +152,9 @@ def liquidNodes(material, liquid, values, diffusePath, texturePaths, lit, mesh):
   """A liquid's look in the preview, as the client's liquid effects draw it on the given mesh ("terrain" or "object") at the effect
   time the preview sets (0 unless a view asks for another), also used for the client's own liquid materials when a zone is imported
   (then lit by their baked light). Water (RegionWater.fxo / SModelWater.fxo, ps_2_0): no diffuse; its color runs from waterColor1 seen
-  from straight above to waterColor2 at grazing angles, lit like any surface, under a normal map sampled at the texture coordinates and
-  at twice them, flattening with distance until flat 300 units off; plus its environment cube map, looked up along the view mirrored
+  from straight above to waterColor2 at grazing angles under a normal map sampled at the texture coordinates and at twice them,
+  flattening with distance until flat 300 units off, and is lit by the mesh's own normal like any surface, as the client's vertex light
+  is (the ripples choose its color and what it mirrors, not its light); plus its environment cube map, looked up along the view mirrored
   about that normal (texturePaths' environment is its equirectangular lookup image), times fresnel (bias + (1 - bias) times the grazing
   term to fresnelPower), reflectionAmount, and reflectionColor, added unlit before fog. A waterfall (RegionWaterFall.fxo): its
   diffuse's color lit, as see-through as its alpha, each sampled at its own slide. Lava (RegionLava.fxo, SModelLava.fxo, ps_1_4): the
@@ -160,8 +167,8 @@ def liquidNodes(material, liquid, values, diffusePath, texturePaths, lit, mesh):
   slides = values.get("slides", [0.0, 0.0, 0.0, 0.0])
   diffuse = imageNode(material, diffuseNodeName, diffusePath)
   if liquid == "water" and all(key in values for key in ("waterColor1", "waterColor2", "fresnelBias", "fresnelPower")):
-    baseColor, normal, added = clientWater(material, values, texturePaths, slides)
-    bridgeClientLight.surfaceOutput(material, baseColor, None, "opaque", lit, 0.5, normal, added)
+    baseColor, added = clientWater(material, values, texturePaths, slides)
+    bridgeClientLight.surfaceOutput(material, baseColor, None, "opaque", lit, 0.5, None, added)
     return
   tree.links.new(scrolledCoordinates(tree, 1.0, slides[:2]), diffuse.inputs["Vector"])
   if liquid == "lava":
@@ -248,7 +255,8 @@ lookupNudge = (1e-5, 1e-5, 0.0)
 
 
 def clientWater(material, values, texturePaths, slides):
-  """The client's DX9 water as preview nodes: its base color to light, its rippled normal, and its mirrored environment to add."""
+  """The client's DX9 water as preview nodes: its base color to light, chosen by its rippled normal, and its mirrored environment to
+  add."""
   tree = material.node_tree
   links = tree.links
 
@@ -308,6 +316,7 @@ def clientWater(material, values, texturePaths, slides):
     bias = values["fresnelBias"]
     fresnel = math("ADD", bias, math("MULTIPLY", 1 - bias, math("POWER", grazing, values["fresnelPower"])))
     lookup = tree.nodes.new("ShaderNodeTexEnvironment")
+    lookup.name = environmentLookupNodeName
     lookup.image = loadImage(texturePaths["environment"], "Non-Color")
     lookup.interpolation = "Linear"
     # The node reads a direction whose x or y is exactly 0 (calm water seen straight down in a map) as its image's first texel; a
@@ -315,7 +324,7 @@ def clientWater(material, values, texturePaths, slides):
     links.new(vector("ADD", vector("REFLECT", scaled(geometry.outputs["Incoming"], -1.0), normal), lookupNudge), lookup.inputs["Vector"])
     mirrored = vector("MULTIPLY", lookup.outputs["Color"], tuple(component * values["reflectionAmount"] for component in values["reflectionColor"]))
     added = scaled(mirrored, fresnel)
-  return baseColor, normal, added
+  return baseColor, added
 
 
 def liquidOf(material):
@@ -323,6 +332,36 @@ def liquidOf(material):
   if material is None or bridgeMeshAccess.liquidProperty not in material:
     return None
   return json.loads(material[bridgeMeshAccess.liquidProperty])
+
+
+def environmentLookups():
+  """Each water material's environment cube map and the lookup image its preview mirrors (made from the cube map under the tooling
+  root, which a work file only points to): [{material, cubeMap, lookup}], absolute paths as this file resolves them."""
+  found = []
+  for material in bpy.data.materials:
+    nodes = material.node_tree.nodes if liquidOf(material) is not None else {}
+    if environmentNodeName in nodes and environmentLookupNodeName in nodes:
+      found.append({
+        "material": material.name, "cubeMap": os.path.normpath(bpy.path.abspath(nodes[environmentNodeName].image.filepath)),
+        "lookup": os.path.normpath(bpy.path.abspath(nodes[environmentLookupNodeName].image.filepath)),
+      })
+  return {"lookups": found}
+
+
+def restoreEnvironmentLookups(lookups):
+  """Point each named water material's preview at its lookup image ({material: absolute path}) and read the image again; the file
+  changes only where a path does."""
+  for name, path in lookups.items():
+    node = bpy.data.materials[name].node_tree.nodes[environmentLookupNodeName]
+    if os.path.normcase(os.path.normpath(bpy.path.abspath(node.image.filepath))) == os.path.normcase(os.path.normpath(path)):
+      node.image.reload()
+      continue
+    old = node.image
+    node.image = loadImage(path, "Non-Color")
+    if old.users == 0:
+      bpy.data.images.remove(old)
+    state.unsavedChanges = True
+  return {"restored": sorted(lookups)}
 
 
 def assignMaterial(objectName, materialName, selector):
@@ -389,4 +428,6 @@ commands = {
   "createMaterial": (createMaterial, True),
   "createLiquidMaterial": (createLiquidMaterial, True),
   "assignMaterial": (assignMaterial, True),
+  "environmentLookups": (environmentLookups, False),
+  "restoreEnvironmentLookups": (restoreEnvironmentLookups, False),
 }

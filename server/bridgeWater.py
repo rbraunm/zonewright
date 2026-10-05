@@ -3,7 +3,8 @@ so water is adjusted one body at a time and looked at after every change. A pool
 path at levels falling with it, spreading over the ground below its level within reach of the path; a fall hangs as a sheet from a lip,
 arcing out as it drops. Pools and rivers reach a little under their banks so no seam shows at the waterline, and the swim volumes the
 client needs are derived from what they cover. A body's white water is the client's: spray emitters where the water strikes, kept with
-the body and placed again whenever it is rebuilt. Runs under Blender's Python."""
+the body and placed again whenever it is rebuilt, and a fall's foot again whenever the pool or river it lands in is rebuilt or deleted.
+Runs under Blender's Python."""
 import json
 import math
 import re
@@ -33,7 +34,8 @@ ringLift = 0.5
 # no sliver of it shows on a gentle shore.
 shoreTuck = 2.0
 shoreRounds = 2
-# A flood that has measured this many grid points has leaked into open ground; it is refused rather than left to fill the zone.
+# A flood that has measured this many grid points is refused rather than left to fill a zone's whole grid; one that leaks over open
+# ground short of it is built and says where it reached the end of the ground.
 maximumFloodPoints = 250000
 # A fall's sheet starts this far back from its lip, level with it, so it turns over the edge rather than starting in the air.
 lipLeadIn = 4.0
@@ -42,6 +44,9 @@ lipProbeSpacings = 2.0
 up = mathutils.Vector((0.0, 0.0, 1.0))
 down = mathutils.Vector((0.0, 0.0, -1.0))
 reach = bridgeMeshAccess.waterReach
+# A river's texture runs along its path with each bend rounded to this many times its reach, so its inside bank is squeezed by at most
+# a third and its outside stretched by a third where the legs leave room.
+bendRounding = 3.0
 surfaceContact = 1e-3
 edgeHalvings = 20
 # A cut closer to a cell's corner than this share of its edge would leave a sliver of a face; it is taken as the corner.
@@ -58,10 +63,11 @@ def groundTop(x, y):
 
 
 class Ground:
-  """What water lies on and against: what players stand on (bridgeMeshAccess.playerSolidTriangles)."""
+  """What water lies on and against: what players stand on (bridgeMeshAccess.playerSolidTriangles), but for the objects named in
+  excluding (about to be deleted)."""
 
-  def __init__(self):
-    positions, triangles = bridgeMeshAccess.playerSolidTriangles()
+  def __init__(self, excluding=()):
+    positions, triangles = bridgeMeshAccess.playerSolidTriangles(excluding)
     self.tree = mathutils.bvhtree.BVHTree.FromPolygons(positions.tolist(), triangles.tolist())
 
   def depth(self, x, y, level):
@@ -130,6 +136,13 @@ def requirePath(path):
     raise ValueError(f"A river's path is at least two [x, y, level] points, got {path!r}")
   if (numpy.linalg.norm(numpy.diff(pathArray[:, :2], axis=0), axis=1) < 1e-6).any():
     raise ValueError("A river's path has two points at the same [x, y]; a drop is a fall, made with pourWaterfall")
+  rising = numpy.flatnonzero(numpy.diff(pathArray[:, 2]) > 0)
+  if len(rising):
+    index = int(rising[0])
+    raise ValueError(
+      f"A river's path runs downstream, its levels falling or level along it, but it rises from {round(float(pathArray[index, 2]), 2)} at"
+      f" point {index + 1} to {round(float(pathArray[index + 1, 2]), 2)} at point {index + 2}: start it at its upstream end (reverse a"
+      " path given from the mouth), or lower the later level")
   return pathArray.tolist()
 
 
@@ -174,35 +187,29 @@ def validatedDefinition(definition):
 
 
 def requireSpray(spray, kind):
-  """A spray as the body keeps it: {at, definition, rings, spacing, count, above}, at "foot" or "lip" for a fall, {"points": [[x, y],
-  ...]} on a pool or river, or {"along": [[x, y], [x, y]]} for a stretch of a river; a row takes its spacing or its count."""
+  """A spray as the body keeps it: {at, definition, rings, spacing, count, above}, at "foot" or "lip" for a fall, a row along its
+  width by its spacing or its count, or {"points": [[x, y], ...]} on a pool or river, one emitter at each point laid by hand."""
   if not isinstance(spray, dict) or set(spray) != set(sprayFields):
     raise ValueError(f"A spray is {{{', '.join(sprayFields)}}}, got {spray!r}")
   at = spray["at"]
   if at in ("foot", "lip"):
     if kind != "fall":
-      raise ValueError(f"A {kind}'s sprays go at points ({{\"points\": [[x, y], ...]}}) or, on a river, along a stretch ({{\"along\": [[x, y], [x, y]]}}); \"{at}\" is a fall's")
+      raise ValueError(f"A {kind}'s sprays go at points on its surface ({{\"points\": [[x, y], ...]}}); \"{at}\" is a fall's")
   elif isinstance(at, dict) and set(at) == {"points"}:
     if kind == "fall":
       raise ValueError("A fall's sprays go at its \"foot\" or its \"lip\"; spray points on the pool or river it lands in")
     if not at["points"]:
       raise ValueError("A spray's points are one or more [x, y]")
     at = {"points": [requirePlanPoint("A spray point", point) for point in at["points"]]}
-  elif isinstance(at, dict) and set(at) == {"along"}:
-    if kind != "river":
-      raise ValueError(f"Only a river's sprays run along a stretch of it; a {kind}'s go at {'its foot or lip' if kind == 'fall' else 'points'}")
-    if len(at["along"]) != 2:
-      raise ValueError(f"along is the stretch's two ends [[x, y], [x, y]], got {at['along']!r}")
-    at = {"along": [requirePlanPoint("A stretch's end", point) for point in at["along"]]}
   else:
-    raise ValueError(f"A spray's at is \"foot\", \"lip\", {{\"points\": [[x, y], ...]}}, or {{\"along\": [[x, y], [x, y]]}}, got {at!r}")
+    raise ValueError(f"A spray's at is \"foot\", \"lip\", or {{\"points\": [[x, y], ...]}} (a river's rapids too: lay each splash where the water breaks), got {at!r}")
   for key in ("definition", "rings"):
     value = spray[key]
     if (value is not None or key == "definition") and (not isinstance(value, int) or isinstance(value, bool) or value < 1):
       raise ValueError(f"A spray's {key} is a client emitter definition index, 1 or more{'' if key == 'definition' else ', or null'}, got {value!r}")
   if spray["rings"] is not None and at == "lip":
     raise ValueError("Rings lie on water; a lip has none under it")
-  if isinstance(at, dict) and "points" in at:
+  if isinstance(at, dict):
     if spray["spacing"] is not None or spray["count"] is not None:
       raise ValueError("A spray at points puts one emitter at each; it takes no spacing or count")
   elif (spray["spacing"] is None) == (spray["count"] is None):
@@ -259,6 +266,65 @@ def pathPositions(points, path):
   lateral = numpy.where(beyond, square, numpy.where(leftward, -1.0, 1.0) * distances[rows, closest])
   levels = starts[closest, 2] + fraction * (ends[closest, 2] - starts[closest, 2])
   return arcStarts[closest] + fraction * lengths[closest], lateral, levels, beyond
+
+
+def mappingPieces(path, reach):
+  """The line a river's texture runs along: its path in plan with each bend rounded to bendRounding times its reach, or as near as the
+  legs either side leave room for (half a leg between two bends): [("line", start, length, direction) or ("arc", center, radius, start
+  angle, signed sweep)] downstream, each ending with its distance from the river's start; and the bends rounded tighter than the reach,
+  whose insides fold."""
+  points = numpy.asarray(path, dtype=numpy.float64)[:, :2]
+  legs = numpy.diff(points, axis=0)
+  lengths = numpy.linalg.norm(legs, axis=1)
+  directions = legs / lengths[:, None]
+  turns = [math.atan2(before[0] * after[1] - before[1] * after[0], before @ after) for before, after in zip(directions[:-1], directions[1:])]
+  room = [lengths[leg] / (2 if 0 < leg < len(legs) - 1 else 1) for leg in range(len(legs))]
+  pieces, tight, start, travelled = [], [], points[0], 0.0
+  for joint, turn in enumerate(turns, 1):
+    if abs(turn) < 1e-6:
+      continue
+    half = math.tan(abs(turn) / 2)
+    radius = min(bendRounding * reach, room[joint - 1] / half, room[joint] / half)
+    if radius < reach:
+      tight.append(bridgeObjects.roundVector(points[joint], 1))
+    before, after = points[joint] - directions[joint - 1] * radius * half, points[joint] + directions[joint] * radius * half
+    left = numpy.array([-directions[joint - 1][1], directions[joint - 1][0]])
+    center = before + left * radius * math.copysign(1.0, turn)
+    pieces.append(("line", start, float(numpy.linalg.norm(before - start)), directions[joint - 1], travelled))
+    travelled += pieces[-1][2]
+    pieces.append(("arc", center, radius, math.atan2(*(before - center)[::-1]), turn, travelled))
+    travelled += radius * abs(turn)
+    start = after
+  pieces.append(("line", start, float(numpy.linalg.norm(points[-1] - start)), directions[-1], travelled))
+  return pieces, tight
+
+
+def mappedPositions(points, pieces):
+  """For [x, y] points: the distance along a river's mapping line (mappingPieces) to its nearest spot and the signed distance across it
+  (right positive looking downstream), the line running on straight past both ends."""
+  best = numpy.full(len(points), numpy.inf)
+  along, across = numpy.zeros(len(points)), numpy.zeros(len(points))
+  for index, piece in enumerate(pieces):
+    if piece[0] == "line":
+      _, start, length, unit, travelled = piece
+      offsets = points - start
+      reached = offsets @ unit
+      clipped = numpy.clip(reached, -numpy.inf if index == 0 else 0.0, numpy.inf if index == len(pieces) - 1 else length)
+      side = offsets[:, 1] * unit[0] - offsets[:, 0] * unit[1]
+      distance = numpy.hypot(reached - clipped, side)
+      pieceAlong, pieceAcross = travelled + clipped, -side
+    else:
+      _, center, radius, startAngle, sweep, travelled = piece
+      offsets = points - center
+      angles = numpy.mod((numpy.arctan2(offsets[:, 1], offsets[:, 0]) - startAngle) * math.copysign(1.0, sweep), 2 * math.pi)
+      onArc = angles <= abs(sweep)
+      fromCenter = numpy.linalg.norm(offsets, axis=1)
+      distance = numpy.where(onArc, numpy.abs(fromCenter - radius), numpy.inf)
+      pieceAlong, pieceAcross = travelled + radius * angles, (fromCenter - radius) * math.copysign(1.0, sweep)
+    nearer = distance < best
+    best = numpy.where(nearer, distance, best)
+    along, across = numpy.where(nearer, pieceAlong, along), numpy.where(nearer, pieceAcross, across)
+  return along, across
 
 
 def levelsAt(definition, points):
@@ -462,9 +528,9 @@ def loopPoint(key, cuts, step):
 
 def surfaceMesh(name, definition, cells):
   """The surface over the cells at the body's levels, cut along the bounds of where it may spread; a pool's flat cells merged and mapped
-  across the plan, a river's mapped along its path: u across (rightward looking downstream) and the client's v downstream, as the client's
-  rivers run it (Brell's Rest, Beasts' Domain), so its liquid's slides flow as theirs do. Export counts v down from the texture's top
-  (client v = 1 - Blender v), so Blender's v falls downstream."""
+  across the plan, a river's mapped along its path with its bends rounded (mappingPieces): u across (rightward looking downstream) and
+  the client's v downstream, as the client's rivers run it (Brell's Rest, Beasts' Domain), so its liquid's slides flow as theirs do.
+  Export counts v down from the texture's top (client v = 1 - Blender v), so Blender's v falls downstream."""
   spacing = definition["spacing"]
 
   def allowed(points):
@@ -492,12 +558,13 @@ def surfaceMesh(name, definition, cells):
     bmesh.ops.dissolve_limit(meshEditor, angle_limit=math.radians(0.01), use_dissolve_boundaries=False, verts=list(meshEditor.verts), edges=list(meshEditor.edges))
   uvLayer = meshEditor.loops.layers.uv.new(bridgeSurfacing.uvLayerName)
   repeat = definition["worldUnitsPerRepeat"]
+  pieces = mappingPieces(definition["path"], definition["reach"])[0] if definition["kind"] == "river" else None
   for face in meshEditor.faces:
     points = numpy.array([list(loop.vert.co[:2]) for loop in face.loops])
     if definition["kind"] == "pool":
       coordinates = points / repeat
     else:
-      along, across, _, _ = pathPositions(points, definition["path"])
+      along, across = mappedPositions(points, pieces)
       coordinates = numpy.column_stack([across, -along]) / repeat
     for loop, coordinate in zip(face.loops, coordinates):
       loop[uvLayer].uv = coordinate
@@ -561,6 +628,8 @@ def spreadBody(name, definition, ground):
     "coveredPoints": len(wet), "deepest": round(max(wetDepths), 2),
     "reachesGroundEnd": [[round(i * spacing, 1), round(j * spacing, 1)] for i, j in edges[:8]], "groundEndPoints": len(edges),
   }
+  if definition["kind"] == "river":
+    report["tightBends"] = mappingPieces(definition["path"], definition["reach"])[1]
   return surfaceMesh(name, definition, cells), report
 
 
@@ -582,12 +651,15 @@ def resampledLip(lip, spacing):
   return numpy.array(points), numpy.array(directions)
 
 
-def fallGrid(definition, ground):
-  """The sheet's vertices, [column along the lip, row], row 0 the lead-in behind the lip and row 1 the lip; the lip's points and its
-  length along them at each."""
-  spacing, bottom, throw, spread = definition["spacing"], definition["bottom"], definition["throw"], definition["spread"]
+def lipOutward(directions):
+  return numpy.column_stack([directions[:, 1], -directions[:, 0]])
+
+
+def requireLipFacing(definition, ground):
+  """Refuse a lip whose ground in front does not lie below the ground behind it: a lip run from the fall's right edge to its left."""
+  spacing = definition["spacing"]
   points, directions = resampledLip(definition["lip"], spacing)
-  outward = numpy.column_stack([directions[:, 1], -directions[:, 0]])
+  outward = lipOutward(directions)
   arc = numpy.concatenate([[0.0], numpy.cumsum(numpy.linalg.norm(numpy.diff(points[:, :2], axis=0), axis=1))])
   middle = int(numpy.searchsorted(arc, arc[-1] / 2))
   probe = lipProbeSpacings * spacing
@@ -596,8 +668,17 @@ def fallGrid(definition, ground):
   behind = ground.heightBelow(*(points[middle, :2] - outward[middle] * probe), aboveLip)
   if behind is None or (front is not None and front >= behind):
     raise ValueError(
-      f"The ground in front of the lip (at {[round(value, 1) for value in points[middle, :2] + outward[middle] * probe]}) does not lie below the ground behind it: a lip"
+      f"The ground in front of the lip (at {bridgeObjects.roundVector(points[middle, :2] + outward[middle] * probe, 1)}) does not lie below the ground behind it: a lip"
       " runs from the fall's left edge to its right as seen from in front of it; reverse it if it runs the other way")
+
+
+def fallGrid(definition):
+  """The sheet's vertices, [column along the lip, row], row 0 the lead-in behind the lip and row 1 the lip; the lip's points and its
+  length along them at each. They follow from the definition alone."""
+  spacing, bottom, throw, spread = definition["spacing"], definition["bottom"], definition["throw"], definition["spread"]
+  points, directions = resampledLip(definition["lip"], spacing)
+  outward = lipOutward(directions)
+  arc = numpy.concatenate([[0.0], numpy.cumsum(numpy.linalg.norm(numpy.diff(points[:, :2], axis=0), axis=1))])
   center = numpy.interp(arc[-1] / 2, arc, points[:, 0]), numpy.interp(arc[-1] / 2, arc, points[:, 1])
   center = numpy.array(center)
   rows = max(1, math.ceil((points[:, 2].max() - bottom) / spacing))
@@ -616,8 +697,10 @@ def fallMesh(name, definition, ground):
   face by `throw` at the bottom as falling water is (out as the square root of the drop) and spreading `spread` times as wide. Mapped as
   the client maps its falls: u spans the lip `acrossRepeats` times (once, 0 to 1, so a fall texture's faded side edges frame the fall)
   and the client's v runs down the drop, a repeat every worldUnitsPerRepeat, so its liquid's slides flow down as theirs do (Blender's v
-  falls down the drop; export counts v down from the texture's top)."""
-  grid, points, arc = fallGrid(definition, ground)
+  falls down the drop; export counts v down from the texture's top). Smooth shaded, so it lights and exports with normals shared
+  across its rows, as the client's fall sheets carry them (Crescent Reach, Brell's Rest), not stepping row by row."""
+  requireLipFacing(definition, ground)
+  grid, points, arc = fallGrid(definition)
   rows = grid.shape[1] - 2
   bottom = definition["bottom"]
   meshEditor = bmesh.new()
@@ -630,6 +713,7 @@ def fallMesh(name, definition, ground):
     for row in range(rows + 1):
       corners = ((column, row), (column, row + 1), (column + 1, row + 1), (column + 1, row))
       face = meshEditor.faces.new([vertices[c][r] for c, r in corners])
+      face.smooth = True
       for loop, (c, r) in zip(face.loops, corners):
         loop[uvLayer].uv = (across[c], -fallen[c, r] / repeat)
   mesh = bpy.data.meshes.new(name)
@@ -652,15 +736,16 @@ def fallMesh(name, definition, ground):
 class BodySurface:
   """A newly built pool or river's surface, which stands in world space, for its sprays to stand on."""
 
-  def __init__(self, name, mesh):
-    self.name = name
-    self.tree = mathutils.bvhtree.BVHTree.FromPolygons([vertex.co for vertex in mesh.vertices], [polygon.vertices for polygon in mesh.polygons])
-    self.top = max(vertex.co.z for vertex in mesh.vertices) + 1
+  def __init__(self, mesh):
+    self.positions = [vertex.co.copy() for vertex in mesh.vertices]
+    self.polygons = [list(polygon.vertices) for polygon in mesh.polygons]
+    self.tree = mathutils.bvhtree.BVHTree.FromPolygons(self.positions, self.polygons)
+    self.top = max(vertex.z for vertex in self.positions) + 1
 
   def height(self, point):
     location = self.tree.ray_cast(mathutils.Vector((point[0], point[1], self.top)), down, reach)[0]
     if location is None:
-      raise ValueError(f"The spray point {[round(float(value), 1) for value in point]} is not over '{self.name}''s surface; move it onto the water, or take the spray off (editWater sprays)")
+      raise ValueError(f"the point {bridgeObjects.roundVector(point, 1)} is not over the surface; move it onto the water")
     return location.z
 
 
@@ -671,13 +756,15 @@ def heightAt(column, level):
 
 
 def footOfColumn(column, ground, water):
-  """Where one column of a fall's sheet, its lip first, strikes what lies below: the water players swim under where its foot lies
-  under a surface, else where it enters the ground, else what lies straight under its end; with whether that is water."""
+  """Where one column of a fall's sheet, its lip first, strikes what lies below: the first water surface under its lip (the river
+  pouring over it left out), cast down so a slab of water is struck on its top, not its underside, unless that water lies tucked under
+  the bank, which the column strikes first; else where it enters the ground; else what lies straight under its end, ground at its very
+  height included; with whether that is water."""
   end = mathutils.Vector(column[-1])
-  drop = column[0][2] - column[-1][2]
+  top = column[0][2] - bridgeMeshAccess.castNudge
   if water is not None:
-    location = water.ray_cast(end - up * bridgeMeshAccess.castNudge, up, drop + bridgeMeshAccess.castNudge)[0]
-    if location is not None:
+    location = water.ray_cast(mathutils.Vector((end.x, end.y, top)), down, top - end.z + bridgeMeshAccess.castNudge)[0]
+    if location is not None and not ground.insideRock(location):
       return heightAt(column, location.z), True
   hidden = [ground.insideRock(point) for point in column]
   if hidden[-1]:
@@ -685,16 +772,17 @@ def footOfColumn(column, ground, water):
     while lowest >= 0 and hidden[lowest]:
       lowest -= 1
     if lowest < 0:
-      raise ValueError("A column of the fall's sheet lies inside the rock from its lip down; move the lip or raise its throw")
+      raise ValueError("a column of the sheet lies inside the rock from its lip down; move the lip or raise its throw")
     inside, outside = column[lowest + 1], column[lowest]
     for _ in range(edgeHalvings):
       middle = (inside + outside) / 2
       inside, outside = (middle, outside) if ground.insideRock(middle) else (inside, middle)
     return outside, False
-  waterBelow = water.ray_cast(end, down, reach)[0] if water is not None else None
-  groundBelow = ground.heightBelow(end.x, end.y, end.z)
+  lifted = end + up * bridgeMeshAccess.castNudge
+  waterBelow = water.ray_cast(lifted, down, reach)[0] if water is not None else None
+  groundBelow = ground.heightBelow(lifted.x, lifted.y, lifted.z)
   if waterBelow is None and groundBelow is None:
-    raise ValueError(f"Nothing lies under the foot of the fall at {[round(value, 1) for value in column[-1]]} for its spray to stand on")
+    raise ValueError(f"nothing lies under the foot of the fall at {bridgeObjects.roundVector(column[-1], 1)}, neither water nor ground")
   if groundBelow is None or (waterBelow is not None and waterBelow.z >= groundBelow):
     return numpy.array(waterBelow), True
   return numpy.array([end.x, end.y, groundBelow]), False
@@ -711,35 +799,35 @@ def rowPositions(line, onWater, spray):
   return [(position, onWater[int(numpy.abs(lengths - mark).argmin())]) for position, mark in zip(positions, marks)]
 
 
-def pathPointAt(path, distance):
-  pathArray = numpy.asarray(path, dtype=numpy.float64)
-  lengths = numpy.concatenate([[0.0], numpy.cumsum(numpy.linalg.norm(numpy.diff(pathArray[:, :2], axis=0), axis=1))])
-  return numpy.array([numpy.interp(distance, lengths, pathArray[:, axis]) for axis in range(2)])
-
-
 def sprayPlaces(definition, spray, surface, ground, water):
   """Where one spray's emitters stand, on what they strike: [(position on the surface, whether it is water)]. A fall's foot is where
-  each column of its sheet strikes the water or ground below, its lip the lip; points and stretches lie on the body's own surface."""
+  each column of its sheet strikes the water or ground below, its lip the lip; points lie on the body's own surface."""
   at = spray["at"]
   if at in ("foot", "lip"):
-    grid, points, _ = fallGrid(definition, ground)
+    grid, points, _ = fallGrid(definition)
     if at == "lip":
       return rowPositions(grid[:, 1], [False] * len(points), spray)
     feet = [footOfColumn(grid[column, 1:], ground, water) for column in range(len(points))]
     return rowPositions([point for point, _ in feet], [isWater for _, isWater in feet], spray)
-  if "points" in at:
-    return [(numpy.array([*point, surface.height(point)]), True) for point in at["points"]]
-  ends = pathPositions(numpy.asarray(at["along"], dtype=numpy.float64), definition["path"])[0]
-  plan = [pathPointAt(definition["path"], distance) for distance in numpy.linspace(ends[0], ends[1], max(2, math.ceil(abs(ends[1] - ends[0]) / definition["spacing"]) + 1))]
-  return rowPositions([[*point, surface.height(point)] for point in plan], [True] * len(plan), spray)
+  return [(numpy.array([*point, surface.height(point)]), True) for point in at["points"]]
 
 
-def sprayRecords(name, definition, surface, ground):
-  """Every emitter the body's sprays place, named for the body and spray, with its definition and what it stands on."""
-  water = bridgeMeshAccess.swimSurfaces() if any(spray["at"] == "foot" for spray in definition["sprays"]) else None
+def sprayRecords(name, definition, surface, ground, water):
+  """Every emitter the body's sprays place, named for the body and spray, with its definition and what it stands on; refused, naming
+  the body and spray, where one cannot stand or where rings would lie on dry ground."""
   records = []
   for index, spray in enumerate(definition["sprays"], 1):
-    for number, (position, onWater) in enumerate(sprayPlaces(definition, spray, surface, ground, water), 1):
+    label = f"Spray {index} of '{name}' (at {'points' if isinstance(spray['at'], dict) else 'its ' + spray['at']}, definition {spray['definition']})"
+    try:
+      places = sprayPlaces(definition, spray, surface, ground, water)
+    except ValueError as error:
+      raise ValueError(f"{label} cannot stand: {error}; or take the spray off (editWater sprays)") from None
+    dry = [position for position, onWater in places if not onWater]
+    if spray["rings"] is not None and dry:
+      raise ValueError(
+        f"{label} lays ripple rings ({spray['rings']}), which lie on water, but dry ground lies under {len(dry)} of its {len(places)}"
+        f" emitters (at {bridgeObjects.roundVector(dry[0], 1)}): give the fall water to land in, or take the rings off this spray (editWater sprays)")
+    for number, (position, onWater) in enumerate(places, 1):
       on = "water" if onWater else ("lip" if spray["at"] == "lip" else "ground")
       records.append({"name": f"{name}Spray{index}_{number}", "definition": spray["definition"], "position": [float(position[0]), float(position[1]), float(position[2] + spray["above"])], "spray": index, "role": "spray", "on": on})
       if spray["rings"] is not None:
@@ -751,33 +839,109 @@ def placedSprays(name):
   return [sceneObject for sceneObject in bpy.data.objects if bridgeMeshAccess.sprayProperty in sceneObject and json.loads(sceneObject[bridgeMeshAccess.sprayProperty])["body"] == name]
 
 
+def requireSprayNames(name, records):
+  """Refuse, before anything changes, records whose names another object holds: the body's own emitters give theirs up."""
+  for record in records:
+    holder = bpy.data.objects.get(record["name"])
+    if holder is None or (bridgeMeshAccess.sprayProperty in holder and json.loads(holder[bridgeMeshAccess.sprayProperty])["body"] == name):
+      continue
+    owner = f", one of the emitters of '{json.loads(holder[bridgeMeshAccess.sprayProperty])['body']}'" if bridgeMeshAccess.sprayProperty in holder else ""
+    raise ValueError(f"'{name}''s sprays name an emitter '{record['name']}', and an object of that name already exists{owner}; rename that object (organize) first")
+
+
 def placeSprays(sceneObject, records):
-  """Take away the body's spray emitters and place them as the records say, in the body's collection."""
-  old = placedSprays(sceneObject.name)
-  oldNames = {emitter.name for emitter in old}
+  """Place the body's spray emitters as the records say, in the body's collection. An emitter already standing where its record now
+  places it is kept as it is, a hand nudge or a hidden render with it; one whose strike moved is moved there; the rest are taken away
+  or made."""
+  wanted = {record["name"]: record for record in records}
+  kept = {}
+  for emitter in placedSprays(sceneObject.name):
+    record = wanted.get(emitter.name)
+    if record is not None and int(emitter[bridgeEnvironment.definitionProperty]) == record["definition"]:
+      kept[emitter.name] = emitter
+    else:
+      bpy.data.objects.remove(emitter)
+  fresh = [record for record in records if record["name"] not in kept]
+  if fresh:
+    bridgeEnvironment.placeEmitters(
+      [{"name": record["name"], "position": record["position"], "definition": record["definition"], "lifespan": sprayLifespan} for record in fresh],
+      sceneObject.users_collection[0].name, None,
+    )
   for record in records:
-    if record["name"] not in oldNames:
-      bridgeObjects.requireNewName(record["name"])
-  for emitter in old:
-    bpy.data.objects.remove(emitter)
-  if not records:
-    return
-  bridgeEnvironment.placeEmitters(
-    [{"name": record["name"], "position": record["position"], "definition": record["definition"], "lifespan": sprayLifespan} for record in records],
-    sceneObject.users_collection[0].name, None,
-  )
-  for record in records:
-    bpy.data.objects[record["name"]][bridgeMeshAccess.sprayProperty] = json.dumps({"body": sceneObject.name, "spray": record["spray"], "role": record["role"], "on": record["on"]})
+    emitter = kept.get(record["name"]) or bpy.data.objects[record["name"]]
+    if record["name"] in kept and not numpy.allclose(json.loads(emitter[bridgeMeshAccess.sprayProperty])["placed"], record["position"], atol=1e-4):
+      emitter.location = record["position"]
+    emitter[bridgeMeshAccess.sprayProperty] = json.dumps({"body": sceneObject.name, "spray": record["spray"], "role": record["role"], "on": record["on"], "placed": record["position"]})
   bpy.context.view_layer.update()
 
 
-def replaceFallFeet(ground):
-  """Place again the sprays of every fall that sprays its foot, after the water it lands in changed; the falls' names."""
-  bodies = [(sceneObject, readDefinition(sceneObject)) for sceneObject in bpy.context.scene.objects if bridgeMeshAccess.waterProperty in sceneObject]
-  falls = [(fall, definition) for fall, definition in bodies if definition["kind"] == "fall" and any(spray["at"] == "foot" for spray in definition["sprays"])]
-  for fall, definition in falls:
-    placeSprays(fall, sprayRecords(fall.name, definition, None, ground))
-  return sorted(fall.name for fall, _ in falls)
+def footSprayingFalls(leaving=()):
+  falls = []
+  for sceneObject in bpy.context.scene.objects:
+    if bridgeMeshAccess.waterProperty not in sceneObject or sceneObject.name in leaving:
+      continue
+    definition = readDefinition(sceneObject)
+    if definition["kind"] == "fall" and any(spray["at"] == "foot" for spray in definition["sprays"]):
+      falls.append(sceneObject)
+  return falls
+
+
+def fallsLandingOn(surfaces, leaving=()):
+  """The falls spraying their feet whose feet lie over any of the given surfaces (BVH trees): a pool or river as it stood and as it is
+  about to stand. A foot strikes what lies under the end of each column of its sheet, cast down from the lip (footOfColumn)."""
+  landing = []
+  for fall in footSprayingFalls(leaving):
+    grid, points, _ = fallGrid(readDefinition(fall))
+    top = float(points[:, 2].max()) - bridgeMeshAccess.castNudge
+    if any(surface.ray_cast(mathutils.Vector((x, y, top)), down, reach)[0] is not None for x, y, _ in grid[:, -1] for surface in surfaces):
+      landing.append(fall)
+  return landing
+
+
+def fallFeetOn(surfaces, ground, waterAfter, leaving=()):
+  """The sprays of the falls landing on the given surfaces, placed against the water as it is about to stand (waterAfter() makes it):
+  {fall name: records}; refused, naming the fall, where one cannot stand."""
+  landing = fallsLandingOn(surfaces, leaving)
+  water = waterAfter() if landing else None
+  feet = {}
+  for fall in landing:
+    feet[fall.name] = sprayRecords(fall.name, readDefinition(fall), None, ground, water)
+    requireSprayNames(fall.name, feet[fall.name])
+  return feet
+
+
+def placeFallFeet(feet):
+  for name, records in feet.items():
+    placeSprays(bpy.data.objects[name], records)
+
+
+def fallFeetWithout(sceneObjects):
+  """For objects about to be deleted, the sprays of the falls that land in the pools and rivers among them, placed against the water
+  and ground left (fallFeetOn); falls deleted with them are left out."""
+  names = {sceneObject.name for sceneObject in sceneObjects}
+  removed = [sceneObject for sceneObject in sceneObjects if bridgeMeshAccess.waterProperty in sceneObject and readDefinition(sceneObject)["kind"] != "fall" and len(sceneObject.data.polygons)]
+  if not removed or not footSprayingFalls(names):
+    return {}
+  return fallFeetOn([bridgeMeshAccess.worldTree([body]) for body in removed], Ground(names), lambda: bridgeMeshAccess.swimSurfaces(names), names)
+
+
+def sprayRenames(oldName, newName):
+  """The names a body's emitters take when it is renamed, each named for the body keeping what follows the body's name, refused while
+  another object holds one: [(emitter, its name then)]."""
+  emitters = placedSprays(oldName)
+  renames = [(emitter, newName + emitter.name[len(oldName):] if emitter.name.startswith(oldName) else emitter.name) for emitter in emitters]
+  for emitter, name in renames:
+    holder = bpy.data.objects.get(name)
+    if holder is not None and holder not in emitters:
+      raise ValueError(f"Renamed '{newName}', '{oldName}''s emitter '{emitter.name}' would be '{name}', which another object already holds; rename that object first")
+  return renames
+
+
+def renameSprays(renames, newName):
+  """Rename a body's emitters as sprayRenames says and give them to the body by its new name."""
+  for emitter, name in renames:
+    emitter.name = name
+    emitter[bridgeMeshAccess.sprayProperty] = json.dumps(json.loads(emitter[bridgeMeshAccess.sprayProperty]) | {"body": newName})
 
 
 def describeSprays(sceneObject, definition):
@@ -839,21 +1003,28 @@ def bodyFlow(sceneObject, definition):
 
 # Bodies
 
-def buildBody(name, definition, ground):
-  """The body's mesh, what the build found, and the emitters its sprays place on it as built; refused before anything changes when a
-  spray cannot stand where it is set."""
+def buildBody(name, definition, ground, previous=None, rendered=True):
+  """The body's mesh, what the build found, the emitters its sprays place on it as built, and, for a pool or river, the sprays of the
+  falls that land on it as it stood (`previous`, its object) or as it will stand, placed against it as it will ({fall name: records});
+  refused before anything changes when a spray cannot stand where it is set. A body hidden from renders is not swum (not `rendered`)."""
   if definition["kind"] == "fall":
     mesh, report = fallMesh(name, definition, ground)
     surface = None
   else:
     mesh, report = spreadBody(name, definition, ground)
-    surface = BodySurface(name, mesh)
+    surface = BodySurface(mesh)
   try:
-    records = sprayRecords(name, definition, surface, ground)
+    water = bridgeMeshAccess.swimSurfaces() if any(spray["at"] == "foot" for spray in definition["sprays"]) else None
+    records = sprayRecords(name, definition, surface, ground, water)
+    requireSprayNames(name, records)
+    feet = {}
+    if surface is not None:
+      surfaces = [surface.tree] + ([bridgeMeshAccess.worldTree([previous])] if previous is not None and len(previous.data.polygons) else [])
+      feet = fallFeetOn(surfaces, ground, lambda: bridgeMeshAccess.swimSurfaces({name}, (surface.positions, surface.polygons) if rendered else None))
   except ValueError:
     bpy.data.meshes.remove(mesh)
     raise
-  return mesh, report, records
+  return mesh, report, records, feet
 
 
 def describeBody(sceneObject, ground, report=None):
@@ -868,14 +1039,11 @@ def describeBody(sceneObject, ground, report=None):
   return description | ({"built": report} if report is not None else {})
 
 
-def settleSprays(sceneObject, definition, records, ground, report):
-  """Place the body's sprays as built and, after a pool or river changed, those at the foot of every fall that sprays it."""
+def settleSprays(sceneObject, records, feet, report):
+  """Place the body's sprays as built and those of the falls landing on it; the report names those falls."""
   placeSprays(sceneObject, records)
-  if definition["kind"] != "fall":
-    sprayedAgain = replaceFallFeet(ground)
-    if sprayedAgain:
-      report = report | {"fallFeetSprayedAgain": sprayedAgain}
-  return report
+  placeFallFeet(feet)
+  return report | ({"fallFeetSprayedAgain": sorted(feet)} if feet else {})
 
 
 def placeBody(name, definition, materialName, collection):
@@ -883,18 +1051,18 @@ def placeBody(name, definition, materialName, collection):
   material = requireLiquidMaterial(definition["kind"], materialName)
   definition = validatedDefinition(definition)
   ground = Ground()
-  mesh, report, records = buildBody(name, definition, ground)
+  mesh, report, records, feet = buildBody(name, definition, ground)
   mesh.materials.append(material)
   sceneObject = bpy.data.objects.new(name, mesh)
   sceneObject[bridgeMeshAccess.waterProperty] = json.dumps(definition)
   bridgeObjects.targetCollection(collection or waterCollectionName).objects.link(sceneObject)
   bpy.context.view_layer.update()
-  report = settleSprays(sceneObject, definition, records, ground, report)
-  return describeBody(sceneObject, ground, report)
+  return describeBody(sceneObject, ground, settleSprays(sceneObject, records, feet, report))
 
 
-def installBody(sceneObject, definition, mesh, material, ground, report, records):
-  """Put a body's newly built mesh in place of its old one, with what it was made from, and its sprays where they now stand."""
+def installBody(sceneObject, definition, mesh, material, ground, report, records, feet):
+  """Put a body's newly built mesh in place of its old one, with what it was made from, and its sprays and those of the falls landing
+  on it where they now stand."""
   mesh.materials.append(material)
   oldMesh = sceneObject.data
   sceneObject.matrix_world = mathutils.Matrix.Identity(4)
@@ -903,16 +1071,57 @@ def installBody(sceneObject, definition, mesh, material, ground, report, records
   mesh.name = sceneObject.name
   sceneObject[bridgeMeshAccess.waterProperty] = json.dumps(definition)
   bpy.context.view_layer.update()
-  report = settleSprays(sceneObject, definition, records, ground, report)
-  return describeBody(sceneObject, ground, report)
+  return describeBody(sceneObject, ground, settleSprays(sceneObject, records, feet, report))
 
 
 def rebuildBody(sceneObject, definition, materialName):
   material = sceneObject.material_slots[0].material if materialName is None else requireLiquidMaterial(definition["kind"], materialName)
   definition = validatedDefinition(definition)
   ground = Ground()
-  mesh, report, records = buildBody(sceneObject.name, definition, ground)
-  return installBody(sceneObject, definition, mesh, material, ground, report, records)
+  mesh, report, records, feet = buildBody(sceneObject.name, definition, ground, sceneObject, not sceneObject.hide_render)
+  return installBody(sceneObject, definition, mesh, material, ground, report, records, feet)
+
+
+def shiftedDefinition(definition, offset):
+  """A body's definition moved by offset [x, y, z]: its seed, level, outline, path, lip, bottom, strokes, and spray points."""
+  dx, dy, dz = offset
+
+  def plan(point):
+    return [point[0] + dx, point[1] + dy]
+
+  def area(stroke):
+    shape = stroke["area"]
+    moved = {"circle": shape["circle"] | {"center": plan(shape["circle"]["center"])}} if "circle" in shape else {"polygon": [plan(point) for point in shape["polygon"]]}
+    return stroke | {"area": moved}
+
+  kind = definition["kind"]
+  if kind == "pool":
+    moved = {"seed": plan(definition["seed"]), "level": definition["level"] + dz, "within": None if definition["within"] is None else [plan(point) for point in definition["within"]]}
+  elif kind == "river":
+    moved = {"path": [[x + dx, y + dy, level + dz] for x, y, level in definition["path"]]}
+  else:
+    moved = {"lip": [[x + dx, y + dy, z + dz] for x, y, z in definition["lip"]], "bottom": definition["bottom"] + dz}
+  if kind != "fall":
+    moved["strokes"] = [area(stroke) for stroke in definition["strokes"]]
+  moved["sprays"] = [spray | {"at": {"points": [plan(point) for point in spray["at"]["points"]]}} if isinstance(spray["at"], dict) else spray for spray in definition["sprays"]]
+  return definition | moved
+
+
+def moveBody(sceneObject, offset):
+  """Move a water body by moving what it is made from and building it again against the ground there, its sprays with it."""
+  return rebuildBody(sceneObject, shiftedDefinition(readDefinition(sceneObject), offset), None)
+
+
+def duplicateBody(source, offset):
+  """A copy of a water body built from its definition moved by offset against the ground there, with its sprays, named as Blender names
+  a copy; its name."""
+  stem = re.sub(r"\.\d{3}$", "", source.name)
+  number = 1
+  while bpy.data.objects.get(f"{stem}.{number:03d}") is not None:
+    number += 1
+  name = f"{stem}.{number:03d}"
+  placeBody(name, shiftedDefinition(readDefinition(source), offset), source.material_slots[0].material.name, source.users_collection[0].name)
+  return name
 
 
 def floodWater(name, seed, level, within, spacing, worldUnitsPerRepeat, material, collection):
@@ -1022,9 +1231,9 @@ def shapeWaterExtent(name, mode, area):
     raise ValueError(f"mode is one of {list(strokeModes)}, got '{mode}'")
   definition = validatedDefinition(definition | {"strokes": definition["strokes"] + [{"mode": mode, "area": requireArea(area)}]})
   ground = Ground()
-  mesh, report, records = buildBody(name, definition, ground)
+  mesh, report, records, feet = buildBody(name, definition, ground, sceneObject, not sceneObject.hide_render)
   changed = meshShape(mesh, mathutils.Matrix.Identity(4)) != meshShape(sceneObject.data, sceneObject.matrix_world)
-  description = installBody(sceneObject, definition, mesh, sceneObject.material_slots[0].material, ground, report, records)
+  description = installBody(sceneObject, definition, mesh, sceneObject.material_slots[0].material, ground, report, records, feet)
   if changed:
     return description | {"strokeChanged": True}
   return description | {"strokeChanged": False, "whyUnchanged": unchangedStrokeReason(definition, mode, area, ground)}

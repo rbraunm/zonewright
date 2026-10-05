@@ -20,6 +20,7 @@ import bridgeMeshAccess
 import bridgeSurfacing
 import bridgeSwim
 import bridgeViews
+import bridgeWater
 from bridgeState import state
 from playerScale import walkableNormalZ
 
@@ -70,6 +71,10 @@ def isZonewrightMaterial(material):
 
 def isBlockout(material):
   return isZonewrightMaterial(material) and bool(material.get(bridgeSurfacing.blockoutPropertyName))
+
+
+def isFallSheet(sceneObject):
+  return bridgeMeshAccess.waterProperty in sceneObject and bridgeWater.readDefinition(sceneObject)["kind"] == "fall"
 
 
 def isGround(material):
@@ -364,6 +369,9 @@ def surveyFaces(shipped):
     repeat, elongation, textureArea = textureScales(data, entry["corners"], texels)
     triangleArea = numpy.linalg.norm(entry["crosses"], axis=1) / 2
     measured = (triangleArea > degenerateArea) & (textureArea > zeroTextureArea) & numpy.array([pixels[slot] is not None for slot in range(len(pixels))])[slots]
+    # A fall is mapped as the client maps its falls, its texture spanning the lip once and repeating down the drop (bridgeWater.fallMesh),
+    # however long a texel lies that way; it is neither measured as stretched nor counted in its material's usual repeat.
+    measured &= not isFallSheet(entry["part"])
     entry["scales"] = (repeat, elongation, textureArea, triangleArea, measured)
     for slot in numpy.unique(slots[measured]):
       pick = measured & (slots == slot)

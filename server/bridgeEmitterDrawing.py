@@ -16,6 +16,7 @@ import emitterParticles
 particleColorAttribute = "eqParticleColor"
 materialPrefix = "zonewrightParticles"
 originScale = 1e-3
+particleOriginBehind = 1e5
 notDrawnNames = 5
 # The client draws no particle deeper in the view than this, less its definition's depth bias (0x100721e0 caps the particle far clip at
 # 0x1013680c's 500; 0x10074987 skips particles past it).
@@ -128,9 +129,10 @@ def emitterMesh(preview, label, particles, mode, camera, material, emitterPositi
   forward = camera["forward"]
   ordered = sorted(particles, key=lambda particle: -forward.dot(mathutils.Vector(particle["center"]) - camera["position"]))
   # The client draws its particles after the whole world, blended surfaces too (its frame, 0x10097420, draws the scene at 0x1008b470 and
-  # the particles at 0x10072110). Blender orders blended objects by their origins, so each emitter's mesh keeps its origin just off the
-  # camera, a farther emitter's farther off.
-  origin = camera["position"] + (mathutils.Vector(emitterPosition) - camera["position"]) * originScale
+  # the particles at 0x10072110). Blender draws blended objects by their origins' depth in the view, farthest first and those behind the
+  # camera last, and a water body's origin is the world's, so each emitter's mesh keeps its origin far behind the camera, behind any
+  # zone's origin, a farther emitter's a little less far.
+  origin = camera["position"] - camera["forward"] * particleOriginBehind + (mathutils.Vector(emitterPosition) - camera["position"]) * originScale
   points, uvs, colors = [], [], []
   for particle in ordered:
     points.extend(quadCorners(particle, mode, camera))

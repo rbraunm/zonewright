@@ -268,6 +268,8 @@ def surfaceOutput(material, baseColor, alpha, alphaMode, lit, threshold, normal=
     links.new(tree.nodes.new("ShaderNodeBsdfTransparent").outputs["BSDF"], mix.inputs[1])
     links.new(emission.outputs["Emission"], mix.inputs[2])
     surface = mix.outputs["Shader"]
-    material.surface_render_method = "DITHERED"
+    # A blended surface is drawn over what lies behind it by its alpha, as the client's source-alpha blend draws it, not dithered, whose
+    # grain at the preview's few samples speckles a fall with the rock behind it; a cutout is all or nothing either way.
+    material.surface_render_method = "BLENDED" if alphaMode == "blended" else "DITHERED"
   output = next(node for node in tree.nodes if node.type == "OUTPUT_MATERIAL")
   links.new(surface, output.inputs["Surface"])

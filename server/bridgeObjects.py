@@ -16,6 +16,7 @@ import bridgeGrading
 import bridgeMeshAccess
 import bridgePasses
 import bridgeShaping
+import bridgeWater
 
 roundShapes = ("cylinder", "cone", "sphere")
 eulerModes = ("XYZ", "XZY", "YXZ", "YZX", "ZXY", "ZYX")
@@ -302,7 +303,14 @@ def transformObjects(names, translate, rotateDegrees, scale, location, rotationD
   if all(value is None for value in (translate, rotateDegrees, scale, location, rotationDegrees)):
     raise ValueError("Nothing to change: pass at least one of translate, rotateDegrees, scale, location, rotationDegrees")
   sceneObjects = [bridgeMeshAccess.requireObject(name) for name in names]
-  for sceneObject in sceneObjects:
+  bodies = [sceneObject for sceneObject in sceneObjects if bridgeMeshAccess.waterProperty in sceneObject]
+  if bodies and any(value is not None for value in (rotateDegrees, scale, location, rotationDegrees)):
+    raise ValueError(
+      f"{[body.name for body in bodies]} are water bodies, built from what they are made from: translate moves one, built again where it"
+      " lands; turn or reshape one with editWater (its lip, path, seed, or level)")
+  for body in bodies:
+    bridgeWater.moveBody(body, translate)
+  for sceneObject in [sceneObject for sceneObject in sceneObjects if sceneObject not in bodies]:
     if location is not None:
       sceneObject.location = location
     if translate is not None:
@@ -321,11 +329,16 @@ def transformObjects(names, translate, rotateDegrees, scale, location, rotationD
 
 
 def duplicateObjects(names, offset, linkData):
-  """Copy objects with everything parented under them, once each: an object named under another named one comes with that one."""
+  """Copy objects with everything parented under them, once each: an object named under another named one comes with that one. A water
+  body's copy is built again from what it is made from, moved by the offset, against the ground there, its sprays with it."""
   sources = [bridgeMeshAccess.requireObject(name) for name in names]
   roots = [source for source in sources if not any(ancestor in sources for ancestor in ancestorsOf(source))]
-  copies = {}
-  for root in roots:
+  bodies = [root for root in roots if bridgeMeshAccess.waterProperty in root]
+  for body in bodies:
+    if body.children:
+      raise ValueError(f"Water body '{body.name}' has {[child.name for child in body.children]} parented under it; a copy is built from the body alone, so unparent them first")
+  copies = {body: bpy.data.objects[bridgeWater.duplicateBody(body, offset)] for body in bodies}
+  for root in [root for root in roots if root not in bodies]:
     carried = [root] + list(root.children_recursive)
     for source in carried:
       duplicate = source.copy()
@@ -390,8 +403,10 @@ def bodySprays(names):
 
 
 def deleteObjects(names):
-  """Delete objects, and with a water body the emitters its sprays placed."""
+  """Delete objects, a water body with the emitters its sprays placed; the feet of the falls landing in a deleted pool or river are
+  placed again on what lies under them then, refused before anything is deleted where one cannot stand."""
   sceneObjects = [bridgeMeshAccess.requireObject(name) for name in names]
+  feet = bridgeWater.fallFeetWithout(sceneObjects)
   sprays = [spray for spray in bodySprays({sceneObject.name for sceneObject in sceneObjects if bridgeMeshAccess.waterProperty in sceneObject}) if spray.name not in names]
   removedSprays = sorted(spray.name for spray in sprays)
   removedData = []
@@ -401,7 +416,8 @@ def deleteObjects(names):
     if isinstance(data, bpy.types.Mesh) and data.users == 0:
       removedData.append(data.name)
       bpy.data.meshes.remove(data)
-  return {"deleted": names, "removedMeshes": removedData, "removedSprays": removedSprays}
+  bridgeWater.placeFallFeet(feet)
+  return {"deleted": names, "removedMeshes": removedData, "removedSprays": removedSprays} | ({"fallFeetSprayedAgain": sorted(feet)} if feet else {})
 
 
 def organize(renames, parents, collections):
@@ -410,9 +426,9 @@ def organize(renames, parents, collections):
   for oldName, newName in (renames or {}).items():
     sceneObject = bridgeMeshAccess.requireObject(oldName)
     requireNewName(newName)
-    for spray in bodySprays({oldName}) if bridgeMeshAccess.waterProperty in sceneObject else []:
-      spray[bridgeMeshAccess.sprayProperty] = json.dumps(json.loads(spray[bridgeMeshAccess.sprayProperty]) | {"body": newName})
+    sprayRenames = bridgeWater.sprayRenames(oldName, newName) if bridgeMeshAccess.waterProperty in sceneObject else []
     sceneObject.name = newName
+    bridgeWater.renameSprays(sprayRenames, newName)
     nameOwnMesh(sceneObject)
   bpy.context.view_layer.update()
   for childName, parentName in (parents or {}).items():

@@ -646,10 +646,32 @@ async def newFile(context: Context, discardUnsavedChanges: bool = False):
   return await callBridge(context, "newFile", {"discardUnsavedChanges": discardUnsavedChanges})
 
 
+async def openWorkFile(context, path, discardUnsavedChanges):
+  """Open a .blend and draw its water's environments: each water material's lookup image, which is not part of the work file, made
+  again under this machine's tooling root from the material's cube map where it is missing, and the material pointed at it. Water whose
+  cube map file is missing mirrors nothing and is listed (environmentMapsMissing)."""
+  opened = await callBridge(context, "openFile", {"path": path, "discardUnsavedChanges": discardUnsavedChanges})
+  lookups, missing = {}, []
+  for entry in (await callBridge(context, "environmentLookups", {}))["lookups"]:
+    if not os.path.isfile(entry["cubeMap"]):
+      missing.append({"material": entry["material"], "cubeMap": entry["cubeMap"]})
+      continue
+    present = os.path.isfile(entry["lookup"])
+    expected = environmentLookupPath(entry["cubeMap"])
+    if not (present and os.path.normcase(entry["lookup"]) == os.path.normcase(os.path.normpath(expected))):
+      lookups[entry["material"]] = expected
+  if lookups:
+    await callBridge(context, "restoreEnvironmentLookups", {"lookups": lookups})
+    opened = (await callBridge(context, "getStatus", {})) | {"environmentLookupsMade": sorted(lookups)}
+  return opened | ({"environmentMapsMissing": missing} if missing else {})
+
+
 @guardedTool()
 async def openFile(context: Context, path: str, discardUnsavedChanges: bool = False):
-  """Open a .blend by absolute path. Refuses when the open file has unsaved changes unless they are explicitly discarded."""
-  return await callBridge(context, "openFile", {"path": path, "discardUnsavedChanges": discardUnsavedChanges})
+  """Open a .blend by absolute path. Refuses when the open file has unsaved changes unless they are explicitly discarded. A water
+  material's environment lookup, kept under the tooling root rather than in the work file, is made again from its cube map when missing
+  (environmentLookupsMade); a cube map whose file is missing is listed (environmentMapsMissing), and that water mirrors nothing."""
+  return await openWorkFile(context, path, discardUnsavedChanges)
 
 
 @guardedTool()
@@ -705,7 +727,7 @@ async def restoreCheckpoint(context: Context, name: str, discardUnsavedChanges: 
   if os.path.isfile(workFile):
     beforeRestore = await anyio.to_thread.run_sync(callReportingFailures, checkpoints.saveCheckpoint, toolingRoot, workFile, f"before restore {stamp}")
   await anyio.to_thread.run_sync(callReportingFailures, checkpoints.restoreOver, checkpointPath, workFile)
-  reopened = await callBridge(context, "openFile", {"path": workFile, "discardUnsavedChanges": True})
+  reopened = await openWorkFile(context, workFile, True)
   return reopened | {"restored": name, "beforeRestore": beforeRestore["name"] if beforeRestore is not None else None}
 
 
@@ -1422,14 +1444,16 @@ async def transformObjects(
   context: Context, names: list[str], translate: list[float] | None = None, rotateDegrees: list[float] | None = None, scale: list[float] | None = None,
   location: list[float] | None = None, rotationDegrees: list[float] | None = None,
 ):
-  """Move, rotate, or scale objects: relative (translate, rotateDegrees about world axes, scale factors) or absolute (location, rotationDegrees); not both forms of one channel."""
+  """Move, rotate, or scale objects: relative (translate, rotateDegrees about world axes, scale factors) or absolute (location, rotationDegrees); not both forms of one channel. A water body, built from what it is made from, only translates: what it is made from moves and it is built again against the ground there, its sprays with it (and the feet of falls landing in a moved pool or river); editWater turns or reshapes one."""
   return await callBridge(context, "transformObjects", {"names": names, "translate": translate, "rotateDegrees": rotateDegrees, "scale": scale, "location": location, "rotationDegrees": rotationDegrees})
 
 
 @guardedTool()
 async def duplicateObjects(context: Context, names: list[str], offset: list[float], linkData: bool = False):
   """Copy objects, with everything parented under them, offset from the originals; linkData shares the meshes instead of copying them
-  (a copied mesh takes its copy's name). Returns original to copy names, children included."""
+  (a copied mesh takes its copy's name). A water body's copy is built anew from what the body is made from moved by the offset (seed
+  and level, path, lip and bottom, outlines, strokes, spray points), against the ground there, with its sprays. Returns original to copy
+  names, children included."""
   return await callBridge(context, "duplicateObjects", {"names": names, "offset": offset, "linkData": linkData})
 
 
@@ -1442,14 +1466,16 @@ async def joinObjects(context: Context, names: list[str], into: str):
 
 @guardedTool()
 async def deleteObjects(context: Context, names: list[str]):
-  """Delete objects; meshes left with no users are removed too, and a water body's spray emitters (sprayWater) go with it."""
+  """Delete objects; meshes left with no users are removed too, and a water body's spray emitters (sprayWater) go with it. The feet of
+  the falls that land in a deleted pool or river are sprayed again on what then lies under them (fallFeetSprayedAgain); the delete is
+  refused, before anything goes, where one cannot stand there (ripple rings left on dry ground: take them off the fall first)."""
   return await callBridge(context, "deleteObjects", {"names": names})
 
 
 @guardedTool()
 async def organize(context: Context, renames: dict[str, str] | None = None, parents: dict[str, str | None] | None = None, collections: dict[str, str] | None = None):
   """Rename objects (old to new, applied first; a mesh only that object uses takes the new name too, as zone export names models by
-  their mesh), then set parents (child to parent, or null to clear; world transform kept) and move objects into collections (created
+  their mesh, and a water body's spray emitters theirs, named for it), then set parents (child to parent, or null to clear; world transform kept) and move objects into collections (created
   if missing), using the new names."""
   return await callBridge(context, "organize", {"renames": renames, "parents": parents, "collections": collections})
 
@@ -2576,9 +2602,13 @@ liquidDefaults = {
   # The slides of wtr_waterfall_tile, the fall the most client zones use (Highpass Hold, Steppes, Silyssar, Illsalin, Underquarry, ...):
   # both layers down a fall whose v runs down, as the client's and pourWaterfall's falls run it.
   "waterfall": {"slides": [-0.12, -0.32, 0.0, -0.5]},
-  # The slides the client's lava materials use most.
-  "lava": {"slides": [0.01, 0.0, 0.0, 0.03]},
+  # The slides of Brell's Rest's lava_lake02_c, which more of the client's lava-textured materials carry than any other (7 in 6 archives:
+  # Brell's Rest, Shining City, Underquarry, Convorteum, Breeding Grounds, Brell's Temple): two layers creeping apart.
+  "lava": {"slides": [-0.01, -0.01, 0.01, -0.01]},
 }
+slideNames = ("first x", "first y", "second x", "second y")
+# The client's effects take their clock modulo this many seconds (RegionWater.fxo, RegionWaterFall.fxo, RegionLava.fxo preshaders).
+effectWrapSeconds = 100
 
 
 def flowSlides(liquid, flow):
@@ -2589,6 +2619,25 @@ def flowSlides(liquid, flow):
     raise ToolError(f"flow is [first layer, second layer] in texture repeats a second along the body, got {flow!r}")
   first, second = flow
   return [0.0, first, 0.0, -2 * second] if liquid == "water" else [0.0, -first, 0.0, -second]
+
+
+def wrapJumps(liquid, slides, flow):
+  """Where a layer's pattern jumps when the effect clock wraps: each slide whose wrap time is not a whole number of repeats, with how far
+  it jumps (in repeats, at most half) and the nearest values either side that do not, given as the slide or, when `flow` set the slides,
+  as the flow layer and its value."""
+  jumps = []
+  for index, slide in enumerate(slides):
+    travelled = effectWrapSeconds * slide
+    if abs(travelled - round(travelled)) <= 1e-9:
+      continue
+    seamless = [math.floor(travelled) / effectWrapSeconds, math.ceil(travelled) / effectWrapSeconds]
+    jump = {"jumpRepeats": round(abs(travelled - round(travelled)), 4)}
+    if flow is None:
+      jumps.append({"slide": slideNames[index], "value": slide} | jump | {"seamless": [round(value, 4) for value in seamless]})
+    else:
+      factor = {"water": (1.0, -2.0)}.get(liquid, (-1.0, -1.0))[index // 2]
+      jumps.append({"flow": ("first", "second")[index // 2], "value": flow[index // 2]} | jump | {"seamless": sorted(round(value / factor, 4) for value in seamless)})
+  return jumps
 
 
 def environmentLookupPath(environmentTexture):
@@ -2621,20 +2670,25 @@ async def createLiquidMaterial(
   [first, second]: how many texture repeats a second each layer moves along the body that takes it (a river downstream, a fall down,
   as runWater and pourWaterfall run their v), from which the slides are set as the client's effects take them (water: [0, first, 0,
   -2 * second]; waterfall and lava: [0, -first, 0, -second]). Water's own two layers moving against each other is still water, as most
-  of the client's is; flow moves both one way, a river. The client's effects take time modulo 100 seconds, so a slide whose 100 times
-  is not a whole number of repeats jumps then and is refused. A material's slides are shared by every body that takes it; getWater
-  says which way and how fast each body flows. Values left out take the client's own (water: its WaterSwap.ini new water and still
-  slides; waterfall: the slides of the client's most used fall texture, flowing down; lava: what most of its lava uses). Colors are
-  three numbers from 0 to 1. A texture is an absolute path or a catalog texture id (texture/<name>@<hash>); a water's
-  environmentTexture is a DDS cube map, as the client loads only those (a 2D texture there would reflect nothing in game). The preview
-  draws it as the client's effects draw it on a placed object (which a water body exports as), at effect time 0 unless renderView sets
-  liquidTime: water takes no color from its diffuse (the client's older effects do) but runs from waterColor1 seen from above to
-  waterColor2 at grazing angles, lit like any surface, rippled by its normal map at the texture coordinates and twice them (so the
-  normal map repeats as often as the surface's texture coordinates do), and mirrors its environment cube map by fresnel, looked up
-  along the view reflected about the ripples; a waterfall is its diffuse's color, lit, as see-through as its alpha, each layer scrolled
-  by its own slide; lava's diffuse alpha is how much crust shows (1 crust, 0 glow): the crust is the diffuse lit, and the rest glows
-  with secondDiffuseTexture's color, unlit, so it glows in the dark and at night (paint the alpha to place the glow). Pools,
-  rivers, and falls (floodWater, runWater, pourWaterfall) take these materials."""
+  of the client's is; flow moves both one way, a river. The client's effects take time modulo 100 seconds, so a layer whose slide
+  times 100 is not a whole number of repeats jumps then, as the client's slowest lava creeps do (Ashengate's 0.005); the result's
+  jumpsAtWrap lists each such slide (or flow layer) with how far it jumps and the nearest values either side that do not. A material's
+  slides are shared by every body that takes it; getWater says which way and how fast each body flows. Values left out take the
+  client's own (water: its WaterSwap.ini new water and still slides; waterfall: the slides of the client's most used fall texture,
+  flowing down; lava: Brell's Rest's lava_lake02_c, the slides most of its lava-textured materials carry). Colors are three numbers
+  from 0 to 1; fresnelBias is 0 to 1, fresnelPower above 0, and reflectionAmount 0 or more (the client's own run 0 to 1, 1 to 10, and
+  0 to 2). A texture is an absolute path or a catalog texture id (texture/<name>@<hash>); a water's environmentTexture is a DDS cube
+  map, as the client loads only those (a 2D texture there would reflect nothing in game); the preview mirrors it from a lookup image
+  kept under the tooling root, made again from the cube map whenever a file opens without it (another machine, a cleared cache). The
+  preview draws it as the client's effects draw it on a placed object (which a water body exports as), at effect time 0 unless
+  renderView sets liquidTime: water takes no color from its diffuse (the client's older effects do) but runs from waterColor1 seen from
+  above to waterColor2 at grazing angles, rippled by its normal map at the texture coordinates and twice them (so the normal map
+  repeats as often as the surface's texture coordinates do), lit by the surface's own normal as the client's vertex light is, and
+  mirrors its environment cube map by fresnel, looked up along the view reflected about the ripples; a waterfall is its diffuse's
+  color, lit, blended over what lies behind by its alpha, each layer scrolled by its own slide; lava's diffuse alpha is how much crust
+  shows (1 crust, 0 glow): the crust is the diffuse lit, and the rest glows with secondDiffuseTexture's color, unlit, so it glows in
+  the dark and at night (paint the alpha to place the glow). Pools, rivers, and falls (floodWater, runWater, pourWaterfall) take these
+  materials."""
   if liquid not in liquidDefaults:
     raise ToolError(f"liquid is one of {list(liquidDefaults)}, got '{liquid}'")
   if flow is not None and slides is not None:
@@ -2650,11 +2704,12 @@ async def createLiquidMaterial(
     raise ToolError(f"A {liquid} material does not take {stray}; it takes {list(liquidDefaults[liquid])}")
   values = liquidDefaults[liquid] | {key: value for key, value in given.items() if value is not None}
   environmentPath = catalogTexturePath(environmentTexture)
-  return await callBridge(context, "createLiquidMaterial", {
+  made = await callBridge(context, "createLiquidMaterial", {
     "name": name, "liquid": liquid, "diffuseTexture": catalogTexturePath(diffuseTexture), "normalTexture": catalogTexturePath(normalTexture),
     "environmentTexture": environmentPath, "environmentLookup": environmentLookupPath(environmentPath) if environmentPath is not None else None,
     "secondDiffuseTexture": catalogTexturePath(secondDiffuseTexture), "values": values,
   })
+  return made | {"jumpsAtWrap": wrapJumps(liquid, values["slides"], flow)}
 
 
 waterBodyHelp = (
@@ -2671,8 +2726,10 @@ waterBodyHelp = (
 
 @guardedTool(description=(
   "Flood a pool: from `seed` [x, y] (where the water must stand over ground) out over every grid point with ground below `level`,"
-  " point to neighbouring point, within the `within` outline [[x, y], ...] when given; a flood that spreads without filling (into open"
-  " ground) is refused, to be bounded with `within`, a lower level, or shapeWaterExtent. Meshed every `spacing` units, its flat cells"
+  " point to neighbouring point, within the `within` outline [[x, y], ...] when given. A flood is not stopped by its size: one that"
+  " spreads over open ground to the end of the ground (a level over a plateau, a gap in a rim) is built, and its built.reachesGroundEnd"
+  " says where it ran off (groundEndPoints how often); bound it with `within`, a lower level, or shapeWaterExtent unless it is meant to"
+  " reach the zone's edge (a sea). Only a flood over 250,000 grid points is refused. Meshed every `spacing` units, its flat cells"
   " merged, the material repeating every `worldUnitsPerRepeat` units. A starting point: shape it with editWater (level, seed, within)"
   " and shapeWaterExtent, and its bed with carveWaterBed." + waterBodyHelp
 ))
@@ -2688,14 +2745,18 @@ async def floodWater(
 
 @guardedTool(description=(
   "Run a river along `path` [[x, y, level], ...], downstream in order, its surface at each point's level and falling evenly between"
-  " them (a drop is a fall: end one river at the lip, pourWaterfall, start the next below), spreading over the ground below its level"
-  " within `reach` of the path. Mapped along the path as the client's rivers are (Brell's Rest, Beasts' Domain): u across, rightward"
-  " looking downstream, and the client's v downstream, a repeat every `worldUnitsPerRepeat` both ways, so a material's flow"
-  " (createLiquidMaterial) runs it downstream; getWater says which way it flows. Its material is water (a surface whose two layers"
-  " move one way downstream, as Beasts' Domain's), waterfall (a see-through scrolling ribbon laid over a rock bed, as Crescent Reach's"
-  " and Brell's Rest's are; swum as water), or lava. A path may start or end at the edge of the ground, as a river entering or leaving"
-  " the zone. Carve its channel first (sculptAlongPath) where the ground has none. A starting point: adjust with editWater (path,"
-  " reach) and shapeWaterExtent; sprayWater adds white water along its rapids and where it joins a pool." + waterBodyHelp
+  " them (a drop is a fall: end one river at the lip, pourWaterfall, start the next below); a path whose level rises along it is"
+  " refused (one given from the mouth runs backwards: reverse it). It spreads over the ground below its level within `reach` of the"
+  " path. Mapped along the path as the client's rivers are (Brell's Rest, Beasts' Domain): u across, rightward looking downstream, and"
+  " the client's v downstream, a repeat every `worldUnitsPerRepeat` both ways, so a material's flow (createLiquidMaterial) runs it"
+  " downstream; getWater says which way it flows. The mapping follows the path with each bend rounded to three times the reach, so the"
+  " texture turns with the water instead of folding; where the legs either side of a bend leave less room than the reach (a hairpin),"
+  " built.tightBends names the bend, whose inside still squeezes: add path points to open the bend, or narrow the reach. Its material"
+  " is water (a surface whose two layers move one way downstream, as Beasts' Domain's), waterfall (a see-through scrolling ribbon laid"
+  " over a rock bed, as Crescent Reach's and Brell's Rest's are; swum as water), or lava. A path may start or end at the edge of the"
+  " ground, as a river entering or leaving the zone. Carve its channel first (sculptAlongPath) where the ground has none. A starting"
+  " point: adjust with editWater (path, reach) and shapeWaterExtent; sprayWater adds white water at points on its rapids and where it"
+  " joins a pool." + waterBodyHelp
 ))
 async def runWater(
   context: Context, name: str, path: list[list[float]], reach: float, material: str, spacing: float = 8.0, worldUnitsPerRepeat: float = 64.0,
@@ -2757,8 +2818,7 @@ def resolvedSpray(spray):
     if index is not None and (not isinstance(index, int) or not 1 <= index < len(definitions)):
       raise ToolError(f"A spray's {key} is a client environment emitter definition, 1 to {len(definitions) - 1}, got {index!r}")
   spray = {"rings": None, "spacing": None, "count": None, "above": 1.0} | spray
-  isRow = spray["at"] in ("foot", "lip") or (isinstance(spray["at"], dict) and "along" in spray["at"])
-  if isRow and spray["spacing"] is None and spray["count"] is None:
+  if spray["at"] in ("foot", "lip") and spray["spacing"] is None and spray["count"] is None:
     definition = definitions[spray["definition"]]
     if definition["emitterScaled"] or definition["shapeRadius"] <= 0:
       raise ToolError(f"Definition {definition['index']} '{definition['name']}' starts its particles at its emitter, so no width sets a row's spacing; give spacing or count")
@@ -2770,19 +2830,24 @@ def resolvedSpray(spray):
   "White water on one body, as the client's zones make it: no foam surface (no client EQG zone has one) but particle emitters where"
   " the water strikes, kept with the body and placed again whenever it is rebuilt. `at` is \"foot\" (a fall's foot: where its sheet"
   " strikes the water below, a pool's or a client zone's, or else the ground, along the whole width), \"lip\" (along a fall's lip,"
-  " where the water goes over), {\"points\": [[x, y], ...]} (on a pool's or river's own surface: rocks in a river, steps, where a"
-  " river joins a pool), or {\"along\": [[x, y], [x, y]]} (a river's rapids: along its path from the spot nearest the first point to"
-  " the spot nearest the second). `definition` is the client environment emitter definition (findAssets kind emitter, and the"
-  " catalog's measured use, say which zones use each where); `rings` an optional second one laid at the same places 0.5 over the"
-  " water, as Crescent Reach lays its ripple rings (not at a lip). A row has `count` emitters, or one per `spacing` of its width (at"
-  " least one), each in the middle of its share; without either, one per disc width of the definition, twice the radius it starts"
-  " particles within. Each emitter stands `above` over what it strikes (the client's stand 0 to 5 over their water). From the client's"
-  " zones: a fall's foot 133 (crwaterfallbottom, Crescent Reach, Beasts' Domain) or 99 (geyserbottom, Highpass Hold) with rings 142"
-  " (waterwheelsplashbig); a lip 101 (waterfall_top); a river's rapids small splashes such as 277 (Brell's Rest) with their spacing;"
-  " where a river meets a pool 141 (waterwheelsplash). The emitters export as any emitter does, into <zone>_EnvironmentEmitters.txt;"
-  " editWater's sprays changes or removes them ([] takes them all off), and deleting the body takes them with it. Rebuilding a pool"
-  " or river places the foot sprays of every fall again, as where they strike may have moved. Wet rocks at a fall's foot, which the"
-  " client's falls use to hide where the sheet meets the water, are placed by hand (placeObject)."
+  " where the water goes over), or {\"points\": [[x, y], ...]} (on a pool's or river's own surface, one emitter at each point, laid"
+  " by hand: rocks in a river, steps, a river's rapids, where a river joins a pool). `definition` is the client environment emitter"
+  " definition (findAssets kind emitter, and the catalog's measured use, say which zones use each where); `rings` an optional second"
+  " one laid at the same places 0.5 over the water, as Crescent Reach lays its ripple rings, refused at a lip and where any of the"
+  " row's emitters strikes dry ground. A row at a foot or lip has `count` emitters, or one per `spacing` of its width (at least one),"
+  " each in the middle of its share; without either, one per disc width of the definition, twice the radius it starts particles"
+  " within. Each emitter stands `above` over what it strikes (the client's stand 0 to 5 over their water). From the client's zones: a"
+  " fall's foot 133 (crwaterfallbottom, Crescent Reach's within a unit of their pools) or 99 (geyserbottom, Highpass Hold) with rings"
+  " 142 (waterwheelsplashbig, Crescent Reach); along a lip where a river pours away, 133 in a"
+  " row (Beasts' Domain lays six 56 to 88 apart where its river leaves the zone over the edge); 101 (waterfall_top) only high on a tall"
+  " fall (Beasts' Domain's two on its 1000-unit fall, at 969 and 679), as its disc (radius 50, thrown 30 to 70 up) whites out the lip"
+  " of a short one; a river's rapids small splashes such as 277 at points scattered across and along the white water, never an even"
+  " row (Brell's Rest's 22 lie 18 to 59 apart and zigzag across its river); where a river meets a pool 141 (waterwheelsplash). The"
+  " emitters export as any emitter does, into <zone>_EnvironmentEmitters.txt; editWater's sprays changes or removes them ([] takes them"
+  " all off), and deleting the body takes them with it. Rebuilding or deleting the pool or river a fall lands in places that fall's"
+  " foot sprays again (fallFeetSprayedAgain), refusing the edit where they could not stand; other falls are left be. An emitter whose"
+  " strike did not move is kept as it is, so a hand nudge (transformObjects) or a hidden render lasts until the water under it moves."
+  " Wet rocks at a fall's foot, which the client's falls use to hide where the sheet meets the water, are placed by hand (placeObject)."
 ))
 async def sprayWater(
   context: Context, name: str, at: str | dict, definition: int, rings: int | None = None, spacing: float | None = None, count: int | None = None,

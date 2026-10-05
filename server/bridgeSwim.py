@@ -147,8 +147,10 @@ def cellBoxes(cells, spacing):
 
 
 def bodyFingerprint(body, cells):
-  """What a body's boxes were made from: its definition, its surface, and the bed under it."""
-  digest = hashlib.sha256(json.dumps(bridgeWater.readDefinition(body), sort_keys=True).encode())
+  """What a body's boxes were made from: its definition but its white water (sprays change nothing players swim in), its surface, and
+  the bed under it."""
+  definition = {key: value for key, value in bridgeWater.readDefinition(body).items() if key != "sprays"}
+  digest = hashlib.sha256(json.dumps(definition, sort_keys=True).encode())
   positions, _ = bridgeMeshAccess.readVertexArrays(body)
   digest.update(numpy.round(positions, 2).tobytes())
   digest.update(json.dumps(sorted([[cell[0], cell[1], round(level, 2), round(floor, 2)] for cell, (level, floor, _) in cells.items()])).encode())
