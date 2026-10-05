@@ -229,6 +229,30 @@ def testPointLightsLightWhatTheyReachAsTheClientDoes(stageBlenderServer, tmp_pat
 
 
 @pytest.mark.clientData("clientFiles")
+def testATextureDrawnBlendedAndAddedDrawsAgain(stageBlenderServer):
+  # Definitions 50 (added) and 204 (blended), both Guardian of the Gears' smoke, share pt_add_smoke.dds: one image, two materials.
+  definitionsPath = eqEmitterDefinitions.environmentDefinitionsPath(everquestClient)
+  definitions = eqEmitterDefinitions.parseDefinitions(definitionsPath.read_bytes(), definitionsPath.name)
+  assert [(definitions[index]["texture"].lower(), definitions[index]["additive"]) for index in (50, 204)] == [("pt_add_smoke.dds", 1), ("pt_add_smoke.dds", 0)]
+  view = {"eye": [0, -30, 3], "target": [0, 0, 3]}
+  emitters = [
+    {"name": "added", "position": [-3, 0, 0], "definition": 50, "lifespan": 4000000},
+    {"name": "blended", "position": [3, 0, 0], "definition": 204, "lifespan": 4000000},
+  ]
+
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    await session.expectSuccess("setZoneProperties", darkEnvironment)
+    await session.expectSuccess("placeEmitters", {"emitters": emitters})
+    _, first = await session.expectImage("renderView", {"view": view})
+    _, second = await session.expectImage("renderView", {"view": view})
+    return first, second
+
+  first, second = stageBlenderServer.session(steps)
+  assert first["emitters"]["emitters"] == second["emitters"]["emitters"] == 2 and first["emitters"]["notDrawn"] == []
+
+
+@pytest.mark.clientData("clientFiles")
 def testEmittersDrawTheirParticlesWhereTheyStand(stageBlenderServer, tmp_path):
   texturePath = writePNG(tmp_path / "stone.png", 8, 8, texture)
   view = {"eye": [0, -8, 3], "target": [0, 0, 3]}
