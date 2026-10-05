@@ -89,7 +89,8 @@ def dataImage(path):
 
 def terrainMaterial(folder, comboIndex):
   """A terrain tile's ecosystems as the client draws them (docs/clientRendering.md, EQ terrain), its passes summed: per ecosystem, its
-  color map times twice the detail textures weighed by its detail mask, times the vertex tint, weighed by the color map's coverage."""
+  color map times the detail textures weighed by its detail mask, times the vertex tint (doubled by the bump effects, tintScale),
+  weighed by the color map's coverage."""
   materialName = f"eq_{os.path.basename(folder)}_terrain{comboIndex}"
   material = bpy.data.materials.get(materialName)
   if material is not None and material.get("eqFolder") == folder:
@@ -126,7 +127,6 @@ def terrainMaterial(folder, comboIndex):
   tint = nodes.new("ShaderNodeAttribute")
   tint.attribute_type = "GEOMETRY"
   tint.attribute_name = bridgeClientLight.tintAttribute
-  doubledTint = vectorMath("SCALE", tint.outputs["Color"], 2.0)
   total = None
   for slot in combo:
     colorMap = texture(slot["colorMap"], atlas.outputs["UV"], "EXTEND")
@@ -137,7 +137,7 @@ def terrainMaterial(folder, comboIndex):
       repeated = vectorMath("SCALE", detail.outputs["UV"], float(layer["repeat"]))
       weighed = vectorMath("SCALE", texture(layer["texture"], repeated, "REPEAT").outputs["Color"], weights.outputs[channel])
       details = weighed if details is None else vectorMath("ADD", details, weighed)
-    passColor = vectorMath("MULTIPLY", vectorMath("MULTIPLY", colorMap.outputs["Color"], details), doubledTint)
+    passColor = vectorMath("MULTIPLY", vectorMath("MULTIPLY", colorMap.outputs["Color"], details), vectorMath("SCALE", tint.outputs["Color"], float(slot["tintScale"])))
     covered = vectorMath("SCALE", passColor, colorMap.outputs["Alpha"])
     total = covered if total is None else vectorMath("ADD", total, covered)
   bridgeClientLight.surfaceOutput(material, total, None, "opaque", True, alphaThreshold)

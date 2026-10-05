@@ -1,8 +1,10 @@
 """The textures the client builds for each terrain tile (docs/clientRendering.md, EQ terrain): for every ecosystem on the tile, a color
 map (the layers' cover maps weighed by height and slope, alpha its coverage of the tile) and a detail mask (the weight of each detail
 layer), computed as EQGraphicsDX9.dll does at 0x100eeed0, 0x100ee790, 0x100f4690, and 0x100ac770."""
+import functools
 import io
 import math
+from fractions import Fraction
 
 import numpy
 from PIL import Image
@@ -20,17 +22,31 @@ slopeTable = numpy.append(numpy.degrees(numpy.arccos(numpy.arange(1000, dtype=nu
 inverse255 = numpy.float32(1 / 255)
 inverse65535 = numpy.float32(1 / 65535)
 defaultMap = "default.bmp"
+# trunc(0.01 * t * t - 255) for each t as the FPU takes it: 0.01 as a double, slightly over a hundredth, and the product exact.
+blendThresholds = numpy.array([math.trunc(Fraction(0.01) * t * t - 255) for t in range(256)])
+
+
+def mipLevel(image, side, sourceName):
+  """A square map at the tile texture size, as the client reads it from the mip chain D3DX builds by box filtering (0x100a0410,
+  0x100a02d0)."""
+  height, width = image.shape[:2]
+  if height != width or width % side or width & (width - 1):
+    raise ValueError(f"{sourceName} is {width}x{height}; terrain maps are read as square powers of two of at least {side}")
+  factor = width // side
+  return numpy.rint(image.reshape(side, factor, side, factor, -1).mean(axis=(1, 3))).astype(numpy.uint8)
 
 
 def coverImage(ddsBytes, side, sourceName):
-  """A cover map at the tile texture size, as the client reads it from the mip chain D3DX builds by box filtering (the DXT5
-  recompression of each generated level is not reproduced)."""
-  image = numpy.asarray(Image.open(io.BytesIO(eqTextures.repairDDS(ddsBytes))).convert("RGB"), dtype=numpy.float64)
-  height, width = image.shape[:2]
-  if height != width or width % side or width & (width - 1):
-    raise ValueError(f"{sourceName} is {width}x{height}; cover maps are read as square powers of two of at least {side}")
-  factor = width // side
-  return numpy.rint(image.reshape(side, factor, side, factor, 3).mean(axis=(1, 3))).astype(numpy.uint8)
+  """A cover map at the tile texture size (the DXT5 recompression of each generated level is not reproduced)."""
+  return mipLevel(numpy.asarray(Image.open(io.BytesIO(eqTextures.repairDDS(ddsBytes))).convert("RGB"), dtype=numpy.float64), side, sourceName)
+
+
+def blendImage(bitmapBytes, side, sourceName):
+  """A blend map at the tile texture size: the client takes only 8-bit maps (0x100eda30), whose bytes are its blend values."""
+  image = Image.open(io.BytesIO(bitmapBytes))
+  if image.mode != "L":
+    raise ValueError(f"{sourceName} is a {image.mode} image; blend maps are 8-bit grayscale")
+  return mipLevel(numpy.asarray(image, dtype=numpy.float64)[..., None], side, sourceName)[..., 0]
 
 
 def vertexNormals(heights, neighbors, spacing):
@@ -84,27 +100,49 @@ def layerFactor(layer, heights, slopes):
   return numpy.where(inside, factor, 0.0)
 
 
-def layerWeights(layers, heights, slopes, sourceName):
-  """Each texture layer's weight per texel, 0-255: the last layer first, each later one taking its share of what earlier ones left,
-  and the first layer the rest."""
-  for layer in layers:
-    for key in ("blendMap", "layeringMap"):
-      if layer.get(key, defaultMap) != defaultMap:
-        raise ValueError(f"{sourceName}: layer {layer['name']} has {key} {layer[key]}, which is not read yet")
+@functools.cache
+def blendSlopes(softness):
+  """trunc(t * (100 - softness) * 0.001 + 1) for each t, the product of the client's single-precision factors exact (0x100ee879)."""
+  scale = Fraction(float(numpy.float32(float(100 - softness) * float(numpy.float32(0.001)))))
+  return numpy.array([math.trunc(scale * t + 1) for t in range(256)])
+
+
+def blendedFactor(factor, blend, softness):
+  """A layer's factor through its blend map (0x100eec0d): where the factor is strictly between 0.02 and 0.98, t = (1 - factor) * 255
+  truncated sets a threshold, and the blend value past it, times a slope that BLENDSOFTNESS flattens, becomes the factor; -1 where the
+  blend value falls short, which leaves the texel out."""
+  t = numpy.trunc((1 - factor) * 255).astype(numpy.int64) & 0xFF
+  value = (blend.astype(numpy.int64) - blendThresholds[t]) * blendSlopes(softness)[t]
+  blended = numpy.where(value < 0, -1.0, numpy.where(value > 255, 1.0, value * float(inverse255)))
+  return numpy.where((factor > 0.02) & (factor < 0.98), blended, factor)
+
+
+def layerWeights(layers, heights, slopes, blends):
+  """Each texture layer's weight per texel, 0-255 (0x100ee790): the last layer first, each later one taking its factor (through its
+  blend map, if any) of what earlier ones left, truncated, and the first layer the rest."""
   weights = [numpy.zeros(heights.shape, dtype=numpy.int64) for _ in layers]
   taken = numpy.zeros(heights.shape, dtype=numpy.int64)
   for index in range(min(len(layers), maximumLayers) - 1, 0, -1):
-    weights[index] = numpy.rint(layerFactor(layers[index], heights, slopes) * (255 - taken)).astype(numpy.int64)
-    taken += weights[index]
+    factor = layerFactor(layers[index], heights, slopes)
+    if blends[index] is not None:
+      # A layer without *BLENDSOFTNESS keeps the constructor's 0 (0x100edde0).
+      factor = blendedFactor(factor, blends[index], layers[index].get("blendSoftness", 0))
+    weights[index] = numpy.where(factor < 0, 0, numpy.trunc(numpy.maximum(factor, 0) * (255 - taken)).astype(numpy.int64) & 0xFF)
+    taken = (taken + weights[index]) & 0xFF
   weights[0] = 255 - taken
   return weights
 
 
 def colorMap(layers, weights, covers):
   """The color map's color (0x100eeed0): each layer's cover map times its weight, the first layer's written, the others added (bytes
-  wrapping), a weight below 3 adding nothing and one of 253 or more taking the cover map whole."""
+  wrapping), a weight below 3 adding nothing and one of 253 or more taking the cover map whole. A later layer whose cover map did not
+  load adds nothing; without the first layer's the client writes no color at all, leaving the texture as it was."""
   color = numpy.zeros((textureSide, textureSide, 3), dtype=numpy.int64)
   for index, (layer, weight) in enumerate(zip(layers, weights)):
+    if covers[layer["coverMap"]] is None:
+      if index == 0:
+        raise ValueError(f"Layer {layer['name']}'s cover map {layer['coverMap']} did not load; the client then leaves the tile's color map unwritten")
+      continue
     cover = covers[layer["coverMap"]].astype(numpy.int64)
     scaled = numpy.rint(cover * (weight.astype(numpy.float32) * inverse255)[..., None]).astype(numpy.int64)
     whole = (weight >= 253)[..., None]
@@ -167,8 +205,9 @@ def detailMask(weights, neighborWeights):
   return numpy.stack(channels, axis=-1).astype(numpy.uint8)
 
 
-def tileTextures(terrain, ecosystems, covers):
-  """For each tile, for each ecosystem on it in order: its color map and detail mask (RGBA, rows along y), keyed by tile origin."""
+def tileTextures(terrain, ecosystems, covers, blends):
+  """For each tile, for each ecosystem on it in order: its color map and detail mask (RGBA, rows along y), keyed by tile origin. Covers
+  and blends map each map name to its image at the texture size, None for one that did not load."""
   tilesByGrid = {(tile["longitude"], tile["latitude"]): tile for tile in terrain["tiles"]}
   spacing = terrain["header"]["unitsPerVertex"]
   vertexSide = terrain["header"]["quadsPerTile"] + 1
@@ -180,7 +219,10 @@ def tileTextures(terrain, ecosystems, covers):
     normals = vertexNormals(tile["heights"].astype(numpy.float64), [None if neighbor is None else neighbor["heights"].astype(numpy.float64) for neighbor in neighbors], spacing)
     heights = bilinear(tile["heights"].astype(numpy.float64), cell, fraction)
     slopes = slopeTable[numpy.floor(bilinear(normals[..., 2], cell, fraction) * 1000 + 0.5).astype(int)]
-    weights[key] = [layerWeights(ecosystems[layer["ecosystem"]], heights, slopes, layer["ecosystem"]) for layer in tile["layers"]]
+    weights[key] = [
+      layerWeights(ecosystems[layer["ecosystem"]], heights, slopes, [blends.get(textureLayer.get("blendMap", defaultMap)) for textureLayer in ecosystems[layer["ecosystem"]]])
+      for layer in tile["layers"]
+    ]
   textures = {}
   for key, tile in tilesByGrid.items():
     longitude, latitude = key

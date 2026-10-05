@@ -13,10 +13,10 @@ anywhere = {"minHeight": -10000.0, "maxHeight": 10000.0, "heightTolerance": 10.0
 def testLayerWeightsFallOffAcrossTheSlopeTolerance():
   layers = [anywhere | {"name": "grass", "minSlope": 0, "maxSlope": 90, "slopeTolerance": 1}, anywhere | {"name": "rock", "minSlope": 40, "maxSlope": 90, "slopeTolerance": 10}]
   slopes = numpy.array([[0.0, 30.0, 35.0, 40.0, 60.0]])
-  grass, rock = eqTerrainTextures.layerWeights(layers, numpy.zeros_like(slopes), slopes, "test")
-  # Rock is whole from 40 degrees, gone at 30, half at 35 (127.5 rounded to even); grass takes what rock leaves.
-  assert rock.tolist() == [[0, 0, 128, 255, 255]]
-  assert grass.tolist() == [[255, 255, 127, 0, 0]]
+  grass, rock = eqTerrainTextures.layerWeights(layers, numpy.zeros_like(slopes), slopes, [None, None])
+  # Rock is whole from 40 degrees, gone at 30, half at 35 (127.5, truncated); grass takes what rock leaves.
+  assert rock.tolist() == [[0, 0, 127, 255, 255]]
+  assert grass.tolist() == [[255, 255, 128, 0, 0]]
 
 
 def testLaterLayersTakeTheirShareFirst():
@@ -24,11 +24,35 @@ def testLaterLayersTakeTheirShareFirst():
     {"name": name, "minHeight": low, "maxHeight": 10000.0, "heightTolerance": 100.0, "minSlope": 0, "maxSlope": 90, "slopeTolerance": 1} for name, low in (("middle", 0.0), ("top", 100.0))
   ]
   heights = numpy.array([[-200.0, 50.0, 150.0]])
-  base, middle, top = eqTerrainTextures.layerWeights(layers, heights, numpy.zeros_like(heights), "test")
-  # The last layer weighs first: half at 50 (127.5 to 128), whole at 150; the middle layer covers what is left at its own factor.
-  assert top.tolist() == [[0, 128, 255]]
-  assert middle.tolist() == [[0, 127, 0]]
+  base, middle, top = eqTerrainTextures.layerWeights(layers, heights, numpy.zeros_like(heights), [None, None, None])
+  # The last layer weighs first: half at 50 (127.5 to 127), whole at 150; the middle layer covers what is left at its own factor.
+  assert top.tolist() == [[0, 127, 255]]
+  assert middle.tolist() == [[0, 128, 0]]
   assert base.tolist() == [[255, 0, 0]]
+
+
+def testBlendMapTurnsTheFalloffIntoAThresholdOnItsValues():
+  layers = [anywhere | {"name": "base", "minSlope": 0, "maxSlope": 90, "slopeTolerance": 1}, anywhere | {"name": "rock", "minSlope": 40, "maxSlope": 90, "slopeTolerance": 10, "blendSoftness": 100}]
+  # At 33 degrees rock's factor is 0.3: t = (1 - factor) * 255 truncated is 178, its threshold 0.01 * 178^2 - 255 truncated 61, and with
+  # softness 100 the blend value past it is the factor in 255ths, through the client's single-precision 1/255.
+  slopes = numpy.array([[33.0, 33.0, 33.0, 50.0, 0.0]])
+  blend = numpy.array([[50, 61, 100, 0, 255]], dtype=numpy.uint8)
+  base, rock = eqTerrainTextures.layerWeights(layers, numpy.zeros_like(slopes), slopes, [None, blend])
+  # 50 falls short (the texel is left out), 61 meets it (factor 0), 100 is 39 past it (factor 39/255). A whole factor (50 degrees) and
+  # no factor (0 degrees) pass the blend map untouched.
+  assert rock.tolist() == [[0, 0, 39, 255, 0]]
+  assert base.tolist() == [[255, 255, 216, 0, 255]]
+
+
+def testBlendThresholdsUseTheDoublePrecisionHundredth():
+  # t 100 ((1 - factor) * 255 = 100.5): 0.01 as a double is slightly over a hundredth, so 0.01 * 100 * 100 - 255 is just over -155 and
+  # truncates to -154, which a blend value of 0 is 154 past.
+  factor = numpy.array([[1 - 100.5 / 255]])
+  assert eqTerrainTextures.blendedFactor(factor, numpy.array([[0]], dtype=numpy.uint8), 100)[0, 0] == 154 * float(eqTerrainTextures.inverse255)
+  # Softness 20 slopes the threshold by t * float32(0.08) + 1, truncated: 7 at t 75, where 0.01 * 75^2 - 255 is -198.75 (-198).
+  factor = numpy.array([[1 - 75.5 / 255]])
+  assert eqTerrainTextures.blendedFactor(factor, numpy.array([[0]], dtype=numpy.uint8), 20)[0, 0] == 1.0
+  assert eqTerrainTextures.blendedFactor(factor, numpy.array([[0]], dtype=numpy.uint8), 99)[0, 0] == 198 * float(eqTerrainTextures.inverse255)
 
 
 def testCoverageStacksLaterEcosystemsOverEarlierOnes():

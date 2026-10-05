@@ -20,7 +20,7 @@ import eqTextures
 import eqWorldFile
 import zoneSources
 
-zoneCacheFormat = 8
+zoneCacheFormat = 10
 # A model's vertex light where its file gives none: no baked light and the full share of scene light, an assumption until the client's
 # lighting of EQG objects is traced.
 unlitColor = (0, 0, 0, 255)
@@ -251,23 +251,38 @@ def parseObjectGroup(togText, sourceName):
     fields = {key: values.split() for key, values in re.findall(r"\*(\w+)\s+([^\r\n]*)", match.group(1))}
     if fields.get("FILE", [None])[0] != "LIT":
       raise ValueError(f"{sourceName}: object {fields.get('NAME')} names {fields.get('FILE')}; only LIT files are read")
-    scale = float(fields["SCALE"][0])
     objects.append({
       "model": fields["NAME"][0].lower() + ".mod", "position": tuple(float(value) for value in fields["POSITION"]),
-      "rotationDegrees": tuple(float(value) for value in fields["ROTATION"]), "scale": (scale, scale, scale), "lit": fields["FILE"][1].lower(),
+      "rotationDegrees": tuple(float(value) for value in fields["ROTATION"]), "scale": float(fields["SCALE"][0]), "lit": fields["FILE"][1].lower(),
     })
   return objects
 
 
-def litColors(litBytes, vertexCount, sourceName):
-  """A .lit file's baked light per vertex, or None for one whose count differs from the model's vertices, which the client ignores
-  (EQGraphicsDX9.dll 0x100548d0)."""
+def memberBakedLight(archive, litName, vertexCount):
+  """A group member's baked light as the client takes it: RGBA per vertex, or None and why the member draws without it. Without the
+  file in the archive no light data is set (EQGraphicsDX9.dll 0x100a5810, 0x10053aeb); a count that differs from the model's vertices
+  is ignored (0x100548d0); and a file holding fewer colors than its count is copied whole by that count from the loader's pooled
+  buffer (0x100cb540), so the rest comes from memory past the file's end."""
+  if litName not in archive.entries:
+    return None, "missing"
+  litBytes = archive.read(litName)
   count = struct.unpack_from("<I", litBytes, 0)[0]
-  if len(litBytes) != 4 + 4 * count:
-    raise ValueError(f"{sourceName}: {count} colors in {len(litBytes)} bytes")
   if count != vertexCount:
-    return None
-  return bytesRGBA(numpy.frombuffer(litBytes, dtype="<u4", count=count, offset=4))
+    return None, "notFitting"
+  if len(litBytes) < 4 + 4 * count:
+    return None, "short"
+  return bytesRGBA(numpy.frombuffer(litBytes, dtype="<u4", count=count, offset=4)), None
+
+
+def groupMemberTransform(group, member):
+  """How an object group places a member (0x101038c0): from the group's position, a height in the world, by the member's offset turned
+  by the group's turns and scaled by the group's x scale, lifted by the group's tenth value times that scale; the member turns by its
+  own turns plus the group's and scales by its scale times the group's on each axis."""
+  scaleX = group["scale"][0]
+  offset = eqgTerrain.placementMatrix(group["rotationDegrees"], (1.0, 1.0, 1.0)) @ numpy.array(member["position"])
+  position = numpy.array(group["position"]) + scaleX * offset + numpy.array((0.0, 0.0, scaleX * group["memberLift"]))
+  turns = tuple(groupTurn + memberTurn for groupTurn, memberTurn in zip(group["rotationDegrees"], member["rotationDegrees"]))
+  return eqgTerrain.placementMatrix(turns, tuple(axis * member["scale"] for axis in group["scale"])), position
 
 
 def placedEQGPart(model, transform, position, colors):
@@ -350,9 +365,40 @@ def terrainTileParts(terrain, comboIndex):
   return parts
 
 
+def loadsFromArchive(archive, name):
+  return name != eqTerrainTextures.defaultMap and name in archive.entries
+
+
+def terrainMaps(archive, ecosystems):
+  """The cover and blend maps the ecosystems' layers name, at the tile texture size, None for one the archive lacks (the terrain's
+  bitmap lookup then finds none, 0x100ea060), and the names of maps the archive lacks, by kind. A layering map that loads is refused:
+  no client zone ships one, so how the client applies one is not checked against any."""
+  covers, blends = {}, {}
+  missing = {kind: set() for kind in ("coverMaps", "blendMaps", "layeringMaps", "detailMaps", "normalMaps")}
+  side = eqTerrainTextures.textureSide
+  for layers in ecosystems.values():
+    for layer in layers:
+      cover = layer["coverMap"]
+      if cover not in covers:
+        covers[cover] = eqTerrainTextures.coverImage(archive.read(cover), side, cover) if loadsFromArchive(archive, cover) else None
+      blend = layer.get("blendMap", eqTerrainTextures.defaultMap)
+      if blend != eqTerrainTextures.defaultMap and blend not in blends:
+        blends[blend] = eqTerrainTextures.blendImage(archive.read(blend), side, blend) if loadsFromArchive(archive, blend) else None
+      layering = layer.get("layeringMap", eqTerrainTextures.defaultMap)
+      if loadsFromArchive(archive, layering):
+        raise ValueError(f"{archive.archivePath.name}: layer {layer['name']} names layering map {layering}, which is not drawn yet")
+      named = (("coverMaps", cover), ("blendMaps", blend), ("layeringMaps", layering), ("detailMaps", layer["detailMap"]), ("normalMaps", layer.get("normalMap", eqTerrainTextures.defaultMap)))
+      for kind, name in named:
+        if name != eqTerrainTextures.defaultMap and name not in archive.entries:
+          missing[kind].add(name)
+  return covers, blends, {kind: sorted(names) for kind, names in missing.items()}
+
+
 def writeTerrainTextures(zoneFolder, terrain, textures, combos, ecosystems, archive):
   """The atlases (a color map and a detail mask image per ecosystem slot, saved bottom row first as Blender reads images) and the detail
-  textures, described in terrain.json for the bridge's terrain materials."""
+  textures, described in terrain.json for the bridge's terrain materials. A detail map that does not load leaves its sampler empty,
+  which the client's shaders read as black (Direct3D 9: a sampler without a texture returns 0, 0, 0, 1). An ecosystem whose first
+  layer has no normal map draws with Terrain_<n>Detail, which does not double the tint, instead of Terrain_Bump<n>Detail (0x1008fe20)."""
   side = eqTerrainTextures.textureSide
   (originLongitude, originLatitude), (width, height) = terrainAtlasLayout(terrain)
   slots = max(len(combo) for combo in combos)
@@ -371,12 +417,22 @@ def writeTerrainTextures(zoneFolder, terrain, textures, combos, ecosystems, arch
   detailFiles = {}
   for ecosystem in sorted({name for combo in combos for name in combo}):
     for layer in ecosystems[ecosystem]:
-      if layer["detailMap"] not in detailFiles:
-        detailFiles[layer["detailMap"]], readable = eqTextures.readableTexture(layer["detailMap"], readEntry(archive, layer["detailMap"]))
-        (zoneFolder / detailFiles[layer["detailMap"]]).write_bytes(readable)
+      detail = layer["detailMap"]
+      if detail in detailFiles:
+        continue
+      if loadsFromArchive(archive, detail):
+        detailFiles[detail], readable = eqTextures.readableTexture(detail, archive.read(detail))
+        (zoneFolder / detailFiles[detail]).write_bytes(readable)
+      else:
+        detailFiles[detail] = "detailUnloaded.png"
+        Image.new("RGB", (1, 1), (0, 0, 0)).save(zoneFolder / detailFiles[detail])
   description = {"combos": [
     [
-      {"colorMap": fileNames["colorMap"][slot], "detailMask": fileNames["detailMask"][slot], "details": [{"texture": detailFiles[layer["detailMap"]], "repeat": layer["detailRepeat"]} for layer in ecosystems[ecosystem]]}
+      {
+        "colorMap": fileNames["colorMap"][slot], "detailMask": fileNames["detailMask"][slot],
+        "tintScale": 2.0 if loadsFromArchive(archive, ecosystems[ecosystem][0].get("normalMap", eqTerrainTextures.defaultMap)) else 1.0,
+        "details": [{"texture": detailFiles[layer["detailMap"]], "repeat": layer["detailRepeat"]} for layer in ecosystems[ecosystem]],
+      }
       for slot, ecosystem in enumerate(combo)
     ]
     for combo in combos
@@ -385,12 +441,10 @@ def writeTerrainTextures(zoneFolder, terrain, textures, combos, ecosystems, arch
 
 
 def buildTerrainZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
-  """An EQ terrain zone's tiles, the objects they place on the ground, and the object groups they place."""
+  """An EQ terrain zone's tiles, the objects they place on the ground, and the object groups they place. Hole quads, maps the archive
+  lacks, and baked light the client does not take are drawn as the client draws them and listed."""
   archive = eqArchive.EQArchive(source["archive"])
-  terrain = eqgTerrain.parseTerrain(archive.read(source["zon"]).decode("latin1"), archive.read(source["zon"][:-4] + ".dat"), zoneName)
-  kinds = eqgTerrain.quadKinds(terrain)
-  if kinds:
-    raise ValueError(f"Zone '{zoneName}' marks terrain quads with kind bits {kinds}, whose drawing is not traced yet")
+  terrain = eqgTerrain.parseTerrain(*zoneSources.terrainFiles(source), zoneName)
   if any(not tile["layers"] for tile in terrain["tiles"]):
     raise ValueError(f"Zone '{zoneName}' has tiles without ecosystems, which the client draws with its default texture; not read yet")
   ecosystems = {}
@@ -401,12 +455,8 @@ def buildTerrainZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
         ecosystems[name] = eqgTerrain.parseEcosystem(readEntry(archive, name + ".eco").decode("latin1"), f"{source['archive'].name}:{name}.eco")
         if len(ecosystems[name]) > eqTerrainTextures.maximumDetailLayers:
           raise ValueError(f"Ecosystem {name} has {len(ecosystems[name])} texture layers; the client's terrain effects draw at most {eqTerrainTextures.maximumDetailLayers}")
-  covers = {}
-  for layers in ecosystems.values():
-    for layer in layers:
-      if layer["coverMap"] not in covers:
-        covers[layer["coverMap"]] = eqTerrainTextures.coverImage(readEntry(archive, layer["coverMap"]), eqTerrainTextures.textureSide, layer["coverMap"])
-  textures = eqTerrainTextures.tileTextures(terrain, ecosystems, covers)
+  covers, blends, missingMaps = terrainMaps(archive, ecosystems)
+  textures = eqTerrainTextures.tileTextures(terrain, ecosystems, covers, blends)
   combos = sorted({tuple(layer["ecosystem"] for layer in tile["layers"]) for tile in terrain["tiles"]})
   parts = [part | {"takesAllLights": False} for part in terrainTileParts(terrain, {combo: index for index, combo in enumerate(combos)})]
   tileCount = len(parts)
@@ -421,33 +471,32 @@ def buildTerrainZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
     colors = numpy.tile(numpy.array(unlitColor, dtype=numpy.uint8), (len(model["vertices"]), 1))
     parts.append(placedEQGPart(model, transform, eqgTerrain.placedPosition(terrain, tilesByOrigin, placement), colors) | {"takesAllLights": True})
     placedCounts[placement["model"]] = placedCounts.get(placement["model"], 0) + 1
-  missingGroups, litMismatches = set(), set()
+  missingGroups = set()
+  litProblems = {"missing": set(), "notFitting": set(), "short": set()}
   for group in terrain["groups"]:
     groupEntry = group["group"] + ".tog"
     if groupEntry not in archive.entries:
       missingGroups.add(group["group"])
       continue
-    groupTransform = eqgTerrain.placementMatrix(group["rotationDegrees"], group["scale"])
-    groupPosition = eqgTerrain.placedPosition(terrain, tilesByOrigin, group)
     for member in parseObjectGroup(archive.read(groupEntry).decode("latin1"), f"{source['archive'].name}:{groupEntry}"):
       model = objects.model(member["model"])
       if model is None:
         continue
-      colors = litColors(readEntry(archive, member["lit"]), len(model["vertices"]), member["lit"])
-      baked = colors is not None
-      if colors is None:
-        litMismatches.add(member["lit"])
+      colors, problem = memberBakedLight(archive, member["lit"], len(model["vertices"]))
+      if problem is not None:
+        litProblems[problem].add(member["lit"])
         colors = numpy.tile(numpy.array(unlitColor, dtype=numpy.uint8), (len(model["vertices"]), 1))
-      transform = groupTransform @ eqgTerrain.placementMatrix(member["rotationDegrees"], member["scale"])
-      parts.append(placedEQGPart(model, transform, groupPosition + groupTransform @ numpy.array(member["position"]), colors) | {"takesAllLights": not baked})
+      parts.append(placedEQGPart(model, *groupMemberTransform(group, member), colors) | {"takesAllLights": problem is not None})
       placedCounts[member["model"]] = placedCounts.get(member["model"], 0) + 1
   textureHolders = [archive] + [eqArchive.EQArchive(clientRoot / name) for name in objects.archives if name != source["archive"].name.lower()]
   written = eqModels.writePartsCache(zoneFolder, parts, textureHolders, f"Zone '{zoneName}'")
   writeTerrainTextures(zoneFolder, terrain, textures, combos, ecosystems, archive)
   return {
-    "tiles": tileCount, "ecosystems": sorted(ecosystems), "terrainCombos": [list(combo) for combo in combos], "placements": len(terrain["placements"]),
-    "objectGroups": len(terrain["groups"]), "missingObjectGroups": sorted(missingGroups), "litFilesNotMatchingModels": sorted(litMismatches),
-    "placedObjects": sum(placedCounts.values()),
+    "tiles": tileCount, "holeQuads": eqgTerrain.holeQuadCount(terrain), "ecosystems": sorted(ecosystems), "terrainCombos": [list(combo) for combo in combos],
+    "terrainMapsMissing": {kind: names for kind, names in missingMaps.items() if names}, "placements": len(terrain["placements"]),
+    "objectGroups": len(terrain["groups"]), "missingObjectGroups": sorted(missingGroups), "litFilesMissing": sorted(litProblems["missing"]),
+    "litFilesNotMatchingModels": sorted(litProblems["notFitting"]), "litFilesShorterThanTheirCount": sorted(litProblems["short"]),
+    "placedObjects": sum(placedCounts.values()), "looseZoneFile": "zonPath" in source,
     "objectArchives": objects.archives, "missingModels": sorted(objects.missing), "particleCloudsNotDrawn": 0,
   } | written
 

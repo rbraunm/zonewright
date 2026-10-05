@@ -963,9 +963,10 @@ def readEmitterList(path):
 async def importZone(context: Context, zone: str, collection: str | None = None):
   """Bring a client zone into the open scene as one object named for it, drawn as the client draws it, with the vertex colors and normals
   the client lights it by: a classic (WLD) zone's region meshes and the objects its objects.wld places, or an EQ terrain zone's tiles
-  (each ecosystem's cover and detail textures blended as the client blends them) and the objects and object groups its tiles place on
-  the ground, or an EQG (EQGZ) zone's terrain and placed models (the loose .zon beside the archive when the client has one, as it
-  loads it), with baked light where its count fits each model. It keeps the zone file's coordinates, which the scene shares (Blender
+  (each ecosystem's cover and detail textures blended as the client blends them, hole quads left out) and the objects and object
+  groups its tiles place, or an EQG (EQGZ) zone's terrain and placed models, from the loose .zon beside the archive when the client has
+  one, as it loads it, with baked light where its count fits each model; the result lists what the client draws without (maps and
+  baked light files the archive lacks or that do not fit). It keeps the zone file's coordinates, which the scene shares (Blender
   x, y are the server's y, x). The zone's lights (classic and EQG zones) come in as point lights in "<zone> lights" and its emitters as
   empties in "<zone> emitters", as placeLights and placeEmitters make them. An EQG zone's zone-line regions come in as zone-line guides in
   "<zone> zone lines", as placeZoneLine makes them, named as the zone file names them (the number the client reads from the name) and
