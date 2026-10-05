@@ -41,6 +41,7 @@ heavyGroups = {
     | {(zoneSurveySkill / "SKILL.md").as_posix()},
   "clientFiles": readerFiles,
   "calibration": {"server/eqCalibration.py", "server/bridgeClientLight.py"},
+  "serverMaps": {"server/serverMapFiles.py", "server/serverMapDrawing.py", "tests/serverReference.py", "tests/serverReference.json"},
   "install": {f"server/{name}.py" for name in (
     "toolingSync", "toolingManifest", "toolingStatus", "extensionCatalog", "machineProfile", "machineBenchmark", "blenderProcess",
   )} | {"toolingManifest.json"},
