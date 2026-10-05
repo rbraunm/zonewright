@@ -1,8 +1,8 @@
 """Dressed faces at cave mouths: a defined pass, "facade <cave> <end>", that presses the cliff at a cave's open end into a flat vertical
-face square to its path (or turned to the cliff's line) over a level apron, so a hall (cutCave with wallShare 1) reads as carved into the rock rather than as a cave
-mouth. Its definition keeps the face itself, so it is graded again (bridgeGrading) whether the cave is cut or taken back: the ground it
-reads is every face no cave made and every cave's plug faces on their vertices, as the ground stands with the caves taken back. Runs
-under Blender's Python."""
+face square to its path (or turned to the cliff's line) over a level apron, so a hall (cutCave with wallShare 1) reads as carved into
+the rock rather than as a cave mouth. Its definition keeps the face itself, so it is graded again (bridgeGrading) whether the cave is
+cut or taken back: the ground it reads is every face no cave made and every cave's plug faces on their vertices, as the ground stands
+with the caves taken back. Runs under Blender's Python."""
 import math
 
 import numpy

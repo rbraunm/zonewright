@@ -210,13 +210,13 @@ def restingLift(sceneObject, surfaces, castHeight):
 
 
 def dropHeight(sceneObject, surfaces, castHeight):
-  """Where an object drops from: from just under the rock over its middle (in a cave, under an overhang), looked for from halfway up
-  it, so it lands on the ground under that rock even when its top touches the rock (a column under a hall's ceiling); else from above
-  the whole scene."""
+  """Where an object drops from where rock lies over its middle (in a cave, under an overhang), looked for from halfway up it: from its
+  own top, or from just under the rock where its top reaches it (a column under a hall's ceiling), so it lands on the ground under that
+  rock; else from above the whole scene."""
   bottom, top, samples = footprint(sceneObject)
   middle = numpy.mean(samples, axis=0)
   location, normal, _, _ = surfaces.ray_cast(mathutils.Vector((middle[0], middle[1], (bottom + top) / 2)), mathutils.Vector((0.0, 0.0, 1.0)), castHeight)
-  return location.z - bridgeMeshAccess.castNudge if location is not None and normal.z < 0 else castHeight
+  return min(top, location.z - bridgeMeshAccess.castNudge) if location is not None and normal.z < 0 else castHeight
 
 
 def settleObjects(names, depth, tiltShare, onto):

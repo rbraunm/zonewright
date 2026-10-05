@@ -500,3 +500,180 @@ def testARailPieceIsPassableToWalks(stageBlenderServer, tmp_path):
     walk, detail = walks[piece]
     assert detail["passable"] is False
     assert [problem["kind"] for problem in walk["problems"]] == ["rise"] and walk["problems"][0]["height"] == height, (piece, walk["problems"])
+
+
+async def hallPlot(session, folder):
+  """The test plot with a hall 24 wide and 20 tall cut from its plaza 50 into the cliff (its floor 0, its ceiling 20)."""
+  await structurePlots.testPlot(session, folder)
+  for name, color in (("hallWall", (150, 140, 120, 255)), ("hallFloor", (90, 80, 70, 255))):
+    await session.expectSuccess("createMaterial", {"name": name, "diffuseTexture": str(writePNG(folder / f"{name}.png", 4, 4, color))})
+  await session.expectSuccess("cutCave", {
+    "objectName": "ground", "name": "hall", "path": [[60, 0, 0], [60, 50, 0]], "widths": [24, 24], "heights": [20, 20], "wallMaterial": "hallWall",
+    "floorMaterial": "hallFloor", "worldUnitsPerRepeat": 12, "wallShare": 1,
+  })
+
+
+def testAColumnUpToAHallsCeilingSettlesOnTheHallsFloor(stageBlenderServer, tmp_path):
+  async def steps(session):
+    kitPath = await structurePlots.testKit(session, tmp_path)
+    await hallPlot(session, tmp_path)
+    # A leg 10 tall held 10 over the floor: its top touches the ceiling.
+    await place(session, "column", kitPath, "testKitLeg", location=[60, 40, 10], facingDegrees=0)
+    settled = await session.expectSuccess("settleObjects", {"names": ["column"]})
+    choice = await session.expectError("placeKitPiece", {"name": "column2", "kitPath": str(kitPath), "piece": "testKitLeg", "location": [52, 40], "facingDegrees": 0})
+    return settled, choice
+
+  settled, choice = stageBlenderServer.session(steps)
+  (column,) = settled["settled"]
+  assert column["location"] == [60.0, 40.0, 0.0] and column["under"] == [0.0, 0.0] and column["spans"] == [0.0, 10.0]
+  assert "At [52, 40] 'ground' stands over the ground at [52.0, 40.0]: the highest ground there, at 60.0, is the top of 'ground', whose underside, at 20.0, stands over ground at 0.0" in choice
+  assert "-0.0" not in choice
+
+
+def testFramesStandProudOfTheWallOnceHoweverManyOpeningsItTakes(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await structurePlots.testKit(session, tmp_path)
+    await addFrameMaterial(session, tmp_path)
+    window = {"piece": wallPiece, "kind": "window", "width": 6, "height": 8, "sill": 12, "frame": doorFrame}
+    await session.expectSuccess("cutOpening", window | {"along": -6})
+    await session.expectSuccess("cutOpening", window | {"along": 6})
+    low = await session.expectError("cutOpening", {"piece": "testKitWall12", "kind": "window", "along": 0, "width": 4, "height": 4, "sill": 0.5, "frame": doorFrame})
+    return low, await kitPieceOf(session, wallPiece)
+
+  low, piece = stageBlenderServer.session(steps)
+  assert piece["bounds"] == [[-12.5, -5.5, 0.0], [12.5, 5.5, 30.0]]
+  assert [opening["along"] for opening in piece["openings"]] == [-6.0, 6.0]
+  assert "The window with its frame reaches 1.00 past the wall's base; it needs at least 1 of wall below it, so it is 2.00 too wide" in low
+
+
+def testARoofOverWallsIsMeasuredSquareToThemOnTheirBodies(stageBlenderServer, tmp_path):
+  roles = {"roof": "testKitTimber", "under": "testKitStone", "edge": "testKitTrim"}
+
+  def roof(name, over):
+    return {"name": name, "kind": "hip", "pitchDegrees": 30, "overhang": 2, "thickness": 1, "over": over, "location": [0, 900, 0], "materials": roles, "worldUnitsPerRepeat": dict.fromkeys(roles, 5)}
+
+  async def steps(session):
+    await structurePlots.testKit(session, tmp_path)
+    await addFrameMaterial(session, tmp_path)
+    await session.expectSuccess("cutOpening", {"piece": wallPiece, "kind": "window", "along": 0, "width": 6, "height": 8, "sill": 12, "frame": doorFrame})
+    await handBlock(session, "testKitCornerBlock", "testKitCorner", [10, 10, 30], [400, 0, 0])
+    await session.expectSuccess("markKitPiece", {"collectionName": "testKitCorner", "kind": "custom", "sockets": cornerSockets})
+    # A hut of four framed walls and four corners, the first wall turned 30 degrees, each piece snapped on to the last.
+    names = ["hutWall1"]
+    await place(session, "hutWall1", None, location=[0, 0, 0], facingDegrees=30)
+    for index in range(1, 8):
+      names.append(f"hut{'Corner' if index % 2 else 'Wall'}{index}")
+      await snap(session, names[-1], None, names[-2], piece="testKitCorner" if index % 2 else wallPiece)
+    measured = await session.expectSuccess("addRoof", roof("testKitHutRoof", names))
+    await place(session, "askew", None, location=[200, 0, 0], facingDegrees=10)
+    refused = await session.expectError("addRoof", roof("testKitAskewRoof", ["hutWall1", "askew"]))
+    return measured, refused
+
+  measured, refused = stageBlenderServer.session(steps)
+  # Each wall's body is 25 long and 10 deep however proud its window's frame stands; with its corners the hut is 45 square.
+  assert measured["footprint"] == [45.0, 45.0] and measured["facingOver"] == 30.0
+  assert "'askew' stands turned +20.00 degrees against 'hutWall1'" in refused
+
+
+def testAGableRoofsEndsAreSeenFromInsideAndOutside(stageBlenderServer, tmp_path):
+  roles = {"roof": "testKitTimber", "under": "testKitStone", "gable": "testKitFrame", "edge": "testKitTrim"}
+  readGables = """
+found = {}
+for name in names:
+  mesh = bpy.data.objects[name].data
+  slot = [index for index, material in enumerate(mesh.materials) if material.name == 'testKitFrame'][0]
+  found[name] = [
+    {'x': round(sum(mesh.vertices[index].co.x for index in polygon.vertices) / len(polygon.vertices), 4), 'normal': [round(value, 4) + 0.0 for value in polygon.normal]}
+    for polygon in mesh.polygons if polygon.material_index == slot
+  ]
+result = found
+"""
+
+  async def steps(session):
+    await structurePlots.testKit(session, tmp_path)
+    await addFrameMaterial(session, tmp_path)
+    common = {"pitchDegrees": 35, "overhang": 3, "thickness": 1, "footprint": [40, 30], "materials": roles, "worldUnitsPerRepeat": dict.fromkeys(roles, 5)}
+    await session.expectSuccess("addRoof", {"name": "testKitGableRoof", "kind": "gable", "location": [0, 200, 0]} | common)
+    await session.expectSuccess("addRoof", {"name": "testKitShedRoof", "kind": "shed", "location": [200, 200, 0]} | common)
+    return (await session.expectSuccess("runPython", {"code": "names = ['testKitGableRoof', 'testKitShedRoof']\n" + readGables}))["result"]
+
+  gables = stageBlenderServer.session(steps)
+  # Each end wall over the plate is two faces on corners of their own, one looking out of the building and one into it.
+  for name in ("testKitGableRoof", "testKitShedRoof"):
+    ends = sorted((face["x"], face["normal"]) for face in gables[name])
+    assert ends == [(-20.0, [-1.0, 0.0, 0.0]), (-20.0, [1.0, 0.0, 0.0]), (20.0, [-1.0, 0.0, 0.0]), (20.0, [1.0, 0.0, 0.0])], (name, ends)
+
+
+def testACurvedWallSectionTakesAFramedWindow(stageBlenderServer, tmp_path):
+  # A 22.5-degree arc of a tube 15 to 25 from its center, turned so its middle faces +Y, marked about the middle of its wall.
+  turn = math.radians(22.5)
+  wedge = [-35 * math.sin(turn), 35 * math.cos(turn), -10]
+  start, end = math.radians(90 - 11.25), math.radians(90 + 11.25)
+  sockets = [
+    {"name": "start", "at": [20 * math.cos(start), 20 * math.sin(start) - 20, 0.0], "direction": [math.sin(start), -math.cos(start), 0.0]},
+    {"name": "end", "at": [20 * math.cos(end), 20 * math.sin(end) - 20, 0.0], "direction": [-math.sin(end), math.cos(end), 0.0]},
+  ]
+  cutters = (("arcInner", "cylinder", [30, 30, 40], [0, 0, -5], [0, 0, 0]), ("arcSouth", "cube", [140, 70, 50], [0, -35, -10], [0, 0, 0]), ("arcWedge", "cube", [140, 70, 50], wedge, [0, 0, 22.5]))
+
+  async def steps(session):
+    await structurePlots.testKit(session, tmp_path)
+    await addFrameMaterial(session, tmp_path)
+    await session.expectSuccess("createPrimitive", {"kind": "cylinder", "name": "testKitArcMesh", "size": [50, 50, 30], "location": [0, 0, 0], "segments": 64})
+    for name, kind, size, location, rotation in cutters:
+      await session.expectSuccess("createPrimitive", {"kind": kind, "name": name, "size": size, "location": location, "rotationDegrees": rotation} | ({"segments": 64} if kind == "cylinder" else {}))
+      await session.expectSuccess("booleanCut", {"objectName": "testKitArcMesh", "cutterName": name})
+    await session.expectSuccess("transformObjects", {"names": ["testKitArcMesh"], "rotateDegrees": [0, 0, 90 - 11.25]})
+    await session.expectSuccess("assignMaterial", {"objectName": "testKitArcMesh", "materialName": "testKitStone"})
+    await session.expectSuccess("projectUVs", {"objectName": "testKitArcMesh", "method": "box", "worldUnitsPerRepeat": 12.5})
+    await session.expectSuccess("organize", {"collections": {"testKitArcMesh": "testKitArc"}})
+    marked = await session.expectSuccess("markKitPiece", {"collectionName": "testKitArc", "kind": "custom", "origin": [0, 20, 0], "sockets": sockets})
+    cut = await session.expectSuccess("cutOpening", {"piece": "testKitArc", "kind": "window", "along": 0, "width": 4, "height": 6, "sill": 12, "frame": doorFrame})
+    return marked, cut, await kitPieceOf(session, "testKitArcMesh")
+
+  marked, cut, piece = stageBlenderServer.session(steps)
+  assert marked["module"] is None
+  assert cut["clearWidth"] == 4.0 and cut["clearHeight"] == 6.0
+  assert [opening["kind"] for opening in piece["openings"]] == ["window"] and "testKitFrame" in repeats(piece)
+
+
+def testASnappedPieceSaysWhatGroundLiesUnderIt(stageBlenderServer, tmp_path):
+  async def steps(session):
+    kitPath = await structurePlots.testKit(session, tmp_path)
+    await structurePlots.testPlot(session, tmp_path)
+    await place(session, "rimWall", kitPath, location=[-5, -20], facingDegrees=0)
+    out = await snap(session, "gorgeWall", kitPath, "rimWall", socket="start", pieceSocket="end")
+    given = await place(session, "plazaWall", kitPath, location=[60, -20, 0], facingDegrees=0)
+    return out, given
+
+  out, given = stageBlenderServer.session(steps)
+  # Snapped west off the rim, the wall runs from x -42.5 to -17.5 at the rim's height, over the gorge's wall falling to its floor at -40.
+  assert out["footing"] == {"base": 0.0, "under": [-structurePlots.gorgeDepth, 0.0], "floats": structurePlots.gorgeDepth}
+  assert given["footing"] == {"base": 0.0, "under": [0.0, 0.0], "floats": None}
+
+
+def testPlacedPiecesStayUprightAtScaleOne(stageBlenderServer, tmp_path):
+  async def steps(session):
+    kitPath = await structurePlots.testKit(session, tmp_path)
+    await structurePlots.testPlot(session, tmp_path)
+    await place(session, "slopeWall", kitPath, location=[55, -80], facingDegrees=90)
+    await place(session, "wallA", kitPath, location=[60, -20, 0], facingDegrees=0)
+    await snap(session, "wallB", kitPath, "wallA")
+    before = await session.expectSuccess("getObjectDetail", {"name": "wallB"})
+    refusals = {
+      "tilt": await session.expectError("settleObjects", {"names": ["slopeWall"], "tiltShare": 1}),
+      "scale": await session.expectError("transformObjects", {"names": ["wallB"], "scale": [1.5, 1.5, 1.5]}),
+      "roll": await session.expectError("transformObjects", {"names": ["wallB"], "rotateDegrees": [0, 4, 0]}),
+      "copy": await session.expectError("placeCopies", {"source": "wallA", "copies": [{"location": [0, 0, 0], "scale": 2}]}),
+    }
+    after = await session.expectSuccess("getObjectDetail", {"name": "wallB"})
+    turned = await session.expectSuccess("transformObjects", {"names": ["wallB"], "rotateDegrees": [0, 0, 15]})
+    return before, refusals, after, turned
+
+  before, refusals, after, turned = stageBlenderServer.session(steps)
+  assert "settle it with tiltShare 0" in refusals["tilt"]
+  for action in ("scale", "roll"):
+    assert "'wallB' is a placed kit piece, which stands upright at scale 1" in refusals[action] and "this transform would tilt or scale it" in refusals[action]
+  assert "Copy 0 of placed kit piece 'wallA' is tilted or scaled" in refusals["copy"]
+  assert [after[key] for key in ("location", "rotationDegrees", "scale")] == [before[key] for key in ("location", "rotationDegrees", "scale")]
+  assert joins(after["kitPiece"])["start"] == {"object": "wallA", "socket": "end"}
+  assert turned["objects"][0]["rotationDegrees"] == [0.0, 0.0, 15.0]

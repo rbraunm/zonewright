@@ -1,5 +1,6 @@
 import numpy
 
+from conftest import writePNG
 import structurePlots
 
 turnPost = {"piece": "testKitPost", "at": "turns"}
@@ -140,3 +141,66 @@ def testAWallBuriedPastItsMaximumIsRefused(stageBlenderServer, tmp_path):
   assert "Section 0 would be buried" in refusal and "over maximumBurial 10" in refusal
   depth = float(refusal.split("would be buried ")[1].split(" deep")[0])
   assert depth > 10
+
+
+def testAWallOnLevelGroundStaysLevelEveryJointAtOneHeight(stageBlenderServer, tmp_path):
+  async def steps(session):
+    kitPath = await kitAndPlot(session, tmp_path)
+    flat = await session.expectSuccess("buildWall", wallArguments(kitPath, "flatWall", [[10, -20], [60, -20], [60, -7.5]], posts=turnPost))
+    contour = await session.expectSuccess("buildWall", wallArguments(kitPath, "contourWall", [[30, -80], [80, -80]]))
+    return flat, contour
+
+  flat, contour = stageBlenderServer.session(steps)
+  # On the plaza at 0, and along the slope's level line at y -80: no joint lower than another, no section sheared.
+  assert {joint["height"] for joint in flat["joints"]} == {flat["joints"][0]["height"]} and abs(flat["joints"][0]["height"] + 1.5) <= 1e-4
+  assert [section["rise"] for section in flat["sections"]] == [0.0, 0.0, 0.0]
+  assert len({joint["height"] for joint in contour["joints"]}) == 1 and [section["rise"] for section in contour["sections"]] == [0.0, 0.0]
+  assert [section["base"] for section in contour["sections"]] == [[contour["joints"][0]["height"]] * 2] * 2
+
+
+def testAFramedDoorStandsInAWallRunOfItsModule(stageBlenderServer, tmp_path):
+  async def steps(session):
+    kitPath = await structurePlots.testKit(session, tmp_path)
+    await session.expectSuccess("createMaterial", {"name": "testKitFrame", "diffuseTexture": str(writePNG(tmp_path / "textures" / "testKitFrame.png", 4, 4, (40, 30, 20, 255)))})
+    await session.expectSuccess("createKitPiece", {
+      "name": "testKitWall25Door", "kind": "wall", "size": [25, 10, 30], "location": [100, 40, 0],
+      "materials": {"face": "testKitStone", "edge": "testKitTrim"}, "worldUnitsPerRepeat": {"face": 12.5, "edge": 5},
+    })
+    await session.expectSuccess("cutOpening", {"piece": "testKitWall25Door", "kind": "door", "along": 0, "width": 10, "height": 16, "frame": {"width": 1.5, "depth": 0.5, "material": "testKitFrame", "worldUnitsPerRepeat": 2.5}})
+    await session.expectSuccess("saveFile", {})
+    await structurePlots.testPlot(session, tmp_path)
+    return await session.expectSuccess("buildWall", wallArguments(str(kitPath), "gateRun", [[10, -20], [110, -20]], variants={"1": "testKitWall25Door"}))
+
+  built = stageBlenderServer.session(steps)
+  assert [section["piece"] for section in built["sections"]] == ["testKitWall25", "testKitWall25Door", "testKitWall25", "testKitWall25"]
+
+
+def testASteepShearIsRefusedAndASteppedWallReportsItsSectionsBases(stageBlenderServer, tmp_path):
+  down = [[-15, -60], [-40, -60]]
+
+  async def steps(session):
+    kitPath = await kitAndPlot(session, tmp_path)
+    steep = await session.expectError("buildWall", wallArguments(kitPath, "gorgeWall", down, maximumBurial=50))
+    stepped = await session.expectSuccess("buildWall", wallArguments(kitPath, "gorgeWall", down, follow="step", maximumBurial=50))
+    buried = await session.expectError("buildWall", wallArguments(kitPath, "buriedWall", [[-15, -80], [-40, -80]], follow="step"))
+    return steep, stepped, buried
+
+  steep, stepped, buried = stageBlenderServer.session(steps)
+  # Down the gorge's wall, 2 in every 1, a sheared section would lean its courses well past 30 degrees.
+  assert "Section 0 would be sheared" in steep and "steeper than 30: its courses would run up the slope; step the wall" in steep
+  base = stepped["sections"][0]["base"]
+  assert base[0] == base[1] and abs(base[0] - (structurePlots.gorgeHeight(-40) - 1.0)) <= 0.01
+  assert [joint["bases"] for joint in stepped["joints"]] == [[None, base[0]], [base[1], None]]
+  assert "or allow a deeper burial (maximumBurial)" in buried and "step it" not in buried
+
+
+def testAnElevationStandsOnTheGroundShortOfTheWallsOtherLegs(stageBlenderServer, tmp_path):
+  async def steps(session):
+    kitPath = await kitAndPlot(session, tmp_path)
+    return await session.expectSuccess("buildWall", wallArguments(kitPath, "yard", [[20, -30], [70, -30], [70, -5], [20, -5], [20, -30]], posts=turnPost))
+
+  built = stageBlenderServer.session(steps)
+  # The yard's fronts face in: each leg is seen from inside it, the eye a player's height over the plaza and short of the leg across, aimed
+  # two fifths of the way up the wall from its foot so the foot is in frame.
+  assert built["views"]["front0"] == {"eye": [45.0, -17.0, 6.0], "target": [45.0, -30.0, 12.0]}
+  assert built["views"]["front1"] == {"eye": [32.0, -17.5, 6.0], "target": [70.0, -17.5, 12.0]}

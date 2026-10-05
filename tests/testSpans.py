@@ -43,6 +43,13 @@ def testARopeBridgeSagsBetweenItsAnchorsCoveredEdgeToEdgeAndWalkedAcross(stageBl
   assert walk["narrowest"]["width"] == 8.0, [(row["at"], row["left"], row["right"]) for row in walk["profile"]]
   assert [part["name"] for part in built["parts"]] == ["gorgeBridge"] and built["parts"][0]["model"] == "obj_gorgebridge.mod"
   assert "gorgeBridge" in [entry["name"] for entry in summary["objects"]]
+  # The rope's cards hang plumb along the sag: every corner has its partner straight above or below it.
+  ropeFaces = [face for face in found if face["material"] == "testKitRope"]
+  assert ropeFaces and all(hangsPlumb(face) for face in ropeFaces), [face for face in ropeFaces if not hangsPlumb(face)][:2]
+
+
+def hangsPlumb(face):
+  return all(any(abs(other[0] - point[0]) <= 1e-4 and abs(other[1] - point[1]) <= 1e-4 and abs(other[2] - point[2]) > 0.5 for other in face["points"]) for point in face["points"])
 
 
 def testRopesAndRailsArePassableAndNothingElse(stageBlenderServer, tmp_path):
@@ -203,16 +210,20 @@ def testAWalkwayHoldsLevelLandingsGradesItsLegsAndLaysListedFlights(stageBlender
 def testABracketReachesTheRockBesideIt(stageBlenderServer, tmp_path):
   async def steps(session):
     kitPath = await kitAndPlot(session, tmp_path)
-    return await session.expectSuccess("buildWalkway", {
+    built = await session.expectSuccess("buildWalkway", {
       "name": "ledgeWalk", "kitPath": kitPath, "points": [[100, 6, 4], [60, 6, 4]], "width": 4, "deck": "testKitPlank",
       "posts": {"piece": "testKitLeg", "spacing": 10, "sides": "left"}, "brackets": {"piece": "testKitBeam", "side": "right", "reach": 10, "legs": [0]},
     })
+    return built, await structurePlots.faces(session, "ledgeWalk")
 
-  built = stageBlenderServer.session(steps)
+  built, found = stageBlenderServer.session(steps)
   middle = 4 - 0.5 - 1.5
   assert len(built["brackets"]) == 5
   for bracket in built["brackets"]:
     assert abs(bracket["reach"] - (structurePlots.cliffFaceY(middle) - 8)) <= 0.01, bracket
+  # Each bracket's ends: under the deck's far edge (y 4) and sink (2) into the rock past where it meets it.
+  ends = sorted({round(face["points"][0][1], 3) for face in found if face["material"] == "testKitTrim" and max(point[2] for point in face["points"]) <= 3.5 + 1e-6 and len({round(point[1], 4) for point in face["points"]}) == 1})
+  assert ends == [4.0, round(structurePlots.cliffFaceY(middle) + 2, 3)]
 
 
 def testWalkwayRefusals(stageBlenderServer, tmp_path):
@@ -250,6 +261,64 @@ def testAWalkwayMayEndOffTheGroundAndReportsEachEndsFooting(stageBlenderServer, 
   assert built["endFootingGaps"] == {"start": 0.0, "end": None}
   assert built["posts"]["longest"] > 40
   assert built["walk"]["walkable"]
+  # Past the open end there is only air: its view stands on the deck just inside the end, looking back along it.
+  assert built["views"]["fromEnd"] == {"standAt": [-48.0, -90.0, 0.0], "headingDegrees": 90.0, "pitchDegrees": -5.0}
+
+
+def testOneSidedRailsStandPostsOnTheirSideOnly(stageBlenderServer, tmp_path):
+  async def steps(session):
+    kitPath = await kitAndPlot(session, tmp_path)
+    leftOnly = await session.expectSuccess("buildBridge", bridgeArguments(kitPath, "leftRope", posts=legs, rails=ropes | {"sides": "left"}))
+    both = await session.expectSuccess("buildBridge", bridgeArguments(kitPath, "bothPosts", start=[-100, 40, 0], end=[-20, 40, 0], posts=legs | {"sides": "both"}, rails=ropes | {"sides": "left"}))
+    refused = await session.expectError("buildBridge", bridgeArguments(kitPath, "mismatched", start=[-100, 80, 0], end=[-20, 80, 0], posts=legs | {"sides": "right"}, rails=ropes | {"sides": "left"}))
+    return leftOnly, both, refused
+
+  leftOnly, both, refused = stageBlenderServer.session(steps)
+  assert leftOnly["posts"] and {post["side"] for post in leftOnly["posts"]} == {"left"}
+  assert {post["side"] for post in both["posts"]} == {"left", "right"}
+  assert "Rails run from post to post: give posts on every side the rails run" in refused
+
+
+def testALandingsOuterCornerPostStandsOnTheMiterAndItsRailsRunStraight(stageBlenderServer, tmp_path):
+  async def steps(session):
+    kitPath = await kitAndPlot(session, tmp_path)
+    return await session.expectSuccess("buildWalkway", {
+      "name": "turnWalk", "kitPath": kitPath, "points": [[20, -20, 4], [60, -20, 4], [60, 0, 4]], "width": 4, "deck": "testKitPlank",
+      "posts": {"piece": "testKitLeg", "spacing": 10}, "rails": {"piece": "testKitRail", "height": 2.5},
+    })
+
+  built = stageBlenderServer.session(steps)
+  # The landing's outer corner is (62, -22); a 2-wide leg there stands out a unit along both edges at once.
+  corner = [post for post in built["posts"]["each"] if post["side"] == "right" and abs(post["at"][0] - 63) <= 1.5 and abs(post["at"][1] + 23) <= 1.5]
+  assert [post["at"] for post in corner] == [[63.0, -23.0]]
+
+
+def testAFlightIsRailedHeadToFootAndRefusesAHeadInOrOnWhatItLandsOn(stageBlenderServer, tmp_path):
+  foot, head = [-75.0, -60.0, -40.0], [-20.0, -60.0, 0.0]
+
+  def flight(kitPath, name, **changes):
+    return {"name": name, "kitPath": kitPath, "bottom": foot, "top": head, "width": 6, "tread": "testKitTread", "riser": 1} | changes
+
+  async def steps(session):
+    kitPath = await kitAndPlot(session, tmp_path)
+    built = await session.expectSuccess("buildStairs", flight(kitPath, "gorgeFlight", posts={"piece": "testKitLeg", "spacing": 8}, rails={"piece": "testKitRail", "height": 3}))
+    refusals = {
+      "buried": await session.expectError("buildStairs", flight(kitPath, "buriedFlight", bottom=[-75, -100, -40], top=[-20, -100, -2])),
+      "onto": await session.expectError("buildStairs", flight(kitPath, "ontoFlight", bottom=[-75, -100, -40], top=[-14, -100, 0])),
+    }
+    return built, refusals
+
+  built, refusals = stageBlenderServer.session(steps)
+  run, rise = head[0] - foot[0], head[2] - foot[2]
+  # Railed, a post stands at every station from the foot to the head, however close to the ground, and the rail runs the whole flight.
+  for side in ("left", "right"):
+    stations = sorted(post["at"][0] for post in built["legs"] if post["side"] == side)
+    assert stations[0] == foot[0] and stations[-1] == head[0], (side, stations)
+  assert abs(built["rails"]["length"] - 2 * math.hypot(run, rise)) <= 0.01
+  assert abs(built["walk"]["steepestGrade"]["degrees"] - math.degrees(math.atan2(rise, run))) <= 3 and built["walk"]["steepest"]["slopeDegrees"] == 0.0
+  assert built["views"]["fromHead"] == {"standAt": [-17.0, -60.0, 0.0], "headingDegrees": 270.0, "pitchDegrees": round(-math.degrees(math.atan2(5.5 + rise / 2, 3 + run / 2)), 2)}
+  assert "The flight's head [-20.0, -100.0, -2.0] lies 2.00 under what it stands on there (the top of 'ground' at 0.00)" in refusals["buried"]
+  assert "The flight's top tread would lie inside what its head stands on ('ground', its top at 0.00)" in refusals["onto"]
 
 
 def testAWalkwayInTheTerrainCollectionIsTerrain(stageBlenderServer, tmp_path):

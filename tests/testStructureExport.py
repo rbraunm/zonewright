@@ -268,6 +268,8 @@ def testAMissingKitFailsBothExports(stageBlenderServer, tmp_path):
     assert placed[0]["collections"] == ["testKitWall25"] and placed[0]["placedBy"] == ["plazaWall"] and placed[0]["placements"] == 1
     assert "is gone" in placed[0]["message"]
     assert [failure["structure"] for failure in laid] == ["gorgeBridge"] and laid[0]["missing"], purpose
+    # The bridge's baked faces keep the kit's materials, now placeholders of the missing kit: the kit's failure names them, nothing else.
+    assert [failure for failure in report["failures"] if failure["failure"] == "material not made by createMaterial or createLiquidMaterial"] == [], purpose
   assert not archivePathIn(tmp_path).exists() and "kit missing" in refused
 
 

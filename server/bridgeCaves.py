@@ -33,7 +33,8 @@ breakupReach = 3.0
 patchEdges = 2.0
 solidDepth = 20.0
 matchDistance = 1e-4
-openFloorLift = 1e-3
+# A face of the tube's floor this close to the ground's plane lies in it.
+groundPlaneTolerance = 1e-3
 mouthEdgeShare = 1.0 / 3.0
 weldRounds = 8
 # Candidate rows lie this share of edgeLength apart; rows are kept so no point of the section moves more than edgeLength between two.
@@ -504,9 +505,6 @@ def tubeMesh(definition, rows, surface):
   shape = rows["shape"]
   sections = sectionPoints(shape, rows["floors"], rows["directions"], rows["widths"], rows["heights"], rows["scales"])
   count, size = sections.shape[:2]
-  # Where the tube runs in the open in front of its mouth its floor lies in the ground's own plane, which the exact boolean resolves
-  # either way, at times leaving the cave's floor as a patch on the open ground; a hair over the ground there, it leaves the ground be.
-  sections[(surface.depths(rows["floors"]) <= 0)[:, None] & shape["onFloor"][None, :], 2] += openFloorLift
   vertices = sections.reshape(-1, 3)
   breakup = definition["breakup"]
   if breakup is not None:
@@ -825,6 +823,22 @@ def simpleLoops(corners):
   return [corners] if len(corners) >= 3 else []
 
 
+def groundedFloor(positions, faces, sources, normals, patchPositions, patchFaces):
+  """The faces' sources with each face of the tube's floor that lies in the ground's own plane (where the tube runs out in the open in
+  front of its mouth, its floor level with the ground, the exact boolean may keep the tube's floor there rather than the ground's) taken
+  as a piece of the ground face it lies on, so the open ground in front of a mouth stays ground."""
+  tree = mathutils.bvhtree.BVHTree.FromPolygons(patchPositions.tolist(), patchFaces)
+  sources = list(sources)
+  for index, (face, source, normal) in enumerate(zip(faces, sources, normals)):
+    if source > -2 or normal[2] <= floorNormalZ:
+      continue
+    middle = mathutils.Vector(positions[face].mean(axis=0).tolist())
+    location, _, patchFace, _ = tree.ray_cast(middle + up * groundPlaneTolerance, down, 2 * groundPlaneTolerance)
+    if location is not None:
+      sources[index] = patchFace
+  return sources
+
+
 def isFlat(points):
   """Whether a triangle's corners lie in a line, within matchDistance of it."""
   lengths = [numpy.linalg.norm(points[(position + 1) % 3] - points[position]) for position in range(3)]
@@ -1071,6 +1085,7 @@ def spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, pa
     if distance < matchDistance:
       original[index] = patchVertices[found]
   cutFaces, cutSources, cutNormals = withoutSlivers(cutPositions, *snappedCut(cutFaces, cutSources, cutNormals, original))
+  cutSources = groundedFloor(cutPositions, cutFaces, cutSources, cutNormals, shown[patchVertices], [[localIndex[vertex.index] for vertex in face.verts] for face in patch])
   onTerrain, onLining = {}, numpy.zeros(len(cutPositions), dtype=bool)
   for face, source in zip(cutFaces, cutSources):
     for vertex in face:

@@ -1001,8 +1001,9 @@ exportChecksHelp = (
   " number, structures laid on ground or a kit that has changed since (stale: editStructure lays them again), and, until reach mapping"
   " exists, any zone: containment cannot be checked yet. A test export lists all of these but"
   " containment as findings. Findings, never refusals, for both: texture coverage, each with where it lies: the base material showing where no unmuted"
-  " surfacing layer covers a face; ground borders on the terrain where two ground materials meet, walkable ground on at least one side,"
-  " with no paintTransition strip between them, as a length per border and its stretches (each a center, bounds, and length); texture stretched or squeezed (a texel lying over 2x longer one way than the other"
+  " surfacing layer covers a face (a cave's lining, in its own materials, is not ground under the base); ground borders on the terrain where two ground materials meet, walkable ground on at least one side,"
+  " with no paintTransition strip between them, as a length per border and its stretches (each a center, bounds, and length; a cave's"
+  " lining meeting the ground is no border); texture stretched or squeezed (a texel lying over 2x longer one way than the other"
   " in the world, or world units per repeat over 2x off, either way, the material's area-weighted median, `usualRepeat`); zero texture"
   " area; and back faces (faces wound against the rest of their surface: a closed surface faces out, a terrain sheet up)."
   " Each failure and finding names the object (and the placed objects that place it), the material, the image, and the face count, with"
@@ -1378,7 +1379,8 @@ async def transformObjects(
   context: Context, names: list[str], translate: list[float] | None = None, rotateDegrees: list[float] | None = None, scale: list[float] | None = None,
   location: list[float] | None = None, rotationDegrees: list[float] | None = None,
 ):
-  """Move, rotate, or scale objects: relative (translate, rotateDegrees about world axes, scale factors) or absolute (location, rotationDegrees); not both forms of one channel."""
+  """Move, rotate, or scale objects: relative (translate, rotateDegrees about world axes, scale factors) or absolute (location, rotationDegrees); not both forms of one channel.
+  A placed kit piece turns only about the vertical and keeps scale 1: a tilt or scale of one is refused, moving none."""
   return await callBridge(context, "transformObjects", {"names": names, "translate": translate, "rotateDegrees": rotateDegrees, "scale": scale, "location": location, "rotationDegrees": rotationDegrees})
 
 
@@ -2497,7 +2499,8 @@ async def placeCopies(
   """Place many linked copies of an object (sharing its mesh, or its collection for a kit instance) in one call, each with its own
   location [x, y, z], rotationDegrees [x, y, z] (Blender's XYZ order, z turning counterclockwise seen from above, x and y tilting; EQ
   models face +X), uniform scale, and optional name: exactly what an EQ placement holds. With settle, each copy is then settled onto the
-  ground by its footprint as settleObjects does (its z is ignored; [x, y] will do). Returns each copy as placed (with settleObjects' report when settled), to edit copy by copy."""
+  ground by its footprint as settleObjects does (its z is ignored; [x, y] will do). A copy of a placed kit piece stands upright at scale
+  1 (rotationDegrees [0, 0, turn]); tilted or scaled ones are refused. Returns each copy as placed (with settleObjects' report when settled), to edit copy by copy."""
   return await callBridge(context, "placeCopies", {"source": source, "copies": copies, "collection": collection, "settle": settle, "depth": depth, "tiltShare": tiltShare})
 
 
@@ -2520,13 +2523,14 @@ async def generateCopies(
 
 @guardedTool()
 async def settleObjects(context: Context, names: list[str], depth: float = 0.0, tiltShare: float = 0.0, onto: str | None = None):
-  """Drop objects onto what lies below them by their footprint rather than their origin, from above the whole scene, or from their own
-  tops where rock lies over them (a cave's ceiling, an overhang), so one in a cave lands on its floor, not on the hill over it: onto
-  the ground (what players stand on, apart from the objects being settled), sunk to the lowest ground under the footprint so no edge
-  floats; or onto a named object, resting on it with no vertex below its surface (a crate on a table, or tilted on a ramp); then
-  `depth` lower. tiltShare (0 to 1) turns each that share of the way toward the slope of the ground under it, keeping its heading (and
-  replacing any tilt it had). Settling again after the ground changes puts everything back on it. Each result gives the ground's
-  lowest and highest under the footprint and the object's own bottom and top."""
+  """Drop objects onto what lies below them by their footprint rather than their origin, from above the whole scene, or where rock lies
+  over their middle (a cave's ceiling, an overhang; looked for from halfway up each) from their own tops, or from just under the rock
+  where a top reaches it, so one in a cave lands on its floor, not on the hill over it, even a column up to a hall's ceiling: onto the ground (what
+  players stand on, apart from the objects being settled), sunk to the lowest ground under the footprint so no edge floats; or onto a
+  named object, resting on it with no vertex below its surface (a crate on a table, or tilted on a ramp); then `depth` lower. tiltShare
+  (0 to 1) turns each that share of the way toward the slope of the ground under it, keeping its heading (and replacing any tilt it
+  had); refused for a placed kit piece, which stands upright. Settling again after the ground changes puts everything back on it. Each
+  result gives the ground's lowest and highest under the footprint and the object's own bottom and top."""
   return await callBridge(context, "settleObjects", {"names": names, "depth": depth, "tiltShare": tiltShare, "onto": onto})
 
 
@@ -2631,7 +2635,8 @@ async def createKitPiece(
   " bench; placed only); `sockets` [{name, at [x, y, z] in the piece frame, direction}] (each direction a unit vector, level or straight"
   " up or down; each within 1 unit of the piece's bounds), or the kind's defaults from its bounds (custom has none); a wall, beam, plank,"
   " rail, or ropeRail needs start and end facing apart; a corner is custom with turned sockets (a 10 x 10 block: start at (-5, 0, 0)"
-  " facing -X, end at (0, 5, 0) facing +Y). `passable` true marks its meshes passable, false takes the mark off, null keeps the piece's"
+  " facing -X, end at (0, 5, 0) facing +Y), and so is a curved wall section (its module null: turned sockets span no module)."
+  " `passable` true marks its meshes passable, false takes the mark off, null keeps the piece's"
   " (or takes the kind's for a new piece). Every face needs a material createMaterial made and texture coordinates. Placed instances"
   " keep their transforms, so a moved origin or socket shows in them: look after. Returns the record, what is derived from it (as"
   " createKitPiece), and unmappable: faces whose texture coordinates are not affine in position within 1 percent, which map oddly where"
@@ -2644,12 +2649,14 @@ async def markKitPiece(
 
 
 @guardedTool(description=(
-  "Cut a door or window through a wall piece of this file, front to back: centered `along` from its middle along X, its bottom `sill`"
+  "Cut a door or window through a wall piece of this file, or a custom one (a curved wall section, modeled with the middle of its wall"
+  " facing +Y), front to back along Y: centered `along` from its middle along X, its bottom `sill`"
   " over the base (a door 0, a window above 0), `width` wide with jambs `height` tall; with `archRise` its head a round arch rising"
   " that far over the jambs in `archSegments` straight pieces (a semicircle at half the width). The cut is an exact boolean of a prism"
   " through the piece; its reveal takes the material and texture density of the faces it cuts through, or with `frame` {width, depth,"
   " material, worldUnitsPerRepeat} the reveal and a band `width` wide round the opening on both faces (jambs, head, and a window's sill),"
-  " standing `depth` proud, take the frame's material box-mapped at its repeat, as the client trims its openings. The opening and its"
+  " standing `depth` proud of the faces the opening goes through (however many framed openings the piece already has), take the frame's"
+  " material box-mapped at its repeat, as the client trims its openings. The opening and its"
   " frame leave at least 1 unit of wall at each end and above (and below a window) and overlap no opening cut before; it is recorded in"
   " the piece's openings. Zones that link the kit show it when next opened. Returns the opening's corners [x, z] in the piece frame,"
   " its clear width and height as cut, the faces made, and the triangles before and after."
@@ -2665,16 +2672,19 @@ async def cutOpening(
 
 @guardedTool(description=(
   "Model a roof as a kit piece (kind roof) at `location` (its wall plate's middle, its origin) for a rectangular `footprint` [length X,"
-  " depth Y], or for the plan bounds of the meshes or placed pieces of this file named in `over`; give exactly one. Each slope's"
+  " depth Y], or for what the meshes or placed pieces of this file named in `over` stand on: measured square to them (they stand"
+  " turned alike, or a quarter turn apart; others are refused, naming the turn), a placed wall by its body between its faces, not the"
+  " frames standing proud of them; give exactly one. Each slope's"
   " underside passes through the footprint's edges at the plate (z 0), so it sits on walls of that footprint; slopes at `pitchDegrees`"
   " (5 to 60), running out `overhang` past every side (the eaves drop overhang x tan(pitch) under the plate), `thickness` thick square to"
   " the slope. `kind` gable: two slopes meeting at a ridge along `ridgeAlong` (\"x\" or \"y\"), gable triangles closing its ends down to"
   " the plate; hip: four slopes, the ridge along `ridgeAlong` (the longer side) shortened by hips at 45 degrees in plan, a point over a"
-  " square; shed: one slope rising toward the back (-Y), its ends closed by gable triangles. Roles: roof (slope tops, mapped in their"
+  " square; shed: one slope rising toward the back (-Y), its ends closed by gable triangles. Each gable or shed end is two faces on"
+  " corners of their own, one looking out and one in, so a walk-in building's ends are seen from inside. Roles: roof (slope tops, mapped in their"
   " plane, u level along the eaves and v up the slope, so shingles run level), under (undersides, the same), gable (gable and shed ends,"
   " box-mapped; not hip), edge (fascia and verges, box-mapped). Socket plate (0, 0, 0) facing down. Returns the record, its ridge height"
-  " (the top), its eave height (the eaves' underside), size, triangles, and with `over`, plateOver: the point to place it at"
-  " (placeKitPiece, facing 0) to sit on those objects." + kitPieceHelp
+  " (the top), its eave height (the eaves' underside), size, triangles, and with `over`, plateOver and facingOver: where and how to"
+  " place it (placeKitPiece) to sit on those objects." + kitPieceHelp
 ))
 async def addRoof(
   context: Context, name: str, kind: str, pitchDegrees: float, overhang: float, thickness: float, materials: dict[str, str],
@@ -2694,10 +2704,13 @@ async def addRoof(
   " settleObjects settles (onto the lowest ground under it), then `depth` lower (refused where rock lies over ground: give z); or"
   " snapped: `snapTo` {object, socket, pieceSocket} puts the piece where its pieceSocket meets the placed piece object's socket face to"
   " face (Freeport's wall runs stand exactly 25.0 apart): a level pair turns the piece to meet it (no facingDegrees), a vertical pair"
-  " (a post on a wall's top) keeps facingDegrees, by default the object's. A socket already joined is refused, naming its partner. A"
-  " placed piece is an ordinary placement (transformObjects, deleteObjects, settleObjects work on it), never in the terrain collection."
-  " Returns where it stands and faces, the piece {kit, piece, kind, size, module, passable, fingerprint}, its sockets in the world each"
-  " joined to another's or free, and settleObjects' report when settled." + facingHelp + kitPieceHelp
+  " (a post on a wall's top) keeps facingDegrees, by default the object's. A socket already joined is refused, naming its partner, and"
+  " so is a snap to a piece tilted or scaled. A placed piece is an ordinary placement (transformObjects, deleteObjects, settleObjects"
+  " work on it, keeping it upright at scale 1), never in the terrain collection. Where rock lies over ground the refusal names the"
+  " object over it. Returns where it stands and faces, the piece {kit, piece, kind, size, module, passable, fingerprint}, its sockets in"
+  " the world each joined to another's or free, and settleObjects' report when settled, else footing {base, under: the lowest and"
+  " highest surface players stand on under its footprint, floats: how far its base stands over the lowest where more than a step,"
+  " else null} (a run snapped out over a drop says so)." + facingHelp + kitPieceHelp
 ))
 async def placeKitPiece(
   context: Context, name: str, kitPath: str | None, piece: str, location: list[float] | None = None, facingDegrees: float | None = None,
@@ -2713,8 +2726,10 @@ async def placeKitPiece(
 async def swapKitPiece(context: Context, names: list[str], piece: str):
   """Put another piece of the same kit in place of placed ones, each keeping where it stands and how it faces: a window section for a
   plain one, without breaking the run. The new piece's sockets must be the old one's (names, places within 0.01, directions), so every
-  joint holds; otherwise none is swapped and each difference is named. Returns each placement with its new piece and its sockets,
-  joined or free."""
+  joint holds; otherwise none is swapped and each difference is named. In a kit, a prefab whose part it swaps has its footprint
+  measured again about its origin (its entrances kept: name a new doorway with assemblePrefab), and its placements go stale (kit) to be
+  laid again on it. Returns each placement with its new piece and its sockets, joined or free, and each prefab changed with its
+  footprint before and after and its entrances."""
   return await callBridge(context, "swapKitPiece", {"names": names, "piece": piece})
 
 
@@ -2737,8 +2752,9 @@ structureHelp = (
 railsHelp = (
   " rails {piece, height, sides (\"both\", \"left\", \"right\" of travel; both by default)}: a rail piece as bars from post to post, their"
   " tops `height` over the deck, each stretched to fit, or a ropeRail swept along the posts at that height following the deck, its"
-  " top at the height; rails and ropes pass players through (the kit's passable), so open sides can be fallen from, as the client's can."
-  " Rails need posts."
+  " top at the height, hanging plumb however the deck slopes; rails and ropes pass players through (the kit's passable), so open sides"
+  " can be fallen from, as the client's can. Rails need posts on their sides and run the whole stretch: a railed post stands however"
+  " low the walk runs, and where what it stands on reaches the rail's height (a walkway's post at a flight's head) the rail meets that."
 )
 
 
@@ -2756,7 +2772,8 @@ railsHelp = (
   " one (NPC service buildings), a closed shell needs none. Assembling again under its name replaces its parts and entrances, and"
   " instances no longer named go back to the scene collection, so a building is reworked by placing, deleting, and assembling again."
   " Marked as an asset. Refuses an object that is not an instance of this file's pieces, one in two parts or in another prefab, an"
-  " empty part, a part name not camelCase, an interior without an entrance, an entrance more than a step outside the footprint, and a"
+  " empty part, a part name not camelCase, an interior without an entrance, an entrance more than a step outside the footprint, an"
+  " entrance facing into the building (the footprint running on further its way than behind it), and a"
   " name taken by anything but this prefab. Returns its parts (instances, pieces, triangles each), footprint and its size, origin,"
   " entrances in the prefab frame, triangles, and fingerprint." + kitPieceHelp
 ))
@@ -2773,13 +2790,16 @@ async def assemblePrefab(context: Context, name: str, parts: dict[str, list[str]
   " mapped along its sides so its courses run level, no top or bottom faces (Highpass's houses stand on stone bases), one mesh"
   " `<name>Plinth` and one model of its own. Refuses ground inside the footprint more than a step above the floor (it would come up"
   " through the floor: grade the site or raise the floor), and the floor more than a step above the ground under the footprint without"
-  " a plinth (it would float), each naming where and the floor that would fit; a prefab the kit does not hold; a taken name; the"
-  " terrain collection. Returns the floor, the ground's lowest and highest under the footprint and where, the plinth's top, bottom, and"
+  " a plinth (it would float), each naming where and the floor that would fit (a plinth or grading alone where the ground under it runs"
+  " more than two steps); a prefab the kit does not hold; a taken name; the terrain collection; rock or anything else over the ground"
+  " under it, naming the object. Returns the floor, floorOn {object, at, ground} (what set a seated floor, with a warning when it is not"
+  " the ground: a loose piece clipping the footprint), the ground's lowest and highest under the footprint and where, the plinth's top, bottom, and"
   " triangles, the parts with their triangles and the export models they become, each entrance (where it is and faces, the ground a"
   " step outside it, the step up to its threshold, and for a building with an interior part a walk from 10 outside to 10 inside), the"
   " objects its lookups stood on, and views (entrance<Name>: standing 25 out looking at it; orbit: its parts for renderOrbit)."
-  " editStructure moves, turns, or re-plinths it; it goes stale when the ground under its footprint moves or its prefab's footprint or"
-  " entrances change in the kit, and follows its pieces' changes without going stale." + structureHelp + facingHelp
+  " editStructure moves, turns, or re-plinths it; it goes stale when the ground under its footprint moves or its prefab's footprint,"
+  " entrances, or parts (a piece swapped, moved, added, or taken out) change in the kit, and follows its pieces' own changes without"
+  " going stale." + structureHelp + facingHelp
 ))
 async def placePrefab(
   context: Context, name: str, kitPath: str | None, prefab: str, location: list[float], facingDegrees: float, plinth: dict | None = None,
@@ -2799,14 +2819,16 @@ async def placePrefab(
   " {\"arch\": r} rises r over it; level across its `width`. `deck`: a plank piece (planks across edge to edge, round(deck length / plank"
   " depth) of them, each fitted to the width and to the deck length over their count, each turned to the deck's slope where it lies) or"
   " a floor piece (swept along the deck, fitted to the width); the deck and stringers are cut square (vertical) at the anchors, so the deck's end meets the ground it starts from without a sloped sliver to step onto. `stringers`: a beam piece swept under both deck edges. `posts` {piece,"
-  " spacing, above (0)}: post pieces just outside both edges (inner faces at the edges, so the walk keeps the deck's width), at both ends"
+  " spacing, above (0), sides (the rails' sides; both without rails)}: post pieces just outside those edges (inner faces at the edges,"
+  " so the walk keeps the deck's width), at both ends"
   " and evenly at most `spacing` apart, from the deck's underside up to the rails' height plus `above`; the end pairs reach down to"
   " `sink` under the ground as anchors." + railsHelp + " `bents` {stations, post, beam}: trestle frames at those plan distances from the"
   " start: the post piece stretched under each edge from the deck's underside (or the stringers', or under the beam) down to `sink`"
   " under the ground below, and the beam piece (optional) across under the deck. Refused: ends under two plank depths apart in plan;"
   " width over the chord; an end without footing or with rock over it; the deck steeper than `maximumDeckDegrees` anywhere (naming"
   " where, and for a sag or arch the largest that fits); the deck's own underside (stringers may rest in the ground) meeting the ground"
-  " beyond a plank depth from the ends (naming where and how deep: it would run through the hill); rails without posts; a bent station within a width of an end or past"
+  " beyond a plank depth from the ends (naming where and how deep: it would run through the hill); rails without posts, or on a side"
+  " posts do not stand on; a bent station within a width of an end or past"
   " it; an anchor or bent leg with no ground within 300. Returns the plan span, chord, deck length, each end's slope, the steepest, the"
   " lowest deck point, the planks (count and run), posts and anchors with their lengths, rails, bents with each leg's length, the least"
   " clearance under the deck and where, triangles." + structureHelp
@@ -2830,11 +2852,14 @@ async def buildBridge(
   " `tread` across, fitted to the width and to one step's run, so treads meet without a gap, the last at the head's height. `stringers`:"
   " a beam piece swept along both sides under the treads' ends. `posts` {piece, spacing, sides (both by default)}: legs just outside the"
   " edges, evenly at most `spacing` apart, from `sink` under the ground up to the rails' height where that side has rails (else to the"
-  " flight's underside), only where the flight stands more than a step over the ground." + railsHelp + " A walkway's stair legs are laid"
-  " by the same code. Refused: steeper than 45 degrees (naming the run it needs); riser not above 0 or over 2 (a step); a top not a"
-  " riser higher than the bottom; a foot or head without footing within a step; the treads' underside meeting the ground beyond a step"
-  " from its ends (naming where); a leg with no ground within 300; rails without posts. Returns the risers (count and height), run per"
-  " step, pitch, plan length, the legs and their lengths, the least clearance, triangles." + structureHelp
+  " flight's underside), where the flight stands more than a step over the ground or that side has rails." + railsHelp + " A walkway's"
+  " stair legs are laid by the same code. Refused: steeper than 45 degrees (naming the run it needs); riser not above 0 or over 2 (a"
+  " step); a top not a riser higher than the bottom; a foot or head without footing within a step, or lying under what it stands on"
+  " (naming its top: the treads would lie in it); a head set back on the surface it climbs to, so the top tread would lie inside it"
+  " (set the head at its edge); the treads' underside meeting the ground beyond a step from its ends (naming where); a leg with no"
+  " ground within 300; rails without posts. Returns the risers (count and height), run per step, pitch, plan length, the legs and their"
+  " lengths, the least clearance, triangles; views fromFoot, fromHead (just behind the head, looking down it), and side (from the side"
+  " standing in the open, not inside a hill beside it)." + structureHelp
 ))
 async def buildStairs(
   context: Context, name: str, kitPath: str | None, bottom: list[float], top: list[float], width: float, tread: str, riser: float = 1.0,
@@ -2855,10 +2880,11 @@ async def buildStairs(
   " leg steeper than `maximumGradeDegrees` is refused unless listed in `stairLegs`, where a flight is laid instead (buildStairs' code:"
   " `treads`, `riser`); `deck` (plank or floor, as buildBridge's) covers the other legs and the landings (a landing's laid across the"
   " incoming leg's direction and cut to the landing). `posts` {piece, spacing, sides (\"both\", \"left\", \"right\"; both by default)}:"
-  " legs just outside the given edges at every landing corner and evenly at most `spacing` apart along each leg, from `sink` under the"
+  " legs just outside the given edges at every landing corner (on the miter where the edge turns, so a corner post stands out from both"
+  " edges) and evenly at most `spacing` apart along each leg, from `sink` under the"
   " ground up to the rails' height (or the deck's underside where that side has no rail), as Crescent's stilts rise into its rail posts."
   " `brackets` {piece, side, reach, legs}: on the listed legs and the landing edges carrying on from them, at the post stations where the deck stands higher than the beam over the ground, a beam piece level under the deck from its far edge"
-  " across into the rock beside its `side` edge (found within `reach`), stretched to sink `sink` into it, as walkways bolted along a cliff"
+  " across into the rock beside its `side` edge (found within `reach` of that edge), stretched to sink `sink` into it, as walkways bolted along a cliff"
   " are; there the brackets take that side and posts stand only on the other." + railsHelp + " Rails break at each flight's foot and"
   " head. `stringers` as buildBridge's. The ends need not stand on ground (a dock ends over water, a lookout over air); each end's"
   " footing gap is reported (null for none). Refused: fewer than two points or two at one place in plan; a turn over 150 degrees, or a"
@@ -2893,17 +2919,22 @@ async def buildWalkway(
   " there, its base `sink` under the lowest ground at its foot, as Freeport's pillars stand at its joints; wider and deeper than the wall,"
   " else the sections' faces flicker through it. `follow` \"shear\" (the client's way): each section's foot and top slant together to the"
   " ground's fall, verticals vertical: joint heights start at the ground under each joint less sink + shearStep / 2, are lowered until no"
-  " section's straight foot stands above the ground less that anywhere along it (sampled every 1 unit along both faces), then rounded down"
+  " section's straight foot stands above the ground less that anywhere along it (sampled every 1 unit along both faces; a joint two"
+  " sections share lowered once, by the more either needs, so a wall on level ground stays level), then rounded down"
   " by whole shear steps counted from the first joint, so every foot stays at least sink under; a section with rise 0 is an instance of"
   " its piece, any other a mesh object sharing `<piece>Up<r>` or `<piece>Down<r>` (r the rise along the piece's +X in hundredths: the"
   " piece sheared about its middle), so sections of one rise share one model across every wall in the file. `follow` \"step\": each"
   " section level, its foot sink under the lowest ground under it. The ground is found from a step above each point's z when given (a"
   " wall in a cave, on a deck), from above the scene without it (refused where rock lies over ground: give z). Refused: fewer than two"
-  " points or a leg shorter than the shortest section; sections of different depth or height; a leg the modules cannot fill; a variant"
-  " of another module or past the last section; a turn without a post (naming it and its angle); a post no wider or deeper than the"
-  " wall; shearStep not positive; a section buried more than `maximumBurial` anywhere along it (the ground bulges over its line), naming"
-  " it and how deep; the terrain collection. Returns the legs (length, sections), joints (ground and height), sections (piece, rise,"
-  " model, deepest and shallowest burial), the shear models made or reused, posts, and the placements and triangles per model." + structureHelp
+  " points or a leg shorter than the shortest section; sections of different depth or height (between their faces: a variant's frames"
+  " may stand proud); a leg the modules cannot fill; a variant of another module or past the last section; a turn without a post"
+  " (naming it and its angle); a post no wider or deeper than the wall, or one whose top stands under the wall's top beside it; shearStep"
+  " not positive; a section sheared steeper than 30 degrees (step the wall, or run it across the slope); a section buried more than"
+  " `maximumBurial` anywhere along it (the ground bulges over its line, or rises along a stepped one), naming it and how deep; the"
+  " terrain collection. Returns the legs (length, sections), joints (ground, and height when sheared or the bases of the sections"
+  " meeting there when stepped), sections (piece, base at each end, rise, model, deepest and shallowest burial), the shear models made"
+  " or reused, posts, the placements and triangles per model, and views front<leg> (standing on the ground in front of each leg, short of"
+  " any other leg in the way)." + structureHelp
 ))
 async def buildWall(
   context: Context, name: str, kitPath: str | None, path: list[list[float]], frontSide: str, sections: list[str], follow: str = "shear",
@@ -2942,9 +2973,10 @@ async def removeStructure(context: Context, name: str):
 async def getStructures(context: Context, names: list[str] | None = None):
   """Every structure (or those named) in the order they were first laid: kind, order, definition (kitPath absolute), parts with their
   triangles and the export models they become, standsOn (the objects its probes find now), and whether it is stale and why: ground
-  (its probes looked up again: how many moved more than 0.01, the largest change and where), kit (the pieces or prefabs whose
-  fingerprint changed since it was laid: a span bakes its pieces, so it follows the kit only when laid again; a placed prefab follows
-  its pieces at once and goes stale when its prefab's footprint or entrances change), or missing (its kit file, a piece, or a prefab
+  (its probes looked up again: how many moved more than 0.01, the largest change and where, and where a look down from over the scene
+  now meets something standing over the ground, overGround: that object, its top and underside, and the ground under it), kit (the
+  pieces or prefabs whose fingerprint changed since it was laid: a span bakes its pieces, so it follows the kit only when laid again; a
+  placed prefab follows its pieces at once and goes stale when its prefab's footprint, entrances, or parts change), or missing (its kit file, a piece, or a prefab
   cannot be found); its walk line for a bridge, flight, or walkway; its views (orbit: its parts for renderOrbit). Also the loose kit
   pieces placed by hand, counted by kit and piece. Each structure is looked up as its lay looked: leaving out its own parts and every
   structure laid after it. Changes nothing."""

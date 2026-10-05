@@ -515,6 +515,9 @@ def swept(geometry, points, acrossScale=1.0, plumb=False):
   for vertex in numpy.nonzero((segments > 0) & (numpy.abs(along - arcs[segments]) <= onCut))[0]:
     joint = segments[vertex]
     miter = tangents[joint - 1] + tangents[joint]
+    if plumb:
+      # A plumb card's segments meet on the vertical through the joint whatever their slopes: its miter stands upright.
+      miter[2] = 0.0
     miter /= numpy.linalg.norm(miter)
     meeting = []
     for segment in (joint - 1, joint):

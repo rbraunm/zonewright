@@ -89,6 +89,7 @@ def testPrefabRefusals(stageBlenderServer, tmp_path):
       "otherPrefab": await session.expectError("assemblePrefab", {"name": "testKitShed", "parts": {"exterior": ["houseNorth"]}}),
       "partName": await session.expectError("assemblePrefab", {"name": "testKitShed", "parts": {"Exterior": ["plainBlock"]}}),
       "piece": await session.expectError("assemblePrefab", {"name": "testKitWall25", "parts": {"exterior": ["houseNorth"]}}),
+      "inward": await session.expectError("assemblePrefab", {"name": prefab, "parts": parts, "entrances": [structurePlots.houseDoor | {"facingDegrees": 180}]}),
     }
     summary = await session.expectSuccess("getSceneSummary")
     return refusals, summary
@@ -102,6 +103,9 @@ def testPrefabRefusals(stageBlenderServer, tmp_path):
   assert "'houseNorth' is part 'exterior' of prefab 'testKitHouse'" in refusals["otherPrefab"]
   assert "camelCase" in refusals["partName"]
   assert "'testKitWall25' is already the name of a collection in this file that is not a prefab" in refusals["piece"]
+  # The front door's threshold stands 6 in from the footprint's north side and 43.5 from its south.
+  assert "Entrance 'front' at [487.5, 318.75, 0.0] faces 180 degrees, into the building: the footprint runs on 43.50 that way and 6.00 the other" in refusals["inward"]
+  assert "facingDegrees is the way out of the doorway, 0 here" in refusals["inward"]
   assert "testKitShed" not in summary["collections"]
 
 
@@ -207,7 +211,7 @@ def testPlacePrefabRefusesBuryingFloatingAndRockOverGround(stageBlenderServer, t
   assert f"inside the footprint stands {buriedBy:.2f} over the floor at 10.00" in refusals["buried"] and "-104.8] inside the footprint" in refusals["buried"]
   floatBy = 30 - structurePlots.slopeHeight(-80 + footprintHalf[1])
   assert f"stands {floatBy:.2f} over the ground at [" in refusals["floating"] and "-55.2]" in refusals["floating"] and "give a plinth" in refusals["floating"]
-  assert "rock lies over ground" in refusals["rock"] and "give z" in refusals["rock"]
+  assert "'overhang' stands over the ground at [" in refusals["rock"] and "is the top of 'overhang', whose underside" in refusals["rock"] and "give z" in refusals["rock"]
   assert "A building is placed parts, not ground" in refusals["terrain"]
   assert "holds no prefab 'testKitBarn'" in refusals["missing"] and prefab in refusals["missing"]
   assert "'overhang' is already the name of an object" in refusals["taken"]
@@ -317,6 +321,57 @@ def testGroundMovedUnderAPlacedPrefabMakesItStaleAndLayingAgainSeatsIt(stageBlen
   assert relaid["probesMovedSinceLaid"]["moved"] == change["moved"] and relaid["floor"] > 2
   assert relaid["plinth"]["bottom"] == -2.0
   assert fresh["stale"] is False
+
+
+def testSwappingAPartInTheKitMeasuresThePrefabAgainAndItsPlacementsGoStale(stageBlenderServer, tmp_path):
+  zonePath = tmp_path / "zones" / "zone.blend"
+  zonePath.parent.mkdir()
+
+  async def steps(session):
+    kitPath = await structurePlots.testPrefab(session, tmp_path)
+    before = await session.expectSuccess("assemblePrefab", {"name": prefab, "parts": structurePlots.houseParts, "entrances": [structurePlots.houseDoor]})
+    await flatZone(session)
+    await place(session, "house", kitPath, location=[0, 0], facingDegrees=0)
+    await session.expectSuccess("saveFile", {"path": str(zonePath)})
+    await session.expectSuccess("openFile", {"path": str(kitPath)})
+    swapped = await session.expectSuccess("swapKitPiece", {"names": ["houseNorth"], "piece": "testKitWall25Door"})
+    await session.expectSuccess("saveFile", {})
+    await session.expectSuccess("openFile", {"path": str(zonePath)})
+    house = (await session.expectSuccess("getStructures", {}))["structures"][0]
+    return before, swapped, house
+
+  before, swapped, house = stageBlenderServer.session(steps)
+  assert swapped["placements"][0]["piece"]["piece"] == "testKitWall25Door"
+  assert swapped["prefabs"] == [{"prefab": prefab, "footprintBefore": before["footprint"], "footprint": before["footprint"], "entrances": before["entrances"]}]
+  assert house["stale"] is True and house["why"] == ["kit"] and house["kitChanged"] == [prefab]
+
+
+def testTheFloorIsSeatedAndRefusedOnWhatLiesUnderTheFootprint(stageBlenderServer, tmp_path):
+  async def steps(session):
+    kitPath = await structurePlots.testPrefab(session, tmp_path)
+    await structurePlots.testPlot(session, tmp_path)
+    refusals = {
+      "lowerable": await session.expectError("placePrefab", {"name": "barn", "kitPath": str(kitPath), "prefab": prefab, "location": [60, -14, 10], "facingDegrees": 0}),
+      "slope": await session.expectError("placePrefab", {"name": "barn", "kitPath": str(kitPath), "prefab": prefab, "location": [55, -90], "facingDegrees": 0}),
+    }
+    # A loose wall whose top, 30 up, reaches under the house's north-east corner.
+    await session.expectSuccess("placeKitPiece", {"name": "looseWall", "kitPath": str(kitPath), "piece": "testKitWall25", "location": [91, 10.75, 0], "facingDegrees": 0})
+    onWall = await place(session, "shed", kitPath, location=[60, -14], facingDegrees=0, plinth=plinth)
+    await session.expectSuccess("removeStructure", {"name": "shed"})
+    await session.expectSuccess("deleteObjects", {"names": ["looseWall"]})
+    onGround = await place(session, "shed", kitPath, location=[60, -14], facingDegrees=0)
+    await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "canopy", "size": [10, 10, 2], "location": [60, -14, 60]})
+    covered = (await session.expectSuccess("getStructures", {"names": ["shed"]}))["structures"][0]
+    return onWall, onGround, covered, refusals
+
+  onWall, onGround, covered, refusals = stageBlenderServer.session(steps)
+  assert onWall["floor"] == 30.0 and onWall["floorOn"]["object"] == "looseWall" and onWall["floorOn"]["ground"] is False
+  assert onWall["warnings"] == [f"The floor at 30.00 was set by 'looseWall' at {onWall['floorOn']['at']}, the highest thing under the footprint, not by the ground: move the building or 'looseWall' apart, or give the floor's height (location [x, y, z])"]
+  assert onGround["floor"] == 0.0 and onGround["floorOn"]["object"] == "ground" and onGround["floorOn"]["ground"] is True and "warnings" not in onGround
+  # Something placed over the building since makes which ground it stands on a choice: the stale report names it.
+  assert covered["stale"] is True and covered["ground"]["largest"]["probe"] == "overhead" and covered["ground"]["largest"]["overGround"]["object"] == "canopy"
+  assert "give a plinth, or lower the floor to 2.00 or less" in refusals["lowerable"]
+  assert "give a plinth; no floor without one stands on it, the ground under the footprint running from" in refusals["slope"] and "more than two steps apart, so grade the site" in refusals["slope"]
 
 
 def testPrefabPartsRefuseHandEditsNamingTheStructureTools(stageBlenderServer, tmp_path):

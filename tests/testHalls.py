@@ -298,3 +298,164 @@ def testFacadeRefusals(stageBlenderServer, tmp_path):
   assert "width 25 does not frame the cave, 24.0 wide where the face stands: give at least 26.0" in narrow
   assert "height 20.5 does not frame the cave, 20.0 tall where the face stands: give at least 21.0" in low
   assert after == before and detail["definedPasses"] == []
+
+
+# A cliff 100 tall rising from y 88 to y 100 across a 400-square grid of 4-unit cells; halls 24 wide and 20 tall run north into it from
+# the open ground at y 70, each face dressed at y 92 where the cliff stands 33.
+cliffBands = [{"fromFloor": 2, "height": 2.5, "material": "trimLow", "worldUnitsPerRepeat": 2.5}]
+# Open edges and loose vertices away from the grid's border, and pairs of faces on the same corners.
+readSoundness = r"""
+import bmesh
+ground = bpy.data.objects['ground']
+editor = bmesh.new()
+editor.from_mesh(ground.data)
+inner = lambda vertex: abs(vertex.co.x) < 195 and abs(vertex.co.y) < 195
+corners = {}
+for face in editor.faces:
+  corners.setdefault(frozenset(face.verts), []).append(face)
+result = {
+  'openEdges': sum(1 for edge in editor.edges if len(edge.link_faces) == 1 and all(inner(vertex) for vertex in edge.verts)),
+  'looseVertices': sum(1 for vertex in editor.verts if not vertex.link_faces), 'doubledFaces': sum(1 for faces in corners.values() if len(faces) > 1),
+}
+editor.free()
+"""
+# The hall floor's faces: how many are not a cave's lining, and the lowest y of the named cave's lining floor faces' middles.
+readHallFloor = r"""
+import numpy, bridgeMeshAccess, bridgeCaveData
+ground = bpy.data.objects['ground']
+shown, _ = bridgeMeshAccess.readVertexArrays(ground)
+names = [slot.material.name for slot in ground.material_slots]
+lining = bridgeCaveData.liningSelection(ground, True, 'faces')
+own = bridgeCaveData.faceTags(ground, name) == -1
+floors = [polygon for polygon in ground.data.polygons if names[polygon.material_index] == 'hallFloor']
+result = {
+  'notLining': sum(1 for polygon in floors if not lining[polygon.index]),
+  'nearestLiningFloor': min(float(shown[list(polygon.vertices)].mean(axis=0)[1]) for polygon in floors if own[polygon.index]),
+}
+"""
+
+
+async def cliffPlot(session, folder):
+  await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+  await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [400, 400], "spacing": 4, "location": [100, 0, 0], "collection": "terrain"})
+  await session.expectSuccess("sculptOutline", {"objectName": "ground", "mode": "fill", "outline": [[-60, 100], [400, 100], [400, 400], [-60, 400]], "base": 0, "profile": [[-12, 0], [0, 100], [600, 100]]})
+  for name, color in (("cliffGround", (120, 110, 90, 255)), ("hallWall", (150, 140, 120, 255)), ("hallFloor", (90, 80, 70, 255)), ("trimLow", (40, 60, 120, 255))):
+    await session.expectSuccess("createMaterial", {"name": name, "diffuseTexture": str(writePNG(folder / f"{name}.png", 4, 4, color))})
+  await session.expectSuccess("assignMaterial", {"objectName": "ground", "materialName": "cliffGround"})
+  await session.expectSuccess("projectUVs", {"objectName": "ground", "method": "box", "worldUnitsPerRepeat": 12})
+
+
+def cliffHall(name, x, **changes):
+  return {
+    "objectName": "ground", "name": name, "path": [[x, 70, 0], [x, 130, 0]], "widths": [24, 24], "heights": [20, 20], "wallMaterial": "hallWall",
+    "floorMaterial": "hallFloor", "worldUnitsPerRepeat": 12, "wallShare": 1, "trimBands": cliffBands,
+  } | changes
+
+
+def cliffFacade(cave, **changes):
+  return {"objectName": "ground", "cave": cave, "end": "start", "faceAt": 22, "width": 40, "height": 30, "apron": 14} | changes
+
+
+def testTwoHallsStayFreshThroughEachOthersCutsAndRegrades(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await cliffPlot(session, tmp_path)
+    await session.expectSuccess("cutCave", cliffHall("hallP", 20))
+    await session.expectSuccess("cutCave", cliffHall("hallQ", 140))
+    cut = await session.expectSuccess("getObjectDetail", {"name": "ground"})
+    regrades = [await session.expectSuccess("regradeTerrain", {"objectName": "ground"}) for _ in range(2)]
+    game = await session.expectSuccess("checkExport", {"path": str(tmp_path / "halls.eqg"), "purpose": "game"})
+    overlap = await session.expectError("cutCave", cliffHall("hallOver", 40))
+    floor = (await session.expectSuccess("runPython", {"code": "name = 'hallP'\n" + readHallFloor}))["result"]
+    return cut, regrades, game, overlap, floor
+
+  cut, regrades, game, overlap, floor = stageBlenderServer.session(steps)
+  # Each cut leaves the other's ground as that one was cut: neither is stale, and regrading has nothing to refit.
+  assert [(cave["name"], cave["stale"], cave["groundMoved"]["largest"]) for cave in cut["caves"]] == [("hallP", False, 0.0), ("hallQ", False, 0.0)]
+  assert [regraded["refittedCaves"] for regraded in regrades] == [[], []]
+  assert not [failure for failure in game["failures"] if failure["failure"] == "stale"]
+  assert "Cave 'hallOver' would overlap cave(s) ['hallP'] in plan" in overlap
+  # In front of the cliff the hall's floor runs level with the open ground there, which stays ground.
+  assert floor["notLining"] == 0 and floor["nearestLiningFloor"] >= 88 - 4
+
+
+def testTakingAFacadeBackLeavesTheGroundWholeToDressAgain(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await cliffPlot(session, tmp_path)
+    await session.expectSuccess("cutCave", cliffHall("hallA", 20))
+    dressed = await session.expectSuccess("dressFacade", cliffFacade("hallA"))
+    checked = await session.expectSuccess("checkExport", {"path": str(tmp_path / "halls.eqg"), "purpose": "test"})
+    removed = await session.expectSuccess("removeShapingPass", {"objectName": "ground", "name": "facade hallA start"})
+    sound = (await session.expectSuccess("runPython", {"code": readSoundness}))["result"]
+    again = await session.expectSuccess("dressFacade", cliffFacade("hallA"))
+    return dressed, checked, removed, sound, again
+
+  dressed, checked, removed, sound, again = stageBlenderServer.session(steps)
+  assert dressed["foldedFaces"] == 0 and dressed["remappedFaces"] > 0 and dressed["apron"]["deepestCut"] == 0.0
+  # The dressed face and its returns are mapped where they stand; the hall's lining is surfaced by its cave, neither base nor a border.
+  kinds = {finding["finding"] for finding in checked["findings"]}
+  assert not kinds & {"texture stretched or squeezed", "zero texture area", "base material showing", "border without a transition"}, checked["findings"]
+  assert removed["remappedFaces"] > 0 and removed["refit"] is not None
+  assert sound == {"openEdges": 0, "looseVertices": 0, "doubledFaces": 0}
+  assert again["foldedFaces"] == 0 and again["refit"] is not None
+
+
+def testAFacadeBehindTheCliffIsRefusedAndOneTurnedToTheCliffFitsAnObliqueHall(stageBlenderServer, tmp_path):
+  # A hall entering the cliff 22.7 degrees off square: a face square to it stands deep in the rock on its west side.
+  oblique = {"path": [[100, 64, 0], [136, 150, 0]], "heights": [20, 26]}
+
+  async def steps(session):
+    await cliffPlot(session, tmp_path)
+    await session.expectSuccess("cutCave", cliffHall("hallB", 100, **oblique))
+    square = await session.expectError("dressFacade", cliffFacade("hallB", faceAt=39, height=34))
+    turned = await session.expectSuccess("dressFacade", cliffFacade("hallB", faceAt=30, turnDegrees=-22.71))
+    narrow = await session.expectError("dressFacade", cliffFacade("hallB", faceAt=30, turnDegrees=-22.71, width=27))
+    return square, turned, narrow
+
+  square, turned, narrow = stageBlenderServer.session(steps)
+  assert "The ground in front of the face rises to" in square and "over the face's top at 34.0: the face stands behind the cliff's face there" in square
+  assert round(turned["frame"]["facingDegrees"], 2) == 180.0 and turned["foldedFaces"] == 0
+  # Turned to the cliff's line, the face runs along it, every corner at one y.
+  corners = turned["corners"]
+  assert max(corner[1] for corner in corners) - min(corner[1] for corner in corners) <= 0.01, corners
+  assert "crossing the face turned -22.71 degrees on 26.0: give at least 28.0" in narrow
+
+
+def testEditingADressedHallDressesItsFacadeAgainOrRefuses(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await cliffPlot(session, tmp_path)
+    await session.expectSuccess("cutCave", cliffHall("hallA", 20))
+    await session.expectSuccess("dressFacade", cliffFacade("hallA"))
+    wide = await session.expectError("editCave", {"objectName": "ground", "name": "hallA", "changes": {"widths": [42, 42]}})
+    tall = await session.expectError("editCave", {"objectName": "ground", "name": "hallA", "changes": {"heights": [34, 34]}})
+    moved = await session.expectSuccess("editCave", {"objectName": "ground", "name": "hallA", "changes": {"path": [[32, 70, 0], [32, 130, 0]]}})
+    detail = await session.expectSuccess("getObjectDetail", {"name": "ground"})
+    return wide, tall, moved, detail
+
+  wide, tall, moved, detail = stageBlenderServer.session(steps)
+  assert "The facade at the cave's start would no longer frame it: width 40 does not frame the cave, 42.0 wide where the face stands" in wide
+  assert "removeShapingPass 'facade hallA start'" in wide
+  assert "height 30 does not frame the cave, 34.0 tall where the face stands" in tall
+  assert [(entry["end"], entry["frame"]["center"]) for entry in moved["refitFacades"]] == [("start", [32.0, 92.0, 0.0])]
+  assert [(entry["facade"], entry["stale"]) for entry in detail["definedPasses"]] == [("hallA start", False)]
+  assert [(cave["name"], cave["stale"]) for cave in detail["caves"]] == [("hallA", False)]
+
+
+def testAFacadeKeepsOffOtherCavesGroundAndARegradeNamesTheHandWorkItTakesBack(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await cliffPlot(session, tmp_path)
+    await session.expectSuccess("cutCave", cliffHall("hallA", 20))
+    await session.expectSuccess("cutCave", cliffHall("hallB", 160))
+    await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "bump"})
+    await session.expectSuccess("sculptAtPoint", {"objectName": "ground", "mode": "raise", "center": [130, 74, 0], "radius": 8, "strength": 3})
+    await session.expectSuccess("regradeTerrain", {"objectName": "ground"})
+    reaching = await session.expectError("dressFacade", cliffFacade("hallA", blend=150))
+    await session.expectSuccess("dressFacade", cliffFacade("hallA"))
+    await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "touchUp"})
+    await session.expectSuccess("sculptAtPoint", {"objectName": "ground", "mode": "raise", "center": [24, 82, 0], "radius": 8, "strength": 3})
+    regraded = await session.expectSuccess("regradeTerrain", {"objectName": "ground"})
+    return reaching, regraded
+
+  reaching, regraded = stageBlenderServer.session(steps)
+  assert "The facade's apron or blend reaches the ground within reach of cave(s) ['hallB']" in reaching
+  (facade,) = [summary for summary in regraded["replayed"] if summary.get("facade") == "hallA start"]
+  assert [entry["pass"] for entry in facade["overrodeHandWork"]] == ["touchUp"] and facade["overrodeHandWork"][0]["largestOffset"] > 0

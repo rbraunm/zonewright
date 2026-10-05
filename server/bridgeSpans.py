@@ -511,6 +511,7 @@ def layStairs(laying):
     if found is None:
       raise ValueError(f"The flight's {label} {roundVector(point, 2)} has no footing within a step ({stepHeight:g}) below it")
     if found - point[2] > buriedTolerance:
+      found = round(found, 2) + 0.0
       raise ValueError(
         f"The flight's {label} {roundVector(point, 2)} lies {found - point[2]:.2f} under what it stands on there (the top of '{laying.lookups.lastOwner}' at"
         f" {found:.2f}), so its {'top tread would run into its side' if label == 'head' else 'first treads would lie in it'}; set the {label} on that top (z {found:.2f})"
@@ -521,7 +522,7 @@ def layStairs(laying):
   underLast = laying.lookups.below((lastMiddle[0], lastMiddle[1], top[2] - thickness / 2))
   if underLast is not None and underLast > top[2] - thickness + meetingTolerance:
     raise ValueError(
-      f"The flight's top tread would lie inside what its head stands on ('{laying.lookups.lastOwner}', its top at {underLast:.2f}), the two tops one surface:"
+      f"The flight's top tread would lie inside what its head stands on ('{laying.lookups.lastOwner}', its top at {round(underLast, 2) + 0.0:.2f}), the two tops one surface:"
       f" the head runs onto it; set the head at its edge, where the flight meets it"
     )
   bake = bridgeKitGeometry.Bake()
