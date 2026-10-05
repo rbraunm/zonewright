@@ -1108,8 +1108,10 @@ maximumShortNameLength = 31
 
 
 def isWithin(path, folder):
-  """Whether path lies inside folder once both are resolved (links and junctions followed, '..' taken), case-insensitively."""
-  return Path(os.path.normcase(path.resolve())).is_relative_to(Path(os.path.normcase(folder.resolve())))
+  """Whether path lies inside folder: some folder holding it, once resolved (links and junctions followed, '..' taken), is folder by
+  file identity, so every spelling of folder counts (case, a short name, an extended-length or UNC loopback prefix, a mapped drive)."""
+  resolved = path.resolve()
+  return any(ancestor.exists() and os.path.samefile(ancestor, folder) for ancestor in (resolved, *resolved.parents))
 
 
 def exportTarget(path):
@@ -1121,13 +1123,16 @@ def exportTarget(path):
     raise ToolError(f"Zone name '{zone}' must be lowercase letters and digits, as the client's zone short names are")
   if len(zone) > maximumShortNameLength:
     raise ToolError(f"Zone name '{zone}' is {len(zone)} characters; a zone's short name holds at most {maximumShortNameLength}")
-  clientFolder = os.environ.get("EVERQUEST_CLIENT")
-  if not clientFolder:
-    raise ToolError("EVERQUEST_CLIENT is not set; an export must know the client folder to stay out of it")
-  if isWithin(archivePath, Path(clientFolder)):
+  clientFolder = zoneSources.resolveClientRoot()
+  try:
+    inside = [target for target in exportPipeline.exportFilePaths(archivePath.parent, zone) if isWithin(target, clientFolder)]
+  except OSError as error:
+    raise ToolError(f"Whether an export to '{path}' stays out of the EverQuest client folder cannot be told: {type(error).__name__}: {error}") from error
+  if inside:
     raise ToolError(
-      f"'{path}' lies inside the EverQuest client folder ({clientFolder}): an export writes and removes files beside its archive, and"
-      " would remove the client's own (such as neighborhood_assets.txt); export to a staging folder and copy the client's files from there"
+      f"An export to '{path}' writes or removes '{inside[0]}', which lies inside the EverQuest client folder ({clientFolder}): an export"
+      " writes and removes files beside its archive and under its server folder, and would remove the client's own (such as"
+      " neighborhood_assets.txt); export to a staging folder and copy the client's files from there"
     )
   return archivePath, zone
 
@@ -1155,7 +1160,7 @@ async def writeExport(folder, built, blendPath):
   try:
     return await anyio.to_thread.run_sync(exportPipeline.writeExport, folder, built, blendPath)
   except OSError as error:
-    raise ToolError(f"{type(error).__name__}: {error}") from error
+    raise ToolError("\n".join([f"{type(error).__name__}: {error}", *getattr(error, "__notes__", [])])) from error
 
 
 def clearCheckFolder(zone):
@@ -1194,16 +1199,18 @@ async def checkExport(context: Context, path: str, purpose: str):
 
 @guardedTool(description=(
   "Write the saved scene as an EQG zone archive at `path`, an absolute path ending in <zone>.eqg, the zone's short name in lowercase"
-  " letters and digits (at most 31), outside the EverQuest client folder (an export writes and removes files beside its archive), after"
+  " letters and digits (at most 31), outside the EverQuest client folder however the path spells it (an export writes and removes files"
+  " beside its archive and under its server folder, and none of them may lie in the client folder, a linked server folder included), after"
   " the checks for its purpose (checkExport): any failure refuses the export and lists them all, and nothing is written. Beside the"
   " archive goes <zone>_export.json, the manifest: the purpose, the short name, the .blend, every file written with its size and SHA-256,"
   " and the failure and finding counts. A game export also writes the server's map files built from the archive's bytes under"
   " server\\maps, laid out as the server's maps folder (base\\<zone>.map, water\\<zone>.wtr, nav\\<zone>.nav), and records the nav"
   " settings, the Recast helper, and the nav's islands and probes in the manifest; a test export removes this zone's files under server\\"
-  " (they would no longer match its archive) and lists them in `serverFilesRemoved`. Every file is written whole under a temporary"
-  " name first (making the folders it needs); then the other files take the last export's places and the archive goes in last, and a"
-  " failure at any point (a target that is a folder among them) puts every file back as it was, so a refused or failed export never"
-  " replaces the last good archive or its other files and leaves no partial file. The `terrain` collection's meshes become the zone's terrain;"
+  " (they would no longer match its archive) and lists them in `serverFilesRemoved`. A target that is a folder or read-only, a file"
+  " where a folder must be, or a <file>.previous an export that did not finish left refuses before anything is written. Every file is"
+  " written whole under a temporary name first (making the folders it needs); then the other files take the last export's places and"
+  " the archive goes in last, and a failure before the archive is in place puts every file back as it was, so a refused or failed export"
+  " never replaces the last good archive or its other files and leaves no partial file. The `terrain` collection's meshes become the zone's terrain;"
   " every other rendered mesh becomes a model placed at its object's transform (copies sharing a mesh and without modifiers share one"
   " model) and every collection instance a model of its collection's meshes and, to any depth, of the collections its members instance."
   " So a kit piece is one model however often placed, a placed building one model per part shared by its placements and its plinth one"

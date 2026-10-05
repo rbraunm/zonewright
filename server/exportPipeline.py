@@ -5,6 +5,7 @@ from the archive's bytes, under server\\maps laid out as akk-stack's server/maps
 test export removes this zone's server files, which would no longer match its archive. Every file goes in together, or none does."""
 import hashlib
 import json
+import os
 
 from mcp.server.mcpserver.exceptions import ToolError
 
@@ -37,6 +38,11 @@ def sideFilePaths(folder, zone):
 
 def manifestPath(folder, zone):
   return folder / f"{zone}_export.json"
+
+
+def exportFilePaths(folder, zone):
+  """Every file an export to folder writes or removes: the archive, its manifest, its side files, and this zone's server files."""
+  return [folder / f"{zone}.eqg", manifestPath(folder, zone), *sideFilePaths(folder, zone).values(), *serverFilePaths(folder, zone).values()]
 
 
 def sideContents(collected, zone):
@@ -187,52 +193,87 @@ def writeExport(folder, built, blendPath):
 
 
 def missingFolders(folders):
-  """The folders, and their parents, that do not exist yet, outermost first."""
+  """The folders, and their parents, that do not exist yet, outermost first. A file where a folder must be fails."""
   missing = set()
   for folder in folders:
     for ancestor in (folder, *folder.parents):
-      if ancestor.exists():
+      if ancestor.is_dir():
         break
+      if ancestor.exists():
+        raise NotADirectoryError(f"{ancestor} is a file, where the export needs a folder")
       missing.add(ancestor)
   return sorted(missing, key=lambda path: len(path.parts))
 
 
+def keptPath(target):
+  return target.with_name(target.name + ".previous")
+
+
+def refuseUnreplaceable(targets):
+  """Fail, before anything is written, on a target replaceExportFiles could not take aside and put back: a folder, a read-only file
+  (Windows lets it be renamed but not removed), or one whose <target>.previous an export that did not finish left, which may hold that
+  export's only copy of the file."""
+  for target in targets:
+    kept = keptPath(target)
+    if kept.exists():
+      raise FileExistsError(f"{kept} is left from an export that did not finish and may hold the last export's file: put it back as {target.name} or remove it")
+    if target.exists() and not target.is_file():
+      raise IsADirectoryError(f"{target} is a folder, where the export writes or removes a file")
+    if target.exists() and not os.access(target, os.W_OK):
+      raise PermissionError(f"{target} is read-only, where the export replaces or removes a file")
+
+
+def attempted(action, *arguments):
+  """Run one step of putting files back; its failure as text, so the steps after it still run."""
+  try:
+    action(*arguments)
+  except OSError as error:
+    return [f"{type(error).__name__}: {error}"]
+  return []
+
+
 def replaceExportFiles(archivePath, archiveBytes, otherContents):
   """Put an export's files in the last export's places: each written whole under a temporary name beside its target (making the folders
-  it needs), then the other files (removed where the content is None) and the archive last. A target that is a folder fails. A failure
-  at any point puts every file back as it was and leaves no temporary file or new folder."""
+  it needs), then the other files taken aside to <target>.previous and replaced (or removed where the content is None), and the archive
+  last. What could not be put back (refuseUnreplaceable) fails before anything is written. A failure before the archive is in place
+  puts every file back as it was and leaves no temporary file or new folder, its notes naming any step of that which failed. Once the
+  archive is in place the files taken aside are removed; one that cannot be fails, saying the export is in place."""
   contents = otherContents | {archivePath: archiveBytes}
+  refuseUnreplaceable(contents)
   temporaries = {target: target.with_name(target.name + ".partial") for target, content in contents.items() if content is not None}
   newFolders = missingFolders({target.parent for target in temporaries})
-  previous, placed = {}, []
+  made, previous, placed = [], {}, []
   try:
     for folder in newFolders:
       folder.mkdir()
+      made.append(folder)
     for target, temporary in temporaries.items():
       temporary.write_bytes(contents[target])
     for target in otherContents:
       if target.exists():
-        if not target.is_file():
-          raise IsADirectoryError(f"{target} is a folder, where the export writes or removes a file")
-        previous[target] = target.with_name(target.name + ".previous")
-        target.replace(previous[target])
+        target.replace(keptPath(target))
+        previous[target] = keptPath(target)
     for target in otherContents:
       if target in temporaries:
         temporaries[target].replace(target)
         placed.append(target)
     temporaries[archivePath].replace(archivePath)
-  except OSError:
+  except OSError as error:
+    unrestored = []
     for target in placed:
-      target.unlink()
+      if target not in previous:
+        unrestored += attempted(target.unlink)
     for target, kept in previous.items():
-      kept.replace(target)
+      unrestored += attempted(kept.replace, target)
     for temporary in temporaries.values():
-      temporary.unlink(missing_ok=True)
-    for folder in reversed(newFolders):
-      folder.rmdir()
+      unrestored += attempted(temporary.unlink, True)
+    for folder in reversed(made):
+      unrestored += attempted(folder.rmdir)
+    if unrestored:
+      error.add_note("Not put back: " + "; ".join(unrestored))
     raise
-  finally:
-    for temporary in temporaries.values():
-      temporary.unlink(missing_ok=True)
+  left = []
   for kept in previous.values():
-    kept.unlink()
+    left += attempted(kept.unlink)
+  if left:
+    raise OSError(f"Every file of the export is in place, but what it took aside from the last export could not be removed: {'; '.join(left)}")

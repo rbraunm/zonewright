@@ -2,8 +2,8 @@
 by height and slope (faces seen edge-on from above, such as upright walls, show only as the edges between heights), with the .wtr's
 region boxes outlined and numbered; two collisions side by side with the triangles that differ between them; a nav mesh's polygons
 (serverNav.inspectNav's) filled by nav area, by NPC component with the islands numbered, or as a difference against another nav, in
-panels side by side on one frame, each titled and with its legend; and the server's view of a zone, its collision, region boxes, NPC
-nav, and marked points in one plan."""
+panels side by side on one frame, each titled and with its legend; and the server's view of a zone, its collision (what stands upright
+drawn as lines, so a thin wall shows), region boxes, NPC nav, and marked points in one plan."""
 import collections
 import math
 
@@ -48,6 +48,9 @@ navFillAlpha = 120
 unreachedIslandColor = (150, 150, 150)
 markerRadius = 6
 markerLabelSize = 14
+uprightColor = (150, 20, 20)
+uprightDegrees = 5
+uprightLineWidth = 2
 
 
 def collisionFrame(serverTriangles, longSide):
@@ -365,6 +368,21 @@ def serverPolygonColor(component, islandReach):
   return islandColor if islandReach is None or islandReach[component - 1] else unreachedIslandColor
 
 
+def uprightSegments(zoneTriangles, frame):
+  """The triangles standing within uprightDegrees of vertical, which the top surface shows little or nothing of (a thin wall, nothing),
+  each as its longest span in plan: rows of (x0, y0, x1, y1) in the frame's pixels."""
+  corners = zoneTriangles.astype(numpy.float64)
+  normals = numpy.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0])
+  lengths = numpy.linalg.norm(normals, axis=1)
+  upright = (lengths > 0) & (numpy.abs(normals[:, 2]) <= math.sin(math.radians(uprightDegrees)) * lengths)
+  x, y = frame.pixel((corners[upright, :, 0], corners[upright, :, 1]))
+  pairs = numpy.array([[0, 1], [1, 2], [2, 0]])
+  spans = numpy.hypot(x[:, pairs[:, 0]] - x[:, pairs[:, 1]], y[:, pairs[:, 0]] - y[:, pairs[:, 1]])
+  longest = pairs[spans.argmax(axis=1)]
+  rows = numpy.arange(len(longest))
+  return numpy.stack([x[rows, longest[:, 0]], y[rows, longest[:, 0]], x[rows, longest[:, 1]], y[rows, longest[:, 1]]], axis=1)
+
+
 def islandLegend(islands, islandReach):
   atRisk = sum(island["snapRisk"] for island in islands)
   if islandReach is None:
@@ -377,8 +395,8 @@ def islandLegend(islands, islandReach):
 
 
 def drawServerPlan(outputPath, mapContent, waterRecords, regionLabels, inspection, markers, islandReach=None, longSide=1000):
-  """The server's view of a zone from its files alone, north up: the .map's collision in grey relief and what it holds that the server
-  never collides with tinted blue; the nav's polygons over them (serverNav.inspectNav's), the main piece green, islands orange where
+  """The server's view of a zone from its files alone, north up: the .map's collision in grey relief, what of it stands upright (walls,
+  the sides of blocks) as dark red lines along it, and what it holds that the server never collides with tinted blue; the nav's polygons over them (serverNav.inspectNav's), the main piece green, islands orange where
   players reach them and grey where they do not (islandReach, by island number; None draws every island orange and the legend says
   players' reach was not checked), numbered, and what the server's ground filter never walks (Disabled, zone line) dark; the .wtr's
   boxes outlined in their type's color (water cyan, lava magenta, zone lines green), each with its label (regionLabels, in .wtr order);
@@ -408,6 +426,9 @@ def drawServerPlan(outputPath, mapContent, waterRecords, regionLabels, inspectio
   layer = Image.new("RGBA", frame.size, (0, 0, 0, 0))
   draw = ImageDraw.Draw(layer)
   planDrawing.drawGrid(draw, frame)
+  upright = uprightSegments(serverMapFiles.inZoneAxes(collision), frame)
+  for segment in upright:
+    draw.line(segment.tolist(), fill=(*uprightColor, 255), width=uprightLineWidth)
   outlines = [[frame.pixel(point) for point in regionOutline(record)] for record in waterRecords]
   for record, outline in zip(waterRecords, outlines):
     draw.polygon(outline, outline=(*regionColor(record), 255), width=3)
@@ -434,6 +455,7 @@ def drawServerPlan(outputPath, mapContent, waterRecords, regionLabels, inspectio
   typeCounts = collections.Counter(record["type"] for record in waterRecords)
   main = inspection["mainPiece"]
   legend = [((150, 150, 150), f"collision (.map): {len(collision):,} triangles, lighter higher")]
+  legend += [(uprightColor, f"upright collision (.map): {len(upright):,} triangles, as lines")] if len(upright) else []
   legend += [(passableColor, f"never collided with (.map): {len(passable):,} triangles")] if len(passable) else []
   legend += [(regionColor({"type": kind}), f"{serverMapFiles.waterRegionTypeNames.get(kind, kind)} boxes (.wtr): {count}") for kind, count in sorted(typeCounts.items())]
   legend += [(mainPieceColor, f"NPC main piece{' (stand-in: largest)' if main['standIn'] else ''}: {main['polygons']:,} polygons")]
