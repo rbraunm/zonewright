@@ -606,8 +606,8 @@ def structureReport(shipped, placed):
         continue
       total += triangles.get(part.name, 0)
       if role in ("mesh", "instance"):
-        model = models.setdefault(bridgeExport.modelFile(part, role), {"file": bridgeExport.modelFile(part, role), "triangles": triangles.get(part.name, 0), "placements": 0})
-        model["placements"] += 1
+        modelFile = bridgeExport.modelFile(part, role)
+        models.setdefault(modelFile, {"file": modelFile, "triangles": triangles.get(part.name, 0), "placements": 0})["placements"] += 1
     structures.append({
       "structure": collection.name, "kind": bridgeStructureData.readStructure(collection)["kind"], "models": sorted(models.values(), key=lambda model: model["file"]),
       "triangles": total, "terrain": bridgeStructures.isGround(collection),
