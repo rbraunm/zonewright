@@ -12,7 +12,7 @@ A source is surveyed with `surveyAssets`:
 | A client image folder | `folder:<folder>` | The loose images in `Resources/Sky`, `Resources/WaterSwap`, `Resources/Precipitation`, or `EnvEmitterEffects` |
 | An EQG zone archive | `file:<path>` | An archive outside the client, such as one `exportZone` wrote, with the emitter list beside it |
 
-A zone that ships both a classic and an EQG version cannot be surveyed, as the client's files do not say which one it loads.
+A zone that ships both a classic and an EQG version is surveyed as the EQG one, which the client loads ([clientRendering.md](clientRendering.md#which-files-load)).
 
 ## Asset kinds and ids
 
