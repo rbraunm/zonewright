@@ -40,6 +40,14 @@ def testAxesRoundTripAndRecastKeepsWinding():
   assert numpy.allclose(numpy.cross(serverCorners[1] - serverCorners[0], serverCorners[2] - serverCorners[0]), -numpy.array(eqAxes.serverFromZone(zoneNormal)))
 
 
+def testFrameConvertersKeepFloat32():
+  # Collision and nav triangles are float32; a converter that widened them would change what is written and doubled in memory.
+  corners = numpy.array([[[1.5, -2.0, 0.25], [7.0, 3.0, -1.0], [-4.0, 6.5, 2.0]]], dtype=numpy.float32)
+  for convert in (eqAxes.serverFromZone, eqAxes.zoneFromServer, eqAxes.recastFromZone, eqAxes.zoneFromRecast, eqAxes.recastFromServer):
+    converted = convert(corners)
+    assert converted.dtype == numpy.float32 and converted.shape == corners.shape, convert.__name__
+
+
 def testPlayerScaleNamesASourceForEveryConstant():
   constants = {name for name, value in vars(playerScale).items() if not name.startswith("_") and isinstance(value, float)}
   assert {"playerHeight", "walkableNormalZ", "stepHeight", "eyeHeight", "swimEyeAboveSurface"} <= constants
