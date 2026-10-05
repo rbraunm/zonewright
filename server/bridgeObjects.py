@@ -18,6 +18,8 @@ import bridgeKitGeometry
 import bridgeMeshAccess
 import bridgePasses
 import bridgeShaping
+import bridgeStructureData
+import bridgeStructures
 
 roundShapes = ("cylinder", "cone", "sphere")
 eulerModes = ("XYZ", "XZY", "YXZ", "YZX", "ZXY", "ZYX")
@@ -305,6 +307,8 @@ def transformObjects(names, translate, rotateDegrees, scale, location, rotationD
     raise ValueError("Nothing to change: pass at least one of translate, rotateDegrees, scale, location, rotationDegrees")
   sceneObjects = [bridgeMeshAccess.requireObject(name) for name in names]
   for sceneObject in sceneObjects:
+    bridgeStructureData.requireNotStructurePart(sceneObject, "transformObjects")
+  for sceneObject in sceneObjects:
     if location is not None:
       sceneObject.location = location
     if translate is not None:
@@ -325,6 +329,8 @@ def transformObjects(names, translate, rotateDegrees, scale, location, rotationD
 def duplicateObjects(names, offset, linkData):
   """Copy objects with everything parented under them, once each: an object named under another named one comes with that one."""
   sources = [bridgeMeshAccess.requireObject(name) for name in names]
+  for source in sources:
+    bridgeStructureData.requireNotStructurePart(source, "duplicateObjects")
   roots = [source for source in sources if not any(ancestor in sources for ancestor in ancestorsOf(source))]
   copies = {}
   for root in roots:
@@ -364,8 +370,8 @@ def joinObjects(names, into):
   """Merge meshes into one object; the `into` object keeps its name, origin, and transform, and the others are removed."""
   if into not in names or len(set(names)) < 2:
     raise ValueError(f"joinObjects needs at least two distinct meshes including '{into}', got {names}")
-  sceneObjects = [bridgeMeshAccess.requireMeshObject(name) for name in names]
-  target = bridgeMeshAccess.requireMeshObject(into)
+  sceneObjects = [bridgeMeshAccess.requireEditableMesh(name, "joinObjects") for name in names]
+  target = bridgeMeshAccess.requireEditableMesh(into, "joinObjects")
   if any(len(sceneObject.modifiers) for sceneObject in sceneObjects):
     raise ValueError("Apply or remove modifiers before joining; join merges the base meshes")
   for sceneObject in sceneObjects:
@@ -385,6 +391,8 @@ def joinObjects(names, into):
 
 def deleteObjects(names):
   sceneObjects = [bridgeMeshAccess.requireObject(name) for name in names]
+  for sceneObject in sceneObjects:
+    bridgeStructureData.requireNotStructurePart(sceneObject, "deleteObjects")
   removedData = []
   for sceneObject in sceneObjects:
     data = sceneObject.data
@@ -398,6 +406,11 @@ def deleteObjects(names):
 def organize(renames, parents, collections):
   if renames is None and parents is None and collections is None:
     raise ValueError("Nothing to organize: pass renames, parents, or collections")
+  for oldName in renames or {}:
+    bridgeStructureData.requireNotStructurePart(bridgeMeshAccess.requireObject(oldName), "organize")
+  for name in list(parents or {}) + [parent for parent in (parents or {}).values() if parent is not None] + list(collections or {}):
+    if bpy.data.objects.get(name) is not None:
+      bridgeStructureData.requireNotStructurePart(bpy.data.objects[name], "organize")
   for oldName, newName in (renames or {}).items():
     sceneObject = bridgeMeshAccess.requireObject(oldName)
     requireNewName(newName)
@@ -469,6 +482,9 @@ def getObjectDetail(name):
     detail["kitPiece"] = {key: value for key, value in placement["piece"].items() if key != "size"} | {"facingDegrees": placement["facingDegrees"], "sockets": placement["sockets"]}
   elif sceneObject.type == "MESH" and (piece := bridgeKitData.pieceOfMesh(sceneObject)) is not None:
     detail["kitPiece"] = bridgeKitGeometry.describePiece(piece)
+  part = bridgeStructures.describePart(sceneObject)
+  if part is not None:
+    detail["structurePart"] = part
   return detail
 
 

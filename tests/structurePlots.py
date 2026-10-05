@@ -69,6 +69,81 @@ def slopeHeight(y):
   return (slopeStart - y) * math.tan(math.radians(slopeDegrees))
 
 
+def gorgeHeight(x):
+  """The test plot's ground across the gorge: its walls fall 2 for every 1 in from the rims to its floor."""
+  inside = min(x - gorgeRims[0], gorgeRims[1] - x)
+  return 0.0 if inside <= 0 else max(-gorgeDepth, -2 * inside)
+
+
+def plotGround(x, y):
+  """The test plot's ground at a point away from the cliff's west end: the gorge, the cliff, the slope, or flat."""
+  if gorgeRims[0] < x < gorgeRims[1]:
+    return gorgeHeight(x)
+  if x >= 0 and y >= cliffFoot:
+    return min(cliffHeight, (y - cliffFoot) * cliffHeight / (cliffBrow - cliffFoot))
+  if slopeSpan[0] <= x <= slopeSpan[1] and y < slopeStart:
+    return slopeHeight(y)
+  return 0.0
+
+
+def cliffFaceY(z):
+  """Where the test plot's cliff face stands at a height."""
+  return cliffFoot + (cliffBrow - cliffFoot) * z / cliffHeight
+
+
+readFaces = """
+import bpy, numpy
+found = []
+for name in names:
+  sceneObject = bpy.data.objects[name]
+  mesh = sceneObject.data
+  matrix = numpy.array(sceneObject.matrix_world)
+  positions = numpy.array([list(vertex.co) for vertex in mesh.vertices]).reshape(-1, 3) @ matrix[:3, :3].T + matrix[:3, 3]
+  attribute = mesh.attributes.get('zonewrightPassable')
+  for polygon in mesh.polygons:
+    material = sceneObject.material_slots[polygon.material_index].material if polygon.material_index < len(sceneObject.material_slots) else None
+    found.append({
+      'object': name, 'material': None if material is None else material.name, 'passable': bool(attribute.data[polygon.index].value) if attribute is not None else False,
+      'points': positions[list(polygon.vertices)].round(6).tolist(),
+    })
+result = found
+"""
+
+
+async def faces(session, *names):
+  """Every face of the named meshes in the world: its material, whether it is flagged passable, and its corners."""
+  return (await session.expectSuccess("runPython", {"code": f"names = {list(names)!r}\n" + readFaces}))["result"]
+
+
+readParts = """
+import bpy, numpy
+import bridgeMeshAccess
+found = {}
+for name in names:
+  sceneObject = bpy.data.objects[name]
+  points = []
+  for part, matrix in bridgeMeshAccess.objectParts(sceneObject):
+    world = numpy.array(matrix)
+    points += (numpy.array([list(vertex.co) for vertex in part.data.vertices]).reshape(-1, 3) @ world[:3, :3].T + world[:3, 3]).round(6).tolist()
+  found[name] = {
+    'type': sceneObject.type, 'instance': sceneObject.instance_collection.name if sceneObject.instance_collection is not None else None,
+    'mesh': sceneObject.data.name if sceneObject.type == 'MESH' else None, 'points': points,
+    'local': numpy.array([list(vertex.co) for vertex in sceneObject.data.vertices]).round(6).tolist() if sceneObject.type == 'MESH' else None,
+    'matrix': [list(row) for row in sceneObject.matrix_world],
+  }
+result = found
+"""
+
+
+async def parts(session, names):
+  """Each named object's type, the collection it instances or its mesh, its vertices in the world, and its own mesh's vertices."""
+  return (await session.expectSuccess("runPython", {"code": f"names = {list(names)!r}\n" + readParts}))["result"]
+
+
+def pointsNear(faceList, x, y, radius):
+  return [point for face in faceList for point in face["points"] if math.hypot(point[0] - x, point[1] - y) <= radius]
+
+
 async def testPlot(session, folder):
   """The test plot: ground 240 x 240 every 4 in `terrain`, a gorge 80 wide at its rims (x -100 to -20) and 40 deep (its floor x -80 to
   -40) the full length in y, a cliff 60 tall facing south for x 0 to 120 (its face from y 12 at z 0 to y 20 at z 60, its top to y 120),

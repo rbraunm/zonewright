@@ -24,9 +24,12 @@ import bridgeModels
 import bridgeObjects
 import bridgeShaping
 import bridgeSketch
+import bridgeSpans  # registers its kinds with bridgeStructures
+import bridgeStructures
 import bridgeSwim
 import bridgeSurfacing
 import bridgeViews
+import bridgeWalls  # registers its kind with bridgeStructures
 import bridgeWater
 import skyDrawing
 from bridgeState import requireNoUnsavedChanges, state
@@ -316,7 +319,7 @@ commands = {
   "pick": (pick, False),
   "renderPasses": (renderPasses, False),
   "renderModelThumbnails": (bridgeViews.renderModelThumbnails, False),
-} | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands | bridgeModels.commands | bridgeExportChecks.commands | bridgePasses.commands | bridgeEnvironment.commands | bridgeReview.commands | bridgeReviewGuides.commands | bridgeAuthoring.commands | bridgeWater.commands | bridgeHousing.commands | bridgeGrading.commands | bridgeSketch.commands | bridgeSwim.commands | bridgeArrangement.commands | bridgeBoundaries.commands | bridgeCaves.commands | bridgeKits.commands
+} | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands | bridgeModels.commands | bridgeExportChecks.commands | bridgePasses.commands | bridgeEnvironment.commands | bridgeReview.commands | bridgeReviewGuides.commands | bridgeAuthoring.commands | bridgeWater.commands | bridgeHousing.commands | bridgeGrading.commands | bridgeSketch.commands | bridgeSwim.commands | bridgeArrangement.commands | bridgeBoundaries.commands | bridgeCaves.commands | bridgeKits.commands | bridgeStructures.commands
 
 
 def dispatch(command, arguments):

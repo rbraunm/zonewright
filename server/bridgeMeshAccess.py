@@ -14,6 +14,7 @@ import numpy
 
 import bridgeCaveData
 import bridgeNoise
+import bridgeStructureData
 import playerScale
 
 selectorKeys = (
@@ -485,6 +486,13 @@ def requireMeshObject(name):
   sceneObject = requireObject(name)
   if sceneObject.type != "MESH":
     raise ValueError(f"'{name}' is a {sceneObject.type}, not a mesh")
+  return sceneObject
+
+
+def requireEditableMesh(name, action):
+  """A mesh the tool named by action may change: not part of a structure laid from its definition."""
+  sceneObject = requireMeshObject(name)
+  bridgeStructureData.requireNotStructurePart(sceneObject, action)
   return sceneObject
 
 

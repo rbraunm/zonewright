@@ -86,7 +86,7 @@ def writeWorldPositions(sceneObject, worldPositions):
 
 
 def moveVertices(objectName, selector, offset, falloff):
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "moveVertices")
   mask = bridgeMeshAccess.evaluateSelector(selector, sceneObject, "vertices")
   bridgeMeshAccess.requireSelection(mask, selector, sceneObject, "vertices")
   positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
@@ -113,7 +113,7 @@ def vertexNeighbourAverages(sceneObject, positions):
 
 
 def sculpt(objectName, mode, strokeFractions, nearestPoints, strength, curve, direction, iterations, profileStroke):
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "sculptAtPoint and sculptAlongPath")
   if mode not in sculptModes:
     raise ValueError(f"mode must be one of {list(sculptModes)}, got '{mode}'")
   if mode in fractionModes and not 0 < strength <= 1:
@@ -326,7 +326,7 @@ def signedDistanceToOutline(points, outline):
 
 
 def sculptOutline(objectName, mode, outline, base, profile, strength, conformBreaks):
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "sculptOutline")
   if mode not in profileModes:
     raise ValueError(f"mode must be one of {list(profileModes)}, got '{mode}'")
   if not 0 < strength <= 1:
@@ -354,7 +354,7 @@ def sculptOutline(objectName, mode, outline, base, profile, strength, conformBre
 
 
 def facet(objectName, selector, cellSize, strength, seed, fadeDistance):
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "facet")
   if cellSize <= 0 or not 0 < strength <= 1:
     raise ValueError(f"cellSize must be positive and strength a fraction in (0, 1], got {cellSize} and {strength}")
   positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
@@ -425,7 +425,7 @@ def selectedFaces(meshEditor, sceneObject, selector):
 
 
 def deleteFaces(objectName, selector):
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "deleteFaces")
   meshEditor = bridgeMeshAccess.loadBMesh(sceneObject)
   faces, _ = selectedFaces(meshEditor, sceneObject, selector)
   if len(faces) == len(meshEditor.faces):
@@ -498,7 +498,7 @@ def mapNewFaces(meshEditor, sceneObject, faces, densities):
 
 
 def extrudeFaces(objectName, selector, distance, direction):
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "extrudeFaces")
   _, faceNormals, _ = bridgeMeshAccess.readFaceArrays(sceneObject)
   densities = materialDensities(sceneObject)
   meshEditor = bridgeMeshAccess.loadBMesh(sceneObject)
@@ -520,7 +520,7 @@ def extrudeFaces(objectName, selector, distance, direction):
 
 
 def insetFaces(objectName, selector, thickness, depth):
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "insetFaces")
   densities = materialDensities(sceneObject)
   meshEditor = bridgeMeshAccess.loadBMesh(sceneObject)
   faces, _ = selectedFaces(meshEditor, sceneObject, selector)
@@ -531,7 +531,7 @@ def insetFaces(objectName, selector, thickness, depth):
 
 
 def bevelEdges(objectName, selector, width, segments, minimumAngleDegrees):
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "bevelEdges")
   vertexMask = bridgeMeshAccess.evaluateSelector(selector, sceneObject, "vertices")
   meshEditor = bridgeMeshAccess.loadBMesh(sceneObject)
   edges = [edge for edge in meshEditor.edges if vertexMask[edge.verts[0].index] and vertexMask[edge.verts[1].index]]
@@ -548,7 +548,7 @@ def bevelEdges(objectName, selector, width, segments, minimumAngleDegrees):
 def subdivide(objectName, selector, cuts):
   if cuts < 1:
     raise ValueError(f"cuts must be at least 1, got {cuts}")
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "subdivide")
   meshEditor = bridgeMeshAccess.loadBMesh(sceneObject)
   faces, _ = selectedFaces(meshEditor, sceneObject, selector)
   # Sets of mesh elements iterate in memory order, which changes from run to run; index order keeps the result the same.
@@ -605,7 +605,7 @@ def booleanCut(objectName, cutterName, operation, keepCutter):
   """Cut with the exact solver; each face it makes takes the face attributes of the nearest face the cutter crosses, and is box-mapped."""
   if operation not in booleanOperations:
     raise ValueError(f"operation must be one of {list(booleanOperations)}, got '{operation}'")
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "booleanCut")
   cutter = bridgeMeshAccess.requireMeshObject(cutterName)
   if cutter == sceneObject:
     raise ValueError(f"'{objectName}' cannot cut itself")
@@ -677,7 +677,7 @@ def booleanCut(objectName, cutterName, operation, keepCutter):
 def decimate(objectName, ratio):
   if not 0 < ratio < 1:
     raise ValueError(f"ratio must be in (0, 1), got {ratio}")
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "decimate")
   bridgeMeshAccess.requireNoShapingPasses(sceneObject, "decimate it")
   bridgeCaveData.requireNoCaves(sceneObject, "decimate it")
   requireNoModifiers(sceneObject)
@@ -689,7 +689,7 @@ def decimate(objectName, ratio):
 
 
 def cleanupMesh(objectName, mergeDistance, recalculateNormals):
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "cleanupMesh")
   before = bridgeMeshAccess.meshCounts(sceneObject)
   meshEditor = bridgeMeshAccess.loadBMesh(sceneObject)
   bmesh.ops.remove_doubles(meshEditor, verts=list(meshEditor.verts), dist=mergeDistance)
@@ -782,7 +782,7 @@ def triangulateAlongContours(sceneObject, worldPositions, vertexMask):
 
 
 def followContours(objectName, selector):
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "followContours")
   mask = bridgeMeshAccess.evaluateSelector(selector, sceneObject, "vertices")
   bridgeMeshAccess.requireSelection(mask, selector, sceneObject, "vertices")
   positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
@@ -1030,7 +1030,7 @@ def cutContours(objectName, levels, distanceFrom, waterline, selector, onlyAbove
   """Cut the selected faces along level lines, as an artist adds an edge loop: of equal height, of equal distance from the border of
   the faces distanceFrom picks (with onlyAbove, from its stretches at a wall's foot: footBorders), or of equal distance out from a pool
   or river's waterline."""
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "cutContours")
   if not levels or len(set(levels)) != len(levels):
     raise ValueError(f"levels is a list of different values, got {levels!r}")
   if distanceFrom is not None and waterline is not None:
@@ -1080,7 +1080,7 @@ def moveSummary(sceneObject, positions, updated):
 
 
 def roughen(objectName, featureSize, amplitude, octaves, roughness, seed, direction, selector, fadeDistance):
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "roughen")
   if amplitude <= 0 or not 1 <= octaves <= maximumOctaves or not 0 < roughness <= 1:
     raise ValueError(f"amplitude must be positive, octaves 1 to {maximumOctaves}, and roughness in (0, 1]")
   if direction not in roughenDirections:
@@ -1104,7 +1104,7 @@ def roughen(objectName, featureSize, amplitude, octaves, roughness, seed, direct
 
 
 def warp(objectName, featureSize, amplitude, seed, plane, selector, fadeDistance):
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "warp")
   if amplitude <= 0:
     raise ValueError(f"amplitude must be positive, got {amplitude}")
   if plane not in warpPlanes:

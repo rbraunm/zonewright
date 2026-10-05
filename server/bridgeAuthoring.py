@@ -246,7 +246,7 @@ def hasSurfaceLayers(sceneObject):
 
 
 def addSurfaceLayer(objectName, name):
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "addSurfaceLayer")
   layers = bridgeMeshAccess.surfaceLayers(sceneObject)
   if not name or name in [layer["name"] for layer in layers]:
     raise ValueError(f"'{objectName}' already has a surfacing layer '{name}'" if name else "A surfacing layer needs a name")
@@ -263,7 +263,7 @@ def addSurfaceLayer(objectName, name):
 
 
 def setSurfaceLayer(objectName, name, muted, position):
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "setSurfaceLayer")
   layers = requireLayer(sceneObject, name)
   if muted is None and position is None:
     raise ValueError("setSurfaceLayer needs muted or position")
@@ -280,7 +280,7 @@ def setSurfaceLayer(objectName, name, muted, position):
 
 
 def removeSurfaceLayer(objectName, name):
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "removeSurfaceLayer")
   layers = [layer for layer in requireLayer(sceneObject, name) if layer["name"] != name]
   mesh = sceneObject.data
   for attributeName in (layerAttributePrefix + name, bridgeSurfacing.transitionMappingPrefix + name, conformedPrefix + name):
@@ -426,7 +426,7 @@ def strokeFaces(sceneObject, selector, edgeNoise):
 
 
 def paintSurface(objectName, layer, material, selector, edgeNoise, keepCaveStroke=True):
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "paintSurface")
   requireLayer(sceneObject, layer)
   mask = strokeFaces(sceneObject, selector, edgeNoise)
   slot = materialSlot(sceneObject, material)
@@ -439,7 +439,7 @@ def paintSurface(objectName, layer, material, selector, edgeNoise, keepCaveStrok
 
 
 def eraseSurface(objectName, layer, selector, edgeNoise, keepCaveStroke=True):
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "eraseSurface")
   requireLayer(sceneObject, layer)
   mask = strokeFaces(sceneObject, selector, edgeNoise)
   values = readFaceInts(sceneObject.data, layerAttributePrefix + layer)
@@ -502,7 +502,7 @@ def cleanedLayer(sceneObject, layer, within, minimumArea):
 
 def editSurface(objectName, layer, operation, steps, selector, minimumArea, keepCaveStroke=True):
   """Grow, shrink, or smooth a layer's painted area within the selector, or clean it (cleanedLayer)."""
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "editSurface")
   requireLayer(sceneObject, layer)
   if operation not in surfaceOperations:
     raise ValueError(f"operation is one of {list(surfaceOperations)}, got '{operation}'")
@@ -898,7 +898,7 @@ def slideAlongEdges(sceneObject, movers, partners, fractions):
 
 def conformSurfaceEdges(objectName, layer, smoothing, selector):
   """Bring a layer's borders onto the mesh's own edges along evened lines; borders evened at this smoothing or more stay as they are."""
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "conformSurfaceEdges")
   requireLayer(sceneObject, layer)
   if smoothing <= 0:
     raise ValueError(f"smoothing must be positive, got {smoothing}")
@@ -1027,7 +1027,7 @@ def cleanedValues(mesh, values, within, areas, minimumArea):
 def paintTransition(objectName, layer, material, selector, toward, width, worldUnitsPerRepeat, onlyAbove, keepCaveStroke=True):
   """Paint the faces wholly within `width` of where selector's faces meet toward's, mapped up from that border and along it (stripAlong);
   the material is marked as a transition, so export checks count the borders it lies along as bridged."""
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "paintTransition")
   requireLayer(sceneObject, layer)
   if width <= 0 or worldUnitsPerRepeat <= 0:
     raise ValueError(f"width and worldUnitsPerRepeat must be positive, got {width} and {worldUnitsPerRepeat}")
@@ -1164,7 +1164,7 @@ def squareOffEnds(positions, chainVertices, nearestAlong):
 
 def projectUVs(objectName, method, worldUnitsPerRepeat, selector, direction):
   """Project UVs onto the selector's faces; on a mesh whose layers map transitions, into its base mapping (compose)."""
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "projectUVs")
   bridgeCaveData.refuseLiningMapping(sceneObject, selector, "projectUVs")
   faceMask, selectedLoops, projected = bridgeSurfacing.projectedUVs(sceneObject, method, worldUnitsPerRepeat, selector, direction)
   faceMask = bridgeCaveData.requireSurfaceSelection(sceneObject, selector, faceMask)
@@ -1193,7 +1193,7 @@ def projectUVs(objectName, method, worldUnitsPerRepeat, selector, direction):
 
 def resetRegion(objectName, selector, passes, fadeDistance):
   """Take the named shaping passes (or all) back inside the selection, faded over fadeDistance; names the kept passes still shaping it."""
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "resetRegion")
   available = [entry["name"] for entry in bridgePasses.passList(sceneObject)]
   if not available:
     raise ValueError(f"'{objectName}' has no shaping passes to take back; rebuildRegion reshapes an area without them")
@@ -1292,7 +1292,7 @@ def relaxedHeights(sceneObject, plan, heights, free):
 
 def rebuildRegion(objectName, selector, mode, height, fadeDistance):
   """Span the selection's heights from its surroundings or level it, laid out again in plan where passes record it, diagonals turned."""
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "rebuildRegion")
   if mode not in rebuildModes:
     raise ValueError(f"mode is one of {list(rebuildModes)}, got '{mode}'")
   if (mode == "height") != (height is not None):
@@ -1348,7 +1348,7 @@ def clearRegion(region, terrainObject, shaping, surfacing, objects, fadeDistance
   outcome = {"region": region}
   # Surfacing goes first, while the faces lie where they were painted.
   if surfacing:
-    sceneObject = bridgeMeshAccess.requireMeshObject(terrainObject)
+    sceneObject = bridgeMeshAccess.requireEditableMesh(terrainObject, "clearRegion")
     layers = bridgeMeshAccess.surfaceLayers(sceneObject)
     if not layers:
       raise ValueError(f"'{terrainObject}' has no surfacing layers to erase from")

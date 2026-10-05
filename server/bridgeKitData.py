@@ -110,16 +110,23 @@ def requirePiece(kitPath, piece):
 
 
 @contextlib.contextmanager
-def linkingUndone():
-  """Whatever a refused step linked into the file is taken out again, so a refusal changes nothing."""
+def linkingUndone(always=False):
+  """Whatever a refused step linked or made in the file is taken out again, so a refusal changes nothing; with always, also after a
+  step that only read (a kit linked to be looked at)."""
   before = {kind: set(getattr(bpy.data, kind)) for kind in linkedKinds}
-  try:
-    yield
-  except Exception:
+
+  def takeBack():
     added = [item for kind in linkedKinds for item in set(getattr(bpy.data, kind)) - before[kind]]
     if added:
       bpy.data.batch_remove(added)
+
+  try:
+    yield
+  except Exception:
+    takeBack()
     raise
+  if always:
+    takeBack()
 
 
 def pieceMembers(collection):
@@ -131,6 +138,13 @@ def pieceOfMesh(sceneObject):
   return next((collection for collection in sceneObject.users_collection if pieceProperty in collection), None)
 
 
+def fileMatrix(member):
+  """Where a member stands in its kit file, from its own transform and its parents': a linked member drawn in no scene holds no world
+  matrix of its own."""
+  local = member.matrix_parent_inverse @ member.matrix_basis if member.parent is not None else member.matrix_basis
+  return fileMatrix(member.parent) @ local if member.parent is not None else local
+
+
 def pieceGeometry(collection):
   """A piece's member meshes flattened in the piece frame (origin at its instance_offset): positions, each face's corner count, the
   corners' vertices and texture coordinates, each face's material, and which faces players pass through."""
@@ -140,9 +154,10 @@ def pieceGeometry(collection):
   count = 0
   for member in pieceMembers(collection):
     mesh = member.data
-    coordinates = numpy.empty(len(mesh.vertices) * 3)
-    mesh.vertices.foreach_get("co", coordinates)
-    positions.append(bridgeMeshAccess.worldPositions(member, coordinates.reshape(-1, 3)) - offset)
+    coordinates = numpy.empty(len(mesh.vertices) * 3).reshape(-1, 3)
+    mesh.vertices.foreach_get("co", coordinates.ravel())
+    matrix = numpy.array(fileMatrix(member))
+    positions.append(coordinates @ matrix[:3, :3].T + matrix[:3, 3] - offset)
     loopTotals, loopVertices = bridgeMeshAccess.faceLoops(member)
     totals.append(loopTotals)
     corners.append(loopVertices.astype(numpy.int64) + count)

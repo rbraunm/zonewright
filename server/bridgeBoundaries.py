@@ -15,6 +15,7 @@ import numpy
 
 import bridgeMeshAccess
 import bridgeObjects
+import bridgeStructureData
 import bridgeSurfacing
 import bridgeSwim
 
@@ -80,10 +81,11 @@ def passableFaces(slots, flagged, materials):
   return slotPassable[numpy.minimum(slots, len(materials))] | flagged
 
 
-def collisionSurfaces(boundaries=True):
+def collisionSurfaces(boundaries=True, excluding=()):
   """Ray casts against what the client collides with: what players stand on, without faces they pass through (liquids, cutout cards,
-  objects marked passable, faces an imported zone file flags), and the boundaries unless boundaries is false."""
-  owners = bridgeMeshAccess.playerSolidObjects(collision=True)
+  objects marked passable, faces an imported zone file flags), and the boundaries unless boundaries is false; leaving out the objects
+  named in excluding."""
+  owners = bridgeMeshAccess.playerSolidObjects(excluding, collision=True)
   depsgraph = bpy.context.evaluated_depsgraph_get()
   trees = []
   for owner in owners:
@@ -245,6 +247,7 @@ def markPassable(objects, passable):
   marked = []
   for name in objects:
     sceneObject = bridgeMeshAccess.requireObject(name)
+    bridgeStructureData.requireNotStructurePart(sceneObject, "markPassable")
     if sceneObject.type != "MESH" and not bridgeMeshAccess.isCollectionInstance(sceneObject):
       raise ValueError(f"'{name}' is a {sceneObject.type}; only meshes and collection instances are passed through")
     if bridgeMeshAccess.boundaryProperty in sceneObject:

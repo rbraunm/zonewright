@@ -10,6 +10,7 @@ import numpy
 
 import bridgeMeshAccess
 import bridgeObjects
+import bridgeStructureData
 
 copyKeys = {"name", "location", "rotationDegrees", "scale"}
 patternKinds = ("row", "grid", "ring", "route")
@@ -46,6 +47,7 @@ def placeCopies(source, copies, collection, settle, depth, tiltShare):
   """Linked copies of an object (sharing its mesh), each placed, turned, tilted, and scaled as given; settled onto the ground by footprint
   when asked (then each location's z is ignored)."""
   sourceObject = bridgeMeshAccess.requireObject(source)
+  bridgeStructureData.requireNotStructurePart(sourceObject, "placeCopies")
   if not copies:
     raise ValueError("placeCopies needs at least one copy")
   specs = [requireCopy(index, copy, settle) for index, copy in enumerate(copies)]
@@ -220,6 +222,8 @@ def settleObjects(names, depth, tiltShare, onto):
   if not 0 <= tiltShare <= 1:
     raise ValueError(f"tiltShare is 0 to 1, got {tiltShare}")
   objects = [bridgeMeshAccess.requireObject(name) for name in names]
+  for sceneObject in objects:
+    bridgeStructureData.requireNotStructurePart(sceneObject, "settleObjects")
   surfaces = surfacesExcept(set(names), onto)
   castHeight = bridgeMeshAccess.sceneTopHeight() + settleLift
   down = mathutils.Vector((0.0, 0.0, -1.0))

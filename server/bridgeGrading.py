@@ -20,6 +20,7 @@ import bridgeMeshAccess
 import bridgePasses
 import bridgeReview
 import bridgeShaping
+import bridgeStructures
 
 routePassPrefix = "route "
 routeKind = "route"
@@ -678,7 +679,7 @@ def applyPlots(plan):
 
 
 def gradeRoute(objectName, name, points, width, widths, maximumGradeDegrees, cutBatterDegrees, fillBatterDegrees, landingLength):
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "gradeRoute")
   if not name.strip():
     raise ValueError("A route needs a name")
   definition = routeDefinition(points, width, widths, maximumGradeDegrees, cutBatterDegrees, fillBatterDegrees, landingLength)
@@ -702,12 +703,13 @@ def gradeRoute(objectName, name, points, width, widths, maximumGradeDegrees, cut
 
 
 def regradeTerrain(objectName):
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "regradeTerrain")
   features = definedFeatures(sceneObject)
   if not features and not bridgeCaveData.holdsCaves(sceneObject):
     raise ValueError(f"'{objectName}' has no defined passes and no caves: no route graded on it (gradeRoute), no plot (gradePlot), no facade (dressFacade), and no cave (cutCave)")
   applied = applyReplay(planReplay(sceneObject, features, 0, True)) if features else {"summaries": [], "foldedFaces": 0}
-  return {"object": objectName, "replayed": applied["summaries"], "foldedFaces": applied["foldedFaces"], "refittedCaves": bridgeCaves.refitStaleCaves(sceneObject)}
+  refitted = bridgeCaves.refitStaleCaves(sceneObject)
+  return {"object": objectName, "replayed": applied["summaries"], "foldedFaces": applied["foldedFaces"], "refittedCaves": refitted, "staleStructures": bridgeStructures.staleStructures()}
 
 
 def describeDefinedPasses(sceneObject):

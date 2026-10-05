@@ -1,8 +1,10 @@
 """Kit piece geometry: the shapes createKitPiece and addRoof model, each role's texture mapping in the piece frame, a piece measured
-(size, module, triangles, each material's repeat, texture seams), and the rigid turn and move that places a piece or meets a socket.
-Runs under Blender's Python."""
+(size, module, triangles, each material's repeat, texture seams), the rigid turn and move that places a piece or meets a socket, and
+the fitting that lays pieces into one mesh: rigid, stretched along its axes, swept along a polyline, or sheared, each face's texture
+carried at its world scale by its own affine mapping. Runs under Blender's Python."""
 import math
 
+import bmesh
 import bpy
 import mathutils
 import numpy
@@ -327,3 +329,216 @@ def snappedPlacement(targetAt, targetDirection, socket, facingDegrees):
     facingDegrees = (-math.degrees(turn)) % 360.0
   location = targetAt - turnAbout(facingDegrees) @ mathutils.Vector(socket["at"])
   return location, facingDegrees
+
+
+# Vertices this close to a cut along a swept piece lie on it, and take the miter between the segments meeting there.
+onCut = 1e-6
+
+
+def faceOfLoop(geometry):
+  return numpy.repeat(numpy.arange(len(geometry["loopTotals"])), geometry["loopTotals"])
+
+
+def faceGradients(geometry):
+  """Each face's texture mapping as an affine map of position, its gradient (2 x 3) fitted over its corners by least squares."""
+  totals = geometry["loopTotals"]
+  starts = numpy.cumsum(totals) - totals
+  corners = geometry["positions"][geometry["loopVertices"]]
+  gradients = numpy.zeros((len(totals), 2, 3))
+  for face, (start, total) in enumerate(zip(starts, totals)):
+    points = corners[start:start + total]
+    design = numpy.column_stack([points - points.mean(0), numpy.ones(total)])
+    fit, _, _, _ = numpy.linalg.lstsq(design, geometry["uvs"][start:start + total], rcond=None)
+    gradients[face] = fit[:3].T
+  return gradients
+
+
+def pieceData(collection):
+  """A piece's geometry in its frame (bridgeKitData.pieceGeometry) with each face's texture gradient, its bounds, and its record."""
+  geometry = bridgeKitData.pieceGeometry(collection)
+  geometry["gradients"] = faceGradients(geometry)
+  geometry["low"], geometry["high"] = geometry["positions"].min(0), geometry["positions"].max(0)
+  geometry["record"] = bridgeKitData.readRecord(collection)
+  geometry["piece"] = collection.name
+  return geometry
+
+
+def moved(geometry, positions):
+  """The geometry with its vertices at new places, each face's texture carried at its world scale (uv + gradient x move)."""
+  shift = positions[geometry["loopVertices"]] - geometry["positions"][geometry["loopVertices"]]
+  carried = geometry["uvs"] + numpy.einsum("lij,lj->li", geometry["gradients"][faceOfLoop(geometry)], shift)
+  return geometry | {"positions": positions, "uvs": carried}
+
+
+def stretched(geometry, scales):
+  """Scaled along the piece's axes about its base center, texture carried."""
+  return moved(geometry, geometry["positions"] * numpy.asarray(scales, dtype=numpy.float64))
+
+
+def sheared(geometry, rise, length):
+  """Each vertex raised rise x (its x / length): a wall section following the ground's fall about its middle, verticals vertical, its
+  texture shearing with it."""
+  positions = geometry["positions"].copy()
+  positions[:, 2] += rise * positions[:, 0] / length
+  return geometry | {"positions": positions}
+
+
+def frameMatrix(origin, xAxis, yAxis):
+  """A placement whose piece X runs along xAxis and Y along yAxis (both unit, square to each other), its Z their cross, at origin."""
+  xAxis, yAxis = numpy.asarray(xAxis, dtype=numpy.float64), numpy.asarray(yAxis, dtype=numpy.float64)
+  matrix = numpy.identity(4)
+  matrix[:3, 0], matrix[:3, 1], matrix[:3, 2] = xAxis, yAxis, numpy.cross(xAxis, yAxis)
+  matrix[:3, 3] = origin
+  return matrix
+
+
+def placed(geometry, matrix):
+  """Turned and moved rigidly into the world (texture unchanged)."""
+  return geometry | {"positions": geometry["positions"] @ matrix[:3, :3].T + matrix[:3, 3]}
+
+
+def toEditor(geometry):
+  """A bmesh of the geometry, each face tagged with the face it came from and carrying its corners' texture coordinates."""
+  meshEditor = bmesh.new()
+  uvLayer = meshEditor.loops.layers.uv.new(bridgeSurfacing.uvLayerName)
+  sourceLayer = meshEditor.faces.layers.int.new("source")
+  vertices = [meshEditor.verts.new(position) for position in geometry["positions"].tolist()]
+  start = 0
+  for face, total in enumerate(geometry["loopTotals"]):
+    corners = geometry["loopVertices"][start:start + total]
+    made = meshEditor.faces.new([vertices[index] for index in corners])
+    made[sourceLayer] = face
+    for loop, uv in zip(made.loops, geometry["uvs"][start:start + total]):
+      loop[uvLayer].uv = (float(uv[0]), float(uv[1]))
+    start += total
+  return meshEditor
+
+
+def fromEditor(meshEditor, geometry):
+  """Geometry read back from a bmesh made by toEditor: each face keeps the material, passability, and gradient of the face it came from."""
+  uvLayer = meshEditor.loops.layers.uv[bridgeSurfacing.uvLayerName]
+  sourceLayer = meshEditor.faces.layers.int["source"]
+  meshEditor.verts.index_update()
+  positions = numpy.array([list(vertex.co) for vertex in meshEditor.verts], dtype=numpy.float64).reshape(-1, 3)
+  totals, corners, uvs, sources = [], [], [], []
+  for face in meshEditor.faces:
+    totals.append(len(face.loops))
+    corners.extend(loop.vert.index for loop in face.loops)
+    uvs.extend(list(loop[uvLayer].uv) for loop in face.loops)
+    sources.append(face[sourceLayer])
+  sources = numpy.array(sources, dtype=numpy.int64)
+  return geometry | {
+    "positions": positions, "loopTotals": numpy.array(totals, dtype=numpy.int64), "loopVertices": numpy.array(corners, dtype=numpy.int64),
+    "uvs": numpy.array(uvs, dtype=numpy.float64).reshape(-1, 2), "materials": [geometry["materials"][source] for source in sources],
+    "passable": geometry["passable"][sources], "gradients": geometry["gradients"][sources],
+  }
+
+
+def bisected(geometry, planes, clearOuter=False):
+  """Cut along planes (point, normal); with clearOuter what lies in front of each plane is taken off and the opening closed by a face
+  mapped as the face beside it is."""
+  meshEditor = toEditor(geometry)
+  uvLayer = meshEditor.loops.layers.uv[bridgeSurfacing.uvLayerName]
+  sourceLayer = meshEditor.faces.layers.int["source"]
+  for point, normal in planes:
+    geom = list(meshEditor.verts) + list(meshEditor.edges) + list(meshEditor.faces)
+    result = bmesh.ops.bisect_plane(meshEditor, geom=geom, dist=onCut, plane_co=point, plane_no=normal, clear_outer=clearOuter)
+    if not clearOuter:
+      continue
+    cutEdges = [element for element in result["geom_cut"] if isinstance(element, bmesh.types.BMEdge) and element.is_valid and element.is_boundary]
+    if not cutEdges:
+      continue
+    made = bmesh.ops.holes_fill(meshEditor, edges=cutEdges, sides=0)["faces"]
+    for face in made:
+      neighbor = next(other for edge in face.edges for other in edge.link_faces if other is not face)
+      face[sourceLayer] = neighbor[sourceLayer]
+      reference = neighbor.loops[0]
+      gradient = geometry["gradients"][neighbor[sourceLayer]]
+      for loop in face.loops:
+        uv = numpy.array(reference[uvLayer].uv) + gradient @ (numpy.array(loop.vert.co) - numpy.array(reference.vert.co))
+        loop[uvLayer].uv = (float(uv[0]), float(uv[1]))
+  if clearOuter:
+    bmesh.ops.recalc_face_normals(meshEditor, faces=list(meshEditor.faces))
+  cut = fromEditor(meshEditor, geometry)
+  meshEditor.free()
+  return cut
+
+
+def polylineFrames(points):
+  """Each segment's tangent, level side (left of travel), and up (tangent x side)."""
+  tangents = numpy.diff(points, axis=0)
+  tangents /= numpy.linalg.norm(tangents, axis=1, keepdims=True)
+  sides = numpy.column_stack([-tangents[:, 1], tangents[:, 0], numpy.zeros(len(tangents))])
+  sides /= numpy.linalg.norm(sides, axis=1, keepdims=True)
+  return tangents, sides, numpy.cross(tangents, sides)
+
+
+def swept(geometry, points, acrossScale=1.0):
+  """Bent along a polyline: X stretched to its length (texture carried) and cut where it bends, so X runs along it; Y and Z offsets
+  taken in each segment's frame (tangent, level side, up); vertices on a cut lie on the miter between the segments meeting there."""
+  points = numpy.asarray(points, dtype=numpy.float64)
+  arcs = numpy.concatenate([[0.0], numpy.cumsum(numpy.linalg.norm(numpy.diff(points, axis=0), axis=1))])
+  low, high = geometry["low"][0], geometry["high"][0]
+  straight = geometry["positions"].copy()
+  straight[:, 0] = (straight[:, 0] - low) * arcs[-1] / (high - low)
+  straight[:, 1] *= acrossScale
+  laid = moved(geometry, straight)
+  if len(points) > 2:
+    laid = bisected(laid, [((arc, 0.0, 0.0), (1.0, 0.0, 0.0)) for arc in arcs[1:-1]])
+  tangents, sides, ups = polylineFrames(points)
+  along = laid["positions"][:, 0]
+  segments = numpy.clip(numpy.searchsorted(arcs, along, side="right") - 1, 0, len(points) - 2)
+  offsets = laid["positions"][:, 1:2] * sides[segments] + laid["positions"][:, 2:3] * ups[segments]
+  world = points[segments] + tangents[segments] * (along - arcs[segments])[:, None] + offsets
+  for vertex in numpy.nonzero((segments > 0) & (numpy.abs(along - arcs[segments]) <= onCut))[0]:
+    joint = segments[vertex]
+    miter = tangents[joint - 1] + tangents[joint]
+    miter /= numpy.linalg.norm(miter)
+    meeting = []
+    for segment in (joint - 1, joint):
+      offset = laid["positions"][vertex, 1] * sides[segment] + laid["positions"][vertex, 2] * ups[segment]
+      meeting.append(points[joint] + offset - tangents[segment] * (offset @ miter) / (tangents[segment] @ miter))
+    world[vertex] = (meeting[0] + meeting[1]) / 2
+  return laid | {"positions": world}
+
+
+class Bake:
+  """Pieces gathered into one mesh, each an island of its own (nothing merged), one material slot per material, the texture
+  coordinates in the UV layer, and the faces players pass through flagged by the passable face attribute."""
+
+  def __init__(self):
+    self.parts = []
+
+  def add(self, geometry):
+    self.parts.append(geometry)
+
+  def triangles(self):
+    return int(sum((part["loopTotals"] - 2).sum() for part in self.parts))
+
+  def mesh(self, name, inverse):
+    """The gathered pieces as a new mesh, in the space whose inverse world matrix is given."""
+    positions, faces, uvs, materials, passable, offset = [], [], [], [], [], 0
+    for part in self.parts:
+      positions.append(part["positions"] @ inverse[:3, :3].T + inverse[:3, 3])
+      start = 0
+      for total in part["loopTotals"]:
+        faces.append((part["loopVertices"][start:start + total] + offset).tolist())
+        start += total
+      uvs.append(part["uvs"])
+      materials.extend(part["materials"])
+      passable.append(part["passable"])
+      offset += len(part["positions"])
+    mesh = bpy.data.meshes.new(name)
+    mesh.from_pydata(numpy.concatenate(positions).tolist(), [], faces)
+    slots = {}
+    for material in materials:
+      if material.as_pointer() not in slots:
+        slots[material.as_pointer()] = len(slots)
+        mesh.materials.append(material)
+    mesh.polygons.foreach_set("material_index", numpy.array([slots[material.as_pointer()] for material in materials], dtype=numpy.int32))
+    mesh.uv_layers.new(name=bridgeSurfacing.uvLayerName).data.foreach_set("uv", numpy.concatenate(uvs).astype(numpy.float32).ravel())
+    flags = numpy.concatenate(passable)
+    if flags.any():
+      mesh.attributes.new(bridgeMeshAccess.passableAttribute, "BOOLEAN", "FACE").data.foreach_set("value", flags)
+    mesh.update()
+    return mesh
