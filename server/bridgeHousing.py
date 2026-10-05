@@ -447,7 +447,7 @@ def editPlot(address, newAddress, kind, center, facingDegrees, size, height, ite
   grading = gradingOf(plot)
   if objectName is not None and grading is None:
     raise ValueError(f"Plot '{address}' is not graded; objectName names the ground a graded plot is graded on (gradePlot grades it)")
-  ground = None if grading is None else grading["ground"] if objectName is None else bridgeMeshAccess.requireMeshObject(objectName)
+  ground = None if grading is None else grading["ground"] if objectName is None else bridgeMeshAccess.requireEditableMesh(objectName, "editPlot")
   rebuild = False
   if kind is not None and kind != spec["kind"]:
     if kind not in plotKinds:
@@ -799,7 +799,7 @@ def gradePlot(address, objectName, margin, batterDegrees):
   plot = requirePlot(address)
   if margin < 0 or not 5 <= batterDegrees <= 85:
     raise ValueError(f"margin must be at least 0 and batterDegrees from 5 to 85, got {margin} and {batterDegrees}")
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "gradePlot")
   stored = plot.get(gradingProperty)
   # Grading again where the ground it was graded on was deleted is how such a plot is put right: there is nothing there to take back.
   former = None if stored is None or stored["ground"] in (None, sceneObject) else bridgeGrading.planPlots(stored["ground"], {address: None}, {address})

@@ -85,7 +85,7 @@ def writeIntoActivePass(sceneObject, localPositions):
 
 
 def addShapingPass(objectName, name):
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "addShapingPass")
   if sceneObject.modifiers:
     raise ValueError(f"'{objectName}' has modifiers; passes combine before modifiers, so apply or remove them first")
   if name == baseKeyName:
@@ -104,7 +104,7 @@ def addShapingPass(objectName, name):
 
 
 def setShapingPass(objectName, name, strength, muted, makeActive):
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "setShapingPass")
   key = requirePass(sceneObject, name)
   if strength is None and muted is None and not makeActive:
     raise ValueError("setShapingPass needs a strength, muted, or makeActive")
@@ -127,7 +127,7 @@ def clearPassesKeeping(sceneObject, localPositions):
 
 
 def removeShapingPass(objectName, name):
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "removeShapingPass")
   key = requirePass(sceneObject, name)
   if name in passDefinitions(sceneObject):
     setPassDefinition(sceneObject, name, None)
@@ -140,7 +140,7 @@ def removeShapingPass(objectName, name):
 
 def collapseShapingPasses(objectName):
   """Make the mesh as seen its new base and drop the passes, so its vertices can change."""
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "collapseShapingPasses")
   passes = passList(sceneObject)
   if not passes:
     raise ValueError(f"'{objectName}' has no shaping passes")

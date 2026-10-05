@@ -8,6 +8,7 @@ import numpy
 
 import bridgeMeshAccess
 import bridgeObjects
+import bridgeStructureData
 
 densityArea = 10000.0
 scatterAttemptsPerTarget = 30
@@ -59,6 +60,8 @@ def placeOnSurface(objectNames, at, alignToNormal, surfaceObjects, offset):
   if at is not None and len(at) != len(objectNames):
     raise ValueError(f"at has {len(at)} points for {len(objectNames)} objects")
   placing = [bridgeMeshAccess.requireObject(name) for name in objectNames]
+  for sceneObject in placing:
+    bridgeStructureData.requireNotStructurePart(sceneObject, "placeOnSurface")
   surfaces = landingSurfaces(surfaceObjects, [carried for sceneObject in placing for carried in withDescendants(sceneObject)])
   placements = []
   for index, sceneObject in enumerate(placing):

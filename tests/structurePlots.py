@@ -69,6 +69,45 @@ def slopeHeight(y):
   return (slopeStart - y) * math.tan(math.radians(slopeDegrees))
 
 
+def gorgeHeight(x):
+  """The test plot's ground across the gorge: its walls fall 2 for every 1 in from the rims to its floor."""
+  inside = min(x - gorgeRims[0], gorgeRims[1] - x)
+  return 0.0 if inside <= 0 else max(-gorgeDepth, -2 * inside)
+
+
+def cliffFaceY(z):
+  """Where the test plot's cliff face stands at a height."""
+  return cliffFoot + (cliffBrow - cliffFoot) * z / cliffHeight
+
+
+readFaces = """
+import bpy, numpy
+found = []
+for name in names:
+  sceneObject = bpy.data.objects[name]
+  mesh = sceneObject.data
+  matrix = numpy.array(sceneObject.matrix_world)
+  positions = numpy.array([list(vertex.co) for vertex in mesh.vertices]).reshape(-1, 3) @ matrix[:3, :3].T + matrix[:3, 3]
+  attribute = mesh.attributes.get('zonewrightPassable')
+  for polygon in mesh.polygons:
+    material = sceneObject.material_slots[polygon.material_index].material if polygon.material_index < len(sceneObject.material_slots) else None
+    found.append({
+      'object': name, 'material': None if material is None else material.name, 'passable': bool(attribute.data[polygon.index].value) if attribute is not None else False,
+      'points': positions[list(polygon.vertices)].round(6).tolist(),
+    })
+result = found
+"""
+
+
+async def faces(session, *names):
+  """Every face of the named meshes in the world: its material, whether it is flagged passable, and its corners."""
+  return (await session.expectSuccess("runPython", {"code": f"names = {list(names)!r}\n" + readFaces}))["result"]
+
+
+def pointsNear(faceList, x, y, radius):
+  return [point for face in faceList for point in face["points"] if math.hypot(point[0] - x, point[1] - y) <= radius]
+
+
 async def testPlot(session, folder):
   """The test plot: ground 240 x 240 every 4 in `terrain`, a gorge 80 wide at its rims (x -100 to -20) and 40 deep (its floor x -80 to
   -40) the full length in y, a cliff 60 tall facing south for x 0 to 120 (its face from y 12 at z 0 to y 20 at z 60, its top to y 120),

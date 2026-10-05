@@ -14,6 +14,8 @@ import bridgeBoundaries
 import bridgeExport
 import bridgeMeshAccess
 import bridgeReviewGuides
+import bridgeStructureData
+import bridgeStructures
 import bridgeViews
 from playerScale import playerHeight, stepHeight, walkableNormalZ
 
@@ -327,9 +329,18 @@ def roundVector(vector):
 
 
 def givenPath(path, route):
+  """A route's points: given, a saved review route's, or a bridge's, flight's, or walkway's walk line."""
   if (path is None) == (route is None):
-    raise ValueError("Give path, the route's [x, y, z] points, or route, the name of a saved review route")
-  return bridgeReviewGuides.routePath(route) if route is not None else path
+    raise ValueError("Give path, the route's [x, y, z] points, or route, the name of a saved review route or of a bridge, flight, or walkway")
+  if path is not None:
+    return path
+  structure = bridgeStructureData.findStructure(route)
+  if structure is not None:
+    saved = bpy.data.objects.get(route)
+    if saved is not None and bridgeReviewGuides.reviewRouteProperty in saved:
+      raise ValueError(f"'{route}' names both a saved review route and a structure; rename the route (deleteReviewRoutes, saveReviewRoute) to walk either")
+    return bridgeStructures.walkLine(structure)
+  return bridgeReviewGuides.routePath(route)
 
 
 def walkGivenRoute(path, route, sampleSpacing):

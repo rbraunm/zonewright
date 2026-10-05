@@ -16,6 +16,7 @@ import bridgeKitGeometry
 import bridgeMeshAccess
 import bridgeObjects
 import bridgeShaping
+import bridgeStructureData
 import bridgeSurfacing
 
 openingKinds = ("door", "window")
@@ -612,6 +613,8 @@ def swapKitPiece(names, piece):
   if not isinstance(names, list) or not names:
     raise ValueError(f"names lists at least one placed kit piece, got {names!r}")
   placements = [bridgeKitData.requirePlacedPiece(name) for name in names]
+  for placement in placements:
+    bridgeStructureData.requireNotStructurePart(placement, "swapKitPiece")
   kits = sorted({bridgeKitData.kitPathOf(placement.instance_collection) or "" for placement in placements})
   if len(kits) > 1:
     raise ValueError(f"{names} come from different kits ({[kit or 'this file' for kit in kits]}); a piece is swapped for another of its own kit")

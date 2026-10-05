@@ -544,7 +544,7 @@ def barycentric(points, triangle):
 # Cutting and taking back
 
 def requireTerrain(objectName):
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "cutCave")
   if sceneObject.modifiers:
     raise ValueError(f"'{objectName}' has modifiers; a cave is cut into the mesh as its passes show it, so apply or remove them first")
   if sceneObject.data.users > 1:
