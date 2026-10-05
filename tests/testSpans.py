@@ -251,12 +251,16 @@ def testWalkwayRefusals(stageBlenderServer, tmp_path):
     plank = structurePlots.testKitPieces["testKitPlank"][1][2]
     raised, resting = 3 + plank, 1.5 + plank
     bracketed = structurePlots.testKitPieces["testKitBeam"][1][2] + 3
+    # A level deck from inside the slope's foot, its underside 0.5 up: the slope meets it 4 in from its start, past where a deck may
+    # rest in the ground it starts from, though within a player's step.
+    dug = 0.5 + plank
     refusals = {
       "steep": await session.expectError("buildWalkway", walkway("steep", [[110, -10, 0], [70, -10, 20]])),
       "stairTooSteep": await session.expectError("buildWalkway", walkway("stair", [[110, -10, 0], [100, -10, 12]], stairLegs=[0])),
       "noRock": await session.expectError("buildWalkway", walkway("bracketed", [[110, -10, bracketed], [70, -10, bracketed]], posts={"piece": "testKitLeg", "spacing": 8, "sides": "left"}, brackets={"piece": "testKitBeam", "side": "right", "reach": 5, "legs": [0]})),
       "unheld": await session.expectError("buildWalkway", walkway("raised", [[110, -10, raised], [70, -10, raised]])),
       "turn": await session.expectError("buildWalkway", walkway("hairpin", [[110, -10, 0], [70, -10, 0], [109, -3, 0]])),
+      "dug": await session.expectError("buildWalkway", walkway("dug", [[50, -48, dug], [50, -20, dug]])),
     }
     held = await session.expectSuccess("buildWalkway", walkway("held", [[110, -10, raised], [70, -10, raised]], posts={"piece": "testKitLeg", "spacing": 8}))
     rests = await session.expectSuccess("buildWalkway", walkway("resting", [[110, -30, resting], [70, -30, resting]]))
@@ -272,6 +276,7 @@ def testWalkwayRefusals(stageBlenderServer, tmp_path):
   assert all(post["bottom"] == -2.0 and post["top"] == 3.0 for post in held["posts"]["each"])
   assert rests["posts"]["count"] == 0 and rests["brackets"] == []
   assert "turns 169.8 degrees at point 1" in refusals["turn"]
+  assert f"Leg 0's underside meets the ground {structurePlots.slopeHeight(-44) - 0.5:.2f} deep at [50.0, -44.0, 0.5] (4.0 along)" in refusals["dug"]
 
 
 def testAWalkwayMayEndOffTheGroundAndReportsEachEndsFooting(stageBlenderServer, tmp_path):
@@ -288,6 +293,24 @@ def testAWalkwayMayEndOffTheGroundAndReportsEachEndsFooting(stageBlenderServer, 
   assert built["walk"]["walkable"]
   # Past the open end there is only air: its view stands on the deck just inside the end, looking back along it.
   assert built["views"]["fromEnd"] == {"standAt": [-48.0, -90.0, 0.0], "headingDegrees": 90.0, "pitchDegrees": -5.0}
+
+
+def testAnEndsViewStandsOnItsApproachOnlyWhereTheGroundThereLiesNearTheEndsHeight(stageBlenderServer, tmp_path):
+  async def steps(session):
+    kitPath = await kitAndPlot(session, tmp_path)
+    built = {}
+    for name, (y, height) in {"near": (-10, 3.75), "far": (-30, 4.25)}.items():
+      built[name] = await session.expectSuccess("buildWalkway", {
+        "name": f"{name}Walk", "kitPath": kitPath, "points": [[20, y, height], [60, y, height]], "width": 4, "deck": "testKitPlank",
+        "posts": {"piece": "testKitLeg", "spacing": 8},
+      })
+    return built
+
+  built = stageBlenderServer.session(steps)
+  # 12 back from the start, the flat ground lies 3.75 under the near deck's end, so its view stands there on the approach; it lies 4.25
+  # under the far deck's end, within a player's step yet too far below to show the end from, so its view stands just inside the end.
+  assert built["near"]["views"]["fromStart"] == {"standAt": [8.0, -10.0, 3.75], "headingDegrees": 90.0, "pitchDegrees": -5.0}
+  assert built["far"]["views"]["fromStart"] == {"standAt": [22.0, -30.0, 4.25], "headingDegrees": 90.0, "pitchDegrees": -5.0}
 
 
 def testOneSidedRailsStandPostsOnTheirSideOnly(stageBlenderServer, tmp_path):

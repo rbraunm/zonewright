@@ -85,6 +85,8 @@ def testPrefabRefusals(stageBlenderServer, tmp_path):
       "plainMesh": await session.expectError("assemblePrefab", {"name": "testKitShed", "parts": {"exterior": ["plainBlock"]}}),
       "noEntrance": await session.expectError("assemblePrefab", {"name": prefab, "parts": parts}),
       "outside": await session.expectError("assemblePrefab", {"name": prefab, "parts": parts, "entrances": [structurePlots.houseDoor | {"at": [500, 340, 0]}]}),
+      # 3 past the footprint's north side: within a player's step, yet no doorway's threshold.
+      "pastThreshold": await session.expectError("assemblePrefab", {"name": prefab, "parts": parts, "entrances": [structurePlots.houseDoor | {"at": [487.5, 327.75, 0]}]}),
       "stem": await session.expectError("assemblePrefab", {"name": "shed", "parts": {"exterior": ["plainBlock"]}}),
       "otherPrefab": await session.expectError("assemblePrefab", {"name": "testKitShed", "parts": {"exterior": ["houseNorth"]}}),
       "partName": await session.expectError("assemblePrefab", {"name": "testKitShed", "parts": {"Exterior": ["plainBlock"]}}),
@@ -99,6 +101,7 @@ def testPrefabRefusals(stageBlenderServer, tmp_path):
   assert "'plainBlock' is not an instance of one of this file's pieces" in refusals["plainMesh"]
   assert "interior part is walked into" in refusals["noEntrance"]
   assert "Entrance 'front'" in refusals["outside"] and "15.25 outside the building's footprint" in refusals["outside"]
+  assert "Entrance 'front' at [487.5, 327.75, 0.0] lies 3.00 outside the building's footprint; an entrance is a doorway's threshold, within 2 of it" in refusals["pastThreshold"]
   assert "must start with the kit file's stem 'testKit'" in refusals["stem"]
   assert "'houseNorth' is part 'exterior' of prefab 'testKitHouse'" in refusals["otherPrefab"]
   assert "camelCase" in refusals["partName"]
@@ -107,6 +110,19 @@ def testPrefabRefusals(stageBlenderServer, tmp_path):
   assert "Entrance 'front' at [487.5, 318.75, 0.0] faces 180 degrees, into the building: the footprint runs on 43.50 that way and 6.00 the other" in refusals["inward"]
   assert "facingDegrees is the way out of the doorway, 0 here" in refusals["inward"]
   assert "testKitShed" not in summary["collections"]
+
+
+def testAPieceHungOverTheFloorIsLeftOutOfTheFootprint(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await structurePlots.testPrefab(session, tmp_path)
+    # A post hung 3 over the floor north of the house: within a player's step, yet off the floor, so nothing the house stands on.
+    await session.expectSuccess("placeKitPiece", {"name": "houseSignPost", "kitPath": None, "piece": "testKitPost", "location": [500, 340, 3], "facingDegrees": 0})
+    return await session.expectSuccess("assemblePrefab", {
+      "name": prefab, "parts": structurePlots.houseParts | {"exterior": structurePlots.houseParts["exterior"] + ["houseSignPost"]}, "entrances": [structurePlots.houseDoor],
+    })
+
+  hung = stageBlenderServer.session(steps)
+  assert hung["footprintSize"] == [2 * footprintHalf[0], 2 * footprintHalf[1]]
 
 
 def testNestedInstancesAreStoodOnSettledOntoAndSectioned(stageBlenderServer, tmp_path):
