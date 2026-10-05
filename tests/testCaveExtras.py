@@ -1,12 +1,26 @@
+import io
 import json
 import math
+import struct
+import sys
+from pathlib import Path
 
 import numpy
+from PIL import Image
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
+import eqArchive
+import eqgFiles
 from conftest import writePNG
 from testCaves import caveCanyon, checkCave, borderEdges
 
 caveMaterials = {"wallMaterial": "caveRock", "floorMaterial": "caveFloor", "worldUnitsPerRepeat": 48}
+# What a view needs of the zone: its light, fog, and clip.
+zone = {
+  "ambientColor": [0.42, 0.42, 0.44], "specialAmbientColor": [0, 0, 0], "bounceColor": [0.1, 0.1, 0.12], "sunColor": [0.62, 0.57, 0.48],
+  "sunAzimuthDegrees": 150, "sunElevationDegrees": 40, "fogColor": [0.6, 0.65, 0.75], "fogStart": 800, "fogEnd": 5000, "fogDensity": 0.1,
+  "fogOn": True, "maxClip": 6000, "newEngineZone": True,
+}
 breakup = {"featureSize": 40, "amplitude": 5, "seed": 11}
 # Level from the graded approach into the cliff, then point 2 without a height (the even grade between 2 and 30), segment 3 climbing
 # at a chosen 10 degrees and segment 4 falling at 5, setting the blind end's height.
@@ -412,6 +426,170 @@ def testTwoCavesCrossInsideTheRockAndEachIsTakenBackAlone(stageBlenderServer, tm
     assert checked["edgesOnThreeOrMoreFaces"] == 0 and checked["openEdges"] == borderEdges and checked["largestRingMiss"] <= 1e-4
 
 
+def testAPlanDrawsACavesRunsWhereTheyRun(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    await session.expectSuccess("setZoneProperties", zone)
+    await session.expectSuccess("cutCave", branched)
+    plain, _ = await session.expectImage("renderSketch", {"center": [60, 120], "width": 400, "layers": [], "spotHeights": False})
+    drawn, plan = await session.expectImage("renderSketch", {"center": [60, 120], "width": 400, "layers": ["caves"], "spotHeights": False})
+    return plain, drawn, plan
+
+  plain, drawn, plan = stageBlenderServer.session(steps)
+  plain, drawn = (numpy.asarray(Image.open(io.BytesIO(data)).convert("RGB"), dtype=numpy.int64) for data in (plain, drawn))
+  changed = numpy.abs(plain - drawn).max(axis=2) > 30
+  height, width = changed.shape
+  units = plan["unitsPerPixel"]
+
+  def pixel(x, y):
+    # North (+x) up and east (-y) right, the drawing's middle at the center.
+    return int(round(width / 2 + (120 - y) / units)), int(round(height / 2 - (x - 60) / units))
+
+  # The room's east wall (x 60) halfway along it and the branch's south wall (y 185, where it is 30 wide) are drawn; the hill far from
+  # both is not.
+  for x, y in ((60, 170), (78, 185)):
+    column, row = pixel(x, y)
+    assert changed[row - 3:row + 4, column - 3:column + 4].any(), (x, y)
+  column, row = pixel(160, 20)
+  assert not changed[row - 6:row + 7, column - 6:column + 7].any()
+
+
+def testDaylightReachesExportAsBakedLight(stageBlenderServer, tmp_path):
+  archivePath = tmp_path / "daylit.eqg"
+  # Each imported vertex's baked share of scene light (the alpha of its baked color) by position.
+  readImported = r"""
+import numpy
+zone = bpy.data.objects['daylit']
+mesh = zone.data
+alphas = numpy.empty(len(mesh.vertices) * 4, dtype=numpy.float32)
+mesh.color_attributes['eqColor'].data.foreach_get('color', alphas)
+positions = numpy.empty(len(mesh.vertices) * 3)
+mesh.vertices.foreach_get('co', positions)
+positions = positions.reshape(-1, 3)
+result = {'positions': numpy.round(positions, 3).tolist(), 'alphas': numpy.round(alphas.reshape(-1, 4)[:, 3], 4).tolist()}
+"""
+
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    await session.expectSuccess("cutCave", room | {"breakup": None, "daylight": [1, 1, 0.5, 0, 0]})
+    await session.expectSuccess("saveFile", {"path": str(tmp_path / "daylit.blend")})
+    exported = await session.expectSuccess("exportZone", {"path": str(archivePath), "purpose": "test"})
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    await session.expectSuccess("importZoneFile", {"path": str(archivePath)})
+    imported = (await session.expectSuccess("runPython", {"code": readImported}))["result"]
+    return exported, imported
+
+  exported, imported = stageBlenderServer.session(steps)
+  archive = eqArchive.EQArchive(archivePath)
+  terrain = eqgFiles.parseModel(archive.read("ter_daylit.ter"), "ter_daylit.ter")
+  lit = archive.read("ter_daylit.lit")
+  count = struct.unpack_from("<I", lit, 4)[0]
+  colors = numpy.frombuffer(lit, dtype="<u4", count=count, offset=8)
+  positions = numpy.array(terrain["vertices"])[:, :3]
+  # One baked color per terrain vertex: no color, the share of scene light as alpha.
+  assert lit[:4] == b"EQGP" and count == len(positions) and (colors & 0xFFFFFF).max() == 0
+  alpha = colors >> 24
+  # Full at the mouth and on all the ground, half at point 2 (60 north), none from point 3 on; eased between.
+  x, y, z = positions.T
+  onCenter = numpy.abs(x) < 1e-3
+  assert alpha[(y < -21) | (z > 100)].min() == 255
+  assert set(alpha[onCenter & (numpy.abs(y - 10) < 1e-3) & (numpy.abs(z - 2) < 1e-3)].tolist()) == {255}
+  assert set(alpha[onCenter & (numpy.abs(y - 60) < 1e-3) & (numpy.abs(z - 2) < 1e-3)].tolist()) == {128}
+  assert alpha[(y > 90 + 1e-3) & (z < 60)].max() == 0
+  between = alpha[onCenter & (y > 10 + 1) & (y < 60 - 1) & (numpy.abs(z - 2) < 1e-3)]
+  assert len(between) and between.min() > 128 and between.max() < 255
+  assert exported["terrainBakedLight"] == "ter_daylit.lit"
+  assert [entry["daylitCaves"] for entry in exported["toConfirm"]] == [["room"]]
+  # Imported, the terrain carries the same shares as the share of scene light it takes.
+  importedAlphas = {tuple(position): share for position, share in zip(imported["positions"], imported["alphas"])}
+  matched = [abs(importedAlphas[tuple(numpy.round(position, 3))] - share / 255) for position, share in zip(positions, alpha) if tuple(numpy.round(position, 3)) in importedAlphas]
+  assert len(matched) > 0.9 * len(positions) and max(matched) <= 1 / 255
+
+
+def testDaylightDarkensTheCaveInTheClientsView(stageBlenderServer, tmp_path):
+  deep ={"view": {"eye": [0, 130, 30], "target": [0, 250, 20]}}
+
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    await session.expectSuccess("setZoneProperties", zone)
+    outOfRange = await session.expectError("cutCave", room | {"daylight": [1, 1, 1.5, 0, 0]})
+    miscounted = await session.expectError("cutCave", room | {"daylight": [1, 0]})
+    await session.expectSuccess("cutCave", room | {"daylight": [1, 1, 0.5, 0, 0]})
+    darkened, described = await session.expectImage("renderView", deep)
+    await session.expectSuccess("editCave", {"objectName": "ground", "name": "room", "changes": {"daylight": None}})
+    lit, _ = await session.expectImage("renderView", deep)
+    return outOfRange, miscounted, darkened, described, lit
+
+  outOfRange, miscounted, darkened, described, lit = stageBlenderServer.session(steps)
+  assert "daylight shares" in outOfRange and "lie from 0 to 1" in outOfRange and "are 5 numbers" in miscounted
+
+  def brightness(data):
+    return float(numpy.asarray(Image.open(io.BytesIO(data)).convert("L"), dtype=numpy.float64).mean())
+
+  # Deep in the room, past where its daylight falls to nothing, it takes no scene light: black without lamps. Without daylight set, the
+  # same view is lit as the cliff outside is.
+  assert described["daylight"]["daylitTerrain"] == ["ground"]
+  assert brightness(darkened) < 1 and brightness(lit) > 20
+
+
+def testAnAnchoredLightFollowsItsCave(stageBlenderServer, tmp_path):
+  anchor = {"objectName": "ground", "cave": "room", "at": 230, "side": "right", "over": 10, "out": 3}
+  readLight = "result = list(bpy.data.objects['LIB_lamp'].location)"
+
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    await session.expectSuccess("cutCave", room | {"breakup": None})
+    unseen = await session.expectError("placeLights", {"lights": [{"name": "LIB_lamp", "onCave": anchor, "color": [1, 0.6, 0.3], "radius": 60}]})
+    unplaced = (await session.expectSuccess("runPython", {"code": "result = [o.name for o in bpy.data.objects if o.type == 'LIGHT']"}))["result"]
+    await session.expectSuccess("setZoneProperties", zone)
+    placed = await session.call("placeLights", {"lights": [{"name": "LIB_lamp", "onCave": anchor, "color": [1, 0.6, 0.3], "radius": 60}]})
+    first = (await session.expectSuccess("runPython", {"code": readLight}))["result"]
+    edited = await session.expectSuccess("editCave", {"objectName": "ground", "name": "room", "changes": {"widths": [40, 40, 40, 130, 130]}})
+    second = (await session.expectSuccess("runPython", {"code": readLight}))["result"]
+    inRock = await session.expectError("placeLights", {"lights": [{"name": "LIB_buried", "onCave": anchor | {"over": 80}, "color": [1, 1, 1], "radius": 30}]})
+    both = await session.expectError("placeLights", {"lights": [{"name": "LIB_both", "onCave": anchor, "position": [0, 0, 0], "color": [1, 1, 1], "radius": 30}]})
+    removed = await session.expectSuccess("removeCave", {"objectName": "ground", "name": "room"})
+    return unseen, unplaced, placed, first, edited, second, inRock, both, removed
+
+  unseen, unplaced, (placed, _), first, edited, second, inRock, both, removed = stageBlenderServer.session(steps)
+  # An anchored light is looked at in a client-shaded view, so a zone that cannot draw one places none.
+  assert "Zone properties missing" in unseen and unplaced == []
+  # It stands 3 out from the room's east wall (60 east of its middle), 10 over its floor, and returns a view from the floor below it.
+  assert [content.type for content in placed.content] == ["image", "text"], [content.text for content in placed.content if content.type == "text"]
+  report = json.loads(placed.content[1].text)["anchored"][0]
+  assert report["lightsTerrain"] is True and report["floorBelow"] == [0.0, 170.0, 2.0]
+  assert numpy.allclose(first, [57, 170, 12], atol=0.01)
+  # The room widened to 130, it stands at the new wall.
+  assert numpy.allclose(second, [62, 170, 12], atol=0.01) and edited["cut"]["anchoredLights"] == [{"light": "LIB_lamp", "position": [62.0, 170.0, 12.0]}]
+  assert "lies in rock or outside the cave" in inRock
+  assert "Light 'LIB_both' is placed at a position or anchored on a cave's lining (onCave), one of them" in both
+  assert removed["anchoredLightsLeft"] == ["LIB_lamp"]
+
+
+def testASpiralExportsAndBothLevelsAreWalkedAfterImport(stageBlenderServer, tmp_path):
+  archivePath = tmp_path / "spiral.eqg"
+  intoTheRoom = [[0, -60, 2], [0, 10, 2], [0, 60, 2], [0, 90, 2], [0, 240, 2]]
+  overTheTunnel = [[0, -60, 2], [0, 150, 2], [-40, 150, 2], [-100, 150, 2], [-100, 30, 60], [50, 30, 60]]
+
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    await session.expectSuccess("cutCave", room | {"name": "spiral", "breakup": None, "branches": [over]})
+    await session.expectSuccess("saveFile", {"path": str(tmp_path / "spiral.blend")})
+    exported = await session.expectSuccess("exportZone", {"path": str(archivePath), "purpose": "test"})
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    await session.expectSuccess("importZoneFile", {"path": str(archivePath)})
+    imported = await session.expectSuccess("getObjectDetail", {"name": "spiral"})
+    walks = [await session.expectSuccess("walkRoute", {"path": path, "sampleSpacing": 4}) for path in (intoTheRoom, overTheTunnel)]
+    return exported, imported, walks
+
+  exported, imported, walks = stageBlenderServer.session(steps)
+  assert imported["triangles"] == exported["terrainTriangles"]
+  # Imported, the room under and the passage over the tunnel are both walked from the mouth.
+  for walk in walks:
+    assert walk["walkable"] is True and walk["problems"] == []
+  assert walks[1]["profile"][-1]["at"][2] > 55
+
+
 def testPointsWithoutHeightsTakeTheEvenGradeAndAGradedSegmentSetsItsEnd(stageBlenderServer, tmp_path):
   async def steps(session):
     await caveCanyon(session, tmp_path)
@@ -440,9 +618,14 @@ def testALandingTurnsLevelAndItsStraightsTakeTheGrade(stageBlenderServer, tmp_pa
     measured = (await session.expectSuccess("runPython", {"code": floorHeights(arc)}))["result"]
     climb = (await session.expectSuccess("runPython", {"code": floorHeights([[0, 10, 2], [0, 55, 16], [0, 100, 30]])}))["result"]
     walk = await session.expectSuccess("walkRoute", {"cave": {"objectName": "ground", "name": "landed"}})
-    return cut, measured, climb, walk
+    await session.expectSuccess("setZoneProperties", zone)
+    _, strip = await session.expectImage("renderRouteStrip", {"cave": {"objectName": "ground", "name": "landed"}, "spacing": 60}, "image/jpeg")
+    return cut, measured, climb, walk, strip
 
-  cut, measured, climb, walk = stageBlenderServer.session(steps)
+  cut, measured, climb, walk, strip = stageBlenderServer.session(steps)
+  # The strip stands a frame every 60 along the run, from its mouth at 2 to its landing and on at 30.
+  assert strip["walkable"] is True and [frame["distance"] for frame in strip["frames"]] == [0.0, 60.0, 120.0, 180.0, 240.0]
+  assert abs(strip["frames"][0]["view"]["standAt"][2] - 2) <= 0.5 and abs(strip["frames"][-1]["view"]["standAt"][2] - 30) <= 0.5
   main = cut["runs"]["main"]
   assert main["landings"] == [{"point": 2, "floor": 30.0, "arc": [160.0, round(160 + 40 * math.pi / 2, 1)]}]
   # The floor is level at the landing's height all round its arc, and climbs evenly to the arc's start, the arc left out of the climb.

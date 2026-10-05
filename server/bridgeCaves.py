@@ -19,6 +19,7 @@ import numpy
 
 import bridgeAuthoring
 import bridgeCaveData
+import bridgeCaveLight
 import bridgeCaveRuns
 import bridgeMeshAccess
 import bridgeNoise
@@ -1467,12 +1468,13 @@ def splice(sceneObject, name, definition, strokes):
   }
   bridgeCaveData.writeCaves(sceneObject, known)
   replayStrokes(sceneObject, name, strokes)
+  anchored = bridgeCaveLight.placeAnchoredLights(sceneObject, name)
   ends = [{"run": runName, "end": end, "kind": kind, "rounded": tube["rows"]["rounded"][end]} for runName, tube in tubes.items() for end, kind in tube["rows"]["ends"].items()]
   stretches = [stretch | {"run": runName} for runName, run in worked.items() for stretch in run["line"].levelStretches()]
   return report | {
     "ends": ends, "levelStretches": stretches, "runs": {runName: run["line"].grading() for runName, run in worked.items()},
     "junctions": [{key: value for key, value in junction.items() if key != "exitAlong"} for junction in junctions],
-    "floorStrokes": strokeReport(definition, worked, tubes),
+    "floorStrokes": strokeReport(definition, worked, tubes), "anchoredLights": anchored,
   }
 
 
@@ -2124,7 +2126,10 @@ def removeCave(objectName, name):
     restored = takeBack(sceneObject, name)
     if bridgeMeshAccess.surfaceLayers(sceneObject):
       bridgeAuthoring.showLayers(sceneObject)
-  return {"object": objectName, "cave": name, "definition": record["definition"], "strokes": record["paint"]} | restored
+  return {
+    "object": objectName, "cave": name, "definition": record["definition"], "strokes": record["paint"],
+    "anchoredLightsLeft": bridgeCaveLight.anchoredLights(sceneObject, name),
+  } | restored
 
 
 def traceLedge(objectName, start, end, floorFrom, floorTo, width, height, side, insideShare, step):

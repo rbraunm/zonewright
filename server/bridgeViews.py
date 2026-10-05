@@ -9,6 +9,7 @@ import mathutils
 import numpy
 
 import bridgeBoundaries
+import bridgeCaveLight
 import bridgeClientLight
 import bridgeEmitterDrawing
 import bridgeExportChecks
@@ -641,6 +642,7 @@ def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, b
     if labels is not None or shading in valueShadings:
       description |= bridgeShadings.prepareView(preview, shading, labels, os.path.splitext(outputPath)[0] + "_pass.exr")
     if shading == "client":
+      description["daylight"] = {"daylitTerrain": bridgeCaveLight.applyDaylight(preview)}
       description["pointLights"] = bridgePointLights.applyPointLights(preview, sourceScene)
       description["emitters"] = bridgeEmitterDrawing.drawEmitters(preview, sourceScene, emitters)
     if shading == "coverage":

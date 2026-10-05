@@ -3,10 +3,15 @@ point light whose eqRadius property holds the EQ radius (its reach in world unit
 empty whose eqEmitterDefinition and eqEmitterLifespan properties hold the client emitter definition it shows and the list's lifespan
 field, and eqEmitterAlwaysVisible the field some lists add. A client-shaded preview draws both, as the client does: the lights' light on
 what they reach (bridgePointLights) and the emitters' particles (bridgeEmitterDrawing). Runs under Blender's Python."""
+import json
+
 import bpy
 
+import bridgeCaveLight
+import bridgeCommands
 import bridgeMeshAccess
 import bridgeObjects
+import bridgeViews
 
 radiusProperty = "eqRadius"
 definitionProperty = "eqEmitterDefinition"
@@ -26,23 +31,38 @@ def requireClientContent(clientContent):
     raise ValueError(f"clientContent must be None or one of {list(bridgeMeshAccess.clientContentKinds)}, got {clientContent!r}")
 
 
-def placeLights(lights, collection, clientContent):
-  """Point lights named, placed, colored, and reaching as given: [{name, position, color, radius}]; clientContent marks those an
-  imported zone brings (bridgeMeshAccess.clientContentKinds)."""
+def placeLights(lights, collection, clientContent, viewSky=None):
+  """Point lights named, placed, colored, and reaching as given: [{name, position or onCave, color, radius}], a light anchored on a
+  cave's lining (onCave, bridgeCaveLight) standing where its anchor finds the lining and keeping the anchor; clientContent marks those an
+  imported zone brings (bridgeMeshAccess.clientContentKinds). Anchored lights are looked at in a client-shaded view, so the zone must draw
+  one (viewSky: its sky's state, as a view takes it) before any is placed."""
   requireClientContent(clientContent)
+  if any(light.get("onCave") is not None for light in lights):
+    bridgeViews.requireZone(bridgeCommands.previewZone(viewSky))
+  anchors = []
+  for light in lights:
+    if ("position" in light and light["position"] is not None) == ("onCave" in light and light["onCave"] is not None):
+      raise ValueError(f"Light '{light['name']}' is placed at a position or anchored on a cave's lining (onCave), one of them")
+    anchor = bridgeCaveLight.anchorDefinition(light["onCave"]) if light.get("onCave") is not None else None
+    anchors.append((anchor, None if anchor is None else bridgeCaveLight.anchoredPosition(anchor)))
   destination = bridgeObjects.targetCollection(collection)
-  placed = []
-  for light in map(validatedLight, lights):
+  placed, anchored = [], []
+  for light, (anchor, found) in zip(lights, anchors):
+    light = validatedLight(light | ({"position": found[0]} if found is not None else {}))
     data = bpy.data.lights.new(light["name"], "POINT")
     data.color = light["color"]
     data[radiusProperty] = float(light["radius"])
     lightObject = bpy.data.objects.new(light["name"], data)
     lightObject.location = light["position"]
+    if anchor is not None:
+      lightObject[bridgeCaveLight.anchorProperty] = json.dumps(anchor)
     if clientContent is not None:
       lightObject[bridgeMeshAccess.clientContentProperty] = clientContent
     destination.objects.link(lightObject)
     placed.append(lightObject.name)
-  return {"lights": len(placed), "collection": destination.name, "names": placed}
+    if anchor is not None:
+      anchored.append(bridgeCaveLight.anchoredReport(lightObject, found[1]))
+  return {"lights": len(placed), "collection": destination.name, "names": placed} | ({"anchored": anchored} if anchored else {})
 
 
 def placeEmitters(emitters, collection, clientContent):

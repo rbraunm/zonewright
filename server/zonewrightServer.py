@@ -1091,7 +1091,9 @@ exportChecksHelp = (
   " `coverage` counts the exported faces by status; `excluded` lists what is not the zone's own geometry by reason (guides, plot borders,"
   " regions, anything hidden from renders, placed client content); `toConfirm` lists shipped meshes with shaping passes off or surfacing"
   " layers muted, which leave the zone as if never made, and caves and defined passes whose ground moved since they were made"
-  " (stale; a game export refuses them, and caves broken by a change outside their guards refuse both), and stale structures with why"
+  " (stale; a game export refuses them, and caves broken by a change outside their guards refuse both), caves whose daylight goes out"
+  " as the terrain placement's baked light (daylitCaves: its .lit, which the client's use of on a terrain placement is unverified until"
+  " a test load), and stale structures with why"
   " (ground, kit, missing); `swim` the undecided and changed pools and rivers; `boundaries` and `zoneLines`"
   " what goes into the terrain as invisible walls and into the .zon as zone lines; `structures` each structure's models (file,"
   " triangles, placements) and triangles (one laid as ground has its triangles in the terrain and no model), and `placedTriangles`"
@@ -1182,7 +1184,9 @@ async def checkExport(context: Context, path: str, purpose: str):
   " <zone>_housing.json beside the archive, its plots as Peridot's plot content gives them (address, border door, center and heading in"
   " the server's axes, size across and along, price, upkeep, item capacity, pets, features) with their border doors (OBP_LOTSQUARE or"
   " OBP_GUILDSQUARE, open type 160, in the server's axes and EQ heading), and <zone>_assets.txt naming stonesquare.eqg, which holds the"
-  " border models. Lists an earlier export left that this scene no longer has are removed. No baked light is written yet." + exportChecksHelp
+  " border models. Lists an earlier export left that this scene no longer has are removed. Baked light is written only for the terrain"
+  " placement where caves set daylight (ter_<zone>.lit: no color, each vertex's share of scene light as alpha; terrainBakedLight names"
+  " it); placed models carry none." + exportChecksHelp
 ))
 async def exportZone(context: Context, path: str, purpose: str):
   archivePath, zone = exportTarget(path)
@@ -1713,7 +1717,14 @@ async def cutCave(
   least `minimumRock` (default 8) of rock between them, measured between the tubes as cut, breakup included, anywhere but at their own
   junction. Separate caves keep their mouths apart, but inside the rock one may pass over or under another with minimumRock (the larger
   of the two caves') between their linings; the cut takes only ground into its patch, never another cave's lining, so each is taken back
-  alone. Every choice is the author's: where a branch leaves, at what angle, and what it climbs to. A bend turns on an arc the width in radius (less where the points are
+  alone. Every choice is the author's: where a branch leaves, at what angle, and what it climbs to.
+  `daylight` (one value from 0 to 1 per path point, on the main run or a branch; null for none) is the share of scene light the run's
+  lining takes, eased between points as the widths are, set from what the mouth lets in (1 at the mouth, half thirty in, 0 past the
+  first bend): the client's EQG caves take none at all and are lit by lamps. It is never stored on the mesh but worked out where it is
+  used: client-shaded views draw it as the terrain's baked share of scene light (the ground, the pieces at the mouth, and runs without
+  daylight keep 1), and exportZone writes it as the terrain placement's baked light (ter_<zone>.lit: no color, the share as alpha),
+  listed to confirm until a test load shows the client takes it on a terrain placement. Light the cave with LIB_ lamps anchored on its
+  lining (placeLights onCave). A bend turns on an arc the width in radius (less where the points are
   close). `breakup` {featureSize, amplitude, seed} moves the walls and vault along their outward directions by noise, the floor kept
   flat, fading out within `mouthFade` (default twice edgeLength) of wherever the tube lies in the open, so the lip stays a clean arch.
   Each end is open, some of its floor within a step of walkable ground (a mouth, its section in the open but for a sill a step deep;
@@ -1738,7 +1749,8 @@ async def cutCave(
   whose floor where it starts lies under its parent's (a hole) or more than a step over it without overlook, that never leaves its
   parent, named twice or "main", or leaving an unknown run; two runs closer than minimumRock away from their junction, or a run passing
   that close to itself (naming the runs, the place, and the rock); another cave's lining within minimumRock of the tubes, or crossed by
-  them (naming the cave and the place); another cave's mouth within reach; a bend tighter than half the width, an end part in the rock with its floor buried more than a step under the ground (for a hall, any end part in the rock
+  them (naming the cave and the place); another cave's mouth within reach; daylight not one value from 0 to 1 per point; a cut that
+  would leave a light anchored on the cave in rock (naming the light); a bend tighter than half the width, an end part in the rock with its floor buried more than a step under the ground (for a hall, any end part in the rock
   and part in the open, or a ledge), a floor hanging in the air, both
   ends wholly inside the rock, the tube reaching the terrain's border or another cave's mouth, a mesh with modifiers or shared with another object, and caves that fail their integrity checks;
   `wallShare` outside (0, 1]; a band reaching above the walls' straight part (wallShare of the height) at any path point (naming it),
@@ -1749,7 +1761,7 @@ async def cutCave(
   segment grades and runs, and landings, each floor stroke as placed (a level way's and a pad's ends along the run and sides, a pad's
   top), each junction (branch, the run it leaves, its start, how far its floor stands over its parent's, overlook, and the `frame` of
   its opening for a portal piece: {center (the floor's middle where it leaves the parent's walls), facingDegrees (back into the parent),
-  width, height}), each run's ends, and the floor's level stretches (start, end, length, height, narrowest width: a stretch about
+  width, height}), each run's ends, the lights anchored on it placed again (anchoredLights), and the floor's level stretches (start, end, length, height, narrowest width: a stretch about
   220 wide and long holds a stock player plot). The cave is kept with its definition: the ground within its reach is fingerprinted, getObjectDetail and exports flag it
   stale once that ground moves, and editCave or regradeTerrain cuts it again to fit. Around a cave, shaping leaves its lining where it
   is (results count caveLiningLeft) and keeps its ring on the ground; strokes never slide its vertices sideways; contour cuts, turned
@@ -1975,14 +1987,37 @@ async def followContours(context: Context, objectName: str, selector: dict = all
 
 @guardedTool()
 async def placeLights(context: Context, lights: list[dict], collection: str | None = "lights"):
-  """Place zone lights: point lights [{name, position [x,y,z], color [r,g,b] 0-1 as the client stores it, radius (reach in units)}] in
-  `collection`. exportZone writes them into the zone's .zon, and client-shaded views draw them as the client does
+  """Place zone lights: point lights [{name, position [x,y,z] or onCave, color [r,g,b] 0-1 as the client stores it, radius (reach in
+  units)}] in `collection`. exportZone writes them into the zone's .zon, and client-shaded views draw them as the client does
   (docs/clientRendering.md, Point lights): each adds its color, falling off as 1 - (distance / radius)^2 and by how squarely a surface
-  faces it, to surfaces within its radius. Terrain takes only lights whose name's third letter is B (LIB_), the client's mark for
-  lights on geometry with baked light; placed objects and characters take every light. Each draw takes the three that score highest. The
-  asset catalog's light styles (findAssets kind light) give the colors and radii client zones use for torches, braziers, fill light, and
-  the rest."""
-  return await callBridge(context, "placeLights", {"lights": lights, "collection": collection, "clientContent": None})
+  faces it, to surfaces within its radius, through rock as the client's do (keep a lamp's radius inside its room). Terrain takes only
+  lights whose name's third letter is B (LIB_), the client's mark for lights on geometry with baked light; placed objects and
+  characters take every light. Each draw takes the three that score highest. The asset catalog's light styles (findAssets kind light)
+  give the colors and radii client zones use for torches, braziers, fill light, and the rest; Underquarry pairs a warm lamp light with
+  a cool fill. `onCave` {objectName, cave, run, at, side, over, out} anchors a light on a cave's lining (cutCave) in place of a position:
+  `run` "main" unless a branch is named, `at` a distance along it or {"point": index}, `side` left or right (a wall, looking along the
+  run, `over` its floor) or ceiling (its vault over the run's middle), `out` how far the light stands out from the rock into the cave.
+  The light is placed on the lining as cut and keeps its anchor: every cut of its cave (editCave, regradeTerrain) places it again, and
+  a cut that would leave it in rock is refused, naming it. Refused: a light with both a position and onCave, or neither; an anchor in
+  rock or outside the cave; an unknown cave or run. The result names the lights; for anchored ones, where each stands, the floor below
+  it, and whether it lights the terrain (a LIB_ name) or only objects and characters (LIT_); with a client-shaded view from the floor
+  below the first anchored light, with the scale figure."""
+  anchoring = any(light.get("onCave") is not None for light in lights)
+  zone = await callBridge(context, "getZoneProperties", {}) if anchoring else None
+  sky = await zoneSky(zone) if anchoring else None
+  placed = await callBridge(context, "placeLights", {"lights": lights, "collection": collection, "clientContent": None, "viewSky": sky})
+  if "anchored" not in placed:
+    return placed
+  first = placed["anchored"][0]
+  floor, position = first["floorBelow"], first["position"]
+  heading = math.degrees(math.atan2(position[0] - floor[0], position[1] - floor[1])) % 360.0 if math.hypot(position[0] - floor[0], position[1] - floor[1]) > 1e-6 else 0.0
+  view = {"standAt": floor, "headingDegrees": heading, "pitchDegrees": 20.0}
+  outputPath = newRenderPath()
+  described = await callBridge(context, "renderView", {
+    "view": view, "outputPath": str(outputPath), "figureModel": await scaleFigureModel(zone, view), "shading": "client", "bandHeight": 50.0,
+    "guides": True, "sky": sky, "swimVolumes": False, "labels": None, "emitters": await previewEmitterAssets(), "liquidTime": None,
+  })
+  return [Image(data=outputPath.read_bytes(), format="png"), placed | {"view": {"outputPath": str(outputPath), "standAt": floor, "headingDegrees": round(heading, 1), "pointLights": described.get("pointLights")}}]
 
 
 @guardedTool()
