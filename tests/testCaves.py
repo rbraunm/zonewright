@@ -1,9 +1,15 @@
 import json
+import math
 import re
+import sys
+from pathlib import Path
 
 import numpy
 
 from conftest import writePNG
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
+from playerScale import walkableNormalZ
 
 # A tunnel 40 wide and 45 tall from the cliff foot, rising to a room 120 wide and 70 tall that ends blind.
 hall = {
@@ -261,6 +267,7 @@ def testCaveRefusals(stageBlenderServer, tmp_path):
     steep = await session.expectError("cutCave", hall | {"name": "steep", "path": [[0, -60, 2], [0, 0, 60]], "widths": [40] * 2, "heights": [45] * 2})
     tight = await session.expectError("cutCave", hall | {"name": "tight", "path": [[0, -60, 2], [0, 40, 6], [-30, 10, 6]], "widths": [40] * 3, "heights": [45] * 3})
     border = await session.expectError("cutCave", hall | {"name": "border", "path": [[0, -60, 2], [0, 30, 6], [0, 370, 6]], "widths": [40] * 3, "heights": [45] * 3})
+    overWalkable = await session.expectError("cutCave", hall | {"name": "overWalkable", "maximumFloorDegrees": 75})
     await session.expectSuccess("cutCave", hall)
     before = (await session.expectSuccess("runPython", {"code": checkCave}))["result"]
     # A tunnel 110 east of the hall, whose reach takes in the hall room's wall.
@@ -269,15 +276,17 @@ def testCaveRefusals(stageBlenderServer, tmp_path):
     edited = await session.expectError("editCave", {"objectName": "ground", "name": "hall", "changes": {"path": [[0, -60, 2], [0, 0, 60], [0, 90, 8], [0, 130, 8], [0, 250, 8]]}})
     after = (await session.expectSuccess("runPython", {"code": checkCave}))["result"]
     detail = await session.expectSuccess("getObjectDetail", {"name": "ground"})
-    return partInRock, hanging, hangingLow, steep, tight, border, overlap, edited, before, after, detail
+    return partInRock, hanging, hangingLow, steep, tight, border, overWalkable, overlap, edited, before, after, detail
 
-  partInRock, hanging, hangingLow, steep, tight, border, overlap, edited, before, after, detail = stageBlenderServer.session(steps)
+  partInRock, hanging, hangingLow, steep, tight, border, overWalkable, overlap, edited, before, after, detail = stageBlenderServer.session(steps)
   assert "The cave's start at [0.0, -60.0, -6.0] is part in the rock (up to 8.0 into it)" in partInRock
   assert "The cave's floor hangs in the air from [0.0, -60.0, 12.0]" in hanging and "the ground up to 10.0 below it" in hanging
   assert "The cave's floor hangs in the air from [0.0, -60.0, 5.0] to [0.0, -24.0, 5.4]: no rock lies under its middle within 2, the ground up to 3.4 below it" in hangingLow
   assert "rises 58.0 from point 0 to point 1 over a run of 60.0" in steep and "needs a run of 100.5" in steep
   assert "tighter than half its width" in tight
   assert "reaches the edge of 'ground'" in border
+  # A cave's floor is walked, so its grade limit runs up to the steepest face players walk (playerScale).
+  assert f"maximumFloorDegrees is above 0 and at most {math.degrees(math.acos(walkableNormalZ)):.1f} (the steepest face players walk, playerScale), got 75" in overWalkable
   assert "would overlap cave(s) ['hall']" in overlap
   # A refused edit leaves the cave as it was.
   assert "rises 58.0" in edited and after == before and detail["caves"][0]["from"] == hall["path"][0]

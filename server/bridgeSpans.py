@@ -11,7 +11,7 @@ import numpy
 import bridgeKitGeometry
 import bridgeStructures
 from bridgeStructures import isNumber, requireKeys, requireNonNegative, requirePoint, requirePositive, requireSides, roundVector, size
-from playerScale import eyeHeight, stepHeight
+from playerScale import eyeHeight, stepHeight, walkableNormalZ
 
 bridgeKeys = ("kitPath", "start", "end", "width", "deck", "profile", "posts", "rails", "stringers", "bents", "sink", "maximumDeckDegrees", "collection")
 stairsKeys = ("kitPath", "bottom", "top", "width", "tread", "riser", "stringers", "posts", "rails", "sink", "collection")
@@ -19,7 +19,6 @@ walkwayKeys = (
   "kitPath", "points", "width", "deck", "treads", "stairLegs", "riser", "posts", "brackets", "rails", "stringers", "sink", "maximumGradeDegrees",
   "collection",
 )
-maximumDeckRange = (0.0, 60.0)
 steepestFlightDegrees = 45.0
 maximumRiser = stepHeight
 maximumTurnDegrees = 150.0
@@ -185,8 +184,9 @@ def layBridge(laying):
   width = requirePositive("width", definition["width"])
   sink = requireNonNegative("sink", definition["sink"])
   maximum = definition["maximumDeckDegrees"]
-  if not isNumber(maximum) or not maximumDeckRange[0] < maximum <= maximumDeckRange[1]:
-    raise ValueError(f"maximumDeckDegrees runs over {maximumDeckRange[0]:g} up to {maximumDeckRange[1]:g}, got {maximum!r}")
+  steepestWalkable = math.degrees(math.acos(walkableNormalZ))
+  if not isNumber(maximum) or not 0 < maximum <= steepestWalkable:
+    raise ValueError(f"maximumDeckDegrees runs over 0 up to {steepestWalkable:.1f} (the steepest face players walk, playerScale), got {maximum!r}")
   deck = laying.kit.piece(definition["deck"], ("plank", "floor"), "deck")
   isPlank = deck["record"]["kind"] == "plank"
   endZone = size(deck, 1) if isPlank else size(deck, 2)

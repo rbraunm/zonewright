@@ -100,8 +100,9 @@ def caveDefinition(path, widths, heights, wallMaterial, floorMaterial, worldUnit
     raise ValueError(f"breakup is {{featureSize, amplitude, seed}} with a positive featureSize and amplitude, got {breakup!r}")
   if mouthFade is not None and mouthFade < 0:
     raise ValueError(f"mouthFade is a distance, at least 0, got {mouthFade}")
-  if not 0 < maximumFloorDegrees < 60:
-    raise ValueError(f"maximumFloorDegrees is above 0 and under 60 (steeper is not walked), got {maximumFloorDegrees}")
+  steepestWalkable = math.degrees(math.acos(playerScale.walkableNormalZ))
+  if not 0 < maximumFloorDegrees <= steepestWalkable:
+    raise ValueError(f"maximumFloorDegrees is above 0 and at most {steepestWalkable:.1f} (the steepest face players walk, playerScale), got {maximumFloorDegrees}")
   for material in (wallMaterial, floorMaterial):
     if bpy.data.materials.get(material) is None:
       raise ValueError(f"No material named '{material}'")

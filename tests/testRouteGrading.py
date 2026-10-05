@@ -1,10 +1,15 @@
 import math
 import re
+import sys
+from pathlib import Path
 
 import numpy
 
 from conftest import writePNG
 from testModelsAndDressing import readShapedMesh
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
+from playerScale import walkableNormalZ
 
 # A three-leg switchback climbing 100 up caveCanyon's 45-degree hillside to the entrance of a plot on the rim: legs 24 degrees off the
 # contour, two hairpins, its ends fixed (an end left free takes the ground there each time it is graded, and moves with it).
@@ -84,17 +89,20 @@ def testRefusalsNameTheRunTheClashAndTheLedgeSpan(stageBlenderServer, tmp_path):
   async def steps(session):
     await caveCanyon(session, tmp_path)
     steep = await session.expectError("gradeRoute", {"objectName": "ground", "name": "steep", "width": 20, "points": [[-200, -260, 0], [-100, -260, 70]]})
+    overWalkable = await session.expectError("gradeRoute", {"objectName": "ground", "name": "overWalkable", "width": 20, "points": [[-200, -260, 0], [-100, -260, 70]], "maximumGradeDegrees": 75})
     # Two legs from one hairpin, 30 apart at their far ends (their benches 10 apart), and 45 apart in height there.
     clash = await session.expectError("gradeRoute", {"objectName": "ground", "name": "clash", "width": 20, "points": [[-250, -205, 0], [-100, -190], [-250, -175, 45]]})
     await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "hollow"})
     await session.expectSuccess("sculptAtPoint", hollow)
     ledge = await session.expectError("gradeRoute", {"objectName": "ground", "name": "ledge", "width": 20, "points": [[-300, -250, 0], [-100, -250, 0]], "fillBatterDegrees": None})
     passes = await session.expectSuccess("runPython", {"code": "result = [key.name for key in bpy.data.objects['ground'].data.shape_keys.key_blocks]"})
-    return steep, clash, ledge, passes["result"]
+    return steep, overWalkable, clash, ledge, passes["result"]
 
-  steep, clash, ledge, passes = stageBlenderServer.session(steps)
+  steep, overWalkable, clash, ledge, passes = stageBlenderServer.session(steps)
   assert "rises 70.0 from point 0 to point 1 over a run of 100.0, 35.0 degrees, steeper than 26" in steep
   assert f"needs a run of {70 / math.tan(math.radians(26)):.1f}" in steep
+  # A route is walked, so its grade limit runs up to the steepest face players walk (playerScale).
+  assert f"maximumGradeDegrees is above 0 and at most {math.degrees(math.acos(walkableNormalZ)):.1f} (the steepest face players walk, playerScale), got 75" in overWalkable
   found = re.search(r"stands (-?[\d.]+) high and at \[[^\]]*\], ([\d.]+) away in plan, (-?[\d.]+);.*need ([\d.]+) between them", clash)
   assert "clashes with itself" in clash and found is not None
   first, apart, second, needed = (float(value) for value in found.groups())

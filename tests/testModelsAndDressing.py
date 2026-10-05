@@ -15,12 +15,17 @@ def testScaleFigureWalksAheadUntilAWall(stageBlenderServer):
       "newEngineZone": False,
     })
     _, open = await session.expectImage("renderView", {"view": {"standAt": [0, 0, 0], "headingDegrees": 0, "pitchDegrees": 0}})
+    await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "dais", "size": [40, 40, 3], "location": [0, 25.5, 0]})
+    _, stepped = await session.expectImage("renderView", {"view": {"standAt": [0, 0, 0], "headingDegrees": 0, "pitchDegrees": 0}})
+    await session.expectSuccess("deleteObjects", {"names": ["dais"]})
     await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "wall", "size": [40, 2, 20], "location": [0, 9, 0]})
     _, walled = await session.expectImage("renderView", {"view": {"standAt": [0, 0, 0], "headingDegrees": 0, "pitchDegrees": 0}})
-    return open, walled
+    return open, stepped, walled
 
-  open, walled = stageBlenderServer.session(steps)
+  open, stepped, walled = stageBlenderServer.session(steps)
   assert open["figure"] == [1.5, 15.0, 0.0]
+  # She steps up a riser of 3, under a player's step (playerScale), as a player would, and walks on along its top.
+  assert stepped["figure"] == [1.5, 15.0, 3.0]
   assert walled["figure"] == [1.5, 6.0, 0.0]
 
 

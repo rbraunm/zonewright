@@ -21,7 +21,7 @@ import bridgeStructureData
 import bridgeSurfacing
 import bridgeSwim
 import skyDrawing
-from playerScale import eyeHeight, swimEyeAboveSurface
+from playerScale import eyeHeight, stepHeight, swimEyeAboveSurface
 
 requiredZoneKeys = (
   "ambientColor", "specialAmbientColor", "bounceColor", "sunColor", "sunAzimuthDegrees", "sunElevationDegrees", "fogColor", "fogStart", "fogEnd",
@@ -49,7 +49,6 @@ frameMinimumRadius = 0.5
 figureDistance = 15.0
 figureStep = 1.0
 figureClearance = 1.5
-figureStepClimb = 2.0
 figureStepDrop = 4.0
 figureMinimumDistance = 3.0
 figureSideOffset = 1.5
@@ -567,7 +566,7 @@ def placeScaleFigure(preview, surfaces, ground, headingDegrees, figureModel):
   side = mathutils.Vector((math.cos(heading), -math.sin(heading), 0))
   down = mathutils.Vector((0, 0, -1))
   position = ground.copy()
-  sideHit = surfaces.cast(position + side * figureSideOffset + mathutils.Vector((0, 0, figureStepClimb)), down, figureStepClimb + figureStepDrop)
+  sideHit = surfaces.cast(position + side * figureSideOffset + mathutils.Vector((0, 0, stepHeight)), down, stepHeight + figureStepDrop)
   if sideHit is not None:
     position = sideHit
   walked = 0.0
@@ -575,7 +574,7 @@ def placeScaleFigure(preview, surfaces, ground, headingDegrees, figureModel):
     chest = position + mathutils.Vector((0, 0, figureModel["avatarHeight"]))
     if surfaces.cast(chest, ahead, figureStep + figureClearance) is not None:
       break
-    nextGround = surfaces.cast(position + ahead * figureStep + mathutils.Vector((0, 0, figureStepClimb)), down, figureStepClimb + figureStepDrop)
+    nextGround = surfaces.cast(position + ahead * figureStep + mathutils.Vector((0, 0, stepHeight)), down, stepHeight + figureStepDrop)
     if nextGround is None:
       break
     position = nextGround
