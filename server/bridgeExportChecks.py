@@ -29,7 +29,6 @@ import bridgeSwim
 import bridgeViews
 import bridgeWater
 from bridgeState import state
-from playerScale import walkableNormalZ
 
 exportPurposes = ("test", "game")
 # A face's texture is stretched where a texel lies more than this many times longer one way than the other in the world, and stretched
@@ -38,6 +37,9 @@ exportPurposes = ("test", "game")
 # its repeat) does not flicker over it with float noise.
 stretchFactor = 2.0
 stretchDigits = 3
+# A ground border wants a transition strip where a side is no steeper than 60 degrees and reads as ground underfoot; a steeper face
+# reads as a cliff, where materials meet without one, however steep a player walks.
+transitionGroundNormalZ = 0.5
 zeroTextureArea = 1e-12
 degenerateArea = 1e-9
 locationsShown = 8
@@ -492,17 +494,17 @@ def roundedPoint(point):
 
 
 def groundBorders(entry, slotOf, slotMaterials, base, findings):
-  """Where two ground materials meet on a terrain mesh, with ground a player can walk on at least on one side and no transition strip
-  between them, by pair of materials: the border's length and its stretches, each its center, bounds, and length; returns the faces
-  along them."""
+  """Where two ground materials meet on a terrain mesh, with a face reading as ground underfoot (transitionGroundNormalZ) at least on
+  one side and no transition strip between them, by pair of materials: the border's length and its stretches, each its center, bounds,
+  and length; returns the faces along them."""
   data = entry["data"]
   names = [material.name_full if isGround(material) else None for material in slotMaterials]
   faceNames = numpy.array([names[slot] or "" for slot in slotOf], dtype=object)
   ground = (faceNames != "") & ~base
   faceCross = numpy.stack([numpy.bincount(data["trianglePolygons"], weights=entry["crosses"][:, axis], minlength=len(slotOf)) for axis in range(3)], axis=1)
-  walkable = faceCross[:, 2] >= walkableNormalZ * numpy.linalg.norm(faceCross, axis=1)
+  groundLike = faceCross[:, 2] >= transitionGroundNormalZ * numpy.linalg.norm(faceCross, axis=1)
   faceA, faceB = data["faceA"], data["faceB"]
-  meets = ground[faceA] & ground[faceB] & (faceNames[faceA] != faceNames[faceB]) & (walkable[faceA] | walkable[faceB])
+  meets = ground[faceA] & ground[faceB] & (faceNames[faceA] != faceNames[faceB]) & (groundLike[faceA] | groundLike[faceB])
   faces = numpy.zeros(len(slotOf), dtype=bool)
   if not meets.any():
     return faces

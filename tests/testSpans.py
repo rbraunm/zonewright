@@ -97,6 +97,8 @@ def testBridgeRefusals(stageBlenderServer, tmp_path):
     kitPath = await kitAndPlot(session, tmp_path)
     refusals = {
       "noFooting": await session.expectError("buildBridge", bridgeArguments(kitPath, start=[-100, 0, 10])),
+      # 3 over the rim: lower than a player steps up, yet the deck's end would show a gap over the ground.
+      "raisedEnd": await session.expectError("buildBridge", bridgeArguments(kitPath, start=[-100, 0, 3])),
       "tooSteep": await session.expectError("buildBridge", bridgeArguments(kitPath, profile={"sag": 40})),
       "railsWithoutPosts": await session.expectError("buildBridge", bridgeArguments(kitPath, rails=ropes)),
       "stationPast": await session.expectError("buildBridge", bridgeArguments(kitPath, bents={"stations": [100], "post": "testKitLeg"})),
@@ -109,7 +111,8 @@ def testBridgeRefusals(stageBlenderServer, tmp_path):
     return refusals, structures, summary
 
   refusals, structures, summary = stageBlenderServer.session(steps)
-  assert "has no footing within a step" in refusals["noFooting"] and "start" in refusals["noFooting"]
+  assert "The start [-100.0, 0.0, 10.0] has no footing within 2 below it" in refusals["noFooting"]
+  assert "The start [-100.0, 0.0, 3.0] has no footing within 2 below it" in refusals["raisedEnd"]
   fits = (bridgeSpan * math.tan(math.radians(30))) / 4
   assert "the largest sag that fits is" in refusals["tooSteep"] and f"{fits:.2f}" in refusals["tooSteep"]
   assert "Rails run from post to post" in refusals["railsWithoutPosts"]
@@ -240,21 +243,31 @@ def testWalkwayRefusals(stageBlenderServer, tmp_path):
     def walkway(name, points, **changes):
       return {"name": name, "kitPath": kitPath, "points": points, "width": 4, "deck": "testKitPlank", "treads": "testKitTread"} | changes
 
-    # Its deck's underside over a step (playerScale) above the flat ground at 0, a walkway is raised and must be held.
-    raised = stepHeight + 2
-    return {
+    # The deck's underside 3 over the flat ground at 0: lower than a player steps up, yet off the ground, so it is held by posts or
+    # refused; 1.5 over it, the deck rests there. Bracketed, its underside stands higher over the ground than the beam is deep.
+    plank = structurePlots.testKitPieces["testKitPlank"][1][2]
+    raised, resting = 3 + plank, 1.5 + plank
+    bracketed = structurePlots.testKitPieces["testKitBeam"][1][2] + 3
+    refusals = {
       "steep": await session.expectError("buildWalkway", walkway("steep", [[110, -10, 0], [70, -10, 20]])),
       "stairTooSteep": await session.expectError("buildWalkway", walkway("stair", [[110, -10, 0], [100, -10, 12]], stairLegs=[0])),
-      "noRock": await session.expectError("buildWalkway", walkway("bracketed", [[110, -10, raised], [70, -10, raised]], posts={"piece": "testKitLeg", "spacing": 8, "sides": "left"}, brackets={"piece": "testKitBeam", "side": "right", "reach": 5, "legs": [0]})),
+      "noRock": await session.expectError("buildWalkway", walkway("bracketed", [[110, -10, bracketed], [70, -10, bracketed]], posts={"piece": "testKitLeg", "spacing": 8, "sides": "left"}, brackets={"piece": "testKitBeam", "side": "right", "reach": 5, "legs": [0]})),
       "unheld": await session.expectError("buildWalkway", walkway("raised", [[110, -10, raised], [70, -10, raised]])),
       "turn": await session.expectError("buildWalkway", walkway("hairpin", [[110, -10, 0], [70, -10, 0], [109, -3, 0]])),
     }
+    held = await session.expectSuccess("buildWalkway", walkway("held", [[110, -10, raised], [70, -10, raised]], posts={"piece": "testKitLeg", "spacing": 8}))
+    rests = await session.expectSuccess("buildWalkway", walkway("resting", [[110, -30, resting], [70, -30, resting]]))
+    return refusals, held, rests
 
-  refusals = stageBlenderServer.session(steps)
+  refusals, held, rests = stageBlenderServer.session(steps)
   assert "Leg 0 grades 26.57 degrees" in refusals["steep"] and f"a run of {20 / math.tan(math.radians(15)):.2f}" in refusals["steep"]
   assert "Stair leg 0 is 50.19 degrees steep" in refusals["stairTooSteep"]
   assert "No rock within reach 5 beside the bracket station" in refusals["noRock"] and "[110.0, -8.0]" in refusals["noRock"]
-  assert "held by neither posts nor brackets" in refusals["unheld"] and "left edge" in refusals["unheld"]
+  assert "stands 3.00 over the ground" in refusals["unheld"] and "with its left edge held by neither posts nor brackets" in refusals["unheld"]
+  # Held by posts at both ends and every 8 between on both sides, each from 2 under the ground up to the deck's underside.
+  assert sorted({post["side"] for post in held["posts"]["each"]}) == ["left", "right"] and held["posts"]["count"] == 2 * 6
+  assert all(post["bottom"] == -2.0 and post["top"] == 3.0 for post in held["posts"]["each"])
+  assert rests["posts"]["count"] == 0 and rests["brackets"] == []
   assert "turns 169.8 degrees at point 1" in refusals["turn"]
 
 

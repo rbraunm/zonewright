@@ -22,6 +22,14 @@ editor.free()
 mesh.update()
 """
 coverageMap = {"view": {"map": {"center": [0, 0], "width": 120}}, "shading": "coverage"}
+# A terrain's ground rising along x at `degrees` from 16 before its middle to 16 past it, flat beyond.
+gradeAcross = """
+import math
+mesh = bpy.data.objects[objectName].data
+for vertex in mesh.vertices:
+  vertex.co.z = (min(max(vertex.co.x, -16.0), 16.0) + 16.0) * math.tan(math.radians(degrees))
+mesh.update()
+"""
 # Flat ground facing up in the coverage light (from the northwest, 45 degrees up): half ambient plus half of the light.
 upShade = 0.5 + 0.5 * 0.7071
 colors = {"orange": (1.0, 0.5, 0.0), "brown": (0.45, 0.28, 0.12), "magenta": (0.95, 0.1, 0.85), "grey": (0.62, 0.62, 0.6)}
@@ -131,6 +139,31 @@ def testCoverageFindingsNameWhatThePicturesShowAndClearAsEachIsFixed(stageBlende
   assert [failure["failure"] for failure in viewed["failures"]] == ["containment not checked"]
   assert "exportZone (game) refused, nothing written: 1 failure(s)" in refused and "reach mapping" in refused
   assert written["failures"] == [] and written["findings"] == [] and archivePath.is_file()
+
+
+def testABorderWantsATransitionOnlyWhereItsGroundReadsAsGroundNotCliff(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    for name, color in (("dirt", (120, 90, 60, 255)), ("grass", (70, 120, 50, 255)), ("rock", (110, 110, 105, 255))):
+      await session.expectSuccess("createMaterial", {"name": name, "diffuseTexture": str(writePNG(tmp_path / f"{name}.png", 4, 4, color))})
+    # Grass meets rock across the middle of each slope, the faces on both sides of the border sloping alike.
+    for objectName, degrees, y in (("cliff", 65, 0), ("bank", 45, 100)):
+      await session.expectSuccess("createTerrainGrid", {"name": objectName, "size": [64, 64], "spacing": 8, "location": [0, y, 0], "collection": "terrain"})
+      await session.expectSuccess("runPython", {"code": f"objectName = {objectName!r}\ndegrees = {degrees}\n" + gradeAcross})
+      await session.expectSuccess("assignMaterial", {"objectName": objectName, "materialName": "dirt"})
+      await session.expectSuccess("projectUVs", {"objectName": objectName, "method": "box", "worldUnitsPerRepeat": 16})
+      await session.expectSuccess("addSurfaceLayer", {"objectName": objectName, "name": "ground"})
+      await session.expectSuccess("paintSurface", {"objectName": objectName, "layer": "ground", "material": "grass", "selector": {"all": True}})
+      await session.expectSuccess("paintSurface", {"objectName": objectName, "layer": "ground", "material": "rock", "selector": {"box": {"minimum": [0, y - 40, -1], "maximum": [40, y + 40, 1000]}}})
+    await session.expectSuccess("saveFile", {"path": str(tmp_path / "slopes.blend")})
+    return await session.expectSuccess("checkExport", {"path": str(tmp_path / "slopes.eqg"), "purpose": "test"})
+
+  checked = stageBlenderServer.session(steps)
+  borders = {finding["object"]: finding for finding in checked["findings"] if finding["finding"] == "border without a transition"}
+  # At 65 degrees, which a player walks (up to 71.9), the faces still read as a cliff, where grass meets rock without a strip; at 45 they
+  # read as ground, which wants one.
+  assert list(borders) == ["bank"]
+  assert borders["bank"]["materials"] == ["grass", "rock"] and borders["bank"]["length"] == 64.0
 
 
 def testTwoKitsOfOneFileNameAreRefusedForTheNamesTheirModelsAndMaterialsWouldShare(stageBlenderServer, tmp_path):

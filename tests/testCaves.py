@@ -95,11 +95,11 @@ result = {name: bridgeMeshAccess.readVertexArrays(bpy.data.objects[name])[0].tol
 """
 # A gallery up the fixture's cliff: 40 wide and 30 tall, four fifths of its width in the rock, rising from 2 to 80.
 gallery = {"objectName": "ground", "start": [-120, -45], "end": [120, 10], "floorFrom": 2, "floorTo": 80, "width": 40, "height": 30, "side": "left", "insideShare": 0.8, "step": 20}
-# The share of each point's width inside the uncut rock, a step over its floor across the line from start to end, at 201 points.
+# The share of each point's width inside the uncut rock, probeOverFloor over its floor across the line from start to end, at 201 points.
 measureShares = r"""
 import numpy, mathutils, mathutils.bvhtree
 import bridgeMeshAccess
-from playerScale import stepHeight
+from bridgeCaves import probeOverFloor
 ground = bpy.data.objects['ground']
 shown, _ = bridgeMeshAccess.readVertexArrays(ground)
 tree = mathutils.bvhtree.BVHTree.FromPolygons(shown.tolist(), bridgeMeshAccess.meshTriangles(ground).tolist())
@@ -108,7 +108,7 @@ def inside(point):
   location, normal, _, _ = tree.ray_cast(mathutils.Vector(point), mathutils.Vector((0, 0, 1)))
   return location is not None and normal.z > 0
 
-result = [float(numpy.mean([inside(numpy.array(point) + [0, 0, stepHeight] + share * width * numpy.array(toSide)) for share in numpy.linspace(-0.5, 0.5, 201)])) for point in path]
+result = [float(numpy.mean([inside(numpy.array(point) + [0, 0, probeOverFloor] + share * width * numpy.array(toSide)) for share in numpy.linspace(-0.5, 0.5, 201)])) for point in path]
 """
 # The cut floor's height 6 out from and 12 into the rock from each inner point of the path, across its bend's middle.
 measureFloorAcross = r"""
@@ -255,6 +255,9 @@ def testCaveRefusals(stageBlenderServer, tmp_path):
     partInRock = await session.expectError("cutCave", hall | {"name": "partInRock", "path": [[0, -60, -6]] + hall["path"][1:]})
     # Its floor starting 10 over the graded approach, falling to the tunnel.
     hanging = await session.expectError("cutCave", hall | {"name": "hanging", "path": [[0, -60, 12]] + hall["path"][1:]})
+    # Its floor starting 3 over the approach at 2 and rising toward the tunnel: a player steps up that far, yet the floor shows hanging
+    # in the air.
+    hangingLow = await session.expectError("cutCave", hall | {"name": "hangingLow", "path": [[0, -60, 5]] + hall["path"][1:]})
     steep = await session.expectError("cutCave", hall | {"name": "steep", "path": [[0, -60, 2], [0, 0, 60]], "widths": [40] * 2, "heights": [45] * 2})
     tight = await session.expectError("cutCave", hall | {"name": "tight", "path": [[0, -60, 2], [0, 40, 6], [-30, 10, 6]], "widths": [40] * 3, "heights": [45] * 3})
     border = await session.expectError("cutCave", hall | {"name": "border", "path": [[0, -60, 2], [0, 30, 6], [0, 370, 6]], "widths": [40] * 3, "heights": [45] * 3})
@@ -266,11 +269,12 @@ def testCaveRefusals(stageBlenderServer, tmp_path):
     edited = await session.expectError("editCave", {"objectName": "ground", "name": "hall", "changes": {"path": [[0, -60, 2], [0, 0, 60], [0, 90, 8], [0, 130, 8], [0, 250, 8]]}})
     after = (await session.expectSuccess("runPython", {"code": checkCave}))["result"]
     detail = await session.expectSuccess("getObjectDetail", {"name": "ground"})
-    return partInRock, hanging, steep, tight, border, overlap, edited, before, after, detail
+    return partInRock, hanging, hangingLow, steep, tight, border, overlap, edited, before, after, detail
 
-  partInRock, hanging, steep, tight, border, overlap, edited, before, after, detail = stageBlenderServer.session(steps)
+  partInRock, hanging, hangingLow, steep, tight, border, overlap, edited, before, after, detail = stageBlenderServer.session(steps)
   assert "The cave's start at [0.0, -60.0, -6.0] is part in the rock (up to 8.0 into it)" in partInRock
   assert "The cave's floor hangs in the air from [0.0, -60.0, 12.0]" in hanging and "the ground up to 10.0 below it" in hanging
+  assert "The cave's floor hangs in the air from [0.0, -60.0, 5.0] to [0.0, -24.0, 5.4]: no rock lies under its middle within 2, the ground up to 3.4 below it" in hangingLow
   assert "rises 58.0 from point 0 to point 1 over a run of 60.0" in steep and "needs a run of 100.5" in steep
   assert "tighter than half its width" in tight
   assert "reaches the edge of 'ground'" in border

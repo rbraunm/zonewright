@@ -13,7 +13,7 @@ import bridgeKitGeometry
 import bridgeStructureData
 import bridgeStructures
 from bridgeStructures import requireKeys, requireNonNegative, requirePositive, roundVector, size
-from playerScale import eyeHeight, stepHeight
+from playerScale import eyeHeight
 
 wallKeys = ("kitPath", "path", "frontSide", "sections", "follow", "shearStep", "sink", "maximumBurial", "posts", "variants", "collection")
 follows = ("shear", "step")
@@ -76,7 +76,7 @@ def requireWallPath(path):
   points = [bridgeStructures.requirePoint(f"path point {index}", point, (2, 3)) for index, point in enumerate(path)]
   given = {len(point) for point in points}
   if len(given) > 1:
-    raise ValueError("path points are all [x, y] (the ground found from above) or all [x, y, z] (the ground found from a step above each z)")
+    raise ValueError("path points are all [x, y] (the ground found from above) or all [x, y, z] (the ground found from just above each z)")
   return points, given == {3}
 
 
@@ -208,7 +208,7 @@ def layWall(laying):
 
   def groundAt(point, label):
     if withHeights:
-      found = lookups.below((point[0], point[1], point[2] + stepHeight))
+      found = lookups.below((point[0], point[1], point[2] + bridgeStructures.groundProbeLift))
     else:
       found = lookups.overhead(point[0], point[1])
     if found is None:
@@ -239,9 +239,9 @@ def layWall(laying):
       share = step / count
       center = section["start"][:2] + (section["end"][:2] - section["start"][:2]) * share
       if withHeights:
-        top = section["start"][2] + (section["end"][2] - section["start"][2]) * share + stepHeight
+        top = section["start"][2] + (section["end"][2] - section["start"][2]) * share + bridgeStructures.groundProbeLift
       else:
-        top = max(jointGround[first], jointGround[second]) + stepHeight
+        top = max(jointGround[first], jointGround[second]) + bridgeStructures.groundProbeLift
       for face in (1, -1):
         point = center + left * face * depth / 2
         found = lookups.below((point[0], point[1], top))
@@ -333,7 +333,7 @@ def layWall(laying):
       center = jointPoints[index][:2]
       direction = leg["direction"][:2]
       left = numpy.array([-direction[1], direction[0]])
-      top = jointGround[index] + stepHeight if not withHeights else jointPoints[index][2] + stepHeight
+      top = (jointGround[index] if not withHeights else jointPoints[index][2]) + bridgeStructures.groundProbeLift
       lowest = None
       for corner in ((0, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)):
         point = center + direction * corner[0] * size(postData, 0) / 2 + left * corner[1] * size(postData, 1) / 2

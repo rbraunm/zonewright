@@ -17,7 +17,6 @@ import bridgeMeshAccess
 import bridgeObjects
 import bridgeShaping
 import bridgeStructureData
-from playerScale import stepHeight
 
 openingKinds = ("door", "window")
 openingPieceKinds = ("wall", "custom")
@@ -27,6 +26,11 @@ snapKeys = {"object", "socket", "pieceSocket"}
 openingMargin = 1.0
 # How far an opening's prism runs past the piece, so its cut faces never lie on the piece's own.
 throughMargin = 1.0
+# A piece's base this far or less over the lowest ground under it reads as standing on it; higher, it floats, however high a player
+# steps.
+floatTolerance = 2.0
+# The ground under a piece is looked for from this far over its base, so ground its base is sunk into is found.
+footingProbeLift = 2.0
 sourceAttribute = "zonewrightOpeningSource"
 capAttribute = "zonewrightOpeningCap"
 frameSource, openingSource = 1, 2
@@ -649,17 +653,18 @@ def placeKitPiece(name, kitPath, piece, location, facingDegrees, snapTo, depth, 
 
 def footing(instance):
   """What lies under a piece placed by its socket or at a given height: the lowest and highest surface players stand on under its
-  footprint (found from a step over its base), and how far its base floats over the lowest, so a run snapped out over a drop says so."""
+  footprint (found from footingProbeLift over its base), and how far its base floats over the lowest past floatTolerance, so a run
+  snapped out over a drop says so."""
   bottom, _, samples = bridgeArrangement.footprint(instance)
   trees = bridgeMeshAccess.solidTrees(bridgeMeshAccess.playerSolidObjects({instance.name}))
   surfaces = bridgeMeshAccess.PlayerSurfaces(trees=trees) if trees else None
   heights = [] if surfaces is None else [
-    found.z for x, y in samples if (found := surfaces.footingBelow(mathutils.Vector((x, y, bottom + stepHeight)), bridgeMeshAccess.waterReach)) is not None
+    found.z for x, y in samples if (found := surfaces.footingBelow(mathutils.Vector((x, y, bottom + footingProbeLift)), bridgeMeshAccess.waterReach)) is not None
   ]
   if not heights:
     return {"base": round(bottom, 3), "under": None, "floats": None}
   gap = bottom - min(heights)
-  return {"base": round(bottom, 3), "under": [round(min(heights), 3), round(max(heights), 3)], "floats": round(gap, 3) if gap > stepHeight else None}
+  return {"base": round(bottom, 3), "under": [round(min(heights), 3), round(max(heights), 3)], "floats": round(gap, 3) if gap > floatTolerance else None}
 
 
 def swapKitPiece(names, piece):

@@ -67,6 +67,9 @@ down = mathutils.Vector((0.0, 0.0, -1.0))
 castNudge = 0.01
 # Ground inside a solid is told by level casts this far above it, clear of the ground's own rises, every sixteenth of a turn.
 enclosureProbeHeight = 1.0
+# Ground and cover for a player at a level (a plot's) are looked for from this far over it: over ground a little higher, under a
+# cave's roof.
+levelProbeLift = 2.0
 aroundDirections = [mathutils.Vector((math.cos(turn * math.pi / 8), math.sin(turn * math.pi / 8), 0.0)) for turn in range(16)]
 
 
@@ -358,10 +361,10 @@ class PlayerSurfaces:
     return hit[:2] if hit else None
 
   def groundAtLevel(self, x, y, level):
-    """The ground at [x, y] for a player at `level` (a plot's): where the point a step over the level lies inside a solid, the top of
-    it (ground standing above the level); otherwise the footing under that point, so rock over a cave's floor is never taken for its
-    ground. None where neither is found."""
-    origin = mathutils.Vector((x, y, level + playerScale.stepHeight))
+    """The ground at [x, y] for a player at `level` (a plot's): where the point levelProbeLift over the level lies inside a solid, the
+    top of it (ground standing above the level); otherwise the footing under that point, so rock over a cave's floor is never taken for
+    its ground. None where neither is found."""
+    origin = mathutils.Vector((x, y, level + levelProbeLift))
     above = self.castWithNormal(origin, up, waterReach)
     if above is not None and above[1].z > 0 and self.enclosedAround(origin):
       return above[0].z

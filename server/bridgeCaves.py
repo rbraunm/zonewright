@@ -44,6 +44,10 @@ breakupRoughness = 0.5
 levelTolerance = 0.01
 patchChunk = 2048
 patchRounds = 8
+# A floor's middle this far or less over the ground reads as resting on it; higher, it hangs in the air, however high a player steps.
+floorHangTolerance = 2.0
+# Rock beside and around a cut is probed this far over its floor, clear of the ground the floor lies on.
+probeOverFloor = 2.0
 # A blind end's rows run round its quarter ellipse down to this share of the section, then close on an apex.
 endShrink = 0.3
 endRows = 16
@@ -404,11 +408,11 @@ def roundedPoint(point):
 
 
 def requireFloorOnRock(surface, floors):
-  """Refuse a floor hanging in the air: a sample of its middle neither inside the rock nor within a step above the ground."""
+  """Refuse a floor hanging in the air: a sample of its middle neither inside the rock nor within floorHangTolerance above the ground."""
   inOpen = numpy.flatnonzero(surface.depths(floors) <= 0)
   gaps = numpy.zeros(len(floors))
   gaps[inOpen] = surface.drops(floors[inOpen])
-  hanging = gaps > playerScale.stepHeight
+  hanging = gaps > floorHangTolerance
   if not hanging.any():
     return
   first = int(numpy.argmax(hanging))
@@ -418,7 +422,7 @@ def requireFloorOnRock(surface, floors):
   raise ValueError(
     f"The cave's floor hangs in the air from {roundedPoint(floors[first])} to {roundedPoint(floors[last])}"
     + (f" and in {stretches - 1} more stretches" if stretches > 1 else "")
-    + f": no rock lies under its middle within a step ({playerScale.stepHeight:g}), the ground {'nowhere' if math.isinf(gap) else f'up to {gap:.1f}'} below it."
+    + f": no rock lies under its middle within {floorHangTolerance:g}, the ground {'nowhere' if math.isinf(gap) else f'up to {gap:.1f}'} below it."
     " Keep the floor inside the rock or on the ground; a gallery along a cliff wants more of its width inside the rock (traceLedge insideShare)"
   )
 
@@ -479,7 +483,7 @@ def tubeRows(definition, line, surface):
       numpy.repeat(directions[[row]], len(beyond), axis=0), widths[row] * shrink, heights[row] * shrink, shrink, numpy.zeros(len(beyond), dtype=bool),
     )
     apexes[end] = numpy.array([*(floors[row, :2] + sign * reach * directions[row]), floors[row, 2]])
-    depths = surface.depths(numpy.vstack([sectionPoints(shape, *extended[:5]).reshape(-1, 3), apexes[end] + [0.0, 0.0, playerScale.stepHeight]]))
+    depths = surface.depths(numpy.vstack([sectionPoints(shape, *extended[:5]).reshape(-1, 3), apexes[end] + [0.0, 0.0, probeOverFloor]]))
     if ends[end] == "blind" and not (depths > 0).all():
       raise ValueError(f"The cave's blind {end} at {[round(float(value), 1) for value in floors[row]]} is rounded off over {reach:.1f} beyond it, which reaches out of the rock; end it deeper inside")
     if end == "start":
@@ -1538,7 +1542,7 @@ def traceLedge(objectName, start, end, floorFrom, floorTo, width, height, side, 
   for _ in range(traceRounds):
     offsets = numpy.full(len(line), numpy.nan)
     for index, (point, floor) in enumerate(zip(line.tolist(), floors.tolist())):
-      face = surface.faceBeside(numpy.array([point[0], point[1], floor + playerScale.stepHeight]), toSide, reach)
+      face = surface.faceBeside(numpy.array([point[0], point[1], floor + probeOverFloor]), toSide, reach)
       if face is not None:
         offsets[index] = float((face[:2] - line[index]) @ toSide[:2]) + (insideShare - 0.5) * width
     traced = ~numpy.isnan(offsets)
@@ -1558,7 +1562,7 @@ def traceLedge(objectName, start, end, floorFrom, floorTo, width, height, side, 
   except ValueError as error:
     raise ValueError(f"Traced every {step:g} along the cliff, the path would not cut: {error}. Trace it with a longer step or a narrower width") from error
   across = numpy.linspace(-0.5, 0.5, shareSamples)[:, None] * width * toSide
-  shares = [float((surface.depths(point + [0.0, 0.0, playerScale.stepHeight] + across) > 0).mean()) for point in path]
+  shares = [float((surface.depths(point + [0.0, 0.0, probeOverFloor] + across) > 0).mean()) for point in path]
   segments = []
   for index in range(count - 1):
     run = float(numpy.linalg.norm(path[index + 1, :2] - path[index, :2]))

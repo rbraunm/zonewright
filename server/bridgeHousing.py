@@ -900,7 +900,7 @@ def assessPlot(address):
       direction = mathutils.Vector((math.sin(angle) * math.cos(elevation), math.cos(angle) * math.cos(elevation), math.sin(elevation)))
       blocked += ground.tree.ray_cast(eye, direction, enclosureReach)[0] is not None
   enclosure = round(blocked / (2 * enclosureDirections), 2)
-  cover = surfaces.cast(mathutils.Vector((center[0], center[1], center[2] + playerScale.stepHeight)), bridgeMeshAccess.up, overheadReach)
+  cover = surfaces.cast(mathutils.Vector((center[0], center[1], center[2] + bridgeMeshAccess.levelProbeLift)), bridgeMeshAccess.up, overheadReach)
   overhead = None if cover is None else round(cover.z, 2)
   others = [other for other in plotObjects() if other != plot]
   nearestPlot = min((float(numpy.linalg.norm(numpy.array(other.matrix_world.translation[:2]) - center[:2])) for other in others), default=None)

@@ -29,6 +29,15 @@ layingSuffix = "Laying"
 probeTolerance = 0.01
 # Posts, legs, anchors, and floors find the ground within this far below them.
 groundReach = 300.0
+# A structure's end, foot, or deck this far or less over what it stands on reads as resting on it; higher, a gap shows under it, however
+# high a player steps.
+supportTolerance = 2.0
+# Footing and ground under a structure's part are looked for from this far over where the part is wanted, so ground a little higher
+# (an end sunk into it) is found.
+groundProbeLift = 2.0
+# A view of an end stands on its approach where the ground there lies within this of the end's height, else on the structure, so it
+# shows the end from where it is reached.
+approachGroundReach = 4.0
 # Decks are probed for clearance this often along their edges and centerline, and walked in samples this far apart.
 clearanceSpacing = 4.0
 walkSpacing = 4.0
@@ -173,7 +182,7 @@ def runProbe(surfaces, row, overTop=-math.inf):
   the object it finds it on."""
   kind, origin, direction, reach = int(row[0]), mathutils.Vector(row[1:4]), mathutils.Vector(row[4:7]), float(row[7])
   if kind == bridgeStructureData.probeKinds["footing"]:
-    footing = surfaces.footingOn(origin + up * (stepHeight + castNudge), reach + stepHeight + castNudge)
+    footing = surfaces.footingOn(origin + up * (groundProbeLift + castNudge), reach + groundProbeLift + castNudge)
     return (math.nan, None) if footing is None else (footing.point.z, footing.objectName)
   if kind == bridgeStructureData.probeKinds["below"]:
     above = surfaces.castOn(origin, up, bridgeMeshAccess.waterReach)
@@ -210,8 +219,8 @@ class GroundLookups:
       self.standsOn.add(owner)
     return None if math.isnan(found) else found
 
-  def footing(self, point, reach=stepHeight):
-    """The footing within reach under a point, found from a step over it, or None."""
+  def footing(self, point, reach=supportTolerance):
+    """The footing within reach under a point, found from groundProbeLift over it, or None."""
     return self.look("footing", point, (0.0, 0.0, -1.0), reach)
 
   def below(self, point, reach=groundReach):
@@ -531,11 +540,11 @@ def headingOf(direction):
 
 
 def standView(at, end, direction, groundHeight, pitch=-5.0):
-  """Standing on the approach to an end, heading along a direction: where the ground there lies within two steps of the end's height;
-  else just inside the end, on the structure (a flight's foot against a wall, a lookout's open end over the ground far below), where its
-  edge leaves no doubt what is stood on."""
+  """Standing on the approach to an end, heading along a direction: where the ground there lies within approachGroundReach of the end's
+  height; else just inside the end, on the structure (a flight's foot against a wall, a lookout's open end over the ground far below),
+  where its edge leaves no doubt what is stood on."""
   ground = groundHeight(at[0], at[1])
-  near = ground is not None and abs(ground - at[2]) <= 2 * stepHeight
+  near = ground is not None and abs(ground - at[2]) <= approachGroundReach
   inside = numpy.asarray(end, dtype=numpy.float64) + numpy.append(numpy.asarray(direction, dtype=numpy.float64)[:2], 0.0) * endInset
   return {"standAt": roundVector(at if near else inside), "headingDegrees": headingOf(direction), "pitchDegrees": pitch}
 

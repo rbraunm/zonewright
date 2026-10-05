@@ -16,7 +16,6 @@ import bridgeReview
 import bridgeStructures
 import bridgeSurfacing
 from bridgeStructures import isNumber, requireKeys, requireNonNegative, requirePoint, requirePositive, roundVector
-from playerScale import stepHeight
 
 partNamePattern = re.compile(r"[a-z][A-Za-z0-9]*")
 entranceKeys = {"name", "at", "facingDegrees"}
@@ -25,8 +24,15 @@ plinthDefaults = {"sink": 2.0, "margin": 0.0}
 interiorPart = "interior"
 # The ground under a footprint is looked up this far apart across it and along its sides.
 sampleSpacing = 2.0
-# An entrance's ground is looked for this far below a step outside it; its walk runs from this far outside it to this far inside; its
-# view stands this far out.
+# An entrance is a doorway's threshold, within this of the footprint's edge; its ground outside is looked up this far past the edge.
+thresholdReach = 2.0
+# The footprint is the plan outline of the pieces' points within this of the floor: walls' feet and floors, not a roof's eaves.
+footprintBand = 2.0
+# A floor without a plinth reads as standing on the ground within this of it: ground higher comes up through it, and ground lower
+# shows a gap under its walls, however high a player steps.
+floorTolerance = 2.0
+# An entrance's ground is looked for this far below the point thresholdReach outside it; its walk runs from this far outside it to
+# this far inside; its view stands this far out.
 entranceFootingReach = 60.0
 entranceWalkDistance = 10.0
 entranceViewDistance = 25.0
@@ -171,8 +177,8 @@ def assemblePrefab(name, parts, entrances):
   for entrance in entrances:
     at = numpy.array(entrance["at"][:2]) - origin[:2]
     outside = distanceOutside(footprint, at)
-    if outside > stepHeight:
-      raise ValueError(f"Entrance '{entrance['name']}' at {roundVector(entrance['at'])} lies {outside:.2f} outside the building's footprint; an entrance is a doorway's threshold, within {stepHeight:g} of it")
+    if outside > thresholdReach:
+      raise ValueError(f"Entrance '{entrance['name']}' at {roundVector(entrance['at'])} lies {outside:.2f} outside the building's footprint; an entrance is a doorway's threshold, within {thresholdReach:g} of it")
     out = headingVector(entrance["facingDegrees"])
     leaving, entering = exitDistance(footprint, at, out), exitDistance(footprint, at, -out)
     if leaving > entering:
@@ -218,12 +224,12 @@ def assemblePrefab(name, parts, entrances):
 
 
 def measuredHull(gathered):
-  """The plan outline of what the parts' pieces stand on (their points within a step of the floor), and the floor: the lowest base of
-  the exterior's pieces (or of all, without an exterior)."""
+  """The plan outline of what the parts' pieces stand on (their points within footprintBand of the floor), and the floor: the lowest
+  base of the exterior's pieces (or of all, without an exterior)."""
   bpy.context.view_layer.update()
   floor = min(member.matrix_world.translation.z for member in gathered.get("exterior") or [member for members in gathered.values() for member in members])
   positions = numpy.concatenate([bridgeMeshAccess.partTriangles(bridgeMeshAccess.objectParts(member))[0] for members in gathered.values() for member in members])
-  return convexHull(positions[positions[:, 2] <= floor + stepHeight][:, :2]), floor
+  return convexHull(positions[positions[:, 2] <= floor + footprintBand][:, :2]), floor
 
 
 def prefabMembers(collection):
@@ -326,7 +332,7 @@ def seat(lookups, placement, samples):
     placement.floorOn = {"object": owner, "at": roundVector(at, 2)}
   grounds = []
   for x, y in world:
-    found = lookups.below((float(x), float(y), placement.floor + stepHeight))
+    found = lookups.below((float(x), float(y), placement.floor + bridgeStructures.groundProbeLift))
     if found is None:
       raise ValueError(f"No ground within {bridgeStructures.groundReach:g} under the footprint at [{x:.1f}, {y:.1f}] for a floor at {placement.floor:.2f}")
     grounds.append(found)
@@ -352,7 +358,7 @@ def entranceReport(lookups, placement, footprint, entrance):
   at = placement.point(entrance["at"])
   heading = placement.facingDegrees + entrance["facingDegrees"]
   leaving = exitDistance(footprint, numpy.array(entrance["at"][:2]), headingVector(entrance["facingDegrees"]))
-  outside = numpy.append(at[:2] + headingVector(heading) * (leaving + stepHeight), at[2])
+  outside = numpy.append(at[:2] + headingVector(heading) * (leaving + thresholdReach), at[2])
   groundOutside = lookups.footing(outside, entranceFootingReach)
   return {
     "name": entrance["name"], "at": roundVector(at), "facingDegrees": round(heading % 360.0, 4),
@@ -375,17 +381,18 @@ def layPrefab(laying):
   world, grounds = seat(laying.lookups, placement, samples)
   highest, lowest = int(numpy.argmax(grounds)), int(numpy.argmin(grounds))
   rise = grounds[highest] - placement.floor
-  if rise > stepHeight + 1e-6:
+  if rise > floorTolerance + 1e-6:
     raise ValueError(
       f"The ground at [{world[highest][0]:.1f}, {world[highest][1]:.1f}] inside the footprint stands {rise:.2f} over the floor at {placement.floor:.2f},"
-      f" so it would come up through the floor: grade the site, or raise the floor to at least {grounds[highest] - stepHeight:.2f}"
+      f" so it would come up through the floor: grade the site, or raise the floor to at least {grounds[highest] - floorTolerance:.2f}"
     )
   drop = placement.floor - grounds[lowest]
-  if plinth is None and drop > stepHeight + 1e-6:
-    # A floor low enough not to float stands at most a step over the lowest ground; it must also stand at most a step under the highest.
+  if plinth is None and drop > floorTolerance + 1e-6:
+    # A floor low enough not to float stands at most floorTolerance over the lowest ground; it must also stand at most that under the
+    # highest.
     lowered = (
-      f", or lower the floor to {grounds[lowest] + stepHeight:.2f} or less" if grounds[highest] - stepHeight <= grounds[lowest] + stepHeight + 1e-6
-      else f"; no floor without one stands on it, the ground under the footprint running from {grounds[lowest]:.2f} to {grounds[highest]:.2f}, more than two steps apart, so grade the site"
+      f", or lower the floor to {grounds[lowest] + floorTolerance:.2f} or less" if grounds[highest] - floorTolerance <= grounds[lowest] + floorTolerance + 1e-6
+      else f"; no floor without one stands on it, the ground under the footprint running from {grounds[lowest]:.2f} to {grounds[highest]:.2f}, more than {2 * floorTolerance:g} apart, so grade the site"
     )
     raise ValueError(
       f"The floor at {placement.floor:.2f} stands {drop:.2f} over the ground at [{world[lowest][0]:.1f}, {world[lowest][1]:.1f}] under the footprint,"

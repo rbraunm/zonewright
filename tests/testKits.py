@@ -650,12 +650,15 @@ def testASnappedPieceSaysWhatGroundLiesUnderIt(stageBlenderServer, tmp_path):
     await place(session, "rimWall", kitPath, location=[-5, -20], facingDegrees=0)
     out = await snap(session, "gorgeWall", kitPath, "rimWall", socket="start", pieceSocket="end")
     given = await place(session, "plazaWall", kitPath, location=[60, -20, 0], facingDegrees=0)
-    return out, given
+    raised = await place(session, "raisedWall", kitPath, location=[60, -32, 3], facingDegrees=0)
+    return out, given, raised
 
-  out, given = stageBlenderServer.session(steps)
+  out, given, raised = stageBlenderServer.session(steps)
   # Snapped west off the rim, the wall runs from x -42.5 to -17.5 at the rim's height, over the gorge's wall falling to its floor at -40.
   assert out["footing"] == {"base": 0.0, "under": [-structurePlots.gorgeDepth, 0.0], "floats": structurePlots.gorgeDepth}
   assert given["footing"] == {"base": 0.0, "under": [0.0, 0.0], "floats": None}
+  # 3 over the flat plaza: lower than a player steps up, yet the wall shows floating over the ground.
+  assert raised["footing"] == {"base": 3.0, "under": [0.0, 0.0], "floats": 3.0}
 
 
 def testPlacedPiecesStayUprightAtScaleOne(stageBlenderServer, tmp_path):

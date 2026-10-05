@@ -1135,7 +1135,7 @@ exportChecksHelp = (
   " undecided (getRegions), a stored entry off its footing (getEntries), structures laid on ground or a kit that has changed since (stale: editStructure lays them again), and, until reach mapping"
   " exists, any zone: containment cannot be checked yet. A test export lists all of these but"
   " containment as findings. Findings, never refusals, for both: texture coverage, each with where it lies: the base material showing where no unmuted"
-  " surfacing layer covers a face (a cave's lining, in its own materials, is not ground under the base); ground borders on the terrain where two ground materials meet, walkable ground on at least one side,"
+  " surfacing layer covers a face (a cave's lining, in its own materials, is not ground under the base); ground borders on the terrain where two ground materials meet, ground no steeper than 60 degrees on at least one side,"
   " with no paintTransition strip between them, as a length per border and its stretches (each a center, bounds, and length; a cave's"
   " lining meeting the ground is no border); texture stretched or squeezed (a texel lying over 2x longer one way than the other"
   " in the world, or world units per repeat over 2x off, either way, the material's area-weighted median, `usualRepeat`); zero texture"
@@ -1745,8 +1745,8 @@ async def cutCave(
   Each end is open, some of its floor within a step of walkable ground (a mouth, its section in the open but for a sill a step deep;
   two make a through tunnel; or a gallery's end on the ground beside a cliff, part in the rock), a ledge (part in the rock, its floor
   running out over a drop beside it: a gallery's dead end up a cliff), or blind (wholly inside the rock); an end with rock in its
-  section closes as a dome on its floor over half its width beyond its last point. A floor whose middle hangs in the air (no rock under
-  it within a step) is refused, naming the stretch. traceLedge traces a gallery's path along a cliff.
+  section closes as a dome on its floor over half its width beyond its last point. A floor whose middle hangs in the air (no rock or
+  ground within 2 under it, however high a player steps) is refused, naming the stretch. traceLedge traces a gallery's path along a cliff.
   The ground within reach of the tube (half its width, three breakup amplitudes, and two edges) is closed into a solid, the tube taken
   out of it with the exact boolean, and the result spliced into the same mesh keeping every shaping pass: the ground faces the cut
   changed (the plug) are recorded and deleted as faces only, their vertices staying in every pass, so removeCave puts the ground back
@@ -1843,7 +1843,7 @@ async def traceLedge(
 ):
   """Trace a starting path for a covered gallery or a rock shelter along a cliff of a terrain (objectName), for cutCave; changes
   nothing. Points every `step` or less from `start` to `end` ([x, y] in plan, along the cliff) each look toward `side` (left or right
-  of travel from start to end: the side the rock stands on), a step over the floor, for where the rock begins, and are set so
+  of travel from start to end: the side the rock stands on), 2 over the floor, for where the rock begins, and are set so
   `insideShare` of the `width` lies inside the rock there; more than half keeps the floor's middle on rock and leaves its outer side
   open under the rock above. A point with no rock beside it within three widths (past the cliff's top) keeps the offset from the line
   of the nearest point that found the cliff, so the path runs on in line. The floor rises evenly from `floorFrom` to `floorTo` along the traced path. Start with the floor on the ground at the
@@ -2920,7 +2920,7 @@ async def addRoof(
   " work on it, keeping it upright at scale 1), never in the terrain collection. Where rock lies over ground the refusal names the"
   " object over it. Returns where it stands and faces, the piece {kit, piece, kind, size, module, passable, fingerprint}, its sockets in"
   " the world each joined to another's or free, and settleObjects' report when settled, else footing {base, under: the lowest and"
-  " highest surface players stand on under its footprint, floats: how far its base stands over the lowest where more than a step,"
+  " highest surface players stand on under its footprint, floats: how far its base stands over the lowest where more than 2 (it reads as floating, however high a player steps),"
   " else null} (a run snapped out over a drop says so)." + facingHelp + kitPieceHelp
 ))
 async def placeKitPiece(
@@ -2976,14 +2976,14 @@ railsHelp = (
   " kit file's stem) holding a child collection per part, `<name><Part>`, with the named instances moved into them. `parts` maps each"
   " part's camelCase name (exterior, interior, roof, or any) to its instances; each part becomes one model in an export, shared by every"
   " placement of the building. Its floor is the exterior's lowest base (every part's without an exterior); its footprint is the convex"
-  " hull in plan of every part where it stands on the floor (geometry within a step of the floor: walls' feet, corners, floors, not a"
+  " hull in plan of every part where it stands on the floor (geometry within 2 of the floor: walls' feet, corners, floors, not a"
   " roof's eaves), what seating and plinths are laid from; its origin (the prefab's and every part's instance_offset) is the middle of"
   " the footprint's plan bounds at the floor. `entrances` [{name, at [x, y, z] in this file, facingDegrees}]: a doorway's threshold"
-  " middle and the way out of it, within a step of the footprint; a building with an interior part is walked into and names at least"
+  " middle and the way out of it, within 2 of the footprint; a building with an interior part is walked into and names at least"
   " one (NPC service buildings), a closed shell needs none. Assembling again under its name replaces its parts and entrances, and"
   " instances no longer named go back to the scene collection, so a building is reworked by placing, deleting, and assembling again."
   " Marked as an asset. Refuses an object that is not an instance of this file's pieces, one in two parts or in another prefab, an"
-  " empty part, a part name not camelCase, an interior without an entrance, an entrance more than a step outside the footprint, an"
+  " empty part, a part name not camelCase, an interior without an entrance, an entrance more than 2 outside the footprint, an"
   " entrance facing into the building (the footprint running on further its way than behind it), and a"
   " name taken by anything but this prefab. Returns its parts (instances, pieces, triangles each), footprint and its size, origin,"
   " entrances in the prefab frame, triangles, and fingerprint." + kitPieceHelp
@@ -2999,10 +2999,10 @@ async def assemblePrefab(context: Context, name: str, parts: dict[str, list[str]
   " where rock lies over ground: give z), so no ground stands inside it. `plinth` {material (createMaterial), worldUnitsPerRepeat, sink"
   " (2), margin (0)}: a skirt down the footprint's hull, offset out by margin, from the floor to sink under the lowest ground under it,"
   " mapped along its sides so its courses run level, no top or bottom faces (Highpass's houses stand on stone bases), one mesh"
-  " `<name>Plinth` and one model of its own. Refuses ground inside the footprint more than a step above the floor (it would come up"
-  " through the floor: grade the site or raise the floor), and the floor more than a step above the ground under the footprint without"
-  " a plinth (it would float), each naming where and the floor that would fit (a plinth or grading alone where the ground under it runs"
-  " more than two steps); a prefab the kit does not hold; a taken name; the terrain collection; rock or anything else over the ground"
+  " `<name>Plinth` and one model of its own. Refuses ground inside the footprint more than 2 above the floor (it would come up"
+  " through the floor: grade the site or raise the floor), and the floor more than 2 above the ground under the footprint without"
+  " a plinth (it would float, however high a player steps), each naming where and the floor that would fit (a plinth or grading alone"
+  " where the ground under it runs more than 4); a prefab the kit does not hold; a taken name; the terrain collection; rock or anything else over the ground"
   " under it, naming the object. Returns the floor, floorOn {object, at, ground} (what set a seated floor, with a warning when it is not"
   " the ground: a loose piece clipping the footprint), the ground's lowest and highest under the footprint and where, the plinth's top, bottom, and"
   " triangles, the parts with their triangles and the export models they become, each entrance (where it is and faces, the ground a"
@@ -3024,7 +3024,7 @@ async def placePrefab(
 
 @guardedTool(description=(
   "Lay one bridge between two anchors the artist picked, as one model, as the client's whole-span bridges are. `start` and `end` [x, y,"
-  " z] are the deck's top at its centerline at each end, each within a step over footing with no rock over it within a player's height"
+  " z] are the deck's top at its centerline at each end, each within 2 over footing with no rock over it within a player's height"
   " (grade the abutments first: gradeRoute). The deck runs straight between them, or by `profile` {\"sag\": d} hangs d under the chord at"
   " mid-span (a parabola; the client's rope bridges sag about 9 percent of the span, Xorbb's 24 over 279, about 19 degrees at the ends) or"
   " {\"arch\": r} rises r over it; level across its `width`. `deck`: a plank piece (planks across edge to edge, round(deck length / plank"
@@ -3057,17 +3057,17 @@ async def buildBridge(
 
 
 @guardedTool(description=(
-  "Lay one straight flight between a foot and a head the artist picked, as one model: `bottom` [x, y, z] within a step over footing"
-  " (ground, a floor, a deck laid earlier) and `top` [x, y, z] the floor it climbs to, within a step over footing. Its risers are equal,"
+  "Lay one straight flight between a foot and a head the artist picked, as one model: `bottom` [x, y, z] within 2 over footing"
+  " (ground, a floor, a deck laid earlier) and `top` [x, y, z] the floor it climbs to, within 2 over footing. Its risers are equal,"
   " as many as keep each at most `riser` (the client's timber flights rise 1.0 a step at about 21 degrees); each tread the plank piece"
   " `tread` across, fitted to the width and to one step's run, so treads meet without a gap, the last at the head's height. `stringers`:"
   " a beam piece swept along both sides under the treads' ends. `posts` {piece, spacing, sides (both by default)}: legs just outside the"
   " edges, evenly at most `spacing` apart, from `sink` under the ground up to the rails' height where that side has rails (else to the"
-  " flight's underside), where the flight stands more than a step over the ground or that side has rails." + railsHelp + " A walkway's"
+  " flight's underside), where the flight stands more than 2 over the ground or that side has rails." + railsHelp + " A walkway's"
   " stair legs are laid by the same code. Refused: steeper than 45 degrees (naming the run it needs); riser not above 0 or over"
-  f" {playerScale.stepHeight:g} (a step, playerScale); a top not a riser higher than the bottom; a foot or head without footing within a step, or lying under what it stands on"
+  f" {playerScale.stepHeight:g} (a step, playerScale); a top not a riser higher than the bottom; a foot or head without footing within 2, or lying under what it stands on"
   " (naming its top: the treads would lie in it); a head set back on the surface it climbs to, so the top tread would lie inside it"
-  " (set the head at its edge); the treads' underside meeting the ground beyond a step from its ends (naming where); a leg with no"
+  " (set the head at its edge); the treads' underside meeting the ground beyond 2 from its ends (naming where); a leg with no"
   " ground within 300; rails without posts. Returns the risers (count and height), run per step, pitch, plan length, the legs and their"
   " lengths, the least clearance, triangles; views fromFoot, fromHead (just behind the head, looking down it), and side (from the side"
   " standing in the open, not inside a hill beside it)." + structureHelp
@@ -3101,8 +3101,9 @@ async def buildStairs(
   " footing gap is reported (null for none). Refused: fewer than two points or two at one place in plan; a turn over 150 degrees, or a"
   " leg no longer than its landings take (naming it); a leg over maximumGradeDegrees not in stairLegs (naming its grade and the run it"
   " needs); a stair leg steeper than 45 degrees; a deck leg or landing without `deck`, a stair leg without `treads`; the deck's or"
-  " treads' own underside meeting the ground anywhere off the ends' first step (naming where); the open ends are cut square; a post with no ground within 300; a bracket station with no"
-  " rock within reach (naming it); a stretch standing more than a step over the ground with an edge held by neither posts nor brackets"
+  " treads' own underside meeting the ground anywhere past 2 in from the ends (naming where); the open ends are cut square; a post with no ground within 300; a bracket station with no"
+  " rock within reach (naming it); a stretch standing more than 2 over the ground (it reads as floating, however high a player steps)"
+  " with an edge held by neither posts nor brackets"
   " (naming it and the edge). Returns the legs (from, to, plan and laid length, grade, deck planks or flight risers), landings, posts with"
   " the longest and shortest, brackets with their reach, each end's footing gap, triangles." + structureHelp
 ))
@@ -3135,7 +3136,7 @@ async def buildWalkway(
   " by whole shear steps counted from the first joint, so every foot stays at least sink under; a section with rise 0 is an instance of"
   " its piece, any other a mesh object sharing `<piece>Up<r>` or `<piece>Down<r>` (r the rise along the piece's +X in hundredths: the"
   " piece sheared about its middle), so sections of one rise share one model across every wall in the file. `follow` \"step\": each"
-  " section level, its foot sink under the lowest ground under it. The ground is found from a step above each point's z when given (a"
+  " section level, its foot sink under the lowest ground under it. The ground is found from 2 above each point's z when given (a"
   " wall in a cave, on a deck), from above the scene without it (refused where rock lies over ground: give z). Refused: fewer than two"
   " points or a leg shorter than the shortest section; sections of different depth or height (between their faces: a variant's frames"
   " may stand proud); a leg the modules cannot fill; a variant of another module or past the last section; a turn without a post"
@@ -3653,7 +3654,7 @@ async def assessPlot(context: Context, address: str):
   is, rock or roof over it (overhead: the height of its underside over the plot's center, or null), its nearest plot and route, how
   much of the zone's main routes see it, and overlaps; and the features those suggest, for pricing (set them with editPlot features).
   The ground under it, beyond its sides, and at its entrance is looked up from the plot's own height (ground standing above it, or the
-  footing under a step over it), so a plot in a cave measures the cave's floor and walls, not the hill over it. A view is never
+  footing under 2 over it), so a plot in a cave measures the cave's floor and walls, not the hill over it. A view is never
   suggested: judge it from pictures taken at the plot's edge, looking out as its owner would. The measures check what a picture shows;
   look at the plot too."""
   return await callBridge(context, "assessPlot", {"address": address})
