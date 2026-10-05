@@ -498,7 +498,7 @@ def planOverlays(sheets, layers, spots):
   if "caves" in layers:
     overlays["caves"] = planCaves()
   if "regions" in layers:
-    overlays["regions"] =[{"name": region["name"], "outline": region["outline"]} for region in bridgeAuthoring.getRegions()["regions"]]
+    overlays["regions"] = [{"name": region["name"], "outline": region["outline"]} for region in bridgeAuthoring.getRegions()["regions"]]
   if "plots" in layers:
     overlays["plots"] = [
       {"address": plot.name, "corners": [roundPoint(corner) for corner in bridgeHousing.footprint(plot)], "facingDegrees": round(bridgeHousing.facingOf(plot), 1)}

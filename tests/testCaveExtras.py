@@ -621,7 +621,7 @@ result = {'positions': numpy.round(positions, 3).tolist(), 'alphas': numpy.round
 
 
 def testDaylightDarkensTheCaveInTheClientsView(stageBlenderServer, tmp_path):
-  deep ={"view": {"eye": [0, 130, 30], "target": [0, 250, 20]}}
+  deep = {"view": {"eye": [0, 130, 30], "target": [0, 250, 20]}}
 
   async def steps(session):
     await caveCanyon(session, tmp_path)
@@ -702,6 +702,135 @@ def testASpiralExportsAndBothLevelsAreWalkedAfterImport(stageBlenderServer, tmp_
   for walk in walks:
     assert walk["walkable"] is True and walk["problems"] == []
   assert walks[1]["profile"][-1]["at"][2] > 55
+
+
+def testACaveCutBeforeTheExtrasIsReadByEveryTool(stageBlenderServer, tmp_path):
+  # The room's record as caves were kept before branches, grades, and strokes: its definition's own keys, its plug, and its paint.
+  asBefore = r"""
+import bridgeCaveData
+ground = bpy.data.objects['ground']
+known = bridgeCaveData.caves(ground)
+record = known['room']
+keys = ('path', 'widths', 'heights', 'wallMaterial', 'floorMaterial', 'worldUnitsPerRepeat', 'edgeLength', 'wallShare', 'breakup', 'mouthFade', 'maximumFloorDegrees', 'trimBands')
+known['room'] = {'definition': {key: record['definition'][key] for key in keys}, 'plug': record['plug'], 'paint': record['paint']}
+bridgeCaveData.writeCaves(ground, known)
+result = sorted(known['room'])
+"""
+  housing = {"role": "featured", "intent": "plots in caves", "placement": "world", "plotBudget": {"player": 1, "guild": 0}}
+
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    await session.expectSuccess("setZoneProperties", zone)
+    await session.expectSuccess("cutCave", room)
+    kept = (await session.expectSuccess("runPython", {"code": asBefore}))["result"]
+    await session.expectSuccess("setZoneHousing", housing)
+    placed = await session.expectSuccess("placePlot", {"address": "1 Far", "center": [150, -120], "facingDegrees": 0})
+    _, sketch = await session.expectImage("renderSketch", {"center": [0, 100], "width": 400})
+    _, section = await session.expectImage("renderSection", {"start": [-100, 150], "end": [100, 150]})
+    walk = await session.expectSuccess("walkRoute", {"cave": {"objectName": "ground", "name": "room"}})
+    return kept, placed, sketch, section, walk
+
+  kept, placed, sketch, section, walk = stageBlenderServer.session(steps)
+  assert kept == ["definition", "paint", "plug"]
+  assert placed["caveFloor"] is None
+  assert [entry["cave"] for entry in section["caves"]] == ["room"] and walk["walkable"] is True
+
+
+def testACutIsRefusedWholeWhenItsProfileCannotBeDrawnAndAnEditDrawsTheRunsItChanged(stageBlenderServer, tmp_path):
+  # The room cut with its mouth's height taken from the ground, then its record left without the heights its ends took, as a cave cut
+  # before they were kept: nothing can draw it.
+  forget = r"""
+import bridgeCaveData
+ground = bpy.data.objects['ground']
+known = bridgeCaveData.caves(ground)
+known['room'].pop('groundHeights')
+bridgeCaveData.writeCaves(ground, known)
+result = sorted(known)
+"""
+  sideWay = {"kind": "level", "name": "sideWay", "run": "side", "from": 10, "to": 120, "across": [-6, 6]}
+  east2 = side | {"name": "east2", "path": [[0, 130, 2], [80, 130], [110, 130]]}
+  west2 = west | {"name": "west2", "path": [[0, 230, 2], [-80, 230], [-110, 230]]}
+
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    await session.expectSuccess("gradeRoute", {"objectName": "ground", "name": "eastApproach", "points": [[150, -140, 2], [150, -50, 2]], "width": 56})
+    await session.expectSuccess("cutCave", room | {"path": [[0, -60]] + room["path"][1:]})
+    await session.expectSuccess("runPython", {"code": forget})
+    refused = await session.expectError("cutCave", {"objectName": "ground", "name": "east", "path": [[150, -60, 2], [150, 10, 2], [150, 120, 2]], "widths": [30] * 3, "heights": [30] * 3} | caveMaterials)
+    left = await session.expectSuccess("getObjectDetail", {"name": "ground"})
+    await session.expectSuccess("removeCave", {"objectName": "ground", "name": "room"})
+    await session.expectSuccess("cutCave", branched | {"floor": [sideWay]})
+    stroke = await session.expectSuccess("editCave", {"objectName": "ground", "name": "branched", "changes": {"floor": {"sideWay": {"across": [-9, 9]}}}})
+    added = await session.expectSuccess("editCave", {"objectName": "ground", "name": "branched", "changes": {"branches": {"west": west, "east2": east2, "west2": west2}}})
+    refit = await session.expectSuccess("editCave", {"objectName": "ground", "name": "branched"})
+    return refused, left, stroke, added, refit
+
+  refused, left, stroke, added, refit = stageBlenderServer.session(steps)
+  # The new cave is not kept when its profile cannot be drawn: it is refused whole.
+  assert "takes the ground's height at run 'main''s start" in refused and [cave["name"] for cave in left["caves"]] == ["room"]
+  # Changing a stroke on a branch by name draws that branch's profile as well as the main run's; adding branches draws them.
+  assert stroke["profile"]["panels"] == ["branched: main", "branched: side"]
+  assert added["profile"]["panels"] == ["branched: main", "branched: west", "branched: east2", "branched: west2"] and added["profile"]["runsNotDrawn"] == []
+  # A refit draws every run, four at most, naming the one left out.
+  assert len(refit["profile"]["panels"]) == 4 and refit["profile"]["runsNotDrawn"] == ["west2"]
+
+
+def testLightOnACaveFollowsTheRunItLines(stageBlenderServer, tmp_path):
+  # A dark room and a passage leaving its east wall and running north beside it outside, 12 of rock from the room's wall, daylit: a
+  # vertex of the room's east wall stands 20 from the passage's middle and 60 from the room's, yet lines the room.
+  beside = {"name": "beside", "from": "main", "path": [[40, 100, 2], [84, 100], [84, 230]], "grades": [0, 0], "widths": [24] * 3, "heights": [30] * 3, "daylight": [1, 1, 1]}
+  readShares = r"""
+import numpy
+import bridgeCaveData, bridgeCaveLight, bridgeMeshAccess
+ground = bpy.data.objects['ground']
+shown, _ = bridgeMeshAccess.readVertexArrays(ground)
+shares = bridgeCaveLight.daylightShares(ground)
+lining = bridgeCaveData.attributeValues(ground.data, 'zonewrightCaveVertex:lit') == -2
+x, y, z = shown.T
+roomWall = lining & (numpy.abs(x - 60) < 1) & (y > 160) & (y < 220) & (z > 5) & (z < 25)
+passageWall = lining & (numpy.abs(x - 72) < 1) & (y > 160) & (y < 220) & (z > 5) & (z < 25)
+result = {'roomWall': shares[roomWall].tolist(), 'passageWall': shares[passageWall].tolist()}
+"""
+  anchor = {"objectName": "ground", "cave": "lit", "at": 230, "side": "ceiling", "out": 3}
+
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    await session.expectSuccess("setZoneProperties", zone)
+    await session.expectSuccess("cutCave", room | {"name": "lit", "breakup": None, "daylight": [0] * 5, "branches": [beside], "floor": [{"kind": "pad", "name": "dais", "run": "main", "from": 200, "to": 260, "across": [-30, 30], "rise": 3, "edge": 0.5}]})
+    shares = (await session.expectSuccess("runPython", {"code": readShares}))["result"]
+    placed, _ = await session.call("placeLights", {"lights": [{"name": "LIB_overTheDais", "onCave": anchor, "color": [1, 0.6, 0.3], "radius": 60}]})
+    malformed = await session.expectError("placeLights", {"lights": [{"onCave": anchor, "color": [1, 0.6, 0.3], "radius": 60}]})
+    return shares, placed, malformed
+
+  shares, placed, malformed = stageBlenderServer.session(steps)
+  assert len(shares["roomWall"]) >= 4 and set(shares["roomWall"]) == {0.0}
+  assert len(shares["passageWall"]) >= 4 and set(shares["passageWall"]) == {1.0}
+  # A light on the ceiling over a dais finds the vault from over the dais, not from inside it, and hangs 3 under it.
+  assert not placed.is_error, [content.text for content in placed.content if content.type == "text"]
+  report = json.loads(placed.content[1].text)["anchored"][0]
+  assert report["position"][:2] == [0.0, 170.0] and report["position"][2] > 2 + 3 + 30
+  assert "Light 0 takes name, color, radius, and position or onCave; missing ['name']" in malformed
+
+
+def testARefusedEditLeavesTheLightsAnchoredOnTheCaveWhereTheyStood(stageBlenderServer, tmp_path):
+  from testHalls import cliffPlot, cliffHall, cliffFacade
+  readLight = "result = [round(value, 3) for value in bpy.data.objects['LIB_hallLamp'].location]"
+
+  async def steps(session):
+    await cliffPlot(session, tmp_path)
+    await session.expectSuccess("setZoneProperties", zone)
+    await session.expectSuccess("cutCave", cliffHall("hallA", 20))
+    await session.expectSuccess("dressFacade", cliffFacade("hallA"))
+    await session.call("placeLights", {"lights": [{"name": "LIB_hallLamp", "onCave": {"objectName": "ground", "cave": "hallA", "at": 40, "side": "right", "over": 8, "out": 2}, "color": [1, 0.6, 0.3], "radius": 40}]})
+    before = (await session.expectSuccess("runPython", {"code": readLight}))["result"]
+    refused = await session.expectError("editCave", {"objectName": "ground", "name": "hallA", "changes": {"widths": [40, 40]}})
+    after = (await session.expectSuccess("runPython", {"code": readLight}))["result"]
+    return before, refused, after
+
+  before, refused, after = stageBlenderServer.session(steps)
+  # The widened hall's cut moved the lamp to its new wall before the facade refused the change; the lamp stands where it stood.
+  assert "would no longer frame it" in refused
+  assert before == [30.0, 110.0, 8.0] and after == before
 
 
 def testPointsWithoutHeightsTakeTheEvenGradeAndAGradedSegmentSetsItsEnd(stageBlenderServer, tmp_path):

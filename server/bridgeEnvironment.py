@@ -26,6 +26,22 @@ def validatedLight(light):
   return light
 
 
+def requireLightFields(light, index):
+  """Refuse a light given to placeLights that is not {name, position or onCave, color, radius} with a name, three numbers for its color,
+  and a number for its radius, naming the field."""
+  if not isinstance(light, dict):
+    raise ValueError(f"Light {index} is {{name, position or onCave, color, radius}}, got {light!r}")
+  missing, unknown = sorted({"name", "color", "radius"} - set(light)), sorted(set(light) - {"name", "color", "radius", "position", "onCave"})
+  if missing or unknown:
+    raise ValueError(f"Light {index} takes name, color, radius, and position or onCave; missing {missing}, unknown {unknown}")
+  if not isinstance(light["name"], str):
+    raise ValueError(f"Light {index}'s name is text, got {light['name']!r}")
+  if not isinstance(light["color"], list) or len(light["color"]) != 3 or not all(isinstance(value, (int, float)) and not isinstance(value, bool) for value in light["color"]):
+    raise ValueError(f"Light '{light['name']}''s color is three numbers from 0 to 1 (red, green, blue), got {light['color']!r}")
+  if not isinstance(light["radius"], (int, float)) or isinstance(light["radius"], bool):
+    raise ValueError(f"Light '{light['name']}''s radius is a number, its reach in world units, got {light['radius']!r}")
+
+
 def requireClientContent(clientContent):
   if clientContent is not None and clientContent not in bridgeMeshAccess.clientContentKinds:
     raise ValueError(f"clientContent must be None or one of {list(bridgeMeshAccess.clientContentKinds)}, got {clientContent!r}")
@@ -40,7 +56,8 @@ def placeLights(lights, collection, clientContent, viewSky=None):
   if any(light.get("onCave") is not None for light in lights):
     bridgeViews.requireZone(bridgeCommands.previewZone(viewSky))
   anchors = []
-  for light in lights:
+  for index, light in enumerate(lights):
+    requireLightFields(light, index)
     if ("position" in light and light["position"] is not None) == ("onCave" in light and light["onCave"] is not None):
       raise ValueError(f"Light '{light['name']}' is placed at a position or anchored on a cave's lining (onCave), one of them")
     anchor = bridgeCaveLight.anchorDefinition(light["onCave"]) if light.get("onCave") is not None else None

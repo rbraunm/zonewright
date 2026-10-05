@@ -1765,8 +1765,9 @@ async def cutCave(
   ends wholly inside the rock, the tube reaching the terrain's border or another cave's mouth, a mesh with modifiers or shared with another object, and caves that fail their integrity checks;
   `wallShare` outside (0, 1]; a band reaching above the walls' straight part (wallShare of the height) at any path point (naming it),
   bands overlapping, a band below the floor or not tall, a band material createMaterial did not make, a repeat not positive.
-  Returns its profile, a picture: the section along its run's centerline, unrolled, as renderSection draws it with a cave (ground,
-  floor, vault, grades, landings); the faces and vertices it made, the shortest edges of the lining, the pieces of ground at the mouth,
+  Returns its profile, a picture: the section along each run's centerline, unrolled, as renderSection draws it with a cave (ground,
+  floor, vault, grades, landings), one under another, at most four runs (the rest named in runsNotDrawn, each drawn by renderSection's
+  cave), taken with the cut so a cut that cannot be drawn is refused whole; the faces and vertices it made, the shortest edges of the lining, the pieces of ground at the mouth,
   and the seam, each end's kind, each trim band's faces, each run's worked-out floor heights, stations (distance along at each point),
   segment grades and runs, and landings, each floor stroke as placed (a level way's and a pad's ends along the run and sides, a pad's
   top), each junction (branch, the run it leaves, its start, how far its floor stands over its parent's, overlook, and the `frame` of
@@ -1785,7 +1786,7 @@ async def cutCave(
     "breakup": breakup, "mouthFade": mouthFade, "maximumFloorDegrees": maximumFloorDegrees, "trimBands": trimBands, "grades": grades,
     "landings": landings, "daylight": daylight, "branches": branches, "floor": floor, "minimumRock": minimumRock,
   })
-  image, profile = await caveProfile(context, objectName, name, list(cut["runs"]))
+  image, profile = await caveProfile(cut.pop("profileCuts"))
   return [image, cut | {"profile": profile}]
 
 
@@ -1800,14 +1801,12 @@ async def editCave(context: Context, objectName: str, name: str, changes: dict |
   facade dressed at its mouth (dressFacade) follows it: made again from what it was given (faceAt, width, height, apron, blend,
   turnDegrees) on the changed cave, dressed again where its face moved (refitFacades), and refused when it would no longer frame the
   cave (narrower than the cave plus 2, lower than it plus 1), naming the facade to dress again or take back. If the new cut or a facade
-  is refused, the cave and the ground stay exactly as they were. Returns the profile of the runs it changed (a picture, as cutCave's),
+  is refused, the cave and the ground stay exactly as they were. Returns the profile of the runs it changed (a picture, as cutCave's: the main
+  run, each branch added or changed or the parent of one taken back, and the run of each floor stroke added, changed, or taken back; every
+  run for a refit),
   what taking it back restored, and what the new cut made."""
   edited = await callBridge(context, "editCave", {"objectName": objectName, "name": name, "changes": changes})
-  runs = list(edited["cut"]["runs"])
-  touched = {branch for branch, change in ((changes or {}).get("branches") or {}).items() if change is not None}
-  touched |= {stroke.get("run") for stroke in ((changes or {}).get("floor") or {}).values() if isinstance(stroke, dict)}
-  shown = runs if not changes else [run for run in runs if run == "main" or run in touched]
-  image, profile = await caveProfile(context, objectName, name, shown)
+  image, profile = await caveProfile(edited.pop("profileCuts"))
   return [image, edited | {"profile": profile}]
 
 
@@ -2012,7 +2011,7 @@ async def placeLights(context: Context, lights: list[dict], collection: str | No
   rock or outside the cave; an unknown cave or run. The result names the lights; for anchored ones, where each stands, the floor below
   it, and whether it lights the terrain (a LIB_ name) or only objects and characters (LIT_); with a client-shaded view from the floor
   below the first anchored light, with the scale figure."""
-  anchoring = any(light.get("onCave") is not None for light in lights)
+  anchoring = any(isinstance(light, dict) and light.get("onCave") is not None for light in lights)
   zone = await callBridge(context, "getZoneProperties", {}) if anchoring else None
   sky = await zoneSky(zone) if anchoring else None
   placed = await callBridge(context, "placeLights", {"lights": lights, "collection": collection, "clientContent": None, "viewSky": sky})
@@ -2411,16 +2410,12 @@ async def renderSection(
   return [Image(data=outputPath.read_bytes(), format="png"), summary]
 
 
-async def caveProfile(context, objectName, cave, runs):
-  """A cave's profile: each named run's section along its centerline (renderSection cave), one under another at one scale, with the
-  ground and the caves only."""
-  panels = []
-  for run in runs:
-    cuts = await callBridge(context, "sectionCuts", {"start": None, "end": None, "path": None, "cave": {"objectName": objectName, "name": cave, "run": run}, "bottom": None, "top": None, "layers": ["ground", "caves"]})
-    panels.append((f"{cave}: {run}", cuts))
+async def caveProfile(profileCuts):
+  """A cave's profile drawn from the cuts the bridge took with its cut (bridgeGrading.profileCuts): each run's section along its
+  centerline, one under another at one scale, with the ground and the caves only; the runs left out named."""
   outputPath = newRenderPath()
-  drawn = await anyio.to_thread.run_sync(planDrawing.drawProfiles, outputPath, panels)
-  return Image(data=outputPath.read_bytes(), format="png"), {"outputPath": str(outputPath)} | drawn
+  drawn = await anyio.to_thread.run_sync(planDrawing.drawProfiles, outputPath, [tuple(panel) for panel in profileCuts["panels"]])
+  return Image(data=outputPath.read_bytes(), format="png"), {"outputPath": str(outputPath)} | drawn | {"runsNotDrawn": profileCuts["runsNotDrawn"]}
 
 
 @guardedTool()

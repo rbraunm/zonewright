@@ -22,7 +22,7 @@ anchorProperty = "zonewrightCaveAnchor"
 anchorKeys = ({"objectName", "cave", "at", "side", "out"}, {"run", "over"})
 anchorSides = ("left", "right", "ceiling")
 previewCopySuffix = "Daylit"
-# A lining vertex takes the daylight of the run whose middle (half its height over its floor) is nearest, sampled this often along it.
+# A run's section is measured against lining vertices at its middles (half its height over its floor) sampled this often along it.
 sampleSpacing = 2.0
 
 
@@ -37,8 +37,8 @@ def daylitCaves(sceneObject):
 
 
 def daylightShares(sceneObject):
-  """Each vertex's share of scene light: its cave's run's daylight eased along the run for a lining vertex of a daylit cave (1 for a run
-  that sets none), 1 for the ground; None for a mesh without daylit caves."""
+  """Each vertex's share of scene light: for a lining vertex of a daylit cave, the daylight of the run it lines (runLinedBy), eased
+  along that run (1 for a run that sets none); 1 for the ground; None for a mesh without daylit caves."""
   names = daylitCaves(sceneObject)
   if not names:
     return None
@@ -50,21 +50,32 @@ def daylightShares(sceneObject):
     record = known[name]
     definition = bridgeCaves.caveDefinition(**record["definition"])
     lines = bridgeCaves.recordedLines(name, record)
-    middles, values = [], []
-    for runName, run, _ in bridgeCaves.runSpecs(definition):
-      line = lines[runName]
-      alongs = line.samples(sampleSpacing)
-      floors, _, _, heights = line.at(alongs)
-      middles.append(floors + numpy.column_stack([numpy.zeros((len(alongs), 2)), heights / 2]))
-      values.append(numpy.ones(len(alongs)) if run["daylight"] is None else line.eased(run["daylight"], alongs))
-    middles, values = numpy.vstack(middles), numpy.concatenate(values)
-    tree = mathutils.kdtree.KDTree(len(middles))
-    for index, point in enumerate(middles.tolist()):
-      tree.insert(point, index)
-    tree.balance()
     lining = numpy.flatnonzero(bridgeCaveData.attributeValues(mesh, bridgeCaveData.vertexTagPrefix + name) == bridgeCaveData.liningTag)
-    shares[lining] = [values[tree.find(point)[1]] for point in shown[lining].tolist()]
+    gaps, values = [], []
+    for runName, run, _ in bridgeCaves.runSpecs(definition):
+      gap, along = sectionGaps(lines[runName], shown[lining])
+      gaps.append(gap)
+      values.append(numpy.ones(len(lining)) if run["daylight"] is None else lines[runName].eased(run["daylight"], along))
+    lined = numpy.argmin(numpy.array(gaps), axis=0)
+    shares[lining] = numpy.array(values)[lined, numpy.arange(len(lining))]
   return shares
+
+
+def sectionGaps(line, points):
+  """How far each point stands outside a run's section (its floor, walls, and top at its middle nearest the point, every sampleSpacing
+  along it), 0 inside it; and that middle's distance along the run. A lining vertex lies on its own run's section, give or take the
+  breakup, and at least minimumRock off any other's."""
+  alongs = line.samples(sampleSpacing)
+  floors, directions, widths, heights = line.at(alongs)
+  tree = mathutils.kdtree.KDTree(len(alongs))
+  for index, point in enumerate((floors + numpy.column_stack([numpy.zeros((len(alongs), 2)), heights / 2])).tolist()):
+    tree.insert(point, index)
+  tree.balance()
+  nearest = numpy.array([tree.find(point)[1] for point in points.tolist()], dtype=numpy.int64)
+  offsets = ((points[:, :2] - floors[nearest, :2]) * numpy.column_stack([directions[nearest, 1], -directions[nearest, 0]])).sum(axis=1)
+  across = numpy.maximum(numpy.abs(offsets) - widths[nearest] / 2, 0.0)
+  up = numpy.maximum(numpy.maximum(floors[nearest, 2] - points[:, 2], points[:, 2] - floors[nearest, 2] - heights[nearest]), 0.0)
+  return numpy.hypot(across, up), alongs[nearest]
 
 
 def applyDaylight(preview):
@@ -135,7 +146,8 @@ def anchoredPosition(anchor):
   floor, direction, width, height = floors[0], directions[0], float(widths[0]), float(heights[0])
   right = numpy.array([direction[1], -direction[0], 0.0])
   if anchor["side"] == "ceiling":
-    origin, toward, reach = floor + [0.0, 0.0, 1.0], numpy.array([0.0, 0.0, 1.0]), 3 * height
+    # From half the run's height, over any rubble or pad its floor strokes raise (they stay below the walls' straight part).
+    origin, toward, reach = floor + [0.0, 0.0, height / 2], numpy.array([0.0, 0.0, 1.0]), 3 * height
   else:
     origin, toward, reach = floor + [0.0, 0.0, anchor["over"]], right if anchor["side"] == "right" else -right, 2 * width
   lining = bridgeCaveData.faceTags(sceneObject, anchor["cave"]) == bridgeCaveData.liningFaceTag

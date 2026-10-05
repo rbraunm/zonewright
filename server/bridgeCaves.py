@@ -395,24 +395,24 @@ def workedRuns(definition, surface):
   for name, run, parent in runSpecs(definition):
     owner = bridgeCaveRuns.runOwner(name)
     line = bridgeCaveRuns.runLine(run, name)
-    tookGround = []
+    tookGround = {}
 
     def startHeight(run=run, parent=parent, owner=owner, tookGround=tookGround):
       if parent is None:
-        tookGround.append("start")
-        return surface.groundHeight(run["path"][0], f"{bridgeCaveRuns.capitalized(owner)}'s start")
+        tookGround["start"] = surface.groundHeight(run["path"][0], f"{bridgeCaveRuns.capitalized(owner)}'s start")
+        return tookGround["start"]
       return float(relievedFloorsAt(worked[parent], numpy.array([run["path"][0][:2]]))[0][0])
 
     def endHeight(run=run, owner=owner, tookGround=tookGround):
-      tookGround.append("end")
-      return surface.groundHeight(run["path"][-1], f"{bridgeCaveRuns.capitalized(owner)}'s end")
+      tookGround["end"] = surface.groundHeight(run["path"][-1], f"{bridgeCaveRuns.capitalized(owner)}'s end")
+      return tookGround["end"]
 
     line.setFloors(bridgeCaveRuns.resolveFloors(line, run["path"], run["grades"], startHeight, endHeight))
     line.requireGrades(definition["maximumFloorDegrees"])
     for end in tookGround:
       requireOpenEnd(surface, line, run, end, owner)
     worked[name] = {
-      "name": name, "run": run, "parent": parent, "owner": owner, "line": line,
+      "name": name, "run": run, "parent": parent, "owner": owner, "line": line, "groundHeights": tookGround,
       "relief": bridgeCaveRuns.FloorRelief([stroke for stroke in definition["floor"] if stroke["run"] == name], line),
     }
   return worked
@@ -457,11 +457,29 @@ def parentFloorAt(line, point):
 
 
 def recordedLines(name, record):
-  """A cut cave's runs as cut: each run's line with the floors worked out when it was cut."""
-  if "floors" not in record:
-    raise ValueError(f"Cave '{name}' was cut before its runs' floors were kept with it; cut it again (editCave with no changes) first")
+  """A cut cave's runs as cut: each run's line with its floors worked out again from its definition and the ground heights its ends
+  took when it was cut (groundHeights, kept with the record for the ends given none), a branch's start its parent's floor as its
+  strokes leave it. Refuses a cave whose definition leaves an end to the ground with no height kept for it."""
   definition = caveDefinition(**record["definition"])
-  return {runName: bridgeCaveRuns.runLine(run, runName).setFloors(record["floors"][runName]) for runName, run, _ in runSpecs(definition)}
+  kept = record.get("groundHeights", {})
+  worked = {}
+  for runName, run, parent in runSpecs(definition):
+    line = bridgeCaveRuns.runLine(run, runName)
+
+    def taken(end, runName=runName):
+      if end not in kept.get(runName, {}):
+        raise ValueError(
+          f"Cave '{name}' takes the ground's height at run '{runName}''s {end}, and was cut before the heights its ends took were kept with it;"
+          " cut it again (editCave with no changes) first"
+        )
+      return kept[runName][end]
+
+    def startHeight(run=run, parent=parent, taken=taken):
+      return taken("start") if parent is None else float(relievedFloorsAt(worked[parent], numpy.array([run["path"][0][:2]]))[0][0])
+
+    line.setFloors(bridgeCaveRuns.resolveFloors(line, run["path"], run["grades"], startHeight, lambda taken=taken: taken("end")))
+    worked[runName] = {"line": line, "relief": bridgeCaveRuns.FloorRelief([stroke for stroke in definition["floor"] if stroke["run"] == runName], line)}
+  return {runName: entry["line"] for runName, entry in worked.items()}
 
 
 def requireFloorOnRock(surface, floors, owner):
@@ -1111,10 +1129,15 @@ def requireCave(sceneObject, name):
 
 @contextlib.contextmanager
 def restoredOnFailure(sceneObject):
-  """Run a change to a terrain's caves whole or not at all: on any failure the mesh and its caves go back as they were."""
+  """Run a change to a terrain's caves whole or not at all: on any failure the mesh, its caves, and the lights anchored on them (which
+  every cut places again) go back as they were."""
   mesh = sceneObject.data
   backup = mesh.copy()
   known = sceneObject.get(bridgeCaveData.caveProperty)
+  anchored = [
+    (lightObject, lightObject.location.copy()) for lightObject in bpy.data.objects
+    if lightObject.type == "LIGHT" and bridgeCaveLight.anchorProperty in lightObject and json.loads(lightObject[bridgeCaveLight.anchorProperty])["objectName"] == sceneObject.name
+  ]
   try:
     yield
   except Exception:
@@ -1127,6 +1150,8 @@ def restoredOnFailure(sceneObject):
       sceneObject.pop(bridgeCaveData.caveProperty, None)
     else:
       sceneObject[bridgeCaveData.caveProperty] = known
+    for lightObject, location in anchored:
+      lightObject.location = location
     raise
   else:
     bpy.data.meshes.remove(backup)
@@ -1598,7 +1623,7 @@ def splice(sceneObject, name, definition, strokes):
   known = bridgeCaveData.caves(sceneObject)
   known[name] = {
     "definition": definition, "plug": report.pop("records"), "paint": strokes,
-    "floors": {runName: [float(value) for value in run["line"].floors] for runName, run in worked.items()},
+    "groundHeights": {runName: run["groundHeights"] for runName, run in worked.items() if run["groundHeights"]},
   }
   bridgeCaveData.writeCaves(sceneObject, known)
   replayStrokes(sceneObject, name, strokes)
@@ -2345,7 +2370,6 @@ def refitStaleCaves(sceneObject):
 
 
 commands = {
-  "cutCave": (cutCave, True),
   "removeCave": (removeCave, True),
   "traceLedge": (traceLedge, False),
 }
