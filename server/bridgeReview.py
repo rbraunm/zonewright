@@ -294,12 +294,13 @@ class RouteWalk:
     })
 
 
-def walkRoute(path, sampleSpacing):
+def walkRoute(path, sampleSpacing, excluding=()):
+  """A player's walk along a route; the objects named in excluding are left out of what the walk collides with."""
   if len(path) < 2 or any(len(point) != 3 for point in path):
     raise ValueError(f"A route is at least two [x, y, z] points, got {path!r}")
   if sampleSpacing <= 0:
     raise ValueError(f"sampleSpacing must be positive, got {sampleSpacing}")
-  walk = RouteWalk(bridgeBoundaries.collisionSurfaces(), bridgeMeshAccess.swimSurfaces(), bridgeBoundaries.boundarySurfaces())
+  walk = RouteWalk(bridgeBoundaries.collisionSurfaces(excluding=excluding), bridgeMeshAccess.swimSurfaces(), bridgeBoundaries.boundarySurfaces())
   points, directions = routeSamples(path, sampleSpacing)
   walk.start(points[0], directions[0])
   walk.record(directions[0])

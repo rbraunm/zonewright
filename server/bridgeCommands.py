@@ -18,12 +18,14 @@ import bridgeGrading
 import bridgeHousing
 import bridgeKits
 import bridgePasses
+import bridgePrefabs
 import bridgeReview
 import bridgeReviewGuides
 import bridgeModels
 import bridgeObjects
 import bridgeShaping
 import bridgeSketch
+import bridgeStructures
 import bridgeSwim
 import bridgeSurfacing
 import bridgeViews
@@ -316,7 +318,7 @@ commands = {
   "pick": (pick, False),
   "renderPasses": (renderPasses, False),
   "renderModelThumbnails": (bridgeViews.renderModelThumbnails, False),
-} | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands | bridgeModels.commands | bridgeExportChecks.commands | bridgePasses.commands | bridgeEnvironment.commands | bridgeReview.commands | bridgeReviewGuides.commands | bridgeAuthoring.commands | bridgeWater.commands | bridgeHousing.commands | bridgeGrading.commands | bridgeSketch.commands | bridgeSwim.commands | bridgeArrangement.commands | bridgeBoundaries.commands | bridgeCaves.commands | bridgeKits.commands
+} | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands | bridgeModels.commands | bridgeExportChecks.commands | bridgePasses.commands | bridgeEnvironment.commands | bridgeReview.commands | bridgeReviewGuides.commands | bridgeAuthoring.commands | bridgeWater.commands | bridgeHousing.commands | bridgeGrading.commands | bridgeSketch.commands | bridgeSwim.commands | bridgeArrangement.commands | bridgeBoundaries.commands | bridgeCaves.commands | bridgeKits.commands | bridgeStructures.commands | bridgePrefabs.commands
 
 
 def dispatch(command, arguments):

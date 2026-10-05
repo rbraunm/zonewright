@@ -109,6 +109,52 @@ def requirePiece(kitPath, piece):
   return collection
 
 
+def readPrefab(collection):
+  return json.loads(collection[prefabProperty]) if prefabProperty in collection else None
+
+
+def writePrefab(collection, record):
+  collection[prefabProperty] = json.dumps(record)
+
+
+def localPrefabs():
+  return sorted(collection.name for collection in bpy.data.collections if collection.library is None and prefabProperty in collection)
+
+
+def partCollectionName(prefab, part):
+  return prefab + part[0].upper() + part[1:]
+
+
+def requirePrefab(kitPath, prefab):
+  """A prefab's collection: the open file's own (kitPath None), or linked from the kit at kitPath (once; linking again finds it)."""
+  if kitPath is None:
+    collection = next((found for found in bpy.data.collections if found.name == prefab and found.library is None), None)
+    if collection is None or prefabProperty not in collection:
+      raise ValueError(f"'{prefab}' is not a prefab of this file; its prefabs: {localPrefabs()}")
+    return collection
+  if not os.path.isabs(kitPath) or not os.path.isfile(kitPath):
+    raise FileNotFoundError(f"Kit '{kitPath}' is not an existing absolute path to a .blend")
+  with bpy.data.libraries.load(kitPath, link=True, assets_only=True) as (dataFrom, dataTo):
+    if prefab not in dataFrom.collections:
+      raise ValueError(f"The kit {kitPath} holds no prefab '{prefab}'; its pieces and prefabs: {sorted(dataFrom.collections)}")
+    dataTo.collections = [prefab]
+  collection = dataTo.collections[0]
+  if collection is None or prefabProperty not in collection:
+    raise ValueError(f"'{prefab}' in {kitPath} is an asset but not a prefab (assemblePrefab makes them)")
+  return collection
+
+
+def prefabFingerprint(collection):
+  """Twelve hex digits of a sha1 over a prefab's record (parts, footprint, entrances): its parts are instances, so placements follow its
+  pieces' changes, and only a changed footprint or entrance, which seating and plinths were laid from, changes this."""
+  return hashlib.sha1(json.dumps(readPrefab(collection), sort_keys=True).encode()).hexdigest()[:12]
+
+
+def sourceFingerprint(collection):
+  """The fingerprint of a piece or prefab a structure was laid from."""
+  return prefabFingerprint(collection) if prefabProperty in collection else fingerprint(collection)
+
+
 @contextlib.contextmanager
 def linkingUndone():
   """Whatever a refused step linked into the file is taken out again, so a refusal changes nothing."""
