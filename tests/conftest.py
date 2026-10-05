@@ -24,6 +24,7 @@ repositoryRoot = Path(__file__).resolve().parent.parent
 downloadCachePath = repositoryRoot / "tests" / ".cache"
 repositoryManifest = json.loads((repositoryRoot / "toolingManifest.json").read_text(encoding="ascii"))
 pinnedBlender = repositoryManifest["blender"]
+pinnedRecast = repositoryManifest["recast"]
 everquestClient = json.loads((repositoryRoot / ".mcp.json").read_text(encoding="utf-8"))["mcpServers"]["zonewright"]["env"]["EVERQUEST_CLIENT"]
 # One install of each pinned Blender in the user's profile, shared by every test session in every worktree.
 sharedLocalAppDataPath = Path(os.environ["LOCALAPPDATA"]) / "zonewrightTests" / pinnedBlender["sha256"][:16]
@@ -41,9 +42,12 @@ heavyGroups = {
     | {(zoneSurveySkill / "SKILL.md").as_posix()},
   "clientFiles": readerFiles,
   "calibration": {"server/eqCalibration.py", "server/bridgeClientLight.py"},
+  "serverNav": {"server/serverNav.py", "server/recastHelper.py"} | {f"recastHelper/{name}" for name in (
+    "CMakeLists.txt", "main.cpp", "helperIO.h", "helperIO.cpp", "navMode.cpp", "inspectMode.cpp",
+  )},
   "install": {f"server/{name}.py" for name in (
     "toolingSync", "toolingManifest", "toolingStatus", "extensionCatalog", "machineProfile", "machineBenchmark", "blenderProcess",
-  )} | {"toolingManifest.json"},
+  )} | {"toolingManifest.json", "recastHelper/CMakeLists.txt"},
 }
 
 
@@ -91,6 +95,7 @@ class StagedServer:
     self.localAppData = localAppData if localAppData is not None else rootPath / "localAppData"
     self.toolingRoot = self.localAppData / "zonewright"
     shutil.copytree(repositoryRoot / "server", self.repositoryPath / "server", ignore=shutil.ignore_patterns("__pycache__"))
+    shutil.copytree(repositoryRoot / "recastHelper", self.repositoryPath / "recastHelper")
     shutil.copytree(repositoryRoot / zoneSurveySkill, self.repositoryPath / zoneSurveySkill)
     self.writeManifest(manifest)
     self.openContexts = contextlib.ExitStack()
@@ -112,7 +117,8 @@ class StagedServer:
     return self.repositoryPath / "toolingManifest.json"
 
   def writeManifest(self, manifest):
-    self.manifestPath.write_text(json.dumps(manifest), encoding="ascii")
+    """The manifest, with the repository's Recast pin unless it names one of its own."""
+    self.manifestPath.write_text(json.dumps({"recast": pinnedRecast} | manifest), encoding="ascii")
 
   def readManifest(self):
     return json.loads(self.manifestPath.read_text(encoding="ascii"))
@@ -233,9 +239,39 @@ def exclusiveLock(lockPath):
       msvcrt.locking(lockFile.fileno(), msvcrt.LK_UNLCK, 1)
 
 
+def junction(link, target):
+  subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(target)], check=True, capture_output=True)
+
+
+def linkSharedRecast(toolingRoot, sharedToolingRoot):
+  for name in ("recast", "recastHelper"):
+    junction(toolingRoot / name, sharedToolingRoot / name)
+
+
 @pytest.fixture(scope="session")
-def sharedLocalAppData(request, tmp_path_factory):
-  """The pinned Blender and this machine's profile, synced into the shared install only when it lacks them."""
+def sharedRecastHelper():
+  """The shared install's tooling root, holding the Recast helper built from this worktree's sources: built only when it lacks that
+  fingerprint, and never removing the builds of others, which other worktrees use."""
+  sys.path.insert(0, str(repositoryRoot / "server"))
+  import toolingSync
+  sharedLocalAppDataPath.mkdir(parents=True, exist_ok=True)
+  with exclusiveLock(sharedLocalAppDataPath / "install.lock"):
+    toolingSync.syncRecastHelper(sharedLocalAppDataPath / "zonewright", pinnedRecast, lambda done, of, message: None)
+  return sharedLocalAppDataPath / "zonewright"
+
+
+@pytest.fixture(scope="session")
+def recastToolingRoot(tmp_path_factory, sharedRecastHelper):
+  """A tooling root of this session's own whose Recast tree and helper builds are the shared install's."""
+  toolingRoot = tmp_path_factory.mktemp("recast") / "zonewright"
+  toolingRoot.mkdir()
+  linkSharedRecast(toolingRoot, sharedRecastHelper)
+  return toolingRoot
+
+
+@pytest.fixture(scope="session")
+def sharedLocalAppData(request, tmp_path_factory, sharedRecastHelper):
+  """The pinned Blender, this machine's profile, and the Recast helper, synced into the shared install only when it lacks them."""
   sharedLocalAppDataPath.mkdir(parents=True, exist_ok=True)
   with exclusiveLock(sharedLocalAppDataPath / "install.lock"):
     probe = StagedServer(tmp_path_factory.mktemp("sharedProbe"), {"blender": pinnedBlender, "extensions": {}}, sharedLocalAppDataPath)
@@ -250,12 +286,14 @@ def sharedLocalAppData(request, tmp_path_factory):
 
 @pytest.fixture(scope="session")
 def installedLocalAppData(tmp_path_factory, sharedLocalAppData):
-  """A tooling root of this session's own, so logs and counters stay apart, whose Blender is the shared install."""
+  """A tooling root of this session's own, so logs and counters stay apart, whose Blender, Recast tree, and helper builds are the shared
+  install's."""
   localAppData = tmp_path_factory.mktemp("installed") / "localAppData"
   toolingRoot = localAppData / "zonewright"
   toolingRoot.mkdir(parents=True)
   shutil.copy(sharedLocalAppData / "zonewright" / "machineProfile.json", toolingRoot / "machineProfile.json")
-  subprocess.run(["cmd", "/c", "mklink", "/J", str(toolingRoot / "blender"), str(sharedLocalAppData / "zonewright" / "blender")], check=True, capture_output=True)
+  junction(toolingRoot / "blender", sharedLocalAppData / "zonewright" / "blender")
+  linkSharedRecast(toolingRoot, sharedLocalAppData / "zonewright")
   return localAppData
 
 
