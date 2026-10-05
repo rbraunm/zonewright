@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy
 import pytest
 
+from conftest import everquestClient
 from serverReference import referenceBytes
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
@@ -134,6 +135,45 @@ def testNavIsDeterministic(recastToolingRoot):
   assert report["threads"] == min(machineProfile.workerCount(), 45) > 1
   assert progress[0] == (0, 1, "partitioning collidable triangles")
   assert progress[-1] == (45, 45, "building nav tiles")
+
+
+def testNavFromOurHighpassMapMatchesPeridots(recastToolingRoot):
+  client = Path(everquestClient)
+  ourMap = serverMapFiles.mapBytes(serverMapFiles.zoneFilesOf((client / "highpasshold.eqg").read_bytes(), (client / "highpasshold.zon").read_bytes()))
+  ours, report = serverNav.navBytes(ourMap, referenceBytes("water/highpasshold.wtr"), recastToolingRoot, noProgress)
+  mine, theirs = serverMapFiles.readNav(ours, "our .nav"), serverMapFiles.readNav(referenceBytes("nav/highpasshold.nav"), "Peridot's .nav")
+  assert mine["parameters"] == theirs["parameters"]
+  ourTiles, theirTiles = tilesByKey(mine), tilesByKey(theirs)
+  assert sorted(ourTiles) == sorted(theirTiles)
+  assert len(ourTiles) == 28
+
+  # Which grid tiles' rasterized squares (the tile and its 5-cell border) any terrain or placed-model triangle's footprint reaches, in
+  # Recast x and z.
+  collision = serverMapFiles.inRecastAxes(serverMapFiles.mapCollision(ourMap))[..., [0, 2]]
+  terrainCount = len(serverMapFiles.readMap(ourMap)["collidableIndices"]) // 3
+  low, high = collision.min(axis=1), collision.max(axis=1)
+  origin = numpy.array(mine["parameters"]["origin"])[[0, 2]]
+  tileWidth = mine["parameters"]["tileWidth"]
+  border = serverNav.serverNavSettings["borderSize"] * serverNav.serverNavSettings["cellSize"]
+
+  def reached(tx, ty):
+    tileLow = origin + numpy.array([tx, ty]) * tileWidth - border
+    tileHigh = origin + numpy.array([tx + 1, ty + 1]) * tileWidth + border
+    return ((high >= tileLow).all(axis=1) & (low <= tileHigh).all(axis=1))
+  grid = [(tx, ty) for ty in range(report["tilesHigh"]) for tx in range(report["tilesWide"])]
+  holdsTerrain = {key for key in grid if reached(*key)[:terrainCount].any()}
+  holdsPlaced = {key for key in grid if reached(*key)[terrainCount:].any()}
+  # No tile holds terrain alone: every built tile holds placed-model triangles, five of them nothing else, so no tile's input is
+  # bit-identical to Peridot's, and every one of the 28 is compared below.
+  assert sorted(holdsTerrain - holdsPlaced) == []
+  builtTiles = {(x, y) for x, y, _ in ourTiles}
+  assert builtTiles <= holdsPlaced
+  assert sorted(builtTiles - holdsTerrain) == [(0, 1), (3, 1), (4, 1), (4, 2), (4, 3)]
+  # Our turns are the .zon's, Peridot's azone's round trip of them (up to 2.4e-7 rad apart): no voxel changes, so no tile's polygons
+  # differ (docs/serverFiles.md), and the whole file is the one Peridot's own .map gives.
+  differing = [key for key, ourTile in ourTiles.items() if polygonsWithoutLinks(ourTile) != polygonsWithoutLinks(theirTiles[key])]
+  assert differing == []
+  assert ours == navOfPeridotsFiles("highpasshold", recastToolingRoot)[0]
 
 
 def testIslandsAndProbeOnHighpassHold(recastToolingRoot, tmp_path):
