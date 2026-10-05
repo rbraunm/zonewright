@@ -59,14 +59,14 @@ def testSurveyMeasuresAZonesTexturesLightsAndEmittersAndCachesThem(stageServer):
   assert Path(top["file"]).is_file() and measured[0].read_text(encoding="utf-8") == kept
 
 
-def testManyZonesAreSurveyedInParallelAndAnUnreadableOneIsReported(stageServer):
+def testManyZonesAreSurveyedInParallelAndOneTheClientLacksIsReported(stageServer):
   server = stageCatalogServer(stageServer)
-  first, progressMessages = server.callToolExpectingSuccess("surveyAssets", {"zones": [classicZone, "steppes", eqgZone]})
-  second, _ = server.callToolExpectingSuccess("surveyAssets", {"zones": [classicZone, "steppes", eqgZone]})
+  first, progressMessages = server.callToolExpectingSuccess("surveyAssets", {"zones": [classicZone, "nozone", eqgZone]})
+  second, _ = server.callToolExpectingSuccess("surveyAssets", {"zones": [classicZone, "nozone", eqgZone]})
   lights, _ = server.callToolExpectingSuccess("findAssets", {"kind": "light", "source": eqgZone})
   assert first["zones"] == 3 and first["surveyed"] == 2 and first["current"] == 0
-  assert list(first["errors"]) == ["steppes"] and "No terrain tile beneath" in first["errors"]["steppes"]
-  assert progressMessages[0] == "checking zone file hashes" and sorted(progressMessages[1:]) == sorted([f"surveyed zone:{classicZone}", f"surveyed zone:{eqgZone}", "surveyed zone:steppes"])
+  assert list(first["errors"]) == ["nozone"] and first["errors"]["nozone"].startswith("'nozone' is not a zone in ")
+  assert progressMessages[0] == "checking zone file hashes" and sorted(progressMessages[1:]) == [f"surveyed zone:{classicZone}", f"surveyed zone:{eqgZone}"]
   assert second["surveyed"] == 0 and second["current"] == 2 and second["errors"] == first["errors"]
   assert sum(style["count"] for style in lights["assets"]) == 6
 
