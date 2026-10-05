@@ -3,6 +3,7 @@ import tomllib
 from pathlib import Path
 
 import blenderProcess
+import recastHelper
 import toolingManifest
 
 
@@ -82,4 +83,5 @@ def getToolingStatus(toolingRoot):
     "toolingRoot": str(toolingRoot),
     "blender": getBlenderStatus(toolingRoot, blenderVersion),
     "extensions": getExtensionsStatus(toolingRoot, blenderVersion, manifest["extensions"]),
+    "recastHelper": recastHelper.helperStatus(toolingRoot, manifest["recast"]),
   }

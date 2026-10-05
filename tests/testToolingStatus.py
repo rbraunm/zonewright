@@ -1,12 +1,19 @@
 import math
 import os
+import re
 
-from conftest import pinnedBlender
+from conftest import pinnedBlender, pinnedRecast
 
 
 def testMissingBlenderReportsMissing(stageServer):
   server = stageServer({"blender": pinnedBlender, "extensions": {}})
   status, _ = server.callToolExpectingSuccess("getToolingStatus")
+  recastHelper = status.pop("recastHelper")
+  assert sorted(recastHelper) == ["commit", "compiler", "executablePath", "fingerprint", "state"]
+  assert (recastHelper["state"], recastHelper["commit"]) == ("missing", pinnedRecast["commit"])
+  assert recastHelper["executablePath"] == str(server.toolingRoot / "recastHelper" / recastHelper["fingerprint"][:16] / "recastHelper.exe")
+  assert re.fullmatch(r"[0-9a-f]{64}", recastHelper["fingerprint"])
+  assert re.fullmatch(r"Microsoft \(R\) C/C\+\+ Optimizing Compiler Version [\d.]+ for x64", recastHelper["compiler"])
   assert status == {
     "toolingRoot": str(server.toolingRoot),
     "blender": {
