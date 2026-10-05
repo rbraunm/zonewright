@@ -240,6 +240,7 @@ def testABracketReachesTheRockBesideIt(stageBlenderServer, tmp_path):
 
 
 def testWalkwayRefusals(stageBlenderServer, tmp_path):
+  steepRise = 18.5
   async def steps(session):
     kitPath = await kitAndPlot(session, tmp_path)
 
@@ -261,12 +262,14 @@ def testWalkwayRefusals(stageBlenderServer, tmp_path):
       "unheld": await session.expectError("buildWalkway", walkway("raised", [[110, -10, raised], [70, -10, raised]])),
       "turn": await session.expectError("buildWalkway", walkway("hairpin", [[110, -10, 0], [70, -10, 0], [109, -3, 0]])),
       "dug": await session.expectError("buildWalkway", walkway("dug", [[50, -48, dug], [50, -20, dug]])),
+      "overWalkable": await session.expectError("buildWalkway", walkway("overWalkable", [[110, -30, resting], [70, -30, resting]], maximumGradeDegrees=75)),
     }
     held = await session.expectSuccess("buildWalkway", walkway("held", [[110, -10, raised], [70, -10, raised]], posts={"piece": "testKitLeg", "spacing": 8}))
     rests = await session.expectSuccess("buildWalkway", walkway("resting", [[110, -30, resting], [70, -30, resting]]))
-    return refusals, held, rests
+    steepDeck = await session.expectSuccess("buildWalkway", walkway("steepDeck", [[110, 2, 0], [100, 2, steepRise]], posts={"piece": "testKitLeg", "spacing": 8}, maximumGradeDegrees=65))
+    return refusals, held, rests, steepDeck
 
-  refusals, held, rests = stageBlenderServer.session(steps)
+  refusals, held, rests, steepDeck = stageBlenderServer.session(steps)
   assert "Leg 0 grades 26.57 degrees" in refusals["steep"] and f"a run of {20 / math.tan(math.radians(15)):.2f}" in refusals["steep"]
   assert "Stair leg 0 is 50.19 degrees steep" in refusals["stairTooSteep"]
   assert "No rock within reach 5 beside the bracket station" in refusals["noRock"] and "[110.0, -8.0]" in refusals["noRock"]
@@ -277,6 +280,9 @@ def testWalkwayRefusals(stageBlenderServer, tmp_path):
   assert rests["posts"]["count"] == 0 and rests["brackets"] == []
   assert "turns 169.8 degrees at point 1" in refusals["turn"]
   assert f"Leg 0's underside meets the ground {structurePlots.slopeHeight(-44) - 0.5:.2f} deep at [50.0, -44.0, 0.5] (4.0 along)" in refusals["dug"]
+  # A deck leg is walked, so its grade limit runs up to the steepest face players walk (playerScale), past 60 degrees.
+  assert f"maximumGradeDegrees runs over 0 up to {steepestWalkableDegrees:.1f} (the steepest face players walk, playerScale: deck legs are walked), got 75" in refusals["overWalkable"]
+  assert steepDeck["legs"][0]["laid"] == "deck" and abs(steepDeck["legs"][0]["gradeDegrees"] - math.degrees(math.atan2(steepRise, 10))) <= 0.05
 
 
 def testAWalkwayMayEndOffTheGroundAndReportsEachEndsFooting(stageBlenderServer, tmp_path):

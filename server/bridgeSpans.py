@@ -741,8 +741,8 @@ def layWalkway(laying):
   sink = requireNonNegative("sink", definition["sink"])
   riser = requireRiser(definition["riser"])
   maximum = definition["maximumGradeDegrees"]
-  if not isNumber(maximum) or not 0 < maximum < 90:
-    raise ValueError(f"maximumGradeDegrees runs over 0 up to 90, got {maximum!r}")
+  if not isNumber(maximum) or not 0 < maximum <= steepestWalkableDegrees:
+    raise ValueError(f"maximumGradeDegrees runs over 0 up to {steepestWalkableDegrees:.1f} (the steepest face players walk, playerScale: deck legs are walked), got {maximum!r}")
   stairLegs = definition["stairLegs"] or []
   if not isinstance(stairLegs, list) or not all(isinstance(index, int) and not isinstance(index, bool) and 0 <= index < len(points) - 1 for index in stairLegs):
     raise ValueError(f"stairLegs lists leg indices 0 to {len(points) - 2} (leg i runs from point i to point i + 1), got {stairLegs!r}")
