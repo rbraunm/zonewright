@@ -78,10 +78,10 @@ def zoneLinks(clientRoot, zoneName):
   listed, listMissing = characterListArchives(clientRoot, f"{zoneName}_pre_chr.txt")
   archives += listed
   missing += listMissing
-  for fileName in hardcodedZoneArchives.get(zoneName, []):
-    add(fileName, "eqgame.exe")
   if zoneKind == "wld":
-    for pattern in ("{}_obj2.s3d", "{}_obj.s3d", "{}.s3d", "{}_2_obj.s3d", "{}_chr2.s3d"):
+    for fileName in hardcodedZoneArchives.get(zoneName, []):
+      add(fileName, "eqgame.exe")
+    for pattern in ("{}_obj2.s3d", "{}_obj.s3d", "{}_2_obj.s3d", "{}_chr2.s3d"):
       add(pattern.format(zoneName), "zone load order")
     if zoneName in secondCharacterZones:
       add(f"{zoneName}2_chr.s3d", "eqgame.exe")
@@ -98,6 +98,8 @@ def zoneLinks(clientRoot, zoneName):
         archives.append({"archive": line.lower(), "via": assetList.name, "codes": None})
       else:
         missing.append({"list": assetList.name, "line": line})
+  if zoneKind == "wld":
+    add(f"{zoneName}.s3d", "zone load order")
   return {"zone": zoneName, "format": zoneKind, "archives": archives, "missing": missing}
 
 
