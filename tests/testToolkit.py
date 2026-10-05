@@ -144,7 +144,7 @@ def testDeleteObjectsRemovesTheirOwnMeshesAndKeepsSharedOnes(stageBlenderServer)
 
   linked, owned, deleted, pillar, gone, meshes = stageBlenderServer.session(steps)
   # The linked copy shared the pillar's mesh, which stays with the pillar; the full copy's own mesh goes with it.
-  assert deleted == {"deleted": [linked["pillar"], owned["pillar"]], "removedMeshes": [owned["pillar"]]}
+  assert deleted == {"deleted": [linked["pillar"], owned["pillar"]], "removedMeshes": [owned["pillar"]], "removedSprays": []}
   assert pillar["mesh"] == "pillar" and pillar["sharedMeshUsers"] == 1
   assert f"No object named '{linked['pillar']}'" in gone
   assert meshes == ["pillar"]

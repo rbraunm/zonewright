@@ -25,6 +25,7 @@ import checkpoints
 import conceptComparison
 import emitterAssets
 import eqCalibration
+import eqEmitterDefinitions
 import eqEmitters
 import eqgExport
 import eqModels
@@ -788,13 +789,15 @@ async def scaleFigureModel(zone, view):
 @guardedTool()
 async def renderView(
   context: Context, view: dict, shading: str = "client", bandHeight: float = 50.0, guides: bool = True, swimVolumes: bool = False, labels: list[str] | None = None,
+  liquidTime: float | None = None,
 ):
-  """Render the EQ preview of a view: {"camera": name} (a review camera saved from a standAt view stands the scale figure again where she stood, her ground found as figureAt's is; one matched to concept art renders at the art's aspect and its own field of view), {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], never what they pass through (as walkRoute), or with z on the ground found from 3 above z down to 50 below it, for caves, under overhangs, and on ledges; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera, or stood by hand facing the camera with "figureAt": [x,y] or [x,y,z] in the view, its ground found as standAt's is, on a ledge or ramp too narrow to walk her ahead on), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, the game's north (+X) up and east (-Y) right as the in-game map draws, `width` units across (along y), without fog. {"frame": {"objects": [names], "headingDegrees": h, "pitchDegrees": p}} looks at the named meshes or collection instances from that heading and pitch, standing back so they fit (its result's eye and target reproduce that camera). shading "client" draws the zone as the client does, its point lights and particle emitters with it (the result's pointLights counts the lights and the objects they light, and emitters the emitters drawn, their particles, and those not drawn, grouped by why); "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout; "coverage" draws only what exportZone would export, each face in the color of its export check status (checkExport): black where it cannot export, red for zero texture area, brown for a blockout material, yellow for texture stretched or squeezed, orange where the base material shows, magenta along a ground border without a transition strip, grey when fine, and blue wherever a face is seen from its back, lit from the northwest as layout is, softer so no shaded face reads as black, and without fog; the result counts the exported faces by status. The value shadings draw every mesh (each part of a collection instance as placed, and the scale figure) from a value of its own, lit softly from the northwest, without fog, the result giving the scale: "objects" draws each object in its own flat color, the ones the view shows most of first (blue, orange, green, red, purple, yellow, cyan, magenta, lime, pink, teal, lavender, brown, olive, then grey for the rest), with a legend of the objects the view shows, each with its color and share of the view; "curvature" draws convex forms warm (orange), concave cool (blue), and flat neutral grey, a ridge or trough curved to a radius of 16 at half color and sharper ones fuller, from the bend of the edges around each vertex (so where two meshes meet without sharing edges, as a rock sunk into the ground, there is none); "triangleDensity" draws each face's triangles per 10,000 square units of its own area over fixed decades, blue 1, cyan 10, green 100, yellow 1,000, red 10,000 (the client's EQG terrains run from 8 to 5,083, 244 at the median), with the range the view shows; "texelDensity" draws each face's texture pixels per world unit (its diffuse texture's pixels over the area its texture coordinates spread them across) blue lowest through cyan, green, and yellow to red highest across the range the view shows (the result gives it and each color's value), dark grey where a face has no diffuse texture or texture coordinates: coverage's stretch check compares a face with its own material's usual scale, texelDensity compares materials with each other. labels [names] writes each named object's name on the view by its place (where its middle projects when the object shows there, else the middle of what shows of it), marked with a white dot, but only for the objects the view shows; the result lists the places and the named objects it does not show (an object hidden from renders, a guide with guides off, or one that is not a mesh or collection instance is refused). Guides (plot outlines, sketch massing) draw unless guides is false, and with them, in every shading, the view is tinted red where the boundaries (walls, lids, floors) stand, which the client never draws, a wall as a slab thick enough to show from above, and green where the zone lines stand, seen through the water but hidden behind and under the ground; with swimVolumes, the view is tinted where the swim volumes stand (cyan water, magenta lava), each box seen through the water, so its top shows evenly under a surface it meets or lies just below, but hidden behind and under the ground."""
+  """Render the EQ preview of a view: {"camera": name} (a review camera saved from a standAt view stands the scale figure again where she stood, her ground found as figureAt's is; one matched to concept art renders at the art's aspect and its own field of view), {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], never what they pass through (as walkRoute), or with z on the ground found from 3 above z down to 50 below it, for caves, under overhangs, and on ledges; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera, or stood by hand facing the camera with "figureAt": [x,y] or [x,y,z] in the view, its ground found as standAt's is, on a ledge or ramp too narrow to walk her ahead on), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, the game's north (+X) up and east (-Y) right as the in-game map draws, `width` units across (along y), without fog. {"frame": {"objects": [names], "headingDegrees": h, "pitchDegrees": p}} looks at the named meshes or collection instances from that heading and pitch, standing back so they fit (its result's eye and target reproduce that camera). shading "client" draws the zone as the client does, its point lights and particle emitters with it (the result's pointLights counts the lights and the objects they light, and emitters the emitters drawn, their particles, and those not drawn, grouped by why); "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout; "coverage" draws only what exportZone would export, each face in the color of its export check status (checkExport): black where it cannot export, red for zero texture area, brown for a blockout material, yellow for texture stretched or squeezed, orange where the base material shows, magenta along a ground border without a transition strip, grey when fine, and blue wherever a face is seen from its back, lit from the northwest as layout is, softer so no shaded face reads as black, and without fog; the result counts the exported faces by status. The value shadings draw every mesh (each part of a collection instance as placed, and the scale figure) from a value of its own, lit softly from the northwest, without fog, the result giving the scale: "objects" draws each object in its own flat color, the ones the view shows most of first (blue, orange, green, red, purple, yellow, cyan, magenta, lime, pink, teal, lavender, brown, olive, then grey for the rest), with a legend of the objects the view shows, each with its color and share of the view; "curvature" draws convex forms warm (orange), concave cool (blue), and flat neutral grey, a ridge or trough curved to a radius of 16 at half color and sharper ones fuller, from the bend of the edges around each vertex (so where two meshes meet without sharing edges, as a rock sunk into the ground, there is none); "triangleDensity" draws each face's triangles per 10,000 square units of its own area over fixed decades, blue 1, cyan 10, green 100, yellow 1,000, red 10,000 (the client's EQG terrains run from 8 to 5,083, 244 at the median), with the range the view shows; "texelDensity" draws each face's texture pixels per world unit (its diffuse texture's pixels over the area its texture coordinates spread them across) blue lowest through cyan, green, and yellow to red highest across the range the view shows (the result gives it and each color's value), dark grey where a face has no diffuse texture or texture coordinates: coverage's stretch check compares a face with its own material's usual scale, texelDensity compares materials with each other. labels [names] writes each named object's name on the view by its place (where its middle projects when the object shows there, else the middle of what shows of it), marked with a white dot, but only for the objects the view shows; the result lists the places and the named objects it does not show (an object hidden from renders, a guide with guides off, or one that is not a mesh or collection instance is refused). Guides (plot outlines, sketch massing) draw unless guides is false, and with them, in every shading, the view is tinted red where the boundaries (walls, lids, floors) stand, which the client never draws, a wall as a slab thick enough to show from above, and green where the zone lines stand, seen through the water but hidden behind and under the ground; with swimVolumes, the view is tinted where the swim volumes stand (cyan water, magenta lava), each box seen through the water, so its top shows evenly under a surface it meets or lies just below, but hidden behind and under the ground. Liquids draw as they stand at effect time 0, or at `liquidTime` seconds on the client's effect clock, each layer scrolled by its slides as the client's effects scroll it (time modulo 100): two views a second or two apart show which way and how fast a fall or river moves (liquid materials made before previews scrolled are refused, to be made again); emitters draw at the same moment of their steady state either way."""
   outputPath = newRenderPath()
   zone = await callBridge(context, "getZoneProperties", {})
   description = await callBridge(context, "renderView", {
     "view": view, "outputPath": str(outputPath), "figureModel": await scaleFigureModel(zone, view), "shading": shading, "bandHeight": bandHeight,
     "guides": guides, "sky": await zoneSky(zone), "swimVolumes": swimVolumes, "labels": labels, "emitters": await previewEmitterAssets(),
+    "liquidTime": liquidTime,
   })
   if labels is not None:
     await anyio.to_thread.run_sync(viewSheets.writeNames, outputPath, description["labels"]["shown"])
@@ -1435,7 +1438,7 @@ async def joinObjects(context: Context, names: list[str], into: str):
 
 @guardedTool()
 async def deleteObjects(context: Context, names: list[str]):
-  """Delete objects; meshes left with no users are removed too."""
+  """Delete objects; meshes left with no users are removed too, and a water body's spray emitters (sprayWater) go with it."""
   return await callBridge(context, "deleteObjects", {"names": names})
 
 
@@ -2563,12 +2566,25 @@ async def linkKitAsset(
 # Water
 
 liquidDefaults = {
-  # The client's own new-water settings (Resources/WaterSwap/WaterSwap.ini, [NewWater]) and the slides most of its water materials use.
+  # The client's own new-water settings (Resources/WaterSwap/WaterSwap.ini, [NewWater]) and the slides most of its water materials use,
+  # whose two layers move against each other: still water.
   "water": {"fresnelBias": 0.25, "fresnelPower": 8.0, "reflectionAmount": 0.7, "reflectionColor": [1.0, 1.0, 1.0], "waterColor1": [0.0, 0.04, 0.11], "waterColor2": [0.0, 0.23, 0.17], "slides": [0.02, 0.02, 0.03, 0.03]},
-  # The slides the client's waterfall and lava materials use most.
-  "waterfall": {"slides": [0.0, 0.3, 0.0, 0.2]},
+  # The slides of wtr_waterfall_tile, the fall the most client zones use (Highpass Hold, Steppes, Silyssar, Illsalin, Underquarry, ...):
+  # both layers down a fall whose v runs down, as the client's and pourWaterfall's falls run it.
+  "waterfall": {"slides": [-0.12, -0.32, 0.0, -0.5]},
+  # The slides the client's lava materials use most.
   "lava": {"slides": [0.01, 0.0, 0.0, 0.03]},
 }
+
+
+def flowSlides(liquid, flow):
+  """The slides that move a liquid's two layers flow[0] and flow[1] texture repeats per second along its body's v, downstream or
+  down: water's first layer moves by its first slide and its second, sampled at twice the coordinates, by minus half its second; a
+  waterfall's and lava's layers by minus their slides."""
+  if len(flow) != 2:
+    raise ToolError(f"flow is [first layer, second layer] in texture repeats a second along the body, got {flow!r}")
+  first, second = flow
+  return [0.0, first, 0.0, -2 * second] if liquid == "water" else [0.0, -first, 0.0, -second]
 
 
 @guardedTool()
@@ -2576,20 +2592,32 @@ async def createLiquidMaterial(
   context: Context, name: str, liquid: str, diffuseTexture: str, normalTexture: str | None = None, environmentTexture: str | None = None,
   secondDiffuseTexture: str | None = None, fresnelBias: float | None = None, fresnelPower: float | None = None, reflectionAmount: float | None = None,
   reflectionColor: list[float] | None = None, waterColor1: list[float] | None = None, waterColor2: list[float] | None = None, slides: list[float] | None = None,
+  flow: list[float] | None = None,
 ):
   """A liquid material, the one exception to Phase 1's diffuse-and-normal rule: `liquid` "water" (the client's Opaque_MaxWater.fx: a
   diffuse, normalTexture, environmentTexture, fresnelBias and fresnelPower, reflectionAmount and reflectionColor, waterColor1 and
   waterColor2), "waterfall" (Opaque_MaxWaterFall.fx: a diffuse), or "lava" (Opaque_MaxLava.fx: a diffuse, secondDiffuseTexture, and
-  normalTexture); each takes `slides` [first x, first y, second x, second y], how fast its two texture layers scroll. Values left out
-  take the client's own (water: its WaterSwap.ini new water; slides: what most of its materials use). Colors are three numbers from 0
-  to 1. A texture is an absolute path or a catalog texture id (texture/<name>@<hash>). The preview draws it still, as the client's DX9
-  effects draw it: water takes no color from its diffuse (the client's older effects do) but runs from waterColor1 seen from above to
-  waterColor2 at grazing angles, lit like any surface, rippled by its normal map at the texture coordinates and twice them (so the
-  normal map repeats as often as the surface's texture coordinates do), and mirrors its environment by fresnel (the preview takes the
-  environment cube map's average color); a waterfall is its diffuse, lit, as see-through as its alpha; lava is its two diffuses
-  averaged. Pools, rivers, and falls (floodWater, runWater, pourWaterfall) take these materials."""
+  normalTexture); each takes `slides` [first x, first y, second x, second y], how fast its two texture layers scroll, or instead `flow`
+  [first, second]: how many texture repeats a second each layer moves along the body that takes it (a river downstream, a fall down,
+  as runWater and pourWaterfall run their v), from which the slides are set as the client's effects take them (water: [0, first, 0,
+  -2 * second]; waterfall and lava: [0, -first, 0, -second]). Water's own two layers moving against each other is still water, as most
+  of the client's is; flow moves both one way, a river. The client's effects take time modulo 100 seconds, so a slide whose 100 times
+  is not a whole number of repeats jumps then and is refused. A material's slides are shared by every body that takes it; getWater
+  says which way and how fast each body flows. Values left out take the client's own (water: its WaterSwap.ini new water and still
+  slides; waterfall: the slides of the client's most used fall texture, flowing down; lava: what most of its lava uses). Colors are
+  three numbers from 0 to 1. A texture is an absolute path or a catalog texture id (texture/<name>@<hash>). The preview draws it as the
+  client's DX9 effects draw it, at effect time 0 unless renderView sets liquidTime: water takes no color from its diffuse (the
+  client's older effects do) but runs from waterColor1 seen from above to waterColor2 at grazing angles, lit like any surface, rippled
+  by its normal map at the texture coordinates and twice them (so the normal map repeats as often as the surface's texture coordinates
+  do), and mirrors its environment by fresnel (the preview takes the environment cube map's average color); a waterfall is its
+  diffuse's color, lit, as see-through as its alpha, each layer scrolled by its own slide; lava is its two diffuses averaged. Pools,
+  rivers, and falls (floodWater, runWater, pourWaterfall) take these materials."""
   if liquid not in liquidDefaults:
     raise ToolError(f"liquid is one of {list(liquidDefaults)}, got '{liquid}'")
+  if flow is not None and slides is not None:
+    raise ToolError("Give slides or flow, not both: flow sets the slides")
+  if flow is not None:
+    slides = flowSlides(liquid, flow)
   given = {
     "fresnelBias": fresnelBias, "fresnelPower": fresnelPower, "reflectionAmount": reflectionAmount, "reflectionColor": reflectionColor,
     "waterColor1": waterColor1, "waterColor2": waterColor2, "slides": slides,
@@ -2636,9 +2664,13 @@ async def floodWater(
 @guardedTool(description=(
   "Run a river along `path` [[x, y, level], ...], downstream in order, its surface at each point's level and falling evenly between"
   " them (a drop is a fall: end one river at the lip, pourWaterfall, start the next below), spreading over the ground below its level"
-  " within `reach` of the path. Mapped along the path (v downstream, u across) so its texture flows with it. A path may start or end at"
-  " the edge of the ground, as a river entering or leaving the zone. Carve its channel first (sculptAlongPath) where the ground has none."
-  " A starting point: adjust with editWater (path, reach) and shapeWaterExtent." + waterBodyHelp
+  " within `reach` of the path. Mapped along the path as the client's rivers are (Brell's Rest, Beasts' Domain): u across, rightward"
+  " looking downstream, and the client's v downstream, a repeat every `worldUnitsPerRepeat` both ways, so a material's flow"
+  " (createLiquidMaterial) runs it downstream; getWater says which way it flows. Its material is water (a surface whose two layers"
+  " move one way downstream, as Beasts' Domain's), waterfall (a see-through scrolling ribbon laid over a rock bed, as Crescent Reach's"
+  " and Brell's Rest's are; swum as water), or lava. A path may start or end at the edge of the ground, as a river entering or leaving"
+  " the zone. Carve its channel first (sculptAlongPath) where the ground has none. A starting point: adjust with editWater (path,"
+  " reach) and shapeWaterExtent; sprayWater adds white water along its rapids and where it joins a pool." + waterBodyHelp
 ))
 async def runWater(
   context: Context, name: str, path: list[list[float]], reach: float, material: str, spacing: float = 8.0, worldUnitsPerRepeat: float = 64.0,
@@ -2654,18 +2686,85 @@ async def runWater(
   "Pour a waterfall from `lip` [[x, y, z], ...], the edge the water goes over, running from the fall's left edge to its right as seen"
   " from in front of it: a sheet that starts a little back from the lip, turns over it, and drops to `bottom`, carried out from the face"
   " by `throw` at the bottom (out as the square root of the drop, as falling water goes) and `spread` times as wide there; rows every"
-  " `spacing` units, the texture repeating every `worldUnitsPerRepeat` down and across. The result's built.insideRock lists rows that pass"
-  " inside the rock (raise throw or move the lip) and closestToRock how near the sheet comes. Its waterfall material scrolls in the"
-  " client; give the pool below its own body." + waterBodyHelp
+  " `spacing` units. Mapped as the client maps its falls: the texture spans the lip `acrossRepeats` times (once by default, so a fall"
+  " texture's faded side edges frame the fall; more for a fall made of side-by-side strands) and repeats every `worldUnitsPerRepeat`"
+  " down the drop, the client's v running down, so a waterfall material's slides as the client's falls carry them flow down. The"
+  " client's falls end at their pool's surface or a little under it. The result's built.insideRock lists rows that pass inside the"
+  " rock (raise throw or move the lip) and closestToRock how near the sheet comes. Its waterfall material scrolls in the client; give"
+  " the pool below its own body, and its white water with sprayWater (the client's falls have no foam surface: spray and mist where"
+  " they strike, ripple rings on the pool, and wet rocks placed at the foot to hide where the sheet meets the water)." + waterBodyHelp
 ))
 async def pourWaterfall(
   context: Context, name: str, lip: list[list[float]], bottom: float, material: str, throw: float = 6.0, spread: float = 1.0,
-  spacing: float = 8.0, worldUnitsPerRepeat: float = 64.0, collection: str | None = None,
+  spacing: float = 8.0, worldUnitsPerRepeat: float = 64.0, acrossRepeats: int = 1, collection: str | None = None,
 ):
   return await callBridge(context, "pourWaterfall", {
     "name": name, "lip": lip, "bottom": bottom, "throw": throw, "spread": spread, "spacing": spacing, "worldUnitsPerRepeat": worldUnitsPerRepeat,
-    "material": material, "collection": collection,
+    "acrossRepeats": acrossRepeats, "material": material, "collection": collection,
   })
+
+
+emitterDefinitionsCache = {}
+
+
+def clientEmitterDefinitions():
+  """The client's environment emitter definitions, read once per file version."""
+  path = eqEmitterDefinitions.environmentDefinitionsPath(zoneSources.resolveClientRoot())
+  stamp = path.stat().st_mtime_ns
+  if emitterDefinitionsCache.get("stamp") != stamp:
+    emitterDefinitionsCache.update(stamp=stamp, definitions=eqEmitterDefinitions.parseDefinitions(path.read_bytes(), path.name))
+  return emitterDefinitionsCache["definitions"]
+
+
+def resolvedSpray(spray):
+  """A spray as a body keeps it, its emitter definitions checked against the client's, and a row with neither spacing nor count set
+  one emitter per disc width: twice the radius its definition starts particles within."""
+  spray = {key: value for key, value in spray.items() if key != "emitters"}
+  stray = sorted(set(spray) - {"at", "definition", "rings", "spacing", "count", "above"})
+  if stray or "at" not in spray or "definition" not in spray:
+    raise ToolError(f"A spray is {{at, definition, rings, spacing, count, above}}, at and definition required; got {sorted(spray)}")
+  try:
+    definitions = clientEmitterDefinitions()
+  except (OSError, ValueError) as error:
+    raise ToolError(f"Sprays use the client's emitter definitions: {error}") from error
+  for key in ("definition", "rings"):
+    index = spray.get(key)
+    if index is not None and (not isinstance(index, int) or not 1 <= index < len(definitions)):
+      raise ToolError(f"A spray's {key} is a client environment emitter definition, 1 to {len(definitions) - 1}, got {index!r}")
+  spray = {"rings": None, "spacing": None, "count": None, "above": 1.0} | spray
+  isRow = spray["at"] in ("foot", "lip") or (isinstance(spray["at"], dict) and "along" in spray["at"])
+  if isRow and spray["spacing"] is None and spray["count"] is None:
+    definition = definitions[spray["definition"]]
+    if definition["emitterScaled"] or definition["shapeRadius"] <= 0:
+      raise ToolError(f"Definition {definition['index']} '{definition['name']}' starts its particles at its emitter, so no width sets a row's spacing; give spacing or count")
+    spray["spacing"] = 2 * definition["shapeRadius"]
+  return spray
+
+
+@guardedTool(description=(
+  "White water on one body, as the client's zones make it: no foam surface (no client EQG zone has one) but particle emitters where"
+  " the water strikes, kept with the body and placed again whenever it is rebuilt. `at` is \"foot\" (a fall's foot: where its sheet"
+  " strikes the water below, a pool's or a client zone's, or else the ground, along the whole width), \"lip\" (along a fall's lip,"
+  " where the water goes over), {\"points\": [[x, y], ...]} (on a pool's or river's own surface: rocks in a river, steps, where a"
+  " river joins a pool), or {\"along\": [[x, y], [x, y]]} (a river's rapids: along its path from the spot nearest the first point to"
+  " the spot nearest the second). `definition` is the client environment emitter definition (findAssets kind emitter, and the"
+  " catalog's measured use, say which zones use each where); `rings` an optional second one laid at the same places 0.5 over the"
+  " water, as Crescent Reach lays its ripple rings (not at a lip). A row has `count` emitters, or one per `spacing` of its width (at"
+  " least one), each in the middle of its share; without either, one per disc width of the definition, twice the radius it starts"
+  " particles within. Each emitter stands `above` over what it strikes (the client's stand 0 to 5 over their water). From the client's"
+  " zones: a fall's foot 133 (crwaterfallbottom, Crescent Reach, Beasts' Domain) or 99 (geyserbottom, Highpass Hold) with rings 142"
+  " (waterwheelsplashbig); a lip 101 (waterfall_top); a river's rapids small splashes such as 277 (Brell's Rest) with their spacing;"
+  " where a river meets a pool 141 (waterwheelsplash). The emitters export as any emitter does, into <zone>_EnvironmentEmitters.txt;"
+  " editWater's sprays changes or removes them ([] takes them all off), and deleting the body takes them with it. Rebuilding a pool"
+  " or river places the foot sprays of every fall again, as where they strike may have moved. Wet rocks at a fall's foot, which the"
+  " client's falls use to hide where the sheet meets the water, are placed by hand (placeObject)."
+))
+async def sprayWater(
+  context: Context, name: str, at: str | dict, definition: int, rings: int | None = None, spacing: float | None = None, count: int | None = None,
+  above: float = 1.0,
+):
+  spray = resolvedSpray({"at": at, "definition": definition, "rings": rings, "spacing": spacing, "count": count, "above": above})
+  return await callBridge(context, "sprayWater", {"name": name, "spray": spray})
 
 
 @guardedTool(description=(
@@ -2673,18 +2772,22 @@ async def pourWaterfall(
   " list removes it), spacing, worldUnitsPerRepeat, or strokes (an empty list clears them); a river's path, reach, spacing,"
   " worldUnitsPerRepeat, or strokes; a pool or river's swimmable (false: no one swims in it, a fountain or a trickle; true: it is"
   " swum, its swim volumes to be built; marking false is refused while the body has swim volumes, which go first, with deleteObjects);"
-  " a fall's lip, bottom, throw, spread, spacing, or worldUnitsPerRepeat; any body's material."
-  " With nothing to change it only rebuilds, for after the ground under it has changed." + waterBodyHelp
+  " a fall's lip, bottom, throw, spread, spacing, worldUnitsPerRepeat, or acrossRepeats; any body's material; any body's sprays (the"
+  " whole list as sprayWater keeps them, each {at, definition, rings, spacing, count, above}; getWater's may be passed back as they are,"
+  " their emitters placed anew; an empty list takes them all off)."
+  " With nothing to change it only rebuilds, for after the ground under it has changed, and places its sprays again." + waterBodyHelp
 ))
 async def editWater(
   context: Context, name: str, level: float | None = None, seed: list[float] | None = None, within: list[list[float]] | None = None,
   path: list[list[float]] | None = None, reach: float | None = None, lip: list[list[float]] | None = None, bottom: float | None = None,
   throw: float | None = None, spread: float | None = None, spacing: float | None = None, worldUnitsPerRepeat: float | None = None,
-  strokes: list[dict] | None = None, swimmable: bool | None = None, material: str | None = None,
+  acrossRepeats: int | None = None, strokes: list[dict] | None = None, swimmable: bool | None = None, sprays: list[dict] | None = None,
+  material: str | None = None,
 ):
   changes = {
     "level": level, "seed": seed, "within": within, "path": path, "reach": reach, "lip": lip, "bottom": bottom, "throw": throw,
-    "spread": spread, "spacing": spacing, "worldUnitsPerRepeat": worldUnitsPerRepeat, "strokes": strokes, "swimmable": swimmable,
+    "spread": spread, "spacing": spacing, "worldUnitsPerRepeat": worldUnitsPerRepeat, "acrossRepeats": acrossRepeats, "strokes": strokes,
+    "swimmable": swimmable, "sprays": None if sprays is None else [resolvedSpray(spray) for spray in sprays],
   }
   return await callBridge(context, "editWater", {"name": name, "changes": {key: value for key, value in changes.items() if value is not None}, "material": material})
 
@@ -2718,7 +2821,11 @@ async def carveWaterBed(context: Context, name: str, objectName: str, depth: flo
 async def getWater(context: Context):
   """Every water body: its kind, what it is made from, its material, its levels, its visibleExtent (the plan bounds of the water
   players see: a pool or river's surface where it is not tucked under its banks, a fall's sheet outside the rock; null when none
-  shows), and its mesh counts."""
+  shows), its mesh counts, its sprays with the emitters each placed (name, definition, position, and whether it stands on water, ground,
+  or the lip), and its flow, derived from its material's slides and its own mapping: each texture layer's speed along the body (a river
+  downstream, a fall down; negative is upstream or up) and across it in world units per second of the client's effect clock (a pool's
+  as a velocity [x, y]), and the body's flow: downstream or down, upstream or up (the material is wrong for it), still (the two layers
+  move against each other: the client's still water), drifting (a pool's layers one way), across, or none."""
   return await callBridge(context, "getWater", {})
 
 
