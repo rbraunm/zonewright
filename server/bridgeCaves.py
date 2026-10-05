@@ -280,18 +280,21 @@ def gapStop(gap, share):
 
 def floorOffsets(shape, widths):
   """Each row's floor points across (rows x floorCount, units from the middle, negative to the left): between the floor's corners and
-  its breaks, each break where its stroke set it, or kept at its share of the width it was measured against where the floor narrows
-  past it."""
-  halves = numpy.asarray(widths, dtype=numpy.float64)[:, None] / 2
-  stops = [-halves[:, 0]]
-  for offset, measured in shape["breaks"]:
-    fits = abs(offset) <= halves[:, 0] - bridgeCaveRuns.breakClearance
-    stops.append(numpy.where(fits, offset, offset / measured * 2 * halves[:, 0]))
-  stops.append(halves[:, 0])
-  stops = numpy.column_stack(stops)
-  if (numpy.diff(stops, axis=1) <= stopTolerance).any():
-    row = int(numpy.argwhere(numpy.diff(stops, axis=1) <= stopTolerance)[0][0])
-    raise ValueError(f"The floor strokes' sides cross or meet a wall where the run is {2 * halves[row, 0]:.1f} wide; keep each stroke's sides apart and inside the floor")
+  its breaks, each break where its stroke set it; where the floor narrows past a break (a stroke's side beyond this row's walls, as in a
+  tunnel leading to the stroke's room), it and those beyond it stand evenly between the last break that fits and the wall."""
+  halves = numpy.asarray(widths, dtype=numpy.float64) / 2
+  breaks = numpy.array([offset for offset, _ in shape["breaks"]], dtype=numpy.float64)
+  placed = numpy.repeat(breaks[None, :], len(halves), axis=0)
+  for sign in (1.0, -1.0):
+    side = numpy.flatnonzero(sign * breaks > 0)
+    side = side[numpy.argsort(sign * breaks[side])]
+    for row, half in enumerate(halves):
+      fits = sign * breaks[side] <= half - bridgeCaveRuns.breakClearance
+      outside = side[~fits]
+      if len(outside):
+        last = float((sign * breaks[side[fits]]).max(initial=0.0))
+        placed[row, outside] = sign * (last + (half - last) * numpy.arange(1, len(outside) + 1) / (len(outside) + 1))
+  stops = numpy.column_stack([-halves, placed, halves])
   intervals = numpy.array([interval for interval, _ in shape["floorLayout"]])
   shares = numpy.array([share for _, share in shape["floorLayout"]])
   return stops[:, intervals] + (stops[:, intervals + 1] - stops[:, intervals]) * shares[None, :]
@@ -1925,6 +1928,29 @@ def guideRun(objectName, cave, run):
   if found is None:
     raise ValueError(f"Cave '{cave}' of '{objectName}' has no run '{run}'; its runs are {[entry['run'] for entry in runs]}")
   return found
+
+
+def strokeUnder(x, y, height):
+  """The level way or pad of a cave's run a point stands on (within it in plan and within a step of its height): its object, cave, run,
+  name, kind, and height; or None."""
+  for guide in caveGuides():
+    for run in guide["runs"]:
+      samples = numpy.array(run["samples"])
+      nearest = int(numpy.argmin(numpy.linalg.norm(samples[:, :2] - [x, y], axis=1)))
+      following = min(nearest + 1, len(samples) - 1)
+      previous = max(following - 1, 0)
+      direction = samples[following, :2] - samples[previous, :2]
+      direction /= max(float(numpy.linalg.norm(direction)), 1e-9)
+      offset = numpy.array([x, y]) - samples[nearest, :2]
+      along = float(samples[nearest, 5] + offset @ direction)
+      across = float(offset @ numpy.array([direction[1], -direction[0]]))
+      for stroke in run["strokes"]:
+        if stroke["kind"] == "rough" or not (stroke["from"] <= along <= stroke["to"] and stroke["across"][0] <= across <= stroke["across"][1]):
+          continue
+        level = float(numpy.interp(along, samples[:, 5], samples[:, 2])) if stroke["kind"] == "level" else stroke["top"]
+        if abs(level - height) <= playerScale.stepHeight:
+          return {"object": guide["object"], "cave": guide["cave"], "run": run["run"], "stroke": stroke["name"], "kind": stroke["kind"], "height": round(level, 2)}
+  return None
 
 
 def caveWalkPath(objectName, cave, run):

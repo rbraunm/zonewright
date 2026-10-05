@@ -1689,7 +1689,19 @@ async def cutCave(
   open ground). `grades` (one per segment: signed degrees, or null where the points' heights decide) set a segment's end's height from
   its start's at that grade. `landings` (path point indices, each a bend) turn that bend on a level arc at its point's height, the
   grade taken up on the straights either side, as a builder lands a switchback. Every slope and level is the author's: a climb because
-  it leads up to a room, a landing where it turns. A bend turns on an arc the width in radius (less where the points are
+  it leads up to a room, a landing where it turns.
+  `floor` strokes shape the floor by intent, each named, kept with the cave, and cut again with it ({kind, name, run, ...}; run "main"
+  or a branch's name; from and to are distances along the run or {"point": index}; across [left, right] is units from the run's middle,
+  negative to the left looking along it): level {from, to, across, material?} holds the floor exactly at the run's floor (a walking way
+  through rough ground, a plot's pad, a threshold), its ends rows of the tube and its sides floor points in every row, so its edges are
+  straight lines; pad {from, to, across, top or rise (the other null), edge, material?} sets a level pad at a height (top) or over the
+  run's floor at its middle (rise; negative sinks it), its sides running out to the floor over `edge` (0.5 a riser, more a slope), its
+  edges cut as a level way's (a dais, a plot's raised pad, a terrace step across the whole width); rough {outline [[x, y], ...], rise,
+  edge, breakup {featureSize, amplitude, seed}} raises rubble inside an outline in plan, lumps of the author's noise up to `rise` over
+  the floor, easing to the floor over `edge` past the outline, banked up the wall foot to twice its rise where it meets a wall, the wall's
+  straight part lifted evenly above the bank so it never folds. A level way wins over everything and a pad over rubble; a floor with no
+  strokes stays level wall to wall, a deliberate choice for a hall. `material` gives a level way or a pad's top its own material, its
+  border on the stroke's exact edges. Rubble wants a finer floor: its featureSize at least twice edgeLength (a cave with rubble at 8). A bend turns on an arc the width in radius (less where the points are
   close). `breakup` {featureSize, amplitude, seed} moves the walls and vault along their outward directions by noise, the floor kept
   flat, fading out within `mouthFade` (default twice edgeLength) of wherever the tube lies in the open, so the lip stays a clean arch.
   Each end is open, some of its floor within a step of walkable ground (a mouth, its section in the open but for a sill a step deep;
@@ -1707,7 +1719,10 @@ async def cutCave(
   paint, and mapping.
   Refused, changing nothing: a stretch of floor steeper than `maximumFloorDegrees` (naming it and the run it needs; a graded segment's
   own grade included), a point whose height is set two ways (given, and by a graded segment into it), a graded segment whose start has
-  no height, a landing at an end or at a point where the path does not bend, a bend tighter than half the width, an end part in the rock with its floor buried more than a step under the ground (for a hall, any end part in the rock
+  no height, a landing at an end or at a point where the path does not bend; a floor stroke reaching past its run's walls or ends
+  (naming how far), on an unknown run, named twice, or malformed; rubble finer than twice edgeLength (naming the edgeLength it needs);
+  relief raising a wall's foot to within a step of the lowest trim band or of the top of the walls' straight part (naming the wall and
+  where); a pad sunk where no rock lies under it; a bend tighter than half the width, an end part in the rock with its floor buried more than a step under the ground (for a hall, any end part in the rock
   and part in the open, or a ledge), a floor hanging in the air, both
   ends wholly inside the rock, the tube reaching the terrain's border or another cave's reach, a mesh with modifiers or shared with another object, and caves that fail their integrity checks;
   `wallShare` outside (0, 1]; a band reaching above the walls' straight part (wallShare of the height) at any path point (naming it),
@@ -1715,7 +1730,8 @@ async def cutCave(
   Returns its profile, a picture: the section along its run's centerline, unrolled, as renderSection draws it with a cave (ground,
   floor, vault, grades, landings); the faces and vertices it made, the shortest edges of the lining, the pieces of ground at the mouth,
   and the seam, each end's kind, each trim band's faces, each run's worked-out floor heights, stations (distance along at each point),
-  segment grades and runs, and landings, and the floor's level stretches (start, end, length, height, narrowest width: a stretch about
+  segment grades and runs, and landings, each floor stroke as placed (a level way's and a pad's ends along the run and sides, a pad's
+  top), and the floor's level stretches (start, end, length, height, narrowest width: a stretch about
   220 wide and long holds a stock player plot). The cave is kept with its definition: the ground within its reach is fingerprinted, getObjectDetail and exports flag it
   stale once that ground moves, and editCave or regradeTerrain cuts it again to fit. Around a cave, shaping leaves its lining where it
   is (results count caveLiningLeft) and keeps its ring on the ground; strokes never slide its vertices sideways; contour cuts, turned
@@ -3502,8 +3518,10 @@ async def getHousing(context: Context):
   "Place one plot at `center` [x, y], its address its name (\"101 Canyon Way\"); its height is the ground's under its center unless"
   " `height` is given (the ground as it lies, without any plot's grading). Where rock lies over ground there (a cave under a hill, an"
   " overhang) either could be meant, so without `height` it is refused, naming the top, the rock's underside, and the ground under it:"
-  " give the height of the one meant (a cavern's level stretch from cutCave gives its floor). `features` (from the zone's featureMultipliers) and `pricePlatinum` (an override of the derived price) set its"
-  " price. The result gives its price and any plots it overlaps." + plotHelp
+  " give the height of the one meant (a cavern's level stretch from cutCave gives its floor; a plot in a cave stands on a level way or"
+  " pad of its floor, at that stroke's height). `features` (from the zone's featureMultipliers) and `pricePlatinum` (an override of the derived price) set its"
+  " price. The result gives its price, any plots it overlaps, and caveFloor: the cave floor stroke it stands on (cave, run, name, kind,"
+  " height), or null." + plotHelp
 ))
 async def placePlot(
   context: Context, address: str, center: list[float], facingDegrees: float, kind: str = "player", size: list[float] | None = None,
@@ -3584,7 +3602,8 @@ async def assessPlot(context: Context, address: str):
   is, rock or roof over it (overhead: the height of its underside over the plot's center, or null), its nearest plot and route, how
   much of the zone's main routes see it, and overlaps; and the features those suggest, for pricing (set them with editPlot features).
   The ground under it, beyond its sides, and at its entrance is looked up from the plot's own height (ground standing above it, or the
-  footing under a step over it), so a plot in a cave measures the cave's floor and walls, not the hill over it. A view is never
+  footing under a step over it), so a plot in a cave measures the cave's floor and walls, not the hill over it; caveFloor names the
+  cave floor stroke it stands on (a level way or pad of a cave's run, cutCave floor: its cave, run, name, kind, and height), or null. A view is never
   suggested: judge it from pictures taken at the plot's edge, looking out as its owner would. The measures check what a picture shows;
   look at the plot too."""
   return await callBridge(context, "assessPlot", {"address": address})
