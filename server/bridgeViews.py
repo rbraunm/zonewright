@@ -17,6 +17,7 @@ import bridgeModels
 import bridgePointLights
 import bridgeReviewGuides
 import bridgeShadings
+import bridgeSurfacing
 import bridgeSwim
 import skyDrawing
 from playerScale import swimEyeAboveSurface
@@ -592,17 +593,43 @@ def requireFrame(frame):
   return frame
 
 
-def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes, labels, emitters, frame=None):
+def requireScrollingLiquids(sourceScene):
+  """Refuse a view at a liquid time when a rendered liquid material was made before previews scrolled liquids: it would draw still."""
+  materials = {
+    slot.material for sceneObject in sourceScene.objects if sceneObject.type == "MESH" and not sceneObject.hide_render for slot in sceneObject.material_slots
+    if slot.material is not None and (bridgeMeshAccess.liquidProperty in slot.material or bridgeMeshAccess.clientLiquidProperty in slot.material)
+  }
+  still = sorted(material.name for material in materials if not bridgeSurfacing.scrollsInPreview(material))
+  if still:
+    raise ValueError(
+      f"Liquid materials {still} were made before previews scrolled liquids and would draw still: make them again (createLiquidMaterial,"
+      " then editWater material; an imported zone, importZone again)"
+    )
+
+
+def liquidTimeModulo(liquidTime):
+  """The effect time each liquid effect's preshader takes from the client's clock: modulo 100 (100 * frac(|0.01 t|))."""
+  if not liquidTime >= 0:
+    raise ValueError(f"liquidTime is seconds on the client's effect clock, 0 or more, got {liquidTime!r}")
+  return math.fmod(liquidTime, 100.0)
+
+
+def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes, labels, emitters, frame=None, liquidTime=None):
   """Render a view; in client shading the zone's point lights and emitters are drawn too (emitters: the server's prepared emitter
-  assets, or None without a client)."""
+  assets, or None without a client), and its liquids as they stand at liquidTime on the effect clock (0 when it is None)."""
   if shading not in viewShadings:
     raise ValueError(f"shading must be one of {list(viewShadings)}, got '{shading}'")
   if frame is not None and ("map" in view or "camera" in view):
     raise ValueError("A frame is set for an eye, standAt, or frame view; a map keeps the preview's frame and a review camera its own")
+  if liquidTime is not None:
+    tau = liquidTimeModulo(liquidTime)
+    requireScrollingLiquids(sourceScene)
   # A map, or a drawing for reading shape, coverage, or values, is neither fogged nor has a sky.
   shapeOnly = "map" in view or shading != "client"
   preview = PreviewScene(sourceScene, zone | {"fogOn": False} if shapeOnly else zone, guides, None if shapeOnly else sky)
   try:
+    if liquidTime is not None:
+      preview.scene[bridgeSurfacing.liquidTimeProperty] = tau
     if frame is not None:
       preview.setFrame(requireFrame(frame))
     description = placeCamera(preview, view, figureModel)

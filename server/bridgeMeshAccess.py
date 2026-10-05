@@ -33,6 +33,8 @@ surfaceLayersProperty = "zonewrightSurfaceLayers"
 waterProperty = "zonewrightWater"
 # A swim volume (bridgeSwim) keeps its liquid, its body, and what it was built from in this property.
 swimProperty = "zonewrightSwimVolume"
+# An emitter a water body's spray placed keeps its body, its spray, and what it stands on in this property; it goes with its body.
+sprayProperty = "zonewrightWaterSpray"
 # A guide is drawn to design with (a plot's outline) and never exported; a plot's border is a server-placed door, exported in the
 # zone's housing file rather than its geometry.
 guideProperty = "zonewrightGuide"
@@ -387,19 +389,23 @@ def describeRockOverGround(where, levels):
   )
 
 
-def swimSurfaces():
+def swimSurfaces(leftOut=(), added=None):
   """A BVH over the surfaces players swim under: rendered pools and rivers (falls are not swum) and imported client liquids
-  (swumFaces); None when the scene has none."""
+  (swumFaces), but for the bodies named in leftOut, and with `added`, a body's surface as it is about to stand ((world positions,
+  polygons)); None when there are none."""
   bodies = [
     sceneObject for sceneObject in bpy.context.scene.objects
-    if waterProperty in sceneObject and not sceneObject.hide_render and json.loads(sceneObject[waterProperty])["kind"] != "fall"
+    if waterProperty in sceneObject and not sceneObject.hide_render and json.loads(sceneObject[waterProperty])["kind"] != "fall" and sceneObject.name not in leftOut
   ]
-  liquidOwners = [owner for owner in playerSolidObjects() if any(isSwumMaterial(slot.material) for part, _ in objectParts(owner) for slot in part.material_slots)]
+  liquidOwners = [owner for owner in playerSolidObjects(leftOut) if any(isSwumMaterial(slot.material) for part, _ in objectParts(owner) for slot in part.material_slots)]
   positions, triangles = selectedTriangles(liquidOwners, swumFaces)
   bodyPositions, bodyTriangles = worldTriangles(bodies)
-  triangles = numpy.concatenate([triangles, bodyTriangles + len(positions)])
-  positions = numpy.concatenate([positions, bodyPositions])
-  return mathutils.bvhtree.BVHTree.FromPolygons(positions.tolist(), triangles.tolist()) if len(triangles) else None
+  polygons = numpy.concatenate([triangles, bodyTriangles + len(positions)]).tolist()
+  positions = numpy.concatenate([positions, bodyPositions]).tolist()
+  if added is not None:
+    polygons += [[index + len(positions) for index in polygon] for polygon in added[1]]
+    positions += list(added[0])
+  return mathutils.bvhtree.BVHTree.FromPolygons(positions, polygons) if polygons else None
 
 
 def waterDepthAt(surfaces, point):

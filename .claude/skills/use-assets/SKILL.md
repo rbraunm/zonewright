@@ -26,7 +26,7 @@ Work from the catalog (`docs/assetCatalog.md`), not from guesses about file name
 ## Lights and emitters
 
 - `placeLights` takes the colors and radii of a described light style that fits (`findAssets` kind `light`, category `torch`, `brazier`, ...). Space them as the style's zone did.
-- `placeEmitters` takes a definition index from a described emitter (`findAssets` kind `emitter`); the lifespan most client lists use is 4000000.
+- `placeEmitters` takes a definition index from a described emitter (`findAssets` kind `emitter`); the lifespan most client lists use is 4000000. White water on a fall, river, or pool goes on with `sprayWater` instead, which keeps the emitters with the body.
 - Client-shaded views draw lights and emitters as the client does: a light's pool on what it reaches (terrain takes only `LIB_` lights; name a light for terrain `LIB_`), an emitter's particles. Judge their placement at eye level, at night and by day (`setZoneProperties` `sky` hour), and through `getSceneSummary`.
 
 ## Closing the loop

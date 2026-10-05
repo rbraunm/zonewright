@@ -269,3 +269,27 @@ def testEmittersDrawTheirParticlesWhereTheyStand(stageBlenderServer, tmp_path):
   assert abs(numpy.average(columns, weights=weights) - width / 2) < 0.02 * width
   assert numpy.average(rows, weights=weights) < emitterRow
   assert added.max() > 200
+
+
+@pytest.mark.clientData("clientFiles")
+def testATextureDrawnBothBlendedAndAddedDrawsInOneView(stageBlenderServer, tmp_path):
+  # Brell's Rest's finedust_white01 is drawn blended by brells_waterfallbottom (265) and added by brells_waterfallbottomSM (277): two
+  # particle materials over one image, which the view takes away once when it is done.
+  emitters = [
+    {"name": "blended", "position": [-3, 0, 0], "definition": 265, "lifespan": 4000000},
+    {"name": "added", "position": [3, 0, 0], "definition": 277, "lifespan": 4000000},
+  ]
+
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "wall", "size": [60, 2, 30], "location": [0, 20, -5]})
+    await session.expectSuccess("setZoneProperties", darkEnvironment)
+    await session.expectSuccess("placeEmitters", {"emitters": emitters})
+    _, first = await session.expectImage("renderView", {"view": {"eye": [0, -25, 5], "target": [0, 0, 3]}})
+    _, second = await session.expectImage("renderView", {"view": {"eye": [0, -25, 5], "target": [0, 0, 3]}})
+    images = (await session.expectSuccess("runPython", {"code": "result = sorted(image.name for image in bpy.data.images)"}))["result"]
+    return first, second, images
+
+  first, second, images = stageBlenderServer.session(steps)
+  assert first["emitters"]["emitters"] == 2 and first["emitters"]["notDrawn"] == [] and second["emitters"] == first["emitters"]
+  assert not any("finedust" in name for name in images)

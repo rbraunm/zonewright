@@ -8,7 +8,7 @@ import bpy
 
 groupName = "eqClientLight"
 # Raised whenever buildGroup changes, so a group saved in an older .blend is rebuilt in place.
-groupVersion = 9
+groupVersion = 10
 bakedAttribute = "eqColor"
 normalAttribute = "eqNormal"
 tintAttribute = "eqTint"
@@ -124,8 +124,9 @@ def buildGroup(tree):
   colorInputs = [socket for socket in fogged.inputs if socket.type == "RGBA"]
   tree.links.new(visibility, fogged.inputs["Factor"])
   tree.links.new(build.color("fogColor"), colorInputs[0])
-  # A shader's own unlit term (water's mirrored environment) adds to the lit color before fog, as the client's water effect adds it.
-  tree.links.new(build.vectorMath("ADD", lit, inputs["Added"]), colorInputs[1])
+  # A shader's own unlit term (water's mirrored environment, lava's glow) adds to the lit color before fog, as the client's liquid
+  # effects add it, and the sum is held to 1 as their pixel shaders' output is before fog blends it.
+  tree.links.new(build.vectorMath("MINIMUM", build.vectorMath("ADD", lit, inputs["Added"]), ones.outputs["Vector"]), colorInputs[1])
   shareColor = build.node("ShaderNodeCombineXYZ")
   for axis in "XYZ":
     tree.links.new(inputs["Share"], shareColor.inputs[axis])
@@ -267,6 +268,8 @@ def surfaceOutput(material, baseColor, alpha, alphaMode, lit, threshold, normal=
     links.new(tree.nodes.new("ShaderNodeBsdfTransparent").outputs["BSDF"], mix.inputs[1])
     links.new(emission.outputs["Emission"], mix.inputs[2])
     surface = mix.outputs["Shader"]
-    material.surface_render_method = "DITHERED"
+    # A blended surface is drawn over what lies behind it by its alpha, as the client's source-alpha blend draws it, not dithered, whose
+    # grain at the preview's few samples speckles a fall with the rock behind it; a cutout is all or nothing either way.
+    material.surface_render_method = "BLENDED" if alphaMode == "blended" else "DITHERED"
   output = next(node for node in tree.nodes if node.type == "OUTPUT_MATERIAL")
   links.new(surface, output.inputs["Surface"])

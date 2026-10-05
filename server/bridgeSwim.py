@@ -67,11 +67,13 @@ def requireSwimBody(name):
 
 
 def liquidOfBody(body):
+  """What players swim in under a body: lava under lava, water under water or a river of the waterfall liquid laid over its bed (as
+  Crescent Reach's rivers are, swum through their AWT_ boxes)."""
   material = body.material_slots[0].material if body.material_slots else None
   liquid = bridgeSurfacing.liquidOf(material)
-  if liquid is None or liquid["liquid"] not in volumePrefixes:
-    raise ValueError(f"Water body '{body.name}' needs a water or lava material for swim volumes")
-  return liquid["liquid"]
+  if liquid is None:
+    raise ValueError(f"Water body '{body.name}' needs a liquid material for swim volumes")
+  return "lava" if liquid["liquid"] == "lava" else "water"
 
 
 def bodyCells(body, ground, area=None):
@@ -145,8 +147,10 @@ def cellBoxes(cells, spacing):
 
 
 def bodyFingerprint(body, cells):
-  """What a body's boxes were made from: its definition, its surface, and the bed under it."""
-  digest = hashlib.sha256(json.dumps(bridgeWater.readDefinition(body), sort_keys=True).encode())
+  """What a body's boxes were made from: its definition but its white water (sprays change nothing players swim in), its surface, and
+  the bed under it."""
+  definition = {key: value for key, value in bridgeWater.readDefinition(body).items() if key != "sprays"}
+  digest = hashlib.sha256(json.dumps(definition, sort_keys=True).encode())
   positions, _ = bridgeMeshAccess.readVertexArrays(body)
   digest.update(numpy.round(positions, 2).tobytes())
   digest.update(json.dumps(sorted([[cell[0], cell[1], round(level, 2), round(floor, 2)] for cell, (level, floor, _) in cells.items()])).encode())

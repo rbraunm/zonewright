@@ -50,13 +50,15 @@ def testSwimVolumesStartFromThePoolAndKeepWhatIsDoneByHand(stageBlenderServer, t
     await session.expectSuccess("editWater", {"name": "pool", "level": -7})
     changed = await session.expectSuccess("getSwimVolumes", {})
     accepted = await session.expectSuccess("acceptSwimVolumes", {"body": "pool"})
+    await session.expectSuccess("sprayWater", {"name": "pool", "at": {"points": [[0, 0]]}, "definition": 141})
+    sprayed = (await session.expectSuccess("getSwimVolumes", {}))["bodies"][0]["state"]
     floating = await session.expectSuccess("placeSwimVolume", {"name": "skyPool", "liquid": "water", "minimum": [120, 120, 40], "maximum": [160, 150, 60]})
     clash = await session.expectError("placeSwimVolume", {"name": "SKYPOOL", "liquid": "water", "minimum": [0, 0, 0], "maximum": [1, 1, 1]})
     await session.expectSuccess("transformObjects", {"names": ["AWT_skyPool"], "rotateDegrees": [0, 0, 10]})
     turned = await session.expectSuccess("getSwimVolumes", {})
-    return undecided, built, listed, widened, kept, changed, accepted, floating, clash, turned
+    return undecided, built, listed, widened, kept, changed, accepted, sprayed, floating, clash, turned
 
-  undecided, built, listed, widened, kept, changed, accepted, floating, clash, turned = stageBlenderServer.session(steps)
+  undecided, built, listed, widened, kept, changed, accepted, sprayed, floating, clash, turned = stageBlenderServer.session(steps)
   assert undecided["bodies"] == [{"body": "pool", "state": "undecided", "boxes": [], "findings": []}]
   volumes = listed["volumes"]
   assert [volume["name"] for volume in volumes] == built["built"] and all(name.startswith("AWT_pool") for name in built["built"])
@@ -68,6 +70,8 @@ def testSwimVolumesStartFromThePoolAndKeepWhatIsDoneByHand(stageBlenderServer, t
   assert changed["bodies"][0]["state"] == "changed"
   assert accepted["state"] == "boxed" and accepted["accepted"] == built["built"]
   assert any(finding["finding"] == "top away from the surface" for finding in accepted["findings"])
+  # White water changes nothing players swim in: spraying the pool keeps its boxes accepted.
+  assert sprayed == "boxed"
   # A pool in the air stands alone; a name that clashes once lowercased is refused; a turned box is an error a zone file cannot hold.
   assert floating["name"] == "AWT_skyPool" and floating["body"] is None and floating["minimum"] == [120.0, 120.0, 40.0]
   assert "already exists" in clash
