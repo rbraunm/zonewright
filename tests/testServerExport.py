@@ -10,7 +10,7 @@ import numpy
 import pytest
 from PIL import Image
 
-from conftest import StagedServer, junction, pinnedBlender, pinnedRecast, writePNG
+from conftest import StagedServer, junction, pinnedBlender, pinnedRecast, serverRowValues, writePNG
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
 import eqArchive
@@ -44,7 +44,8 @@ def noProgress(done, of, message):
 
 async def serverZone(session, folder, playerValues=True):
   """Flat ground 512 north to south and 192 across with the two daises, a bush marked passable, a boundary wall, a swim box standing
-  alone, a zone line, the zone row's view values (and the safe point and underworld), and one region players play in over it all,
+  alone, a zone line, the zone row's view values, identity, gate, and template (and the safe point and underworld), and one region
+  players play in over it all,
   saved as servertest.blend in folder."""
   await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
   await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [512, 192], "spacing": 16, "location": [0, 0, 0], "collection": "terrain"})
@@ -64,7 +65,7 @@ async def serverZone(session, folder, playerValues=True):
   await session.expectSuccess("placeSwimVolume", {"name": "pond", "liquid": "water"} | pond)
   await session.expectSuccess("placeZoneLine", {"number": 1, "label": "north", "target": target} | northLine)
   await session.expectSuccess("createRegion", {"name": "field", "outline": [[-256, -96], [256, -96], [256, 96], [-256, 96]], "bottom": -20, "top": 40, "intent": "the field", "access": "play"})
-  await session.expectSuccess("setZoneProperties", environment | (safe if playerValues else {}))
+  await session.expectSuccess("setZoneProperties", environment | serverRowValues("servertest") | (safe if playerValues else {}))
   await session.expectSuccess("saveFile", {"path": str(folder / "servertest.blend")})
 
 

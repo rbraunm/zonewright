@@ -81,8 +81,11 @@ def testPlaceEntryStandsOnShippedFooting(stageBlenderServer, tmp_path):
       "noFromZone": await session.expectError("placeEntry", entryArguments("nowhere", [0, 30], "zoneIn")),
       "badFromZone": await session.expectError("placeEntry", entryArguments("spaced", [0, 30], "zoneIn", fromZone="Qeynos 2")),
       "badFromNumber": await session.expectError("placeEntry", entryArguments("zeroed", [0, 30], "zoneIn", fromZone="qeynos2", fromNumber=0)),
+      "farFromNumber": await session.expectError("placeEntry", entryArguments("beyond", [0, 30], "zoneIn", fromZone="qeynos2", fromNumber=65536)),
       "landingFrom": await session.expectError("placeEntry", entryArguments("landed", [0, 30], fromZone="qeynos2")),
     }
+    await session.expectSuccess("setZoneProperties", {"shortName": "entrytest"})
+    refusals["ownRow"] = await session.expectError("placeEntry", entryArguments("fromHere", [0, 30], "zoneIn", fromZone="entrytest", fromNumber=10))
     listed = await session.expectSuccess("getEntries", {})
     return view, placed, dais, underPool, underTerrace, again, refusals, listed
 
@@ -121,7 +124,10 @@ def testPlaceEntryStandsOnShippedFooting(stageBlenderServer, tmp_path):
   assert "An entry's kind is one of ['zoneIn', 'landing'], got 'portal'" in refusals["kind"]
   assert "A zoneIn needs fromZone" in refusals["noFromZone"]
   assert "fromZone is a zone's short name" in refusals["badFromZone"] and "'Qeynos 2'" in refusals["badFromZone"]
-  assert "fromNumber is the neighbour's zone_points number, a whole number of at least 1, got 0" in refusals["badFromNumber"]
+  fromNumberRule = "fromNumber is the neighbour's zone_points number, a whole number from 1 to 65535 (the row's 16-bit number), got"
+  assert f"{fromNumberRule} 0" in refusals["badFromNumber"] and f"{fromNumberRule} 65536" in refusals["farFromNumber"]
+  # The zone's own rows are its zone lines': a zoneIn from the zone itself names no row.
+  assert "fromNumber names a neighbour's zone_points row, and 'entrytest' is this zone, whose own rows are written from its zone lines" in refusals["ownRow"]
   assert "fromZone and fromNumber are a zoneIn's" in refusals["landingFrom"]
 
 
@@ -154,11 +160,12 @@ def testGetEntriesListsDerivedEntriesAndOffFooting(stageBlenderServer, tmp_path)
     await session.expectSuccess("setZoneProperties", environment | {"safePoint": [-200, -200, 0, 45], "underworld": -100})
     await session.expectSuccess("setZoneHousing", decision)
     await session.expectSuccess("placePlot", {"address": "101 Test Street", "center": [0, 0], "facingDegrees": 0, "size": [60, 80]})
-    await session.expectSuccess("placeZoneLine", {"number": 2, "label": "loop", "minimum": [300, -20, -5], "maximum": [320, 20, 40], "target": {"zone": "entryplot", "x": 200, "y": 200, "z": 0, "headingDegrees": 270}})
-    await session.expectSuccess("placeZoneLine", {"number": 3, "label": "kept", "minimum": [-320, -20, -5], "maximum": [-300, 20, 40], "target": {"zone": "entryplot", "x": "keep", "y": 0, "z": 0, "headingDegrees": 0}})
     await session.expectSuccess("placeZoneLine", {"number": 4, "label": "away", "minimum": [-20, 300, -5], "maximum": [20, 320, 40], "target": otherZone})
     unnamed = await session.expectSuccess("getEntries", {})
+    # A zone line can lead back into this zone only once it has its short name: a target the client does not register is refused.
     await session.expectSuccess("setZoneProperties", {"shortName": "entryplot"})
+    await session.expectSuccess("placeZoneLine", {"number": 2, "label": "loop", "minimum": [300, -20, -5], "maximum": [320, 20, 40], "target": {"zone": "entryplot", "x": 200, "y": 200, "z": 0, "headingDegrees": 270}})
+    await session.expectSuccess("placeZoneLine", {"number": 3, "label": "kept", "minimum": [-320, -20, -5], "maximum": [-300, 20, 40], "target": {"zone": "entryplot", "x": "keep", "y": 0, "z": 0, "headingDegrees": 0}})
     await session.expectImage("placeEntry", entryArguments("dock", [100, -100], headingDegrees=0, isolated=True))
     await session.expectSuccess("transformObjects", {"names": ["dock"], "translate": [0, 0, 3]})
     listed = await session.expectSuccess("getEntries", {})
@@ -169,7 +176,7 @@ def testGetEntriesListsDerivedEntriesAndOffFooting(stageBlenderServer, tmp_path)
   unnamed, listed, badNames, longTarget = stageBlenderServer.session(steps)
   # Without the zone's short name no zone line can be told to lead back into it.
   assert [entry["kind"] for entry in unnamed["entries"]] == ["safePoint", "plotEntrance"]
-  assert [line["zoneLine"] for line in unnamed["notFollowed"]] == ["ATP_2_loop", "ATP_3_kept", "ATP_4_away"]
+  assert [line["zoneLine"] for line in unnamed["notFollowed"]] == ["ATP_4_away"]
   assert all("shortName is not set" in line["why"] for line in unnamed["notFollowed"])
   assert listed["entries"] == [
     {

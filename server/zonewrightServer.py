@@ -30,6 +30,7 @@ import conceptComparison
 import emitterAssets
 import eqAxes
 import eqCalibration
+import eqClientZones
 import eqCubeMaps
 import eqEmitterDefinitions
 import eqEmitters
@@ -226,6 +227,32 @@ async def resolveSky(sky):
 async def zoneSky(zone):
   """The open zone's sky state for a preview, or None when it draws none."""
   return await resolveSky(zone["sky"]) if zone.get("sky", skyDrawing.noSky) != skyDrawing.noSky else None
+
+
+async def clientZoneIDs():
+  """The zones the client registers, short name to id (eqClientZones), read from its eqgame.exe in place."""
+  clientRoot = zoneSources.resolveClientRoot()
+  try:
+    zones = await anyio.to_thread.run_sync(eqClientZones.loadClientZones, clientRoot, toolingRoot)
+  except (OSError, ValueError) as error:
+    raise ToolError(f"The zones the client registers cannot be read from {clientRoot / 'eqgame.exe'}: {error}") from error
+  return zones.idsByShortName()
+
+
+async def zoneRowClientFacts(context, zone):
+  """What the zone row's export checks read from the client (bridgeExportChecks.zoneRowGaps): the zones it registers, when the zone
+  has a short name, id, template, or zone line to check against them, and the sky settings the stored sky type and the short name
+  resolve to, as the client picks its sky by the short name (EQEmu sends no override)."""
+  zoneLines = (await callBridge(context, "getZoneLines", {}))["zoneLines"]
+  checked = set(zone) & set(eqClientZones.checkedZoneProperties) or any("clientContent" not in line for line in zoneLines)
+  facts = {"zones": await clientZoneIDs() if checked else None, "skySections": None}
+  if zone.get("sky", skyDrawing.noSky) != skyDrawing.noSky and "shortName" in zone:
+    try:
+      files = eqSky.SkyFiles(zoneSources.resolveClientRoot())
+      facts["skySections"] = {"stored": files.section(zone["sky"]["type"]), "shortName": files.section(zone["shortName"])}
+    except (OSError, ValueError) as error:
+      raise ToolError(str(error)) from error
+  return facts
 
 
 async def previewEmitterAssets():
@@ -779,6 +806,10 @@ async def setZoneProperties(
   underworld: float | None = None,
   shortName: str | None = None,
   zoneId: int | None = None,
+  longName: str | None = None,
+  timeType: str | None = None,
+  entryGate: dict | str | None = None,
+  serverTemplate: str | None = None,
 ):
   """Set the zone's EQ properties stored in the .blend, in the client's lighting terms (docs/clientRendering.md): ambient, special
   ambient, bounce, and sun colors (0-1, raw as the client uses them); the direction toward the sun (azimuth 0 = +Y, clockwise;
@@ -795,22 +826,33 @@ async def setZoneProperties(
   drops any set before; sky "none" states that the zone draws no sky (its zone row's sky 0, as about a third of the client's EQG
   zones have), so previews show the fog color where nothing is drawn and the light and fog color are set by hand. safePoint [x, y, z, headingDegrees] is where players arrive in the zone (the zone
   row's safe point; heading 0 = +Y, clockwise) and underworld the height below it under which the client puts a falling player back;
-  a game export needs both, with ground the zone ships under the safe point above the underworld. shortName is the zone's short name
-  (1 to 31 lowercase letters and digits): a zone line whose target is it leads back into this zone, a teleport whose landing
-  getEntries lists. zoneId is the zone's id as the server sends it (the zone header's ZoneID), by which the client caps the reach of
-  the lights characters carry (renderView carriedLight). The result gives how the client resolves the sky and the light it supplies."""
+  a game export needs both, with ground the zone ships under the safe point above the underworld. The zone's server row (docs/serverFiles.md,
+  Zone row), which a game export needs whole: shortName, the zone's short name (1 to 31 lowercase letters and digits, which names its
+  files and rows; a zone line whose target is it leads back into this zone, a teleport whose landing getEntries lists), and zoneId, its
+  id as the server sends it (1 to 999 but 997; the client caps the reach of the lights characters carry by it, renderView
+  carriedLight): neither may be one the client registers to another zone (the client loads a zone's files by its id), and an id the
+  client does not register is a finding of a game export (the client needs a registration entry before it can load the zone), a short
+  name it does register a reused slot (the export replaces that zone's server maps and rows); longName, the name players see (1 to 127
+  printable ASCII characters); timeType, the zone row's time_type: indoorDungeon, outdoor, outdoorCity, dungeonCity, indoorCity, or
+  outdoorDungeon; entryGate, who may enter: "open", {"minStatus": n} (the account status needed, 0-255), or {"zoneFlag": true}
+  (a character needs the zone flag for this zone's id, granted by a GM or a quest; the server reads no text flag); and
+  serverTemplate, a zone the client registers, not this one, whose version-0 row a new zone row copies every column zonewright does not
+  write from (ruleset, XP multiplier, binding, combat, levitation, outdoor casting, gravity, lava damage, client limits, idle timing).
+  The result gives how the client resolves the sky and the light it supplies."""
   updates = {
     "ambientColor": ambientColor, "specialAmbientColor": specialAmbientColor, "bounceColor": bounceColor, "sunColor": sunColor,
     "sunAzimuthDegrees": sunAzimuthDegrees, "sunElevationDegrees": sunElevationDegrees, "fogColor": fogColor, "fogStart": fogStart,
     "fogEnd": fogEnd, "fogDensity": fogDensity, "fogOn": fogOn, "minClip": minClip, "maxClip": maxClip, "newEngineZone": newEngineZone, "sky": sky,
-    "safePoint": safePoint, "underworld": underworld, "shortName": shortName, "zoneId": zoneId,
+    "safePoint": safePoint, "underworld": underworld, "shortName": shortName, "zoneId": zoneId, "longName": longName, "timeType": timeType,
+    "entryGate": entryGate, "serverTemplate": serverTemplate,
   }
   given = {key: value for key, value in updates.items() if value is not None}
   if not given:
     raise ToolError(f"setZoneProperties needs at least one of {list(updates)}")
   if isinstance(sky, str) and sky != skyDrawing.noSky:
     raise ToolError(f"sky is {{type, weather, hour, minute}} or \"{skyDrawing.noSky}\", got '{sky}'")
-  stored = await callBridge(context, "setZoneProperties", {"updates": given})
+  registered = await clientZoneIDs() if set(given) & set(eqClientZones.checkedZoneProperties) else None
+  stored = await callBridge(context, "setZoneProperties", {"updates": given, "clientZones": registered})
   resolved = await zoneSky(stored["zone"])
   return stored | {"sky": None if resolved is None else {key: resolved[key] for key in ("chain", "dayFraction", "lightFrom", "environment")}}
 
@@ -1321,7 +1363,9 @@ async def buildExport(context, zone, purpose):
     recastHelper.requireHelper(toolingRoot)
   status = await callBridge(context, "getStatus", {})
   zoneProperties = await callBridge(context, "getZoneProperties", {})
-  checked = await callBridge(context, "collectZoneExport", {"outputFolder": str(toolingRoot / "exports" / zone), "zoneName": zone, "purpose": purpose})
+  checked = await callBridge(context, "collectZoneExport", {
+    "outputFolder": str(toolingRoot / "exports" / zone), "zoneName": zone, "purpose": purpose, "client": await zoneRowClientFacts(context, zoneProperties),
+  })
   built = await anyio.to_thread.run_sync(exportPipeline.build, checked, zone, zoneProperties, toolingRoot, progressReporter(context))
   return built, status["filePath"]
 
@@ -1358,7 +1402,8 @@ def clearCheckFolder(zone):
 async def checkExport(context: Context, path: str, purpose: str):
   archivePath, zone = exportTarget(path)
   if purpose != "game":
-    report = await callBridge(context, "checkZoneExport", {"purpose": purpose})
+    client = await zoneRowClientFacts(context, await callBridge(context, "getZoneProperties", {}))
+    report = await callBridge(context, "checkZoneExport", {"purpose": purpose, "exportName": zone, "client": client})
     return {"path": str(archivePath), "zone": zone} | exportReport(report)
   built, blendPath = await buildExport(context, zone, purpose)
   folder = await anyio.to_thread.run_sync(clearCheckFolder, zone)
@@ -2732,14 +2777,29 @@ async def getBoundaries(context: Context):
 async def placeZoneLine(context: Context, number: int, label: str, minimum: list[float], maximum: list[float], target: dict):
   """Place a zone line: an axis-aligned box from corner `minimum` to `maximum` [x, y, z] named ATP_<number>_<label>, the .zon region the
   client zones players through when they enter it (it reads the number right after ATP_; the server's zone_points row for it is
-  number x 10). target is where it leads: {zone, x, y, z, headingDegrees}, zone a short name (this zone's own for a same-zone teleport
-  or a fall catcher), x, y, z in the zone file's axes (as /loc prints them, y, x, z of the server's), headingDegrees 0 = +Y,
+  number x 10, so the number runs from 1 to 6553, the most a 16-bit row number holds). target is where it leads: {zone, x, y, z,
+  headingDegrees}, zone the short name of a zone the client registers, or this zone's own shortName for a same-zone teleport or a fall
+  catcher (set shortName first: a client cannot load a zone it never registered), x, y, z in the zone file's axes (as /loc prints them, y, x, z of the server's), headingDegrees 0 = +Y,
   clockwise; each coordinate and the heading may be "keep" (the player's own). Zone lines sit in gaps of the boundary walls, tint
   views with guides green in every shading, draw green in plans and sections, and export as ATP_ regions; the server's rows are not written yet. A line placed
   with a number already in use replaces that line; adjust a box with transformObjects, remove it with deleteObjects."""
   if not isinstance(target, dict) or not isinstance(target.get("zone"), str) or not eqgFiles.zoneNamePattern.match(target["zone"]):
     raise ToolError(f"target zone is a zone short name, {eqgFiles.zoneNameRule}, got {target.get('zone') if isinstance(target, dict) else target!r}")
+  await requireRegisteredZone(context, target["zone"], "A zone line's target")
   return await callBridge(context, "placeZoneLine", {"number": number, "label": label, "minimum": minimum, "maximum": maximum, "target": target})
+
+
+async def requireRegisteredZone(context, zoneName, role):
+  """Refuse a zone the client does not register, unless it is this zone's own shortName: a client cannot load a zone it never
+  registered."""
+  if zoneName in await clientZoneIDs():
+    return
+  shortName = (await callBridge(context, "getZoneProperties", {})).get("shortName")
+  if zoneName != shortName:
+    raise ToolError(
+      f"{role} '{zoneName}' is not a zone the client registers, and a client cannot load a zone it never registered; for this zone"
+      f" itself, set its shortName first (setZoneProperties; now {'unset' if shortName is None else repr(shortName)})"
+    )
 
 
 @guardedTool()
@@ -2755,8 +2815,9 @@ async def placeEntry(
   isolated: bool = False,
 ):
   """Place an entry, where players arrive, as an arrow at its footing facing headingDegrees (0 = +Y, clockwise): kind "zoneIn", where a
-  neighbour's zone line lands players (fromZone, the neighbour's short name; fromNumber, that line's zone_points number, when known),
-  or "landing", where a port inside the world lands them (a teleport door, an NPC port). isolated marks an area reached only by its own
+  neighbour's zone line lands players (fromZone, the neighbour's short name, a zone the client registers or this zone's own shortName;
+  fromNumber, that line's zone_points number, 1 to 65535, when known, and never for this zone's own shortName, whose rows its zone
+  lines write), or "landing", where a port inside the world lands them (a teleport door, an NPC port). isolated marks an area reached only by its own
   port. at [x, y] takes the highest footing there, [x, y, z] the footing from 3 above z down to 50 below it, as standAt finds it, on
   what the zone ships and the client collides with: reference zones, placed client objects, guides, and what players pass through are
   no ground. Refused, changing nothing: no footing, footing steeper than players walk or with less headroom than a player's height
@@ -2767,6 +2828,8 @@ async def placeEntry(
   stands on its footing, which a game export refuses. Entries are never exported as geometry. Returns the entry and its arrival view:
   standing on its footing (a standOn view, so reference content there does not lift the eye) facing its heading, in client shading,
   with the scale figure ahead."""
+  if kind == "zoneIn" and isinstance(fromZone, str) and eqgFiles.zoneNamePattern.match(fromZone):
+    await requireRegisteredZone(context, fromZone, "An entry's fromZone")
   placed = await callBridge(context, "placeEntry", {
     "name": name, "at": at, "headingDegrees": headingDegrees, "kind": kind, "fromZone": fromZone, "fromNumber": fromNumber, "isolated": isolated,
   })

@@ -33,7 +33,7 @@ zoneSurveySkill = Path(".claude") / "skills" / "zone-survey"
 readerFiles = {f"server/{name}.py" for name in (
   "eqAnimations", "eqArchive", "eqCubeMaps", "eqEmitterDefinitions", "eqEmitters", "eqLinks", "eqLooks", "eqModels", "eqRaces", "eqSkeletons",
   "eqTerrainTextures", "eqTextures", "eqWorldFile", "eqZones", "eqgFiles", "eqgSkeletons", "eqgTerrain", "loadTimeLight", "viewerLight", "zoneGeometry", "zoneSources",
-  "bridgeModels", "emitterAssets", "emitterParticles", "bridgeEmitterDrawing",
+  "bridgeModels", "emitterAssets", "emitterParticles", "bridgeEmitterDrawing", "eqClientZones", "serverRows",
 )}
 # The slow tiers, in groups by the code their tests check. A run of the whole suite takes a group only when that code changed since the
 # branch left the last pushed claude, or is uncommitted; -m clientData or -m install runs a whole tier, and naming a test file runs it.
@@ -339,6 +339,11 @@ def freshBlenderServer(tmp_path, installedLocalAppData):
   server = StagedServer(tmp_path, {"blender": pinnedBlender, "extensions": {}}, installedLocalAppData)
   yield server
   server.close()
+
+
+def serverRowValues(shortName, zoneID=901):
+  """The zone row's identity, gate, and template, which a game export needs: an id the client does not register unless one is given."""
+  return {"shortName": shortName, "zoneId": zoneID, "longName": f"The {shortName} test", "timeType": "outdoor", "entryGate": "open", "serverTemplate": "qeynos2"}
 
 
 def writePNG(path, width, height, rgba):

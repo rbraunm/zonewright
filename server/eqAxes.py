@@ -12,6 +12,9 @@ Each frame converter takes a point or any array of points (xyz on the last axis)
 import numpy
 
 eqHeadingUnits = 512
+# A zone point's target coordinate and heading the server keeps from the player's own, as zone_points writes them.
+keptCoordinate = 999999
+keptHeading = 999
 
 
 def serverFromZone(points):

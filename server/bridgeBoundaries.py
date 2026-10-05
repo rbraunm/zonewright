@@ -17,6 +17,7 @@ import bridgeMeshAccess
 import bridgeObjects
 import bridgeStructureData
 import bridgeSwim
+import serverRows
 
 boundaryCollectionName = "boundaries"
 zoneLineCollectionName = "zoneLines"
@@ -278,8 +279,11 @@ def guideCorners():
 def placeZoneLine(number, label, minimum, maximum, target):
   """A zone line: an axis-aligned box named ATP_<number>_<label>, the .zon region the client zones players through, with where it
   leads. A line placed with a number already in use replaces that line."""
-  if isinstance(number, bool) or not isinstance(number, int) or number < 1:
-    raise ValueError(f"number is a whole number from 1 (the client reads 0 as none), got {number!r}")
+  if isinstance(number, bool) or not isinstance(number, int) or not 1 <= number <= serverRows.zoneLineNumberLimit:
+    raise ValueError(
+      f"number is a whole number from 1 (the client reads 0 as none) to {serverRows.zoneLineNumberLimit} (its zone_points row is numbered"
+      f" number x 10, which must fit the row's 16-bit number), got {number!r}"
+    )
   if not isinstance(label, str) or not labelPattern.match(label):
     raise ValueError(f"label is letters, digits, and underscores, got {label!r}")
   requireCorners(minimum, maximum)
@@ -323,8 +327,8 @@ def describeZoneLine(box):
 
 def zoneLineErrors():
   """What no zone file can hold among the zone's own zone lines, each with its object and where it stands: a name the client cannot
-  read a number from, a turned box (export writes rotation 0), a box without size, and region names that clash once lowercased, swim
-  volumes included."""
+  read a number from, a number whose zone_points row (number x 10) a 16-bit number cannot hold, a turned box (export writes rotation 0),
+  a box without size, and region names that clash once lowercased, swim volumes included."""
   errors = []
 
   def add(box, message):
@@ -335,6 +339,8 @@ def zoneLineErrors():
     match = zoneLinePattern.match(line.name)
     if match is None or int(match.group(1)) < 1:
       add(line, f"'{line.name}' is not named ATP_<number>_<label> with a number from 1; placeZoneLine names it")
+    elif int(match.group(1)) > serverRows.zoneLineNumberLimit:
+      add(line, f"'{line.name}' is numbered over {serverRows.zoneLineNumberLimit}: its zone_points row, numbered x 10, cannot hold it")
     if any(abs(angle) > turnTolerance for angle in line.matrix_world.to_euler()):
       add(line, f"'{line.name}' is turned; zone lines stay square to the axes")
     if min(line.matrix_world.to_scale()) <= 0:

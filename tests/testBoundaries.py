@@ -8,7 +8,7 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
 import eqArchive
 import eqgFiles
-from conftest import writePNG
+from conftest import serverRowValues, writePNG
 from testModelsAndDressing import freshScene
 from testWater import basin, liquidMaterials
 
@@ -129,7 +129,9 @@ def testExportWritesWallsFlagsAndZoneLinesAndTheArchiveBringsThemBack(stageBlend
 
   checked, exported, builtBoundaries, imported, lines, blocked, through, wading, swimming, reference = stageBlenderServer.session(steps)
   assert checked["failures"] == [] and checked["boundaries"] == ["eastNorth", "eastSouth", "westLid"] and checked["zoneLines"] == ["ATP_1_east"]
-  assert [(finding["finding"], finding["missing"]) for finding in checked["findings"] if "missing" in finding] == [("view values missing", ["minClip", "sky"]), ("safe point or underworld missing", ["safePoint", "underworld"])]
+  assert [(finding["finding"], finding["missing"]) for finding in checked["findings"] if "missing" in finding] == [
+    ("view values missing", ["minClip", "sky"]), ("safe point or underworld missing", ["safePoint", "underworld"]), ("zone row values missing", ["shortName", "zoneId", "longName", "timeType", "entryGate", "serverTemplate"]),
+  ]
   assert sum(entry["triangles"] for entry in builtBoundaries["boundaries"]) == 2 * 33 + 2 * 33 + 2
   assert exported["boundaryTriangles"] == 2 * (2 * 33 + 2 * 33) + 2
   archive = eqArchive.EQArchive(archivePath)
@@ -197,7 +199,7 @@ def testGameExportNeedsTheZoneRowAndZoneLineTargets(stageBlenderServer, tmp_path
     copied = await session.expectSuccess("checkExport", check | {"purpose": "test"})
     await session.expectSuccess("deleteObjects", {"names": ["ATP_2_eastGate.001"]})
     await session.expectSuccess("organize", {"renames": {"ATP_2_north": "ATP_3_north"}})
-    await session.expectSuccess("setZoneProperties", {"minClip": 100, "sky": {"type": "gameplot", "hour": 12, "minute": 0}, "safePoint": [0, 150, 2, 90]})
+    await session.expectSuccess("setZoneProperties", {"minClip": 100, "sky": {"type": "gameplot", "hour": 12, "minute": 0}, "safePoint": [0, 150, 2, 90]} | serverRowValues("gameplot"))
     await session.expectSuccess("saveFile", {})
     ready = await session.expectSuccess("checkExport", check)
     stating = await session.expectSuccess("setZoneProperties", {"sky": "none"})
@@ -211,9 +213,9 @@ def testGameExportNeedsTheZoneRowAndZoneLineTargets(stageBlenderServer, tmp_path
   assert "zone short name" in refusals[5] and "target is {zone, x, y, z, headingDegrees}" in refusals[6]
   assert first["name"] == "ATP_2_gate" and first["target"] == target and first["minimum"] == [180.0, -20.0, -5.0]
   assert replacing["replaced"] == ["ATP_2_gate"] and replacing["name"] == "ATP_2_eastGate" and replacing["target"]["x"] == "keep"
-  assert [failure["failure"] for failure in gaps["failures"]] == ["view values missing", "safe point over no ground", "zone line number used twice", "containment not checked"]
-  assert gaps["failures"][1]["at"] == [500, 500, 10] and gaps["failures"][2] == {"failure": "zone line number used twice", "number": 2, "zoneLines": ["ATP_2_eastGate", "ATP_2_north"]}
-  assert tested["failures"] == [] and [finding["finding"] for finding in tested["findings"] if "object" not in finding] == ["view values missing", "safe point over no ground", "zone line number used twice"]
+  assert [failure["failure"] for failure in gaps["failures"]] == ["view values missing", "safe point over no ground", "zone row values missing", "zone line number used twice", "containment not checked"]
+  assert gaps["failures"][1]["at"] == [500, 500, 10] and gaps["failures"][3] == {"failure": "zone line number used twice", "number": 2, "zoneLines": ["ATP_2_eastGate", "ATP_2_north"]}
+  assert tested["failures"] == [] and [finding["finding"] for finding in tested["findings"] if "object" not in finding] == ["view values missing", "safe point over no ground", "zone row values missing", "zone line number used twice"]
   assert [failure["message"] for failure in copied["failures"]] == ["'ATP_2_eastGate.001' is not named ATP_<number>_<label> with a number from 1; placeZoneLine names it"]
   assert [failure["failure"] for failure in ready["failures"]] == ["containment not checked"] and ready["zoneLines"] == ["ATP_2_eastGate", "ATP_3_north"]
   assert 'sky "none" states that the zone draws none' in gaps["failures"][0]["message"] and "sky" in gaps["failures"][0]["missing"]
