@@ -1,9 +1,9 @@
 """Defined passes: shaping passes rebuilt whole from a definition kept with them. A graded route (gradeRoute) keeps its definition with
-its pass, "route <name>"; the plots graded on a mesh keep theirs on the plots and are graded together (bridgeHousing), as one feature
-placed at the first of their passes. Each is graded on the ground under it as it stands without its own pass and without any defined
-pass made after it, so where two meet the later one wins: grading one again replays every later one whose ground that changed, and
-regradeTerrain replays them all in the order they were made, then cuts again every cave whose ground moved. Runs under Blender's
-Python."""
+its pass, "route <name>", and a facade dressed at a cave's mouth (dressFacade, bridgeFacades) with its pass, "facade <cave> <end>"; the
+plots graded on a mesh keep theirs on the plots and are graded together (bridgeHousing), as one feature placed at the first of their
+passes. Each is graded on the ground under it as it stands without its own pass and without any defined pass made after it, so where two
+meet the later one wins: grading one again replays every later one whose ground that changed, and regradeTerrain replays them all in the
+order they were made, then cuts again every cave whose ground moved. Runs under Blender's Python."""
 import math
 
 import bpy
@@ -14,6 +14,7 @@ import numpy
 import bridgeCaveData
 import bridgeCaves
 import bridgeExport
+import bridgeFacades
 import bridgeHousing
 import bridgeMeshAccess
 import bridgePasses
@@ -499,26 +500,24 @@ def worldOffsets(sceneObject, key, reference):
   return (bridgePasses.keyCoordinates(key) - reference) * key.value @ bridgeMeshAccess.matrixArray(sceneObject.matrix_world)[:3, :3].T
 
 
-def routeDefinitions(sceneObject):
-  """The routes graded on a mesh, by pass name."""
-  return {name: definition for name, definition in bridgePasses.passDefinitions(sceneObject).items() if definition["kind"] == routeKind}
-
-
 def plotsFeature(sceneObject, overrides, subjects, kept):
   plots = sorted(set(bridgeHousing.gradedOn(sceneObject)) | set(overrides))
   return {"kind": "plots", "passes": [bridgeHousing.gradePassName(address) for address in plots if address != kept], "overrides": overrides, "subjects": subjects, "kept": kept}
 
 
 def definedFeatures(sceneObject):
-  """The defined features on a mesh in the order they were made: each route, and the plots graded on it as one, at its first plot's
-  pass (at the end when none has a pass yet)."""
+  """The defined features on a mesh in the order they were made: each route and facade, and the plots graded on it as one, at its first
+  plot's pass (at the end when none has a pass yet)."""
   keys = sceneObject.data.shape_keys
-  routes = routeDefinitions(sceneObject)
+  definitions = bridgePasses.passDefinitions(sceneObject)
   plotPasses = {bridgeHousing.gradePassName(address) for address in bridgeHousing.gradedOn(sceneObject)}
   features, plotsPlaced = [], False
   for key in [] if keys is None else keys.key_blocks:
-    if key.name in routes:
-      features.append({"kind": routeKind, "name": key.name[len(routePassPrefix):], "passes": [key.name], "definition": routes[key.name]})
+    definition = definitions.get(key.name)
+    if definition is not None and definition["kind"] == routeKind:
+      features.append({"kind": routeKind, "name": key.name[len(routePassPrefix):], "passes": [key.name], "definition": definition})
+    elif definition is not None and definition["kind"] == bridgeFacades.facadeKind:
+      features.append({"kind": bridgeFacades.facadeKind, "name": bridgeFacades.featureName(definition), "passes": [key.name], "definition": definition})
     elif key.name in plotPasses and not plotsPlaced:
       features.append(plotsFeature(sceneObject, {}, set(), None))
       plotsPlaced = True
@@ -533,6 +532,8 @@ def featureExtent(sceneObject, feature):
     points = numpy.array([point[:2] for point in feature["definition"]["points"]])
     half = max(feature["definition"]["widths"]) / 2
     return numpy.vstack([points - half, points + half])
+  if feature["kind"] == bridgeFacades.facadeKind:
+    return bridgeFacades.facadeExtent(feature["definition"])
   pads = [bridgeHousing.plotPad(plot) for plot in bridgeHousing.gradedOn(sceneObject).values()] + [pad for pad in feature["overrides"].values() if pad is not None]
   return numpy.vstack([pad["outline"] for pad in pads]) if pads else numpy.zeros((0, 2))
 
@@ -551,6 +552,8 @@ def overlapsChange(sceneObject, feature, held, state, changed, margin):
 def gradeFeature(sceneObject, feature, ground, faces, edgeLength):
   if feature["kind"] == routeKind:
     return planRoute(sceneObject, feature["name"], feature["definition"], ground, faces, edgeLength)
+  if feature["kind"] == bridgeFacades.facadeKind:
+    return bridgeFacades.planFacade(sceneObject, feature["definition"], ground)
   plotPlan = bridgeHousing.planGrading(sceneObject, feature["overrides"], feature["subjects"], feature["kept"], ground)
   offsets = numpy.zeros_like(ground)
   offsets[:, 2] = plotPlan["graded"] - ground[:, 2]
@@ -595,7 +598,7 @@ def passState(sceneObject, names):
   return [{"pass": key.name, "muted": key.mute, "strength": round(key.value, 4)} for key in found if key is not None and (key.mute or key.value != 1.0)]
 
 
-def writeRoutePass(sceneObject, feature, offsets):
+def writeDefinedPass(sceneObject, feature, offsets):
   passName = feature["passes"][0]
   keys = sceneObject.data.shape_keys
   if keys is None or keys.key_blocks.get(passName) is None:
@@ -621,25 +624,32 @@ def applyReplay(plan):
     feature = entry["feature"]
     restored = passState(sceneObject, feature["passes"])
     moved = numpy.abs(graded["offsets"] - entry["held"]).max(axis=1)
-    if feature["kind"] == routeKind:
-      writeRoutePass(sceneObject, feature, graded["offsets"])
-      name = {"route": feature["name"]}
+    if feature["kind"] in (routeKind, bridgeFacades.facadeKind):
+      writeDefinedPass(sceneObject, feature, graded["offsets"])
+      name = {feature["kind"]: feature["name"]}
     else:
       plotOutcome = bridgeHousing.applyGrading(graded["plotPlan"])
       name = {"plots": plotOutcome["gradedPlots"]}
     summaries.append(name | {"movedVertices": int((moved > bridgeHousing.heldTolerance).sum()), "largestChange": round(float(moved.max(initial=0.0)), 2)} | ({"restoredFrom": restored} if restored else {}))
   keys = sceneObject.data.shape_keys
   if keys is not None:
-    defined = set(routeDefinitions(sceneObject)) | {bridgeHousing.gradePassName(address) for address in bridgeHousing.gradedOn(sceneObject)}
+    defined = set(bridgePasses.passDefinitions(sceneObject)) | {bridgeHousing.gradePassName(address) for address in bridgeHousing.gradedOn(sceneObject)}
     keep = active is not None and active not in defined and keys.key_blocks.get(active) is not None
     sceneObject.active_shape_key_index = list(keys.key_blocks).index(keys.key_blocks[active]) if keep else 0
   sceneObject.data.update()
   after, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
   shaped = numpy.abs(after - plan["shown"]).max(axis=1) > bridgeHousing.heldTolerance
+  # A facade's face stands vertical by design, so its cells, with no area in plan, are no fold.
+  standing = numpy.zeros(len(after), dtype=bool)
+  for entry in plan["entries"]:
+    if entry["graded"] is not None and "standing" in entry["graded"]:
+      standing |= entry["graded"]["standing"]
   folded = 0
   if shaped.any():
     bridgeShaping.triangulateAlongContours(sceneObject, after, shaped)
-    folded = int(bridgeShaping.overturnedFaces(sceneObject, after, shaped).sum())
+    loopTotals, loopVertices = bridgeMeshAccess.faceLoops(sceneObject)
+    onFace = numpy.logical_and.reduceat(standing[loopVertices], numpy.cumsum(loopTotals) - loopTotals)
+    folded = int((bridgeShaping.overturnedFaces(sceneObject, after, shaped) & ~onFace).sum())
   return {"summaries": summaries, "plots": plotOutcome, "foldedFaces": folded} | staleCaveReport(sceneObject)
 
 
@@ -695,7 +705,7 @@ def regradeTerrain(objectName):
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   features = definedFeatures(sceneObject)
   if not features and not bridgeCaveData.holdsCaves(sceneObject):
-    raise ValueError(f"'{objectName}' has no defined passes and no caves: no route graded on it (gradeRoute), no plot (gradePlot), and no cave (cutCave)")
+    raise ValueError(f"'{objectName}' has no defined passes and no caves: no route graded on it (gradeRoute), no plot (gradePlot), no facade (dressFacade), and no cave (cutCave)")
   applied = applyReplay(planReplay(sceneObject, features, 0, True)) if features else {"summaries": [], "foldedFaces": 0}
   return {"object": objectName, "replayed": applied["summaries"], "foldedFaces": applied["foldedFaces"], "refittedCaves": bridgeCaves.refitStaleCaves(sceneObject)}
 
@@ -713,12 +723,54 @@ def describeDefinedPasses(sceneObject):
   for entry in plan["entries"]:
     feature = entry["feature"]
     moved = numpy.abs(entry["graded"]["offsets"] - entry["held"]).max(axis=1)
-    named = {"route": feature["name"]} if feature["kind"] == routeKind else {"plots": sorted(bridgeHousing.gradedOn(sceneObject))}
+    named = {feature["kind"]: feature["name"]} if feature["kind"] in (routeKind, bridgeFacades.facadeKind) else {"plots": sorted(bridgeHousing.gradedOn(sceneObject))}
     described.append(named | {"passes": feature["passes"], "stale": bool((moved > bridgeHousing.heldTolerance).any()), "largestChange": round(float(moved.max(initial=0.0)), 3)})
   return described
+
+
+def dressFacade(objectName, cave, end, faceAt, width, height, apron, blend):
+  sceneObject = bridgeCaves.requireTerrain(objectName)
+  bridgeCaves.requireIntact(sceneObject)
+  definition = bridgeFacades.facadeDefinition(sceneObject, cave, end, faceAt, width, height, apron, blend)
+  passName = bridgeFacades.passName(cave, end)
+  facade = {"kind": bridgeFacades.facadeKind, "name": bridgeFacades.featureName(definition), "passes": [passName], "definition": definition}
+  features = definedFeatures(sceneObject)
+  index = next((position for position, feature in enumerate(features) if feature["passes"] == [passName]), None)
+  if index is None:
+    keys = sceneObject.data.shape_keys
+    if keys is not None and keys.key_blocks.get(passName) is not None:
+      raise ValueError(f"'{objectName}' already has a shaping pass '{passName}' that is not a facade; rename or remove it first")
+    index = len(features)
+    features.append(facade)
+  else:
+    features[index] = facade
+  plan = planReplay(sceneObject, features, index, False)
+  report = plan["entries"][0]["graded"]["report"]
+  with bridgeCaves.restoredOnFailure(sceneObject):
+    applied = applyReplay(plan)
+    refit = bridgeCaves.recut(sceneObject, cave, {}) if cave in bridgeCaves.staleCaves(sceneObject) else None
+  return {"object": objectName, "cave": cave, "end": end, "pass": passName} | report | {
+    "foldedFaces": applied["foldedFaces"], "replayed": applied["summaries"][1:], "refit": refit, "staleCaves": bridgeCaves.staleCaves(sceneObject),
+  }
+
+
+def removeShapingPass(objectName, name):
+  """Remove a shaping pass (bridgePasses); a facade's pass takes its dressing back and cuts its cave again to fit the ground as it was."""
+  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  definition = bridgePasses.passDefinitions(sceneObject).get(name)
+  if definition is None or definition["kind"] != bridgeFacades.facadeKind:
+    return bridgePasses.removeShapingPass(objectName, name)
+  bridgeCaves.requireIntact(sceneObject)
+  with bridgeCaves.restoredOnFailure(sceneObject):
+    removed = bridgePasses.removeShapingPass(objectName, name)
+    cave = definition["cave"]
+    refit = bridgeCaves.recut(sceneObject, cave, {}) if cave in bridgeCaves.staleCaves(sceneObject) else None
+  return removed | {"refit": refit, "staleCaves": bridgeCaves.staleCaves(sceneObject)}
 
 
 commands = {
   "gradeRoute": (gradeRoute, True),
   "regradeTerrain": (regradeTerrain, True),
+  "dressFacade": (dressFacade, True),
+  "removeShapingPass": (removeShapingPass, True),
 }

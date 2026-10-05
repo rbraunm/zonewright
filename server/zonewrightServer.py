@@ -1401,7 +1401,7 @@ async def getObjectDetail(context: Context, name: str):
   """One object in depth: transform (rotation as XYZ Euler degrees whatever its rotation mode), size, world bounds (for a collection
   instance, its instanced meshes'; null when it instances none), parent, collections, modifiers; for meshes the mesh's name, the
   vertex, face, and triangle counts, faces per material, UV layers, world units per texture repeat, vertex groups, shaping passes,
-  surfacing layers, its defined passes (graded routes, the plots graded on it, in the order made) and its caves (cutCave), each with
+  surfacing layers, its defined passes (graded routes, dressed facades, the plots graded on it, in the order made) and its caves (cutCave), each with
   whether its ground moved since it was made (stale: grading it again would move it, or the ground within the cave's reach moved, and
   how far), which regradeTerrain or editCave puts right."""
   return await callBridge(context, "getObjectDetail", {"name": name})
@@ -1497,7 +1497,8 @@ async def setShapingPass(context: Context, objectName: str, name: str, strength:
 
 @guardedTool()
 async def removeShapingPass(context: Context, objectName: str, name: str):
-  """Remove a shaping pass and what it holds; the other passes keep theirs. A graded route's pass takes its definition with it."""
+  """Remove a shaping pass and what it holds; the other passes keep theirs. A graded route's pass takes its definition with it; a
+  facade's pass (dressFacade) takes the dressing back and cuts its cave again to fit the ground as it was (refit)."""
   return await callBridge(context, "removeShapingPass", {"objectName": objectName, "name": name})
 
 
@@ -1543,8 +1544,8 @@ async def gradeRoute(
 @guardedTool()
 async def regradeTerrain(context: Context, objectName: str):
   """Put every defined pass on a mesh back on target after other shaping changed the ground under them (a roughen, a sculpt, a pass
-  turned up, down, or off): each graded route (gradeRoute) and the plots graded on it (gradePlot, all together) are taken back and
-  graded again in the order they were first made, each on the ground as it then stands, so where two meet the later one still wins. A
+  turned up, down, or off): each graded route (gradeRoute), dressed facade (dressFacade), and the plots graded on it (gradePlot, all
+  together) are taken back and graded again in the order they were first made, each on the ground as it then stands, so where two meet the later one still wins. A
   muted or turned defined pass comes back unmuted at full strength (restoredFrom says which). Then every cave (cutCave) whose ground
   moved since it was cut is cut again to fit it (refittedCaves, with how far its ground had moved). Reports what each one moved, in
   order."""
@@ -1555,11 +1556,17 @@ async def regradeTerrain(context: Context, objectName: str):
 async def cutCave(
   context: Context, objectName: str, name: str, path: list[list[float]], widths: list[float], heights: list[float], wallMaterial: str,
   floorMaterial: str, worldUnitsPerRepeat: float, edgeLength: float = 16.0, wallShare: float = 0.35, breakup: dict | None = None,
-  mouthFade: float | None = None, maximumFloorDegrees: float = 30.0,
+  mouthFade: float | None = None, maximumFloorDegrees: float = 30.0, trimBands: list[dict] | None = None,
 ):
   """Cut a cave into a terrain mesh (objectName) as the client's own caves are built, one terrain holding the hill and the room under
   it: a closed tube swept along the floor `path` [[x, y, z], ...] with one width and height per point, its floor flat across, its walls
-  straight up to `wallShare` of the height and a vault above. Widths and heights ease from point to point and the floor grades evenly
+  straight up to `wallShare` of the height and a vault above. `wallShare` 1 cuts a hall, as Crescent's guild halls and market are carved
+  into its cliffs: walls straight up the full height under a flat ceiling, its corners square, its ends never rounded: a blind end closes
+  as a flat wall, and an open end stands wholly in the open in front of the cliff (dressFacade dresses the cliff into a carved face
+  there). `trimBands` [{fromFloor, height, material, worldUnitsPerRepeat}] run along the walls at those heights over the floor in every
+  row (a dado, a frieze: Crescent's cr_tile_trim_marble_dark), the walls cut exactly along their edges, in their own createMaterial
+  material mapped along the band, a strip texture running once up it (v from the band's bottom at its repeat); set again on every cut,
+  before the strokes kept with the lining. Breakup stays the artist's choice (none for a dressed hall). Widths and heights ease from point to point and the floor grades evenly
   between their heights; a room is a wide stretch of the path. A bend turns on an arc the width in radius (less where the points are
   close). `breakup` {featureSize, amplitude, seed} moves the walls and vault along their outward directions by noise, the floor kept
   flat, fading out within `mouthFade` (default twice edgeLength) of wherever the tube lies in the open, so the lip stays a clean arch.
@@ -1577,10 +1584,13 @@ async def cutCave(
   layer uncovered on them, box-mapped at `worldUnitsPerRepeat` and smooth shaded; ground faces the cut split keep their materials,
   paint, and mapping.
   Refused, changing nothing: a stretch of floor steeper than `maximumFloorDegrees` (naming it and the run it needs), a bend tighter than
-  half the width, an end part in the rock with its floor buried more than a step under the ground, a floor hanging in the air, both
-  ends wholly inside the rock, the tube reaching the terrain's border or another cave's reach, a mesh with modifiers or shared with another object, and caves that fail their integrity checks.
+  half the width, an end part in the rock with its floor buried more than a step under the ground (for a hall, any end part in the rock
+  and part in the open, or a ledge), a floor hanging in the air, both
+  ends wholly inside the rock, the tube reaching the terrain's border or another cave's reach, a mesh with modifiers or shared with another object, and caves that fail their integrity checks;
+  `wallShare` outside (0, 1]; a band reaching above the walls' straight part (wallShare of the height) at any path point (naming it),
+  bands overlapping, a band below the floor or not tall, a band material createMaterial did not make, a repeat not positive.
   Returns the faces and vertices it made, the shortest edges of the lining, the pieces of ground at the mouth, and the seam, each end's
-  kind, and the floor's level stretches (start, end, length, height, narrowest width: a stretch about 220 wide and long holds a stock
+  kind, each trim band's faces, and the floor's level stretches (start, end, length, height, narrowest width: a stretch about 220 wide and long holds a stock
   player plot). The cave is kept with its definition: the ground within its reach is fingerprinted, getObjectDetail and exports flag it
   stale once that ground moves, and editCave or regradeTerrain cuts it again to fit. Around a cave, shaping leaves its lining where it
   is (results count caveLiningLeft) and keeps its ring on the ground; strokes never slide its vertices sideways; contour cuts, turned
@@ -1591,16 +1601,16 @@ async def cutCave(
   return await callBridge(context, "cutCave", {
     "objectName": objectName, "name": name, "path": path, "widths": widths, "heights": heights, "wallMaterial": wallMaterial,
     "floorMaterial": floorMaterial, "worldUnitsPerRepeat": worldUnitsPerRepeat, "edgeLength": edgeLength, "wallShare": wallShare,
-    "breakup": breakup, "mouthFade": mouthFade, "maximumFloorDegrees": maximumFloorDegrees,
+    "breakup": breakup, "mouthFade": mouthFade, "maximumFloorDegrees": maximumFloorDegrees, "trimBands": trimBands,
   })
 
 
 @guardedTool()
 async def editCave(context: Context, objectName: str, name: str, changes: dict | None = None):
   """Change a cave cut into a terrain (cutCave) and cut it again in one step: `changes` holds any of its definition's path, widths,
-  heights, wallMaterial, floorMaterial, worldUnitsPerRepeat, edgeLength, wallShare, breakup, mouthFade, maximumFloorDegrees; the cave is
-  taken back and cut again from its definition with them merged in, against the ground as it now stands, and the strokes kept with its
-  lining are painted again. With no changes it refits the cave to the ground (after a sculpt at its mouth or a pass turned up). If the
+  heights, wallMaterial, floorMaterial, worldUnitsPerRepeat, edgeLength, wallShare (1 for a hall), breakup, mouthFade,
+  maximumFloorDegrees, trimBands; the cave is taken back and cut again from its definition with them merged in, against the ground as it
+  now stands, its trim bands set again and the strokes kept with its lining painted again. With no changes it refits the cave to the ground (after a sculpt at its mouth or a pass turned up). If the
   new cut is refused, the cave stays exactly as it was. Returns what taking it back restored and what the new cut made."""
   return await callBridge(context, "editCave", {"objectName": objectName, "name": name, "changes": changes})
 
@@ -1611,6 +1621,37 @@ async def removeCave(context: Context, objectName: str, name: str):
   return on their vertices with every shaping pass made since, each carrying the surfacing and mapping its largest piece of ground held
   (painted or mapped since the cut). Returns the cave's definition, to cut it again with cutCave, and the strokes kept with its lining."""
   return await callBridge(context, "removeCave", {"objectName": objectName, "name": name})
+
+
+@guardedTool()
+async def dressFacade(
+  context: Context, objectName: str, cave: str, end: str, faceAt: float, width: float, height: float, apron: float, blend: float = 16.0,
+):
+  """Dress the cliff at a cave's mouth into a carved face, so a hall (cutCave with wallShare 1) reads as cut into the rock rather than as
+  a cave mouth, as Crescent's halls open on dressed faces. The face stands on a vertical plane square to the cave's path, crossing it
+  `faceAt` along the path in from its `end` ("start" or "end"), `width` wide centered on the path, from the floor's height there (F) up
+  to F + `height`. On the terrain objectName: each ground edge crossing the face's line within its width has its front vertex slid along
+  the path's direction onto the line at F and its back vertex onto the line at F + height, the vertices nearest the face's two sides slid
+  along the line onto them, so the face is a flat vertical rectangle with straight edges standing in a recess in the cliff (the cliff
+  beside and above it is not moved); the ground in front of it within `apron` and the width is set level at F, cut or filled, and the
+  ground in front of its line past the apron's edges eases back to the ground as it was over `blend` (smoothstep). The ground read is the
+  ground as it stands with the caves taken back (each cave's recorded faces in place of its cut), so it dresses the same with the cave
+  cut or not; a cave's lining never moves and the vertices where it meets the ground follow that ground. It is a defined pass, "facade
+  <cave> <end>", keeping the face itself (center, facingDegrees, width, height, apron, blend), so regradeTerrain replays it in order with
+  the routes and plots and then refits stale caves; dressing again under that cave and end replaces it; removeShapingPass takes it back
+  and refits the cave. The cave is refit in the same call (refit, as editCave reports it), so it opens on the face; staleCaves names
+  others whose ground moved. Then paint the face and apron (paintSurface with a box around them), place a portal piece at the returned
+  `frame` (its front facing out), and look from the apron at eye height, from across the valley, from inside looking out, and in a
+  section along the path.
+  Refused, changing nothing: no such cave or end; an end that is not open (blind or a ledge); faceAt not positive or past the end's first
+  bend; a width less than the cave's width there plus 2 or a height less than its height there plus 1; the ground just behind the line
+  lower than F + height anywhere across the width (nothing to dress: move faceAt into the cliff, naming where); the apron or blend
+  reaching another cave's ground or the terrain's border; a mesh with modifiers. Returns the face's four corners (foot left, foot right,
+  top right, top left, looking at it), `frame` {center (the foot's middle), facingDegrees (outward), width, height}, the face's vertices
+  and all vertices moved, the apron's cut and fill, and the cave's refit."""
+  return await callBridge(context, "dressFacade", {
+    "objectName": objectName, "cave": cave, "end": end, "faceAt": faceAt, "width": width, "height": height, "apron": apron, "blend": blend,
+  })
 
 
 @guardedTool()
