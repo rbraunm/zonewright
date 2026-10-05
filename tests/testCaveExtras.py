@@ -11,6 +11,8 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
 import eqArchive
 import eqgFiles
+from buildTolerances import wallFootClearance
+from playerScale import stepHeight
 from conftest import writePNG
 from testCaves import caveCanyon, checkCave, borderEdges
 
@@ -288,7 +290,7 @@ def testFloorStrokeRefusals(stageBlenderServer, tmp_path):
   outside, fine, banded, twice, offRun, malformed, detail = stageBlenderServer.session(steps)
   assert "Floor stroke 'way' reaches 10.0 past its run's left wall at 40.0 along it, where the floor is 40.0 wide" in outside
   assert "featureSize 20 is under twice the cave's edgeLength (16)" in fine and "edgeLength of 10 or less" in fine
-  assert "The cave's floor strokes raise its right wall's foot" in banded and "within a step of the lowest trim band (4.0 over the floor)" in banded
+  assert "The cave's floor strokes raise its right wall's foot" in banded and f"within {wallFootClearance:g} of the lowest trim band (4.0 over the floor)" in banded
   assert "Two floor strokes are named 'way'" in twice
   assert "Floor stroke 'rubble' (rough) lies wholly off its run 'main'" in offRun
   assert "Floor stroke 'dais''s edge is a number, got 'wide'" in malformed
@@ -411,7 +413,7 @@ def testBranchRefusals(stageBlenderServer, tmp_path):
     await caveCanyon(session, tmp_path)
     outside = await session.expectError("cutCave", branched | {"branches": [side | {"path": [[80, 200, 2], [120, 200], [150, 200]]}]})
     hole = await session.expectError("cutCave", branched | {"branches": [side | {"path": [[0, 200, -1], [90, 200], [150, 200]]}]})
-    raised = await session.expectError("cutCave", branched | {"branches": [side | {"path": [[0, 200, 6], [90, 200], [150, 200]]}]})
+    raised = await session.expectError("cutCave", branched | {"branches": [side | {"path": [[0, 200, 2 + stepHeight + 1.5], [90, 200], [150, 200]]}]})
     twice = await session.expectError("cutCave", branched | {"branches": [side, side]})
     unknown = await session.expectError("cutCave", branched | {"branches": [side | {"from": "nowhere"}]})
     detail = await session.expectSuccess("getObjectDetail", {"name": "ground"})
@@ -420,7 +422,8 @@ def testBranchRefusals(stageBlenderServer, tmp_path):
   outside, hole, raised, twice, unknown, detail = stageBlenderServer.session(steps)
   assert "Branch 'side' starts at [80.0, 200.0, 2.0] with its first section reaching 20.7 out of its parent 'main''s walls (at [80.0, 200.0, 32.0])" in outside
   assert "Branch 'side''s floor where it starts" in hole and "lies 3.00 under its parent 'main''s floor there" in hole
-  assert "Branch 'side' starts 4.0 over its parent 'main''s floor, more than a step (2)" in raised and "overlook" in raised
+  # Started 1.5 higher than a player steps over the parent's floor, it is refused unless an overlook.
+  assert f"Branch 'side' starts {stepHeight + 1.5:.1f} over its parent 'main''s floor, more than a step ({stepHeight:g})" in raised and "overlook" in raised
   assert "Two branches are named 'side'" in twice
   assert "Branch 'side' leaves 'nowhere', which is not the main run or a branch named before it (['main'])" in unknown
   assert detail["caves"] == []

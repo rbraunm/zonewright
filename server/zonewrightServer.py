@@ -1957,7 +1957,7 @@ async def regradeTerrain(context: Context, objectName: str):
   " no height, a landing at an end or at a point where the path does not bend; a floor stroke reaching past its run's walls or ends"
   " (naming how far), on an unknown run, named twice, or malformed (naming the field); rubble lying wholly off its run; rubble finer"
   " than twice edgeLength (naming the edgeLength it needs);"
-  " relief raising a wall's foot to within a step of the lowest trim band or of the top of the walls' straight part (naming the wall and"
+  f" relief raising a wall's foot to within {buildTolerances.wallFootClearance:g} of the lowest trim band or of the top of the walls' straight part (naming the wall and"
   " where); a pad sunk where no rock lies under it; a branch whose first section reaches out of its parent (naming how far and where),"
   " whose floor where it starts lies under its parent's (a hole; off a slope, naming the climb across its width; under a stroke, naming"
   f" it) or more than a step ({playerScale.stepHeight:g}) over it without overlook, that would cut a trench through its parent's rubble or pad (naming it), that never leaves its"
@@ -3862,8 +3862,8 @@ async def getHousing(context: Context):
   " overhang) either could be meant, so without `height` it is refused, naming the top, the rock's underside, and the ground under it:"
   " give the height of the one meant (a cavern's level stretch from cutCave gives its floor; a plot in a cave stands on a level way or"
   " pad of its floor, at that stroke's height). `features` (from the zone's featureMultipliers) and `pricePlatinum` (an override of the derived price) set its"
-  " price. The result gives its price, any plots it overlaps, and caveFloor: the cave floor stroke it stands on (cave, run, name, kind,"
-  " height), or null." + plotHelp
+  " price. The result gives its price, any plots it overlaps, and caveFloor: the cave floor stroke it stands on, its height within"
+  f" {buildTolerances.strokeStandTolerance:g} of the plot's (cave, run, name, kind, height), or null." + plotHelp
 ))
 async def placePlot(
   context: Context, address: str, center: list[float], facingDegrees: float, kind: str = "player", size: list[float] | None = None,
@@ -3944,8 +3944,8 @@ async def gradePlot(context: Context, address: str, objectName: str, margin: flo
   " much of the zone's main routes see it, and overlaps; and the features those suggest, for pricing (set them with editPlot features)."
   " The ground under it, beyond its sides, and at its entrance is looked up from the plot's own height (ground standing above it, or the"
   f" footing under {buildTolerances.levelProbeLift:g} over it), so a plot in a cave measures the cave's floor and walls, not the hill over it;"
-  " caveFloor names the cave floor stroke it stands on (a level way or pad of a cave's run, cutCave floor: its cave, run, name, kind,"
-  " and height), or null. A view is never"
+  " caveFloor names the cave floor stroke it stands on (a level way or pad of a cave's run, cutCave floor, its height"
+  f" within {buildTolerances.strokeStandTolerance:g} of the plot's: its cave, run, name, kind, and height), or null. A view is never"
   " suggested: judge it from pictures taken at the plot's edge, looking out as its owner would. The measures check what a picture shows;"
   " look at the plot too."
 ))

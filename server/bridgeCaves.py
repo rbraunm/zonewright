@@ -26,7 +26,7 @@ import bridgeNoise
 import bridgePasses
 import bridgeSurfacing
 import playerScale
-from buildTolerances import floorHangTolerance, probeOverFloor
+from buildTolerances import floorHangTolerance, probeOverFloor, strokeStandTolerance, wallFootClearance
 
 # A pass holds single precision: a ring vertex reads back this close to its plug triangle, and ground counts as moved past this.
 ringTolerance = 1e-4
@@ -754,7 +754,7 @@ def brokenTube(definition, worked, rows, unbroken, surface, junctionTrees):
 def relieved(definition, worked, rows, sections, vertices, surface):
   """Give a tube's own rows (vertices, rows x points x 3, changed in place) their floor strokes' relief: each floor point raised or
   lowered by it, and each wall's straight part (below the lowest trim band) moved evenly between its foot's relief at the floor and
-  nothing at its top. Refuses a wall foot raised to within a step of that top, and a sunk floor hanging in the air. Returns each floor
+  nothing at its top. Refuses a wall foot raised to within wallFootClearance of that top, and a sunk floor hanging in the air. Returns each floor
   face's stroke material (rows - 1 lists, None where none)."""
   shape, relief = rows["shape"], worked["relief"]
   count, size = sections.shape[:2]
@@ -774,13 +774,13 @@ def relieved(definition, worked, rows, sections, vertices, surface):
   tops = numpy.minimum(definition["wallShare"] * rows["heights"], lowestBand)
   ups = sections[:, :, 2] - rows["floors"][:, None, 2]
   for side, foot in ((1, values[:, floorCount]), (-1, values[:, 0])):
-    raised = foot > tops - playerScale.stepHeight
+    raised = foot > tops - wallFootClearance
     if raised.any():
       row = int(numpy.flatnonzero(raised)[0])
       limit = "the lowest trim band" if lowestBand <= definition["wallShare"] * rows["heights"][row] else "the top of the walls' straight part"
       raise ValueError(
         f"{bridgeCaveRuns.capitalized(worked['owner'])}'s floor strokes raise its {'right' if side == 1 else 'left'} wall's foot {foot[row]:.1f} at"
-        f" {rows['alongs'][row]:.1f} along it, within a step of {limit} ({tops[row]:.1f} over the floor), so the wall would fold; lower the"
+        f" {rows['alongs'][row]:.1f} along it, within {wallFootClearance:g} of {limit} ({tops[row]:.1f} over the floor), so the wall would fold; lower the"
         " stroke's rise or keep it off the wall there"
       )
     onSide = numpy.flatnonzero(shape["wallSide"] == side)
@@ -910,7 +910,7 @@ def intoJunctionOf(branch, target, rows, unbroken, targetTree):
     )
   alongs = line.samples(1.0)[::-1]
   floors, _, _, heights = line.at(alongs)
-  lifted = floors + numpy.column_stack([numpy.zeros((len(floors), 2)), numpy.minimum(playerScale.stepHeight, heights / 2)])
+  lifted = floors + numpy.column_stack([numpy.zeros((len(floors), 2)), numpy.minimum(probeOverFloor, heights / 2)])
   outside = signedDistances(targetTree, lifted) > 0
   if not outside.any():
     raise ValueError(f"{owner} lies wholly inside '{target['name']}', which it opens into: start it outside that run")
@@ -919,7 +919,7 @@ def intoJunctionOf(branch, target, rows, unbroken, targetTree):
   for _ in range(20):
     middle = (low + high) / 2
     floor, _, _, height = line.at(numpy.array([middle]))
-    if signedDistances(targetTree, floor + [0.0, 0.0, min(playerScale.stepHeight, height[0] / 2)])[0] > 0:
+    if signedDistances(targetTree, floor + [0.0, 0.0, min(probeOverFloor, height[0] / 2)])[0] > 0:
       low = middle
     else:
       high = middle
@@ -979,7 +979,7 @@ def junctionOf(branch, parent, rows, unbroken, parentTree):
     )
   alongs = line.samples(1.0)
   floors, directions, widths, heights = line.at(alongs)
-  lifted = floors + numpy.column_stack([numpy.zeros((len(floors), 2)), numpy.minimum(playerScale.stepHeight, heights / 2)])
+  lifted = floors + numpy.column_stack([numpy.zeros((len(floors), 2)), numpy.minimum(probeOverFloor, heights / 2)])
   outside = signedDistances(parentTree, lifted) > 0
   if not outside.any():
     raise ValueError(f"{bridgeCaveRuns.capitalized(owner)} never leaves its parent '{parent['name']}': its whole length lies inside the parent's walls")
@@ -988,7 +988,7 @@ def junctionOf(branch, parent, rows, unbroken, parentTree):
   for _ in range(20):
     middle = (low + high) / 2
     floor, _, _, height = line.at(numpy.array([middle]))
-    if signedDistances(parentTree, floor + [0.0, 0.0, min(playerScale.stepHeight, height[0] / 2)])[0] > 0:
+    if signedDistances(parentTree, floor + [0.0, 0.0, min(probeOverFloor, height[0] / 2)])[0] > 0:
       high = middle
     else:
       low = middle
@@ -2347,7 +2347,7 @@ def guideRun(objectName, cave, run):
 
 
 def strokeUnder(x, y, height):
-  """The level way or pad of a cave's run a point stands on (within it in plan and within a step of its height): its object, cave, run,
+  """The level way or pad of a cave's run a point stands on (within it in plan and within strokeStandTolerance of its height): its object, cave, run,
   name, kind, and height; or None."""
   for guide in caveGuides():
     for run in guide["runs"]:
@@ -2364,7 +2364,7 @@ def strokeUnder(x, y, height):
         if stroke["kind"] == "rough" or not (stroke["from"] <= along <= stroke["to"] and stroke["across"][0] <= across <= stroke["across"][1]):
           continue
         level = float(numpy.interp(along, samples[:, 5], samples[:, 2])) if stroke["kind"] == "level" else stroke["top"]
-        if abs(level - height) <= playerScale.stepHeight:
+        if abs(level - height) <= strokeStandTolerance:
           return {"object": guide["object"], "cave": guide["cave"], "run": run["run"], "stroke": stroke["name"], "kind": stroke["kind"], "height": round(level, 2)}
   return None
 

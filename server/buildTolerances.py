@@ -7,6 +7,12 @@ supportTolerance = 2.0
 floatTolerance = 2.0
 # A cave floor's middle this far or less over the ground reads as resting on it; higher, it hangs in the air.
 floorHangTolerance = 2.0
+# A floor stroke raising a cave wall's foot leaves at least this much of the wall's straight part over it, under the lowest trim band
+# or the walls' top; less, and the wall folds.
+wallFootClearance = 2.0
+# A point within this of a cave floor stroke's height (a level way's floor, a pad's top) stands on the stroke; farther, it floats over
+# it or is sunk in it.
+strokeStandTolerance = 2.0
 # A prefab's floor without a plinth reads as standing on the ground within this of it: ground higher comes up through it, and ground
 # lower shows a gap under its walls.
 floorTolerance = 2.0
@@ -33,5 +39,6 @@ footingProbeLift = 2.0
 # Ground and cover for a player at a level (a plot's) are looked for from this far over it: over ground a little higher, under a
 # cave's roof.
 levelProbeLift = 2.0
-# Rock beside and around a cave's cut is probed this far over its floor, clear of the ground the floor lies on.
+# Rock beside and around a cave's cut, and the walls a branch passes out through, are probed this far over its floor, clear of the
+# ground or floor it lies on.
 probeOverFloor = 2.0
