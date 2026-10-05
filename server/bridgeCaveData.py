@@ -149,6 +149,14 @@ def liningVertices(sceneObject):
   return CaveVertices(sceneObject).lining
 
 
+def caveMadeVertices(sceneObject):
+  """The vertices caves made: their rings and linings, none of them the ground's own."""
+  if not holdsCaves(sceneObject):
+    return numpy.zeros(len(sceneObject.data.vertices), dtype=bool)
+  caveVertices = CaveVertices(sceneObject)
+  return caveVertices.ring | caveVertices.lining
+
+
 def liningReport(left):
   """What a result says of the lining vertices a write left alone: nothing for a mesh without caves."""
   return {} if left is None else {"caveLiningLeft": left}

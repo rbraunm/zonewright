@@ -51,8 +51,14 @@ faceReachWidths = 3.0
 faceNormalZ = math.cos(math.radians(45.0))
 traceRounds = 3
 shareSamples = 81
-definitionDefaults = {"edgeLength": 16.0, "wallShare": 0.35, "breakup": None, "mouthFade": None, "maximumFloorDegrees": 30.0}
+definitionDefaults = {"edgeLength": 16.0, "wallShare": 0.35, "breakup": None, "mouthFade": None, "maximumFloorDegrees": 30.0, "trimBands": None}
 definitionKeys = ("path", "widths", "heights", "wallMaterial", "floorMaterial", "worldUnitsPerRepeat") + tuple(definitionDefaults)
+bandKeys = {"fromFloor", "height", "material", "worldUnitsPerRepeat"}
+# Two section stops closer than this in every row are one stop.
+stopTolerance = 1e-6
+# Which tube face each piece of lining came from, while a cut is spliced; never written to the mesh.
+tubeFaceLayerName = "zonewrightCaveTubeFace"
+cornerOutward = math.sqrt(0.5)
 up = mathutils.Vector((0.0, 0.0, 1.0))
 down = mathutils.Vector((0.0, 0.0, -1.0))
 
@@ -71,15 +77,18 @@ def replayStrokes(sceneObject, name, strokes):
 
 # Definitions
 
-def caveDefinition(path, widths, heights, wallMaterial, floorMaterial, worldUnitsPerRepeat, edgeLength, wallShare, breakup, mouthFade, maximumFloorDegrees):
+def caveDefinition(path, widths, heights, wallMaterial, floorMaterial, worldUnitsPerRepeat, edgeLength, wallShare, breakup, mouthFade, maximumFloorDegrees, trimBands=None):
   if not isinstance(path, list) or len(path) < 2 or any(len(point) != 3 for point in path):
     raise ValueError(f"A cave's path is at least two [x, y, z] floor points, got {path!r}")
   if len(widths) != len(path) or len(heights) != len(path) or min(widths) <= 0 or min(heights) <= 0:
     raise ValueError(f"widths and heights are one positive value per path point ({len(path)}), got {widths!r} and {heights!r}")
   if edgeLength <= 0 or worldUnitsPerRepeat <= 0:
     raise ValueError(f"edgeLength and worldUnitsPerRepeat are positive, got {edgeLength} and {worldUnitsPerRepeat}")
-  if not 0 < wallShare < 1:
-    raise ValueError(f"wallShare is the share of the height the walls rise straight before the vault, between 0 and 1, got {wallShare}")
+  if not 0 < wallShare <= 1:
+    raise ValueError(
+      f"wallShare is the share of the height the walls rise straight before the vault, above 0 and at most 1 (a hall: straight walls under"
+      f" a flat ceiling), got {wallShare}"
+    )
   if breakup is not None and (not isinstance(breakup, dict) or set(breakup) != {"featureSize", "amplitude", "seed"} or breakup["featureSize"] <= 0 or breakup["amplitude"] <= 0):
     raise ValueError(f"breakup is {{featureSize, amplitude, seed}} with a positive featureSize and amplitude, got {breakup!r}")
   if mouthFade is not None and mouthFade < 0:
@@ -89,12 +98,81 @@ def caveDefinition(path, widths, heights, wallMaterial, floorMaterial, worldUnit
   for material in (wallMaterial, floorMaterial):
     if bpy.data.materials.get(material) is None:
       raise ValueError(f"No material named '{material}'")
-  return {
+  definition = {
     "path": [[float(value) for value in point] for point in path], "widths": [float(value) for value in widths], "heights": [float(value) for value in heights],
     "wallMaterial": wallMaterial, "floorMaterial": floorMaterial, "worldUnitsPerRepeat": float(worldUnitsPerRepeat), "edgeLength": float(edgeLength),
     "wallShare": float(wallShare), "breakup": None if breakup is None else {"featureSize": float(breakup["featureSize"]), "amplitude": float(breakup["amplitude"]), "seed": int(breakup["seed"])},
     "mouthFade": None if mouthFade is None else float(mouthFade), "maximumFloorDegrees": float(maximumFloorDegrees),
+    "trimBands": bandDefinitions(trimBands),
   }
+  wallGaps(definition)
+  return definition
+
+
+def bandDefinitions(trimBands):
+  """Trim bands as a definition keeps them, refusing any that is not a band of the walls with a material of its own."""
+  if trimBands is None:
+    return []
+  if not isinstance(trimBands, list):
+    raise ValueError(f"trimBands is a list of {{fromFloor, height, material, worldUnitsPerRepeat}}, got {trimBands!r}")
+  bands = []
+  for index, band in enumerate(trimBands):
+    if not isinstance(band, dict) or set(band) != bandKeys:
+      raise ValueError(f"Trim band {index} is {{fromFloor, height, material, worldUnitsPerRepeat}}, got {band!r}")
+    if band["fromFloor"] < 0 or band["height"] <= 0:
+      raise ValueError(f"Trim band {index} starts at fromFloor, at least 0 over the floor, and is a positive height tall, got fromFloor {band['fromFloor']} and height {band['height']}")
+    if band["worldUnitsPerRepeat"] <= 0:
+      raise ValueError(f"Trim band {index}'s worldUnitsPerRepeat is positive, got {band['worldUnitsPerRepeat']}")
+    material = bpy.data.materials.get(band["material"])
+    if material is None or bridgeSurfacing.cutoutPropertyName not in material:
+      raise ValueError(f"Trim band {index}'s material '{band['material']}' is not a material createMaterial made; make it with createMaterial first")
+    bands.append({"fromFloor": float(band["fromFloor"]), "height": float(band["height"]), "material": band["material"], "worldUnitsPerRepeat": float(band["worldUnitsPerRepeat"])})
+  ordered = sorted(range(len(bands)), key=lambda index: bands[index]["fromFloor"])
+  for lower, upper in zip(ordered, ordered[1:]):
+    top = bands[lower]["fromFloor"] + bands[lower]["height"]
+    if bands[upper]["fromFloor"] < top - stopTolerance:
+      raise ValueError(
+        f"Trim bands {lower} ({bands[lower]['fromFloor']:g} to {top:g} over the floor) and {upper} ({bands[upper]['fromFloor']:g} to"
+        f" {bands[upper]['fromFloor'] + bands[upper]['height']:g}) overlap; bands may meet but not overlap"
+      )
+  return bands
+
+
+def wallGaps(definition):
+  """The stretches the walls are cut into from the floor up, between the floor, each trim band's edges, and the top of the straight
+  walls: each stretch's ends as (share of the row's height, units over the floor), its trim band (or -1), and how many points it takes
+  to keep its edges within edgeLength in the tallest row. Stops that meet in every row are one stop; refuses a band reaching above the
+  straight walls, or meeting their top in some rows but not others."""
+  heights = numpy.array(definition["heights"])
+  wallShare = definition["wallShare"]
+  for index, band in enumerate(definition["trimBands"]):
+    top = band["fromFloor"] + band["height"]
+    over = numpy.flatnonzero(top > wallShare * heights + stopTolerance)
+    if len(over):
+      point = int(over[0])
+      raise ValueError(
+        f"Trim band {index} ({band['fromFloor']:g} to {top:g} over the floor) reaches above the walls' straight part at path point {point}"
+        f" {roundedPoint(definition['path'][point])}, where the walls rise straight {wallShare * heights[point]:g} (wallShare {wallShare:g} of the"
+        f" height {heights[point]:g}); lower the band, or raise the height or wallShare there"
+      )
+  stops = [((0.0, 0.0), -1)]
+  for index, band in sorted(enumerate(definition["trimBands"]), key=lambda item: item[1]["fromFloor"]):
+    stops += [((0.0, band["fromFloor"]), index), ((0.0, band["fromFloor"] + band["height"]), -1)]
+  stops.append(((wallShare, 0.0), -1))
+  gaps = []
+  for (low, band), (high, _) in zip(stops, stops[1:]):
+    lengths = (high[0] - low[0]) * heights + high[1] - low[1]
+    closed = lengths <= stopTolerance
+    if closed.all():
+      continue
+    if closed.any():
+      point = int(numpy.flatnonzero(closed)[0])
+      raise ValueError(
+        f"A trim band's top meets the top of the straight walls at path point {point} {roundedPoint(definition['path'][point])} but runs below it"
+        " elsewhere; run it below the walls' top everywhere, or along it everywhere"
+      )
+    gaps.append({"low": low, "high": high, "band": band, "count": max(1, math.ceil(lengths.max() / definition["edgeLength"])), "shortest": float(lengths.min())})
+  return gaps
 
 
 def smoothstep(share):
@@ -212,34 +290,59 @@ class CaveLine:
     return stretches
 
 
-def sectionShape(wallShare, counts):
-  """The tube's section counterclockwise looking along it: each point across (a share of the width) and up (a share of the height), and
-  the outward direction there."""
-  floorCount, wallCount, arcCount = counts
-  points = [((-0.5 + index / floorCount, 0.0), (0.0, -1.0)) for index in range(floorCount)]
-  points += [((0.5, wallShare * index / wallCount), (1.0, 0.0)) for index in range(wallCount)]
-  for index in range(arcCount):
-    angle = math.pi * index / arcCount
-    points.append(((0.5 * math.cos(angle), wallShare + (1 - wallShare) * math.sin(angle)), (math.cos(angle), math.sin(angle))))
-  points += [((-0.5, wallShare * (1 - index / wallCount)), (-1.0, 0.0)) for index in range(wallCount)]
-  return points
+def sectionShape(definition):
+  """The tube's section counterclockwise looking along it, from the floor's left corner: each point across (a share of the width) and up
+  (a share of the height plus units over the floor, both shrinking with the rows a rounded end adds), its outward direction, and the
+  trim band (or -1) of the stretch from it to the next point. Enough points for the widest and tallest stretch at edgeLength: the floor
+  evenly across, each wall in its stretches between the floor, the band edges, and its top (wallGaps), then a vault, or for a hall
+  (wallShare 1) a flat ceiling evenly across with square corners."""
+  edgeLength, wallShare = definition["edgeLength"], definition["wallShare"]
+  widest, tallest = max(definition["widths"]), max(definition["heights"])
+  floorCount = max(2, math.ceil(widest / edgeLength))
+  gaps = wallGaps(definition)
+  points = [(-0.5 + index / floorCount, 0.0, 0.0, (0.0, -1.0), -1) for index in range(floorCount)]
+  for gap in gaps:
+    for step in range(gap["count"]):
+      points.append((0.5, *gapStop(gap, step / gap["count"]), (1.0, 0.0), gap["band"]))
+  if wallShare < 1:
+    vault = math.pi * math.sqrt(((widest / 2) ** 2 + ((1 - wallShare) * tallest) ** 2) / 2)
+    arcCount = max(4, math.ceil(vault / edgeLength))
+    for index in range(arcCount):
+      angle = math.pi * index / arcCount
+      points.append((0.5 * math.cos(angle), wallShare + (1 - wallShare) * math.sin(angle), 0.0, (math.cos(angle), math.sin(angle)), -1))
+  else:
+    points += [(0.5 - index / floorCount, 1.0, 0.0, (cornerOutward, cornerOutward) if index == 0 else (0.0, 1.0), -1) for index in range(floorCount)]
+  for gap in reversed(gaps):
+    for step in range(gap["count"]):
+      corner = wallShare == 1 and gap is gaps[-1] and step == 0
+      points.append((-0.5, *gapStop(gap, 1 - step / gap["count"]), (-cornerOutward, cornerOutward) if corner else (-1.0, 0.0), gap["band"]))
+  return {
+    "across": numpy.array([point[0] for point in points]), "upShare": numpy.array([point[1] for point in points]),
+    "upUnits": numpy.array([point[2] for point in points]), "outward": numpy.array([point[3] for point in points]),
+    "bands": numpy.array([point[4] for point in points]), "floorCount": floorCount, "wallCount": sum(gap["count"] for gap in gaps),
+    "onFloor": numpy.array([point[1] == 0.0 and point[2] == 0.0 for point in points]),
+    "shortestStretch": min(gap["shortest"] / gap["count"] for gap in gaps),
+  }
 
 
-def sectionPoints(shape, floors, directions, widths, heights):
-  """World points of the section at each row: rows x points x 3."""
-  across = numpy.array([point[0][0] for point in shape])
-  rise = numpy.array([point[0][1] for point in shape])
+def gapStop(gap, share):
+  """The point share of the way up a wall stretch, as (share of the row's height, units over the floor)."""
+  return tuple((1 - share) * low + share * high for low, high in zip(gap["low"], gap["high"]))
+
+
+def sectionPoints(shape, floors, directions, widths, heights, scales):
+  """World points of the section at each row (scales: how far a rounded end's row has shrunk, 1 elsewhere): rows x points x 3."""
   right = numpy.column_stack([directions[:, 1], -directions[:, 0], numpy.zeros(len(directions))])
-  return floors[:, None, :] + (across[None, :, None] * widths[:, None, None]) * right[:, None, :] + (rise[None, :] * heights[:, None])[..., None] * numpy.array([0.0, 0.0, 1.0])
+  rise = shape["upShare"][None, :] * heights[:, None] + shape["upUnits"][None, :] * scales[:, None]
+  return floors[:, None, :] + (shape["across"][None, :, None] * widths[:, None, None]) * right[:, None, :] + rise[..., None] * numpy.array([0.0, 0.0, 1.0])
 
 
 class TerrainSurface:
-  """The terrain as it is seen near a line in plan, for casts. Only its triangles with a corner within `margin` of the line's plan box
-  are taken, so a large terrain costs no more than the ground in reach."""
+  """The terrain (its triangles over shown positions) as it is seen near a line in plan, for casts. Only its triangles with a corner
+  within `margin` of the line's plan box are taken, so a large terrain costs no more than the ground in reach."""
 
-  def __init__(self, sceneObject, shown, plan, margin):
+  def __init__(self, shown, triangles, plan, margin):
     plan = numpy.asarray(plan, dtype=numpy.float64)[:, :2]
-    triangles = bridgeMeshAccess.meshTriangles(sceneObject)
     near = ((shown[:, :2] >= plan.min(axis=0) - margin) & (shown[:, :2] <= plan.max(axis=0) + margin)).all(axis=1)
     triangles = triangles[near[triangles].any(axis=1)]
     used, local = numpy.unique(triangles, return_inverse=True)
@@ -286,11 +389,11 @@ class TerrainSurface:
     return None if location is None or abs(normal.z) > faceNormalZ else point + direction * distance
 
 
-def caveSurface(sceneObject, shown, definition):
+def caveSurface(shown, triangles, definition):
   """The terrain around a cave's path out to everything its tube and breakup can reach."""
   amplitude = definition["breakup"]["amplitude"] if definition["breakup"] is not None else 0.0
   margin = max(definition["widths"]) + max(definition["heights"]) + breakupReach * amplitude + patchEdges * definition["edgeLength"]
-  return TerrainSurface(sceneObject, shown, definition["path"], margin)
+  return TerrainSurface(shown, triangles, definition["path"], margin)
 
 
 def roundedPoint(point):
@@ -317,35 +420,45 @@ def requireFloorOnRock(surface, floors):
   )
 
 
+def endKind(definition, shape, surface, floor, direction, width, height, end):
+  """How one end of a tube meets the ground, and whether it is rounded off: open (some of its floor on the ground: a mouth wholly in
+  the open but for a sill a step deep, or a gallery's end beside a cliff, part in the rock), ledge (part in the rock with its floor
+  running out over a drop beside it), or blind (wholly inside the rock). A hall's ends are never rounded, and stand wholly in the open
+  or wholly in the rock."""
+  cap = sectionPoints(shape, floor[None], direction[None], numpy.array([width]), numpy.array([height]), numpy.ones(1))[0]
+  depths = surface.depths(cap)
+  hall = definition["wallShare"] == 1
+  if (depths > 0).all():
+    return "blind", not hall
+  if depths.max() <= playerScale.stepHeight:
+    return "open", False
+  if hall:
+    raise ValueError(
+      f"The hall's {end} at {roundedPoint(floor)} is part in the rock (up to {depths.max():.1f} into it) and part in the open: a hall's mouth"
+      " stands in front of the cliff's face, which dressFacade dresses, and its far end inside the rock"
+    )
+  if surface.onGround(cap[shape["onFloor"]]).any():
+    return "open", True
+  if (depths[shape["onFloor"]] <= 0).any():
+    return "ledge", True
+  raise ValueError(
+    f"The cave's {end} at {roundedPoint(floor)} is part in the rock (up to {depths.max():.1f} into it) and part in the open, its"
+    " floor buried more than a step under the ground; end it with its floor on the ground in front of it or beside it, or wholly inside the rock"
+  )
+
+
 def tubeRows(definition, line, surface):
-  """The tube's rows (floor points, plan directions, widths, heights, and how much of the breakup each takes) and each end's kind:
-  open, some of its floor on the ground (a mouth wholly in the open but for a sill a step deep, or a gallery's end beside a cliff,
-  part in the rock); ledge, part in the rock with its floor running out over a drop beside it (a gallery's dead end up a cliff); or
-  blind, wholly inside the rock. An end with rock in its section is rounded off, closing over half its width beyond its last point on
-  an apex at floor height, as a dome closes."""
+  """The tube's rows (floor points, plan directions, widths, heights, and scales: how far a rounded end's row has shrunk, which its
+  breakup and band edges shrink with) and each end's kind (endKind). An end with rock in its section is rounded off, closing over half
+  its width beyond its last point on an apex at floor height, as a dome closes; a hall's blind end closes as a flat wall."""
   edgeLength = definition["edgeLength"]
-  shape = sectionShape(definition["wallShare"], sectionCounts(definition))
-  onFloor = numpy.array([point[0][1] == 0.0 for point in shape])
+  shape = sectionShape(definition)
   candidates = numpy.unique(numpy.concatenate([numpy.arange(0.0, line.length, edgeLength * rowSampleShare), line.stations]))
   floors, directions, widths, heights = line.at(candidates)
   requireFloorOnRock(surface, floors)
   ends, rounded = {}, {}
   for end, row in (("start", 0), ("end", -1)):
-    cap = sectionPoints(shape, floors[[row]], directions[[row]], widths[[row]], heights[[row]])[0]
-    depths = surface.depths(cap)
-    if (depths > 0).all():
-      ends[end], rounded[end] = "blind", True
-    elif depths.max() <= playerScale.stepHeight:
-      ends[end], rounded[end] = "open", False
-    elif surface.onGround(cap[onFloor]).any():
-      ends[end], rounded[end] = "open", True
-    elif (depths[onFloor] <= 0).any():
-      ends[end], rounded[end] = "ledge", True
-    else:
-      raise ValueError(
-        f"The cave's {end} at {roundedPoint(floors[row])} is part in the rock (up to {depths.max():.1f} into it) and part in the open, its"
-        " floor buried more than a step under the ground; end it with its floor on the ground in front of it or beside it, or wholly inside the rock"
-      )
+    ends[end], rounded[end] = endKind(definition, shape, surface, floors[row], directions[row], widths[row], heights[row], end)
   if set(ends.values()) == {"blind"}:
     raise ValueError("Both ends of the cave lie wholly inside the rock, so nothing would open into it; start or end it on open ground in front of its mouth")
   rows = [(floors, directions, widths, heights, numpy.ones(len(candidates)), numpy.isin(candidates, line.stations))]
@@ -363,7 +476,7 @@ def tubeRows(definition, line, surface):
       numpy.repeat(directions[[row]], len(beyond), axis=0), widths[row] * shrink, heights[row] * shrink, shrink, numpy.zeros(len(beyond), dtype=bool),
     )
     apexes[end] = numpy.array([*(floors[row, :2] + sign * reach * directions[row]), floors[row, 2]])
-    depths = surface.depths(numpy.vstack([sectionPoints(shape, *extended[:4]).reshape(-1, 3), apexes[end] + [0.0, 0.0, playerScale.stepHeight]]))
+    depths = surface.depths(numpy.vstack([sectionPoints(shape, *extended[:5]).reshape(-1, 3), apexes[end] + [0.0, 0.0, playerScale.stepHeight]]))
     if ends[end] == "blind" and not (depths > 0).all():
       raise ValueError(f"The cave's blind {end} at {[round(float(value), 1) for value in floors[row]]} is rounded off over {reach:.1f} beyond it, which reaches out of the rock; end it deeper inside")
     if end == "start":
@@ -371,42 +484,33 @@ def tubeRows(definition, line, surface):
     else:
       rows.append(extended)
   floors, directions, widths, heights, scales, stations = (numpy.concatenate([part[index] for part in rows]) for index in range(6))
-  sections = sectionPoints(shape, floors, directions, widths, heights)
+  sections = sectionPoints(shape, floors, directions, widths, heights, scales)
   kept = [0]
   for index in range(1, len(floors)):
     if stations[index] or index == len(floors) - 1 or numpy.linalg.norm(sections[index + 1] - sections[kept[-1]], axis=1).max() > edgeLength:
       kept.append(index)
   return {
     "shape": shape, "floors": floors[kept], "directions": directions[kept], "widths": widths[kept], "heights": heights[kept],
-    "breakupScales": scales[kept], "ends": ends, "rounded": rounded, "apexes": apexes,
+    "scales": scales[kept], "ends": ends, "rounded": rounded, "apexes": apexes,
   }
 
 
-def sectionCounts(definition):
-  """How many section points the floor, each wall, and the vault take: enough for the widest and tallest stretch at edgeLength."""
-  edgeLength = definition["edgeLength"]
-  widest, tallest, wallShare = max(definition["widths"]), max(definition["heights"]), definition["wallShare"]
-  vault = math.pi * math.sqrt(((widest / 2) ** 2 + ((1 - wallShare) * tallest) ** 2) / 2)
-  return max(2, math.ceil(widest / edgeLength)), max(1, math.ceil(wallShare * tallest / edgeLength)), max(4, math.ceil(vault / edgeLength))
-
-
 def tubeMesh(definition, rows, surface):
-  """The tube's world vertices and outward faces: the rows' sections with the walls and vault broken up along their outward
-  directions, the breakup fading out within mouthFade of wherever the tube lies in the open."""
+  """The tube's world vertices, outward faces, and for each face the rows it spans (the end's row twice for a cap) and its trim band (or
+  -1): the rows' sections with the walls and vault broken up along their outward directions, the breakup fading out within mouthFade of
+  wherever the tube lies in the open. A face is in a band only between two rows of the tube itself, not those a rounded end adds."""
   shape = rows["shape"]
-  sections = sectionPoints(shape, rows["floors"], rows["directions"], rows["widths"], rows["heights"])
+  sections = sectionPoints(shape, rows["floors"], rows["directions"], rows["widths"], rows["heights"], rows["scales"])
   count, size = sections.shape[:2]
   vertices = sections.reshape(-1, 3)
   breakup = definition["breakup"]
   if breakup is not None:
     right = numpy.column_stack([rows["directions"][:, 1], -rows["directions"][:, 0], numpy.zeros(count)])
-    outLateral = numpy.array([point[1][0] for point in shape])
-    outRise = numpy.array([point[1][1] for point in shape])
-    outward = (outLateral[None, :, None] * right[:, None, :] + outRise[None, :, None] * numpy.array([0.0, 0.0, 1.0])).reshape(-1, 3)
-    rise = numpy.array([point[0][1] for point in shape])
+    outward = (shape["outward"][None, :, 0, None] * right[:, None, :] + shape["outward"][None, :, 1, None] * numpy.array([0.0, 0.0, 1.0])).reshape(-1, 3)
+    rise = (sections[:, :, 2] - rows["floors"][:, None, 2]) / rows["heights"][:, None]
     # The breakup grows from nothing at the floor to its full amplitude where the vault springs, so the floor's edge stays one clean
     # line and the walls lean out of it rather than standing on a straight band.
-    weights = (numpy.clip(rise[None, :] / definition["wallShare"], 0, 1) * rows["breakupScales"][:, None]).ravel()
+    weights = (numpy.clip(rise / definition["wallShare"], 0, 1) * rows["scales"][:, None]).ravel()
     fade = definition["mouthFade"] if definition["mouthFade"] is not None else 2 * definition["edgeLength"]
     outside = surface.depths(vertices) <= 0
     if fade > 0 and outside.any():
@@ -417,20 +521,61 @@ def tubeMesh(definition, rows, surface):
       weights *= numpy.clip(numpy.array([tree.find(point)[2] for point in vertices.tolist()]) / fade, 0, 1)
     values = bridgeNoise.fractalNoise(bridgeNoise.noiseSamplePoints(vertices, breakup["featureSize"], breakup["seed"]), breakupOctaves, breakupRoughness)
     vertices = vertices + (breakup["amplitude"] * values * weights)[:, None] * outward
-  faces = []
+  faces, spans, bands = [], [], []
+  ownRow = rows["scales"] == 1.0
   for row in range(count - 1):
     for index in range(size):
       following = (index + 1) % size
       faces.append((row * size + index, (row + 1) * size + index, (row + 1) * size + following, row * size + following))
+      spans.append((row, row + 1))
+      bands.append(int(shape["bands"][index]) if ownRow[row] and ownRow[row + 1] else -1)
   for end, row in (("start", 0), ("end", count - 1)):
     ring = [row * size + index for index in range(size)]
     if end in rows["apexes"]:
       apex = len(vertices)
       vertices = numpy.vstack([vertices, rows["apexes"][end]])
-      faces += [(ring[index], ring[(index + 1) % size], apex) for index in range(size)]
+      capFaces, capBands = [(ring[index], ring[(index + 1) % size], apex) for index in range(size)], [-1] * size
+    elif definition["wallShare"] == 1 and rows["ends"][end] == "blind":
+      vertices, capFaces, capBands = flatEnd(vertices, ring, shape)
     else:
-      faces.append(tuple(ring))
-  return vertices, orientedOutward(vertices, faces)
+      capFaces, capBands = [tuple(ring)], [-1]
+    faces += capFaces
+    spans += [(row, row)] * len(capFaces)
+    bands += capBands
+  return vertices, orientedOutward(vertices, faces), numpy.array(spans, dtype=numpy.int64), numpy.array(bands, dtype=numpy.int64)
+
+
+def flatEnd(vertices, ring, shape):
+  """A hall's blind end as a flat wall: a grid of cells spanned between its floor and ceiling and its two walls (a Coons patch of its
+  ring), each row of cells in the band of the walls' stretch beside it. Returns the vertices with the grid's inner ones added, its
+  cells, and their bands."""
+  across, walls = shape["floorCount"], shape["wallCount"]
+  bottom = [ring[index] for index in range(across + 1)]
+  right = [ring[across + index] for index in range(walls + 1)]
+  top = [ring[2 * across + walls]] + [ring[across + walls + across - index] for index in range(1, across + 1)]
+  left = [ring[0]] + [ring[2 * across + walls + walls - index] for index in range(1, walls)] + [ring[2 * across + walls]]
+  points = vertices[right, 2]
+  rises = (points - points[0]) / (points[-1] - points[0])
+  grid = {}
+  for column in range(across + 1):
+    grid[column, 0], grid[column, walls] = bottom[column], top[column]
+  for level in range(walls + 1):
+    grid[0, level], grid[across, level] = left[level], right[level]
+  corners = vertices[[bottom[0], bottom[-1], top[0], top[-1]]]
+  added = []
+  for column in range(1, across):
+    share = column / across
+    for level in range(1, walls):
+      rise = rises[level]
+      point = (
+        (1 - rise) * vertices[bottom[column]] + rise * vertices[top[column]] + (1 - share) * vertices[left[level]] + share * vertices[right[level]]
+        - ((1 - share) * (1 - rise) * corners[0] + share * (1 - rise) * corners[1] + (1 - share) * rise * corners[2] + share * rise * corners[3])
+      )
+      grid[column, level] = len(vertices) + len(added)
+      added.append(point)
+  cells = [(grid[column, level], grid[column + 1, level], grid[column + 1, level + 1], grid[column, level + 1]) for column in range(across) for level in range(walls)]
+  bands = [int(shape["bands"][across + level]) for column in range(across) for level in range(walls)]
+  return (numpy.vstack([vertices, added]) if added else vertices), cells, bands
 
 
 def orientedOutward(vertices, faces):
@@ -611,7 +756,7 @@ def keyArrays(mesh):
 
 def booleanCut(patchPositions, patchFaces, ring, tubeVertices, tubeFaces):
   """The patch closed into a solid down to below the tube, less the tube by the exact boolean: positions, faces, each face's source
-  (its patch face, -1 for the solid's sides and bottom, -2 for the tube), and face normals."""
+  (its patch face, -1 for the solid's sides and bottom, -2 less its index for a face of the tube), and face normals."""
   bottom = min(float(patchPositions[:, 2].min()), float(tubeVertices[:, 2].min())) - solidDepth
   count = len(patchPositions)
   positions = numpy.vstack([patchPositions, numpy.column_stack([patchPositions[ring, :2], numpy.full(len(ring), bottom)])])
@@ -624,7 +769,7 @@ def booleanCut(patchPositions, patchFaces, ring, tubeVertices, tubeFaces):
   faces.append(tuple(count + index for index in reversed(range(len(ring)))))
   sources.append(-1)
   solid = temporaryObject("zonewrightCaveSolid", positions, faces, sources)
-  tube = temporaryObject("zonewrightCaveTube", tubeVertices, tubeFaces, [-2] * len(tubeFaces))
+  tube = temporaryObject("zonewrightCaveTube", tubeVertices, tubeFaces, [-2 - index for index in range(len(tubeFaces))])
   try:
     modifier = solid.modifiers.new("cut", "BOOLEAN")
     modifier.object, modifier.operation, modifier.solver = tube, "DIFFERENCE", "EXACT"
@@ -644,6 +789,58 @@ def booleanCut(patchPositions, patchFaces, ring, tubeVertices, tubeFaces):
   finally:
     bpy.data.meshes.remove(cut)
   return cutPositions.reshape(-1, 3), cutFaces, cutSources, cutNormals.reshape(-1, 3)
+
+
+def snappedCut(faces, sources, normals, original):
+  """The cut's faces with the corners standing on one of the ground's own vertices taken as that one corner, repeats that leaves in a
+  row dropped, and faces left with fewer than three corners dropped. Where the tube runs on the ground's own vertices and edges (a
+  hall's floor and walls on the grid's lines), the exact solver leaves copies of one point a float's rounding apart, joined by faces
+  with no area."""
+  canonical = numpy.arange(len(original))
+  first = {}
+  for index in numpy.flatnonzero(original >= 0).tolist():
+    canonical[index] = first.setdefault(int(original[index]), index)
+  kept, keptSources, keptNormals = [], [], []
+  for face, source, normal in zip(faces, sources, normals):
+    corners = [int(canonical[index]) for index in face]
+    corners = [corner for position, corner in enumerate(corners) if corner != corners[position - 1]]
+    if len(corners) >= 3:
+      kept.append(corners)
+      keptSources.append(int(source))
+      keptNormals.append(normal)
+  return kept, keptSources, keptNormals
+
+
+def withoutSlivers(positions, faces, sources, normals):
+  """The faces with each triangle of the tube whose corners lie in a line (within matchDistance of it) taken out, its middle corner set
+  into the face across its long edge (unless that is the solid's side), so the surface stays closed: the tube running along the
+  ground's own edges leaves such triangles."""
+  owners = {}
+  for index, face in enumerate(faces):
+    for position, corner in enumerate(face):
+      owners[corner, face[(position + 1) % len(face)]] = index
+  dropped = set()
+  for index, face in enumerate(faces):
+    if len(face) != 3 or sources[index] > -2:
+      continue
+    points = positions[face]
+    lengths = [numpy.linalg.norm(points[(position + 1) % 3] - points[position]) for position in range(3)]
+    longest = int(numpy.argmax(lengths))
+    if numpy.linalg.norm(numpy.cross(points[1] - points[0], points[2] - points[0])) / lengths[longest] > matchDistance:
+      continue
+    start, end, middle = face[longest], face[(longest + 1) % 3], face[(longest + 2) % 3]
+    across = owners.get((end, start))
+    if across is None or across in dropped or sources[across] == -1 or middle in faces[across]:
+      continue
+    neighbour = faces[across]
+    position = next(position for position, corner in enumerate(neighbour) if corner == end and neighbour[(position + 1) % len(neighbour)] == start)
+    neighbour.insert(position + 1, middle)
+    for first, second in ((end, middle), (middle, start)):
+      owners[first, second] = across
+    del owners[end, start]
+    dropped.add(index)
+  keep = [index for index in range(len(faces)) if index not in dropped]
+  return [faces[index] for index in keep], [sources[index] for index in keep], [normals[index] for index in keep]
 
 
 def temporaryObject(name, positions, faces, sources):
@@ -711,6 +908,7 @@ def caveLayers(editor, name):
     "weights": verts.float_vector.get(bridgeCaveData.weightsPrefix + name) or verts.float_vector.new(bridgeCaveData.weightsPrefix + name),
     "ground": verts.float_vector.get(bridgeCaveData.groundPrefix + name) or verts.float_vector.new(bridgeCaveData.groundPrefix + name),
     "face": editor.faces.layers.int.get(bridgeCaveData.faceTagPrefix + name) or editor.faces.layers.int.new(bridgeCaveData.faceTagPrefix + name),
+    "tube": editor.faces.layers.int.new(tubeFaceLayerName),
   }
 
 
@@ -754,11 +952,15 @@ def splice(sceneObject, name, definition, strokes):
   matrix = bridgeMeshAccess.matrixArray(sceneObject.matrix_world)
   inverse = numpy.linalg.inv(matrix)
   shown, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
-  surface = caveSurface(sceneObject, shown, definition)
+  surface = caveSurface(shown, bridgeMeshAccess.meshTriangles(sceneObject), definition)
   line = CaveLine(definition)
   line.requireGrades(definition["maximumFloorDegrees"])
   rows = tubeRows(definition, line, surface)
-  tubeVertices, tubeFaces = tubeMesh(definition, rows, surface)
+  tubeVertices, tubeFaces, tubeSpans, tubeBands = tubeMesh(definition, rows, surface)
+  tube = {
+    "vertices": tubeVertices, "faces": tubeFaces, "spans": tubeSpans, "bands": tubeBands, "floors": rows["floors"][:, 2], "size": len(rows["shape"]["across"]),
+    "shortestStretch": rows["shape"]["shortestStretch"],
+  }
   amplitude = definition["breakup"]["amplitude"] if definition["breakup"] is not None else 0.0
   reach = breakupReach * amplitude + patchEdges * definition["edgeLength"]
   near = numpy.flatnonzero(nearTube(shown, rows, reach))
@@ -767,6 +969,7 @@ def splice(sceneObject, name, definition, strokes):
   owners = bridgeCaveData.CaveVertices(sceneObject) if bridgeCaveData.holdsCaves(sceneObject) else None
   wallSlot = bridgeAuthoring.materialSlot(sceneObject, definition["wallMaterial"])
   floorSlot = bridgeAuthoring.materialSlot(sceneObject, definition["floorMaterial"])
+  bandSlots = [bridgeAuthoring.materialSlot(sceneObject, band["material"]) for band in definition["trimBands"]]
   layered = bridgeMeshAccess.surfaceLayers(sceneObject)
   editor = bridgeMeshAccess.loadBMesh(sceneObject)
   try:
@@ -781,7 +984,8 @@ def splice(sceneObject, name, definition, strokes):
       raise ValueError(f"The cave reaches the edge of '{sceneObject.name}' near {[round(float(value), 1) for value in shown[border]]}; keep it {reach:g} inside the terrain's border")
     if owners is not None and owners.namesOf(patchVertices):
       raise ValueError(f"Cave '{name}' would overlap cave(s) {owners.namesOf(patchVertices)} in plan: the ground within its reach holds theirs; keep caves apart (or take one back)")
-    report = spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, patch, tubeVertices, tubeFaces, wallSlot, floorSlot)
+    report = spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, patch, tube, wallSlot, floorSlot, bandSlots)
+    editor.faces.layers.int.remove(layers["tube"])
     editor.normal_update()
     editor.to_mesh(mesh)
   finally:
@@ -800,7 +1004,7 @@ def splice(sceneObject, name, definition, strokes):
   return report | {"ends": ends, "levelStretches": line.levelStretches()}
 
 
-def spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, patch, tubeVertices, tubeFaces, wallSlot, floorSlot):
+def spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, patch, tube, wallSlot, floorSlot, bandSlots):
   shapeLayers = dict(editor.verts.layers.shape.items())
   layerSet = LayerSet(editor)
   surfaceLayers = [layer for key, kind, layer in layerSet.face if key.startswith("int:" + bridgeAuthoring.layerAttributePrefix)]
@@ -815,7 +1019,7 @@ def spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, pa
   patchVertices = sorted({vertex.index for face in patch for vertex in face.verts})
   localIndex = {vertex: position for position, vertex in enumerate(patchVertices)}
   cutPositions, cutFaces, cutSources, cutNormals = booleanCut(
-    shown[patchVertices], [[localIndex[vertex.index] for vertex in face.verts] for face in patch], [localIndex[vertex] for vertex in ring], tubeVertices, tubeFaces,
+    shown[patchVertices], [[localIndex[vertex.index] for vertex in face.verts] for face in patch], [localIndex[vertex] for vertex in ring], tube["vertices"], tube["faces"],
   )
   tree = mathutils.kdtree.KDTree(len(patchVertices))
   for position, vertex in enumerate(patchVertices):
@@ -826,12 +1030,13 @@ def spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, pa
     _, found, distance = tree.find(point)
     if distance < matchDistance:
       original[index] = patchVertices[found]
+  cutFaces, cutSources, cutNormals = withoutSlivers(cutPositions, *snappedCut(cutFaces, cutSources, cutNormals, original))
   onTerrain, onLining = {}, numpy.zeros(len(cutPositions), dtype=bool)
   for face, source in zip(cutFaces, cutSources):
     for vertex in face:
       if source >= 0:
         onTerrain.setdefault(vertex, int(source))
-      elif source == -2:
+      elif source <= -2:
         onLining[vertex] = True
   unchanged = {
     int(source) for face, source in zip(cutFaces, cutSources)
@@ -908,8 +1113,11 @@ def spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, pa
       created[layers["face"]] = sources[int(source)] + 1
       pieces += 1
     else:
-      slot = floorSlot if normal[2] > floorNormalZ else wallSlot
+      tubeFace = -2 - int(source)
+      band = int(tube["bands"][tubeFace])
+      slot = bandSlots[band] if band >= 0 else floorSlot if normal[2] > floorNormalZ else wallSlot
       created.material_index, created.smooth = slot, True
+      created[layers["tube"]] = tubeFace
       for layer in surfaceLayers:
         created[layer] = bridgeAuthoring.uncovered
       if baseLayer is not None:
@@ -917,7 +1125,12 @@ def spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, pa
       created[layers["face"]] = bridgeCaveData.liningFaceTag
       lining += 1
     newFaces.append(created)
-  welded = weldMouth(editor, newFaces, rankOf, pointOf, definition["edgeLength"] * mouthEdgeShare)
+  # A hall's mouth is left as cut, so its walls and ceiling meet the ground square; a band's edges meet it as lines of the seam a band's
+  # height apart, which welding at a third of an edge would fold together.
+  shortest = 0.0 if definition["wallShare"] == 1 else definition["edgeLength"] * mouthEdgeShare
+  if definition["trimBands"]:
+    shortest = min(shortest, tube["shortestStretch"] / 2)
+  welded = weldMouth(editor, newFaces, rankOf, pointOf, shortest)
   caveFaces = {face for face in newFaces if face.is_valid}
   polygons = [face for face in caveFaces if len(face.verts) > 3]
   if polygons:
@@ -933,11 +1146,12 @@ def spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, pa
   caveFaces = [face for face in caveFaces if face.is_valid]
   requireSealed(caveFaces)
   liningFaces = [face for face in caveFaces if face[layers["face"]] == bridgeCaveData.liningFaceTag]
-  mapLining(editor, liningFaces, pointOf, definition["worldUnitsPerRepeat"])
+  bandFaces = mapLining(editor, liningFaces, pointOf, definition, tube, layers["tube"])
   return {
     "object": sceneObject.name, "cave": name, "patchFaces": len(patch), "plugFaces": len(changed), "plugVertices": len(plugIdentifiers),
     "ringVertices": ringCount, "liningVertices": liningCount, "pieces": pieces, "liningFaces": lining, "weldedAtMouth": welded, "doubledFacesRemoved": len(doubled),
-    "tubeFaces": len(tubeFaces), "records": records,
+    "tubeFaces": len(tube["faces"]), "records": records,
+    "trimBands": [{"fromFloor": band["fromFloor"], "height": band["height"], "material": band["material"], "faces": count} for band, count in zip(definition["trimBands"], bandFaces)],
   } | cutReport(caveFaces, liningFaces, pointOf)
 
 
@@ -953,23 +1167,50 @@ def requireSealed(caveFaces):
     )
 
 
-def mapLining(editor, faces, pointOf, worldUnitsPerRepeat):
-  """Box-map lining faces from where they stand, at worldUnitsPerRepeat, as projectUVs maps a face along its normal's largest axis: as
-  their UVs and, where the layers map transitions, as their base mapping with no transition of their own."""
+def mapLining(editor, faces, pointOf, definition, tube, tubeLayer):
+  """Map lining faces from where they stand, as their UVs and, where the layers map transitions, as their base mapping with no
+  transition of their own: box-mapped at worldUnitsPerRepeat, as projectUVs maps a face along its normal's largest axis; a trim band's
+  faces along the band, u along their box axis and v up from the band's bottom edge (over the floor where the face lies), at the band's
+  repeat, so a strip texture runs once up the band. Returns how many faces each band has."""
   uvLayer = editor.loops.layers.uv[bridgeSurfacing.uvLayerName]
   vectors = editor.loops.layers.float_vector
   base = vectors.get(bridgeSurfacing.baseMappingName)
   transitions = [layer for name, layer in vectors.items() if name.startswith(bridgeSurfacing.transitionMappingPrefix)]
   boxAxes = [numpy.array(bridgeSurfacing.planarAxes(numpy.eye(3)[axis])) for axis in range(3)]
+  bandFaces = [0] * len(definition["trimBands"])
   for face in faces:
     points = numpy.array([list(pointOf[vertex]) for vertex in face.verts])
-    axes = boxAxes[int(numpy.abs(numpy.cross(points[1] - points[0], points[2] - points[0])).argmax())]
-    for loop, (u, v) in zip(face.loops, (points @ axes.T / worldUnitsPerRepeat).tolist()):
+    normal = numpy.abs(numpy.cross(points[1] - points[0], points[2] - points[0]))
+    tubeFace = face[tubeLayer]
+    band = int(tube["bands"][tubeFace])
+    if band < 0:
+      uvs = points @ boxAxes[int(normal.argmax())].T / definition["worldUnitsPerRepeat"]
+    else:
+      trim = definition["trimBands"][band]
+      along = boxAxes[0 if normal[0] >= normal[1] else 1][0]
+      uvs = numpy.column_stack([points @ along, points[:, 2] - liningFloors(points, tube, tubeFace) - trim["fromFloor"]]) / trim["worldUnitsPerRepeat"]
+      bandFaces[band] += 1
+    for loop, (u, v) in zip(face.loops, uvs.tolist()):
       loop[uvLayer].uv = (u, v)
       if base is not None:
         loop[base] = (u, v, 0.0)
       for layer in transitions:
         loop[layer] = (math.nan, math.nan, math.nan)
+  return bandFaces
+
+
+def liningFloors(points, tube, tubeFace):
+  """The floor's height under points of the lining that came from one face of the tube: graded between the two rows the face spans,
+  by how far along from one to the other each lies (the end's floor on a cap)."""
+  first, second = tube["spans"][tubeFace]
+  if first == second:
+    return numpy.full(len(points), tube["floors"][first])
+  corners = numpy.array(tube["faces"][tubeFace])
+  rows = corners // tube["size"]
+  start, end = tube["vertices"][corners[rows == first], :2].mean(axis=0), tube["vertices"][corners[rows == second], :2].mean(axis=0)
+  run = end - start
+  shares = numpy.clip((points[:, :2] - start) @ run / (run @ run), 0.0, 1.0)
+  return tube["floors"][first] + shares * (tube["floors"][second] - tube["floors"][first])
 
 
 def cutReport(faces, liningFaces, pointOf):
@@ -1156,13 +1397,13 @@ def describeCaves(sceneObject):
 
 # Commands
 
-def cutCave(objectName, name, path, widths, heights, wallMaterial, floorMaterial, worldUnitsPerRepeat, edgeLength, wallShare, breakup, mouthFade, maximumFloorDegrees):
+def cutCave(objectName, name, path, widths, heights, wallMaterial, floorMaterial, worldUnitsPerRepeat, edgeLength, wallShare, breakup, mouthFade, maximumFloorDegrees, trimBands):
   sceneObject = requireTerrain(objectName)
   if not name.strip():
     raise ValueError("A cave needs a name")
   if name in bridgeCaveData.caves(sceneObject):
     raise ValueError(f"'{objectName}' already has a cave '{name}'; editCave changes it")
-  definition = caveDefinition(path, widths, heights, wallMaterial, floorMaterial, worldUnitsPerRepeat, edgeLength, wallShare, breakup, mouthFade, maximumFloorDegrees)
+  definition = caveDefinition(path, widths, heights, wallMaterial, floorMaterial, worldUnitsPerRepeat, edgeLength, wallShare, breakup, mouthFade, maximumFloorDegrees, trimBands)
   requireIntact(sceneObject)
   with restoredOnFailure(sceneObject):
     return splice(sceneObject, name, definition, [])
@@ -1218,7 +1459,7 @@ def traceLedge(objectName, start, end, floorFrom, floorTo, width, height, side, 
   line = start + alongs[:, None] * direction
   reach = faceReachWidths * width
   shown, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
-  surface = TerrainSurface(sceneObject, shown, numpy.vstack([start, end]), reach + width)
+  surface = TerrainSurface(shown, bridgeMeshAccess.meshTriangles(sceneObject), numpy.vstack([start, end]), reach + width)
   floors = floorFrom + (floorTo - floorFrom) * alongs / length
   # A point's floor height follows its distance along the traced path, so the grade is even, and where its face lies depends on that
   # height: a few rounds settle the two.

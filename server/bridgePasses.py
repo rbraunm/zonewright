@@ -154,6 +154,5 @@ def collapseShapingPasses(objectName):
 commands = {
   "addShapingPass": (addShapingPass, True),
   "setShapingPass": (setShapingPass, True),
-  "removeShapingPass": (removeShapingPass, True),
   "collapseShapingPasses": (collapseShapingPasses, True),
 }
