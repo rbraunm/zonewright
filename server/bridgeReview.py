@@ -14,6 +14,8 @@ import bridgeBoundaries
 import bridgeExport
 import bridgeMeshAccess
 import bridgeReviewGuides
+import bridgeStructureData
+import bridgeStructures
 import bridgeViews
 from playerScale import playerHeight, stepHeight, walkableNormalZ
 
@@ -57,12 +59,13 @@ def triangulated(sceneObject, depsgraph, matrix):
     mesh.loop_triangles.foreach_get("material_index", materialIndices)
   finally:
     evaluated.to_mesh_clear()
-  slotNames = [slot.material.name if slot.material else None for slot in sceneObject.material_slots]
+  slotNames = [slot.material.name_full if slot.material else None for slot in sceneObject.material_slots]
   return positions, triangles.reshape(-1, 3), [slotNames[index] if index < len(slotNames) else None for index in materialIndices]
 
 
 def collectConstruction(outputPath):
-  """Writes the zone's triangles to outputPath (.npz) and returns its texture names and placement count."""
+  """Writes the zone's triangles to outputPath (.npz), each placement's model at its placement (a placed collection's meshes and, to any
+  depth, those of the collections it instances), and returns its texture names (materials by full name) and placement count."""
   depsgraph = bpy.context.evaluated_depsgraph_get()
   shipped, _ = bridgeExport.exportedObjects()
   parts, placements = [], 0
@@ -72,11 +75,7 @@ def collectConstruction(outputPath):
       parts.append((not isTerrain, triangulated(sceneObject, depsgraph, sceneObject.matrix_world)))
       placements += not isTerrain
     elif role == "instance":
-      collection = sceneObject.instance_collection
-      offset = mathutils.Matrix.Translation(-collection.instance_offset)
-      for member in collection.all_objects:
-        if member.type == "MESH" and not member.hide_render:
-          parts.append((True, triangulated(member, depsgraph, sceneObject.matrix_world @ offset @ member.matrix_world)))
+      parts += [(True, triangulated(member, depsgraph, matrix)) for member, matrix in bridgeMeshAccess.objectParts(sceneObject)]
       placements += 1
   textureNames, vertexChunks, triangleChunks, textureChunks, objectChunks, vertexCount = {}, [], [], [], [], 0
   for isObject, (positions, triangles, materialNames) in parts:
@@ -312,9 +311,16 @@ def walkRoute(path, sampleSpacing):
   widths = [(row["left"] if row["left"] is not None else routeSideReach) + (row["right"] if row["right"] is not None else routeSideReach) for row in rows]
   narrowest = int(numpy.argmin(widths))
   wet = [row for row in rows if row["waterDepth"] is not None]
+  # A flight's treads stand level, so the slope stood on reads 0 up a stair; the climb between samples reads its grade.
+  climbs = [
+    (math.degrees(math.atan2(abs(second["at"][2] - first["at"][2]), second["distance"] - first["distance"])), first, second)
+    for first, second in zip(rows[:-1], rows[1:]) if second["distance"] > first["distance"]
+  ]
+  steepestClimb = max(climbs, key=lambda climb: climb[0]) if climbs else None
   return {
     "length": round(walk.travelled, 1), "samples": len(rows), "walkable": not walk.problems, "problems": walk.problems, "oneWay": walk.oneWay,
     "steepest": {"slopeDegrees": round(walk.steepest[0], 1), "at": roundVector(walk.steepest[1])},
+    "steepestGrade": None if steepestClimb is None else {"degrees": round(steepestClimb[0], 1), "from": steepestClimb[1]["at"], "to": steepestClimb[2]["at"]},
     "narrowest": {"width": round(widths[narrowest], 1), "at": rows[narrowest]["at"], "left": rows[narrowest]["left"], "right": rows[narrowest]["right"]},
     "lowestHeadroom": None if walk.lowest is None else {"headroom": round(walk.lowest[0], 1), "at": roundVector(walk.lowest[1])},
     "deepestWater": max(({"depth": row["waterDepth"], "at": row["at"]} for row in wet), key=lambda item: item["depth"]) if wet else None,
@@ -327,9 +333,13 @@ def roundVector(vector):
 
 
 def givenPath(path, route):
+  """A route's points: given, a saved review route's, or a bridge's, flight's, or walkway's walk line."""
   if (path is None) == (route is None):
-    raise ValueError("Give path, the route's [x, y, z] points, or route, the name of a saved review route")
-  return bridgeReviewGuides.routePath(route) if route is not None else path
+    raise ValueError("Give path, the route's [x, y, z] points, or route, the name of a saved review route or of a bridge, flight, or walkway")
+  if path is not None:
+    return path
+  structure = bridgeStructureData.findStructure(route)
+  return bridgeStructures.walkLine(structure) if structure is not None else bridgeReviewGuides.routePath(route)
 
 
 def walkGivenRoute(path, route, sampleSpacing):

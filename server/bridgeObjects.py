@@ -13,9 +13,13 @@ import bridgeCaveData
 import bridgeCaves
 import bridgeExport
 import bridgeGrading
+import bridgeKitData
+import bridgeKitGeometry
 import bridgeMeshAccess
 import bridgePasses
 import bridgeShaping
+import bridgeStructureData
+import bridgeStructures
 import bridgeWater
 
 roundShapes = ("cylinder", "cone", "sphere")
@@ -27,7 +31,7 @@ primitiveKinds = ("plane", "grid", "cube") + roundShapes
 
 
 def roundVector(vector, digits=3):
-  return [round(float(component), digits) for component in vector]
+  return [round(float(component), digits) + 0.0 for component in vector]
 
 
 def targetCollection(collectionName):
@@ -303,14 +307,33 @@ def transformObjects(names, translate, rotateDegrees, scale, location, rotationD
   if all(value is None for value in (translate, rotateDegrees, scale, location, rotationDegrees)):
     raise ValueError("Nothing to change: pass at least one of translate, rotateDegrees, scale, location, rotationDegrees")
   sceneObjects = [bridgeMeshAccess.requireObject(name) for name in names]
+  for sceneObject in sceneObjects:
+    bridgeStructureData.requireNotStructurePart(sceneObject, "transformObjects")
   bodies = [sceneObject for sceneObject in sceneObjects if bridgeMeshAccess.waterProperty in sceneObject]
   if bodies and any(value is not None for value in (rotateDegrees, scale, location, rotationDegrees)):
     raise ValueError(
       f"{[body.name for body in bodies]} are water bodies, built from what they are made from: translate moves one, built again where it"
       " lands; turn or reshape one with editWater (its lip, path, seed, or level)")
-  for body in bodies:
-    bridgeWater.moveBody(body, translate)
-  for sceneObject in [sceneObject for sceneObject in sceneObjects if sceneObject not in bodies]:
+  others = [sceneObject for sceneObject in sceneObjects if sceneObject not in bodies]
+  before = [(sceneObject.location.copy(), sceneObject.rotation_euler.copy(), sceneObject.scale.copy()) for sceneObject in others]
+  try:
+    transformEach(others, translate, rotateDegrees, scale, location, rotationDegrees)
+    bpy.context.view_layer.update()
+    for sceneObject in others:
+      if bridgeKitData.isPlacedPiece(sceneObject):
+        bridgeKitData.requireUpright(sceneObject, "this transform")
+    for body in bodies:
+      bridgeWater.moveBody(body, translate)
+  except ValueError:
+    for sceneObject, (place, turn, size) in zip(others, before):
+      sceneObject.location, sceneObject.rotation_euler, sceneObject.scale = place, turn, size
+    bpy.context.view_layer.update()
+    raise
+  return {"objects": [describeTransform(sceneObject) for sceneObject in sceneObjects]}
+
+
+def transformEach(sceneObjects, translate, rotateDegrees, scale, location, rotationDegrees):
+  for sceneObject in sceneObjects:
     if location is not None:
       sceneObject.location = location
     if translate is not None:
@@ -324,14 +347,14 @@ def transformObjects(names, translate, rotateDegrees, scale, location, rotationD
       sceneObject.rotation_euler = (worldRotation @ sceneObject.rotation_euler.to_matrix()).to_euler(sceneObject.rotation_mode)
     if scale is not None:
       sceneObject.scale = [current * factor for current, factor in zip(sceneObject.scale, scale)]
-  bpy.context.view_layer.update()
-  return {"objects": [describeTransform(sceneObject) for sceneObject in sceneObjects]}
 
 
 def duplicateObjects(names, offset, linkData):
   """Copy objects with everything parented under them, once each: an object named under another named one comes with that one. A water
   body's copy is built again from what it is made from, moved by the offset, against the ground there, its sprays with it."""
   sources = [bridgeMeshAccess.requireObject(name) for name in names]
+  for source in sources:
+    bridgeStructureData.requireNotStructurePart(source, "duplicateObjects")
   roots = [source for source in sources if not any(ancestor in sources for ancestor in ancestorsOf(source))]
   bodies = [root for root in roots if bridgeMeshAccess.waterProperty in root]
   for body in bodies:
@@ -375,8 +398,8 @@ def joinObjects(names, into):
   """Merge meshes into one object; the `into` object keeps its name, origin, and transform, and the others are removed."""
   if into not in names or len(set(names)) < 2:
     raise ValueError(f"joinObjects needs at least two distinct meshes including '{into}', got {names}")
-  sceneObjects = [bridgeMeshAccess.requireMeshObject(name) for name in names]
-  target = bridgeMeshAccess.requireMeshObject(into)
+  sceneObjects = [bridgeMeshAccess.requireEditableMesh(name, "joinObjects") for name in names]
+  target = bridgeMeshAccess.requireEditableMesh(into, "joinObjects")
   if any(len(sceneObject.modifiers) for sceneObject in sceneObjects):
     raise ValueError("Apply or remove modifiers before joining; join merges the base meshes")
   for sceneObject in sceneObjects:
@@ -406,6 +429,8 @@ def deleteObjects(names):
   """Delete objects, a water body with the emitters its sprays placed; the feet of the falls landing in a deleted pool or river are
   placed again on what lies under them then, refused before anything is deleted where one cannot stand."""
   sceneObjects = [bridgeMeshAccess.requireObject(name) for name in names]
+  for sceneObject in sceneObjects:
+    bridgeStructureData.requireNotStructurePart(sceneObject, "deleteObjects")
   feet = bridgeWater.fallFeetWithout(sceneObjects)
   sprays = [spray for spray in bodySprays({sceneObject.name for sceneObject in sceneObjects if bridgeMeshAccess.waterProperty in sceneObject}) if spray.name not in names]
   removedSprays = sorted(spray.name for spray in sprays)
@@ -423,6 +448,9 @@ def deleteObjects(names):
 def organize(renames, parents, collections):
   if renames is None and parents is None and collections is None:
     raise ValueError("Nothing to organize: pass renames, parents, or collections")
+  renamedFrom = {newName: oldName for oldName, newName in (renames or {}).items()}
+  for name in list(renames or {}) + [renamedFrom.get(name, name) for name in list(parents or {}) + [parent for parent in (parents or {}).values() if parent is not None] + list(collections or {})]:
+    bridgeStructureData.requireNotStructurePart(bridgeMeshAccess.requireObject(name), "organize")
   for oldName, newName in (renames or {}).items():
     sceneObject = bridgeMeshAccess.requireObject(oldName)
     requireNewName(newName)
@@ -491,6 +519,17 @@ def getObjectDetail(name):
     }
   if sceneObject.instance_type == "COLLECTION" and sceneObject.instance_collection is not None:
     detail["instanceCollection"] = sceneObject.instance_collection.name
+  if bridgeKitData.isPlacedPiece(sceneObject):
+    placement = bridgeKitGeometry.describePlacement(sceneObject)
+    detail["kitPiece"] = {key: value for key, value in placement["piece"].items() if key != "size"} | {"facingDegrees": placement["facingDegrees"], "sockets": placement["sockets"]}
+  elif sceneObject.type == "MESH" and (piece := bridgeKitData.pieceOfMesh(sceneObject)) is not None:
+    detail["kitPiece"] = bridgeKitGeometry.describePiece(piece)
+  part = bridgeStructures.describePart(sceneObject)
+  if part is not None:
+    detail["structurePart"] = part
+  gathered = bridgeKitData.prefabPartOf(sceneObject)
+  if gathered is not None:
+    detail["prefabPart"] = gathered
   return detail
 
 

@@ -262,8 +262,8 @@ def islandShare(vertices, triangles, materials):
 
 def measureConstruction(geometry, frames):
   """How the zone is built: its terrain (the zone's own meshes: an EQG zone's .ter, a classic zone's region meshes, an EQ terrain zone's
-  tiles) against what is placed on it. Placed classic objects are not measured, and an EQ terrain zone surfaces its tiles by ecosystem
-  rather than by face, so those measures are None there."""
+  tiles) against what is placed on it, and the triangles of every placement of every placed model. Placed classic objects are not
+  measured, and an EQ terrain zone surfaces its tiles by ecosystem rather than by face, so those measures are None there."""
   _, areas, normalZ = frames
   terrain = ~geometry["triangleIsObject"]
   footprintBounds = geometry["terrainBounds"] if geometry["terrainBounds"] is not None else (geometry["vertices"].min(0), geometry["vertices"].max(0))
@@ -281,6 +281,7 @@ def measureConstruction(geometry, frames):
     "terrainSteepShare": round(steepTerrain / terrainArea, 4) if terrainArea else None,
     "steepOnTerrainShare": round(steepTerrain / (steepTerrain + steepObjects), 4) if geometry["format"] != "wld" and steepTerrain + steepObjects else None,
     "terrainPaintedShare": round(float(areas[terrain & geometry["trianglePainted"]].sum()) / terrainArea, 4) if faceSurfaced and terrainArea else None,
+    "placedTriangles": int((~terrain).sum()) if geometry["format"] != "wld" else None,
   }
 
 
@@ -291,7 +292,7 @@ measuredGroups = {
   "verticality": (2, measureVerticality),
   "content": (2, measureContent),
   "regions": (2, measureRegions),
-  "construction": (1, measureConstruction),
+  "construction": (2, measureConstruction),
 }
 
 

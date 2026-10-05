@@ -365,6 +365,7 @@ comparedMeasures = {
   "construction.terrainSteepShare": "Share of terrain area steeper than 50 degrees: cliffs and walls modeled into the ground.",
   "construction.steepOnTerrainShare": "Share of all steep area that is terrain rather than placed models.",
   "construction.terrainPaintedShare": "Share of terrain area painted from palette maps or blended in the shader.",
+  "construction.placedTriangles": "Triangles of the placed models, each counted at every placement (the zone's export gives the same total).",
   "content.placementCount": "Objects placed on the terrain.",
 }
 comparedFormats = ("wld", "eqgz", "eqtzp")
@@ -392,10 +393,12 @@ def percentileRank(values, value):
 @guardedTool()
 async def compareWithClientZones(context: Context, formats: list[str] = ["eqgz"], zones: list[str] | None = None):
   """Measure the open scene's zone as the zone survey measures the client's (its terrain collection as the terrain, every other rendered
-  mesh and collection instance as placed on it) and place each measure among the client's zones of the given formats (wld, eqgz, eqtzp;
-  EQG zones by default, the 2011-era target), or among the named `zones` (such as the references a zone is modeled on): the zone's
-  value, the client zones' 10th, 25th, 50th, 75th, and 90th percentiles, and the zone's percentile among them. Use it after each pass to
-  steer by how the client's own zones are built rather than by taste alone."""
+  mesh and collection instance as placed on it, a placed building's nested pieces included) and place each measure among the client's
+  zones of the given formats (wld, eqgz, eqtzp; EQG zones by default, the 2011-era target), or among the named `zones` (such as the
+  references a zone is modeled on): the zone's value, the client zones' 10th, 25th, 50th, 75th, and 90th percentiles, and the zone's
+  percentile among them. `construction.placedTriangles` sets the triangles of every placement of every placed model (kit pieces,
+  buildings, spans, wall sections; the same total checkExport gives) beside the client's (classic zones' placed objects are not
+  measured). Use it after each pass to steer by how the client's own zones are built rather than by taste alone."""
   unknown = sorted(set(formats) - set(comparedFormats))
   if unknown or not formats:
     raise ToolError(f"formats are among {list(comparedFormats)}, got {formats}")
@@ -816,7 +819,7 @@ async def renderView(
   context: Context, view: dict, shading: str = "client", bandHeight: float = 50.0, guides: bool = True, swimVolumes: bool = False, labels: list[str] | None = None,
   liquidTime: float | None = None,
 ):
-  """Render the EQ preview of a view: {"camera": name} (a review camera saved from a standAt view stands the scale figure again where she stood, her ground found as figureAt's is; one matched to concept art renders at the art's aspect and its own field of view), {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], never what they pass through (as walkRoute), or with z on the ground found from 3 above z down to 50 below it, for caves, under overhangs, and on ledges; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera, or stood by hand facing the camera with "figureAt": [x,y] or [x,y,z] in the view, its ground found as standAt's is, on a ledge or ramp too narrow to walk her ahead on), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, the game's north (+X) up and east (-Y) right as the in-game map draws, `width` units across (along y), without fog. {"frame": {"objects": [names], "headingDegrees": h, "pitchDegrees": p}} looks at the named meshes or collection instances from that heading and pitch, standing back so they fit (its result's eye and target reproduce that camera). shading "client" draws the zone as the client does, its point lights and particle emitters with it (the result's pointLights counts the lights and the objects they light, and emitters the emitters drawn, their particles, and those not drawn, grouped by why); "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout; "coverage" draws only what exportZone would export, each face in the color of its export check status (checkExport): black where it cannot export, red for zero texture area, brown for a blockout material, yellow for texture stretched or squeezed, orange where the base material shows, magenta along a ground border without a transition strip, grey when fine, and blue wherever a face is seen from its back, lit from the northwest as layout is, softer so no shaded face reads as black, and without fog; the result counts the exported faces by status. The value shadings draw every mesh (each part of a collection instance as placed, and the scale figure) from a value of its own, lit softly from the northwest, without fog, the result giving the scale: "objects" draws each object in its own flat color, the ones the view shows most of first (blue, orange, green, red, purple, yellow, cyan, magenta, lime, pink, teal, lavender, brown, olive, then grey for the rest), with a legend of the objects the view shows, each with its color and share of the view; "curvature" draws convex forms warm (orange), concave cool (blue), and flat neutral grey, a ridge or trough curved to a radius of 16 at half color and sharper ones fuller, from the bend of the edges around each vertex (so where two meshes meet without sharing edges, as a rock sunk into the ground, there is none); "triangleDensity" draws each face's triangles per 10,000 square units of its own area over fixed decades, blue 1, cyan 10, green 100, yellow 1,000, red 10,000 (the client's EQG terrains run from 8 to 5,083, 244 at the median), with the range the view shows; "texelDensity" draws each face's texture pixels per world unit (its diffuse texture's pixels over the area its texture coordinates spread them across) blue lowest through cyan, green, and yellow to red highest across the range the view shows (the result gives it and each color's value), dark grey where a face has no diffuse texture or texture coordinates: coverage's stretch check compares a face with its own material's usual scale, texelDensity compares materials with each other. labels [names] writes each named object's name on the view by its place (where its middle projects when the object shows there, else the middle of what shows of it), marked with a white dot, but only for the objects the view shows; the result lists the places and the named objects it does not show (an object hidden from renders, a guide with guides off, or one that is not a mesh or collection instance is refused). Guides (plot outlines, sketch massing) draw unless guides is false, and with them, in every shading, the view is tinted red where the boundaries (walls, lids, floors) stand, which the client never draws, a wall as a slab thick enough to show from above, and green where the zone lines stand, seen through the water but hidden behind and under the ground; with swimVolumes, the view is tinted where the swim volumes stand (cyan water, magenta lava), each box seen through the water, so its top shows evenly under a surface it meets or lies just below, but hidden behind and under the ground. Liquids draw as they stand at effect time 0, or at `liquidTime` seconds on the client's effect clock, each layer scrolled by its slides as the client's effects scroll it (time modulo 100): two views a second or two apart show which way and how fast a fall or river moves (liquid materials made before previews scrolled are refused, to be made again); emitters draw at the same moment of their steady state either way."""
+  """Render the EQ preview of a view: {"camera": name} (a review camera saved from a standAt view stands the scale figure again where she stood, her ground found as figureAt's is; one matched to concept art renders at the art's aspect and its own field of view), {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], never what they pass through (as walkRoute), or with z on the ground found from 3 above z down to 50 below it, for caves, under overhangs, and on ledges; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera, or stood by hand facing the camera with "figureAt": [x,y] or [x,y,z] in the view, its ground found as standAt's is, on a ledge or ramp too narrow to walk her ahead on), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, the game's north (+X) up and east (-Y) right as the in-game map draws, `width` units across (along y), without fog. {"frame": {"objects": [names], "headingDegrees": h, "pitchDegrees": p}} looks at the named meshes, collection instances, or structures (all their parts) from that heading and pitch, standing back so they fit (its result's eye and target reproduce that camera). shading "client" draws the zone as the client does, its point lights and particle emitters with it (the result's pointLights counts the lights and the objects they light, and emitters the emitters drawn, their particles, and those not drawn, grouped by why); "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout; "coverage" draws only what exportZone would export, each face in the color of its export check status (checkExport): black where it cannot export, red for zero texture area, brown for a blockout material, yellow for texture stretched or squeezed, orange where the base material shows, magenta along a ground border without a transition strip, grey when fine, and blue wherever a face is seen from its back, lit from the northwest as layout is, softer so no shaded face reads as black, and without fog; the result counts the exported faces by status. The value shadings draw every mesh (each part of a collection instance as placed, and the scale figure) from a value of its own, lit softly from the northwest, without fog, the result giving the scale: "objects" draws each object in its own flat color, the ones the view shows most of first (blue, orange, green, red, purple, yellow, cyan, magenta, lime, pink, teal, lavender, brown, olive, then grey for the rest), with a legend of the objects the view shows, each with its color and share of the view; "curvature" draws convex forms warm (orange), concave cool (blue), and flat neutral grey, a ridge or trough curved to a radius of 16 at half color and sharper ones fuller, from the bend of the edges around each vertex (so where two meshes meet without sharing edges, as a rock sunk into the ground, there is none); "triangleDensity" draws each face's triangles per 10,000 square units of its own area over fixed decades, blue 1, cyan 10, green 100, yellow 1,000, red 10,000 (the client's EQG terrains run from 8 to 5,083, 244 at the median), with the range the view shows; "texelDensity" draws each face's texture pixels per world unit (its diffuse texture's pixels over the area its texture coordinates spread them across) blue lowest through cyan, green, and yellow to red highest across the range the view shows (the result gives it and each color's value), dark grey where a face has no diffuse texture or texture coordinates: coverage's stretch check compares a face with its own material's usual scale, texelDensity compares materials with each other. labels [names] writes each named object's (or structure's, all its parts together) name on the view by its place (where its middle projects when the object shows there, else the middle of what shows of it), marked with a white dot, but only for the objects the view shows; the result lists the places and the named objects it does not show (an object hidden from renders, a guide with guides off, or one that is not a mesh or collection instance is refused). Guides (plot outlines, sketch massing) draw unless guides is false, and with them, in every shading, the view is tinted red where the boundaries (walls, lids, floors) stand, which the client never draws, a wall as a slab thick enough to show from above, and green where the zone lines stand, seen through the water but hidden behind and under the ground; with swimVolumes, the view is tinted where the swim volumes stand (cyan water, magenta lava), each box seen through the water, so its top shows evenly under a surface it meets or lies just below, but hidden behind and under the ground. Liquids draw as they stand at effect time 0, or at `liquidTime` seconds on the client's effect clock, each layer scrolled by its slides as the client's effects scroll it (time modulo 100): two views a second or two apart show which way and how fast a fall or river moves (liquid materials made before previews scrolled are refused, to be made again); emitters draw at the same moment of their steady state either way."""
   outputPath = newRenderPath()
   zone = await callBridge(context, "getZoneProperties", {})
   description = await callBridge(context, "renderView", {
@@ -1062,8 +1065,11 @@ def groupedExclusions(excluded, shownPerReason=25):
 
 exportChecksHelp = (
   " purpose is \"test\" (quick renders and test loads) or \"game\" (files for the EQ client and server). Both refuse the hard errors:"
-  " the file unsaved; objects export cannot take (a non-mesh in the terrain collection or among a placed collection's members, a placed"
-  " model scaled unevenly, model names that collide); faces with no material or a material createMaterial or createLiquidMaterial did not"
+  " the file unsaved; objects export cannot take (a non-mesh in the terrain collection, or among a placed collection's members, to any"
+  " depth, anything but meshes and collection instances; a placed model scaled unevenly; model names that collide); a placed kit piece or"
+  " building, or a structure, whose kit file or collection cannot be found; two materials that would share one name in the archive (a"
+  " kit's material and the zone's own of one name export apart, the kit's as <name>_<kit file stem>);"
+  " faces with no material or a material createMaterial or createLiquidMaterial did not"
   " make; a missing, packed, generated, or other-drive image, a non-DDS image whose sides are not powers of two, DDS data under another"
   " extension, two images that would share one DDS name, a cutout with a normal map; meshes without texture coordinates; a liquid"
   " material on anything but a water body; a mesh with surfacing layers whose modifiers change its faces; swim volumes a zone file"
@@ -1072,10 +1078,12 @@ exportChecksHelp = (
   " refuses blockout materials (createMaterial blockout) on exported faces, pools and rivers whose swimming is undecided or changed"
   " since their boxes were accepted, missing view values (fogOn, minClip, maxClip, sky or sky \"none\" stated, and the fog's start, end, and density"
   " when it is on), a missing safe point or underworld, a safe point over no ground above the underworld, zone lines without a target or sharing a"
-  " number, and, until reach mapping exists, any zone: containment cannot be checked yet. A test export lists all of these but"
+  " number, structures laid on ground or a kit that has changed since (stale: editStructure lays them again), and, until reach mapping"
+  " exists, any zone: containment cannot be checked yet. A test export lists all of these but"
   " containment as findings. Findings, never refusals, for both: texture coverage, each with where it lies: the base material showing where no unmuted"
-  " surfacing layer covers a face; ground borders on the terrain where two ground materials meet, walkable ground on at least one side,"
-  " with no paintTransition strip between them, as a length per border and its stretches (each a center, bounds, and length); texture stretched or squeezed (a texel lying over 2x longer one way than the other"
+  " surfacing layer covers a face (a cave's lining, in its own materials, is not ground under the base); ground borders on the terrain where two ground materials meet, walkable ground on at least one side,"
+  " with no paintTransition strip between them, as a length per border and its stretches (each a center, bounds, and length; a cave's"
+  " lining meeting the ground is no border); texture stretched or squeezed (a texel lying over 2x longer one way than the other"
   " in the world, or world units per repeat over 2x off, either way, the material's area-weighted median, `usualRepeat`); zero texture"
   " area; and back faces (faces wound against the rest of their surface: a closed surface faces out, a terrain sheet up)."
   " Each failure and finding names the object (and the placed objects that place it), the material, the image, and the face count, with"
@@ -1083,8 +1091,11 @@ exportChecksHelp = (
   " `coverage` counts the exported faces by status; `excluded` lists what is not the zone's own geometry by reason (guides, plot borders,"
   " regions, anything hidden from renders, placed client content); `toConfirm` lists shipped meshes with shaping passes off or surfacing"
   " layers muted, which leave the zone as if never made, and caves and defined passes whose ground moved since they were made"
-  " (stale; a game export refuses them, and caves broken by a change outside their guards refuse both); `swim` the undecided and changed pools and rivers; `boundaries` and `zoneLines`"
-  " what goes into the terrain as invisible walls and into the .zon as zone lines."
+  " (stale; a game export refuses them, and caves broken by a change outside their guards refuse both), and stale structures with why"
+  " (ground, kit, missing); `swim` the undecided and changed pools and rivers; `boundaries` and `zoneLines`"
+  " what goes into the terrain as invisible walls and into the .zon as zone lines; `structures` each structure's models (file,"
+  " triangles, placements) and triangles (one laid as ground has its triangles in the terrain and no model), and `placedTriangles`"
+  " the triangles of every placement of every placed model, which compareWithClientZones sets beside the client's zones."
 )
 
 
@@ -1132,7 +1143,7 @@ def replaceExportFiles(archivePath, archiveBytes, sideContents):
 def exportReport(report):
   return {key: report[key] for key in ("purpose", "failures", "findings", "coverage")} | {
     "excluded": groupedExclusions(report["excluded"]), "toConfirm": report["toConfirm"], "swim": report["swim"],
-    "boundaries": report["boundaries"], "zoneLines": report["zoneLines"],
+    "boundaries": report["boundaries"], "zoneLines": report["zoneLines"], "structures": report["structures"], "placedTriangles": report["placedTriangles"],
   }
 
 
@@ -1154,14 +1165,18 @@ async def checkExport(context: Context, path: str, purpose: str):
   " archive goes in last, and a failure at any point puts every file back as it was, so a refused or failed export never replaces the"
   " last good archive or its side files and leaves no partial file. The `terrain` collection's meshes become the zone's terrain;"
   " every other rendered mesh becomes a model placed at its object's transform (copies sharing a mesh and without modifiers share one"
-  " model) and every collection instance a model of its collection's meshes. createMaterial materials export as the client's shaders:"
+  " model) and every collection instance a model of its collection's meshes and, to any depth, of the collections its members instance."
+  " So a kit piece is one model however often placed, a placed building one model per part shared by its placements and its plinth one"
+  " of its own, a bridge, flight, or walkway one model (or terrain, laid in the terrain collection), and a wall its section piece's"
+  " model, one model per distinct shear, and its post's. createMaterial materials export as the client's shaders:"
   " diffuse and normal map as Opaque_MaxCB1.fx, diffuse only as Opaque_MaxC1.fx, a cutout (diffuse only) as Chroma_MPLBasicAT.fx;"
   " createLiquidMaterial materials as its water, waterfall, and lava shaders with their values. DDS textures are stored unchanged, others"
   " as uncompressed DDS. The swim volumes go into the .zon as AWT_ (water) and ALV_ (lava) regions as they stand (export derives none)"
   " and the zone lines as ATP_ regions, unturned. The boundaries (placeBoundaryWall, placeBoundaryPlane) go into the terrain as"
   " triangles without a material, which the client never draws but collides with (flag 0), a wall's facing both ways and a lid's down"
   " and a floor's up, as they face in the scene; triangles of liquid materials, cutout"
-  " materials, and objects marked passable (markPassable) are flagged 0x1, which the client lets players through."
+  " materials, objects marked passable (markPassable), and faces flagged passable (a span's ropes and rails) are flagged 0x1, which the"
+  " client lets players through."
   " Point lights placed with placeLights go into the .zon; emitters placed with placeEmitters go into <zone>_EnvironmentEmitters.txt"
   " beside the archive (the client reads that list loose from its own folder). A zone with housing (setZoneHousing) also gets"
   " <zone>_housing.json beside the archive, its plots as Peridot's plot content gives them (address, border door, center and heading in"
@@ -1444,7 +1459,8 @@ async def transformObjects(
   context: Context, names: list[str], translate: list[float] | None = None, rotateDegrees: list[float] | None = None, scale: list[float] | None = None,
   location: list[float] | None = None, rotationDegrees: list[float] | None = None,
 ):
-  """Move, rotate, or scale objects: relative (translate, rotateDegrees about world axes, scale factors) or absolute (location, rotationDegrees); not both forms of one channel. A water body, built from what it is made from, only translates: what it is made from moves and it is built again against the ground there, its sprays with it (and the feet of falls landing in a moved pool or river); editWater turns or reshapes one."""
+  """Move, rotate, or scale objects: relative (translate, rotateDegrees about world axes, scale factors) or absolute (location, rotationDegrees); not both forms of one channel. A water body, built from what it is made from, only translates: what it is made from moves and it is built again against the ground there, its sprays with it (and the feet of falls landing in a moved pool or river); editWater turns or reshapes one.
+  A placed kit piece turns only about the vertical and keeps scale 1: a tilt or scale of one is refused, moving none."""
   return await callBridge(context, "transformObjects", {"names": names, "translate": translate, "rotateDegrees": rotateDegrees, "scale": scale, "location": location, "rotationDegrees": rotationDegrees})
 
 
@@ -1485,9 +1501,13 @@ async def getObjectDetail(context: Context, name: str):
   """One object in depth: transform (rotation as XYZ Euler degrees whatever its rotation mode), size, world bounds (for a collection
   instance, its instanced meshes'; null when it instances none), parent, collections, modifiers; for meshes the mesh's name, the
   vertex, face, and triangle counts, faces per material, UV layers, world units per texture repeat, vertex groups, shaping passes,
-  surfacing layers, its defined passes (graded routes, the plots graded on it, in the order made) and its caves (cutCave), each with
-  whether its ground moved since it was made (stale: grading it again would move it, or the ground within the cave's reach moved, and
-  how far), which regradeTerrain or editCave puts right."""
+  surfacing layers, its defined passes (graded routes, dressed facades, the plots graded on it, in the order made) and its caves
+  (cutCave), each with whether its ground moved since it was made (stale: grading it again would move it, or the ground within the
+  cave's reach moved, and how far), which regradeTerrain or editCave puts right. A placed kit piece gives kitPiece: its kit, piece,
+  kind, module, passable, fingerprint, facing, and its sockets in the world, each joined to another's or free; a kit piece's own mesh
+  gives kitPiece: its record (kind, sockets, passable, openings), size, module, triangles, each material's texture and measured repeat,
+  seams, and fingerprint. A structure's part gives structurePart: its structure, kind, and role (span, section, or post; a building's
+  part by name: exterior, interior, roof, plinth). A placed piece gathered into a prefab gives prefabPart: its prefab and part."""
   return await callBridge(context, "getObjectDetail", {"name": name})
 
 
@@ -1506,10 +1526,12 @@ async def walkRoute(context: Context, path: list[list[float]] | None = None, rou
   boundaries, never drawn; not water, which is waded or swum, nor faces players pass through: liquid and cutout materials, objects
   marked passable, faces an imported zone file flags passable; nor guides, regions, spawns, or doors, taken as open; ground inside a
   solid is no footing, ground under one-sided cover such as a roof plane is): from its first point, following the footing underfoot
-  past each point of `path` [[x, y, z], ...] or of the saved review route named `route` (saveReviewRoute), whose heights only need to
+  past each point of `path` [[x, y, z], ...], of the saved review route named `route` (saveReviewRoute), or of the walk line of the
+  bridge, flight, or walkway named `route` (its centerline at deck height, run on 5 past each end that stands on footing), whose heights only need to
   be within a step of the footing (so a route can run over an arch or under it). Judged for a player 6 units tall who walks slopes up
   to 60 degrees and steps up 2, in half-unit strides whatever `sampleSpacing`, which sets only the profile's rows (give `path` or
-  `route`, not both; renderRouteStrip shows the walk in pictures). Returns the length walked, the steepest face stood on, the narrowest footing
+  `route`, not both; renderRouteStrip shows the walk in pictures). Returns the length walked, the steepest face stood on, the steepest
+  grade climbed or descended between two profile rows (steepestGrade: a stair's level treads stand at 0 but climb at its pitch), the narrowest footing
   (how far it runs to each side before a drop of more than a player's height, a wall, a step too high, or a face too steep; null
   beyond 60), the lowest headroom, the deepest water over the footing; `problems`, everything that stops a player, each once over the
   stretch it covers: blocked (a boundary across the way at half a player's height, where it stands), rise (a wall or step over 2 in
@@ -1581,7 +1603,9 @@ async def setShapingPass(context: Context, objectName: str, name: str, strength:
 
 @guardedTool()
 async def removeShapingPass(context: Context, objectName: str, name: str):
-  """Remove a shaping pass and what it holds; the other passes keep theirs. A graded route's pass takes its definition with it."""
+  """Remove a shaping pass and what it holds; the other passes keep theirs. A graded route's pass takes its definition with it; a
+  facade's pass (dressFacade) takes the dressing back, cuts its cave again to fit the ground as it was (refit), and box-maps the faces it
+  had moved again from where they now stand (remappedFaces), so the facade can be dressed again."""
   return await callBridge(context, "removeShapingPass", {"objectName": objectName, "name": name})
 
 
@@ -1627,11 +1651,15 @@ async def gradeRoute(
 @guardedTool()
 async def regradeTerrain(context: Context, objectName: str):
   """Put every defined pass on a mesh back on target after other shaping changed the ground under them (a roughen, a sculpt, a pass
-  turned up, down, or off): each graded route (gradeRoute) and the plots graded on it (gradePlot, all together) are taken back and
-  graded again in the order they were first made, each on the ground as it then stands, so where two meet the later one still wins. A
-  muted or turned defined pass comes back unmuted at full strength (restoredFrom says which). Then every cave (cutCave) whose ground
-  moved since it was cut is cut again to fit it (refittedCaves, with how far its ground had moved). Reports what each one moved, in
-  order."""
+  turned up, down, or off): each graded route (gradeRoute), dressed facade (dressFacade), and the plots graded on it (gradePlot, all
+  together) are taken back and graded again in the order they were first made, each on the ground as it then stands, so where two meet the later one still wins. A
+  muted or turned defined pass comes back unmuted at full strength (restoredFrom says which). A defined pass graded on the ground as the
+  hand passes leave it takes back their work where it grades the ground (a facade's apron levels a mound sculpted on it): each replay
+  names the hand passes it overrode there (overrodeHandWork: pass, vertices, largest offset). Then every cave (cutCave) whose ground
+  moved since it was cut is cut again to fit it (refittedCaves, with how far its ground had moved), and the faces a facade moved are
+  box-mapped again. Whole or not at all: a refused refit leaves the mesh as it was. Reports what each one moved, in order, and
+  staleStructures: every structure (buildBridge, buildWall, ...) whose ground or kit changed since it was laid, with why; editStructure
+  lays each again."""
   return await callBridge(context, "regradeTerrain", {"objectName": objectName})
 
 
@@ -1639,11 +1667,17 @@ async def regradeTerrain(context: Context, objectName: str):
 async def cutCave(
   context: Context, objectName: str, name: str, path: list[list[float]], widths: list[float], heights: list[float], wallMaterial: str,
   floorMaterial: str, worldUnitsPerRepeat: float, edgeLength: float = 16.0, wallShare: float = 0.35, breakup: dict | None = None,
-  mouthFade: float | None = None, maximumFloorDegrees: float = 30.0,
+  mouthFade: float | None = None, maximumFloorDegrees: float = 30.0, trimBands: list[dict] | None = None,
 ):
   """Cut a cave into a terrain mesh (objectName) as the client's own caves are built, one terrain holding the hill and the room under
   it: a closed tube swept along the floor `path` [[x, y, z], ...] with one width and height per point, its floor flat across, its walls
-  straight up to `wallShare` of the height and a vault above. Widths and heights ease from point to point and the floor grades evenly
+  straight up to `wallShare` of the height and a vault above. `wallShare` 1 cuts a hall, as Crescent's guild halls and market are carved
+  into its cliffs: walls straight up the full height under a flat ceiling, its corners square, its ends never rounded: a blind end closes
+  as a flat wall, and an open end stands wholly in the open in front of the cliff (dressFacade dresses the cliff into a carved face
+  there). `trimBands` [{fromFloor, height, material, worldUnitsPerRepeat}] run along the walls at those heights over the floor in every
+  row (a dado, a frieze: Crescent's cr_tile_trim_marble_dark), the walls cut exactly along their edges, in their own createMaterial
+  material mapped along the band, a strip texture running once up it (v from the band's bottom at its repeat); set again on every cut,
+  before the strokes kept with the lining. Breakup stays the artist's choice (none for a dressed hall). Widths and heights ease from point to point and the floor grades evenly
   between their heights; a room is a wide stretch of the path. A bend turns on an arc the width in radius (less where the points are
   close). `breakup` {featureSize, amplitude, seed} moves the walls and vault along their outward directions by noise, the floor kept
   flat, fading out within `mouthFade` (default twice edgeLength) of wherever the tube lies in the open, so the lip stays a clean arch.
@@ -1661,10 +1695,13 @@ async def cutCave(
   layer uncovered on them, box-mapped at `worldUnitsPerRepeat` and smooth shaded; ground faces the cut split keep their materials,
   paint, and mapping.
   Refused, changing nothing: a stretch of floor steeper than `maximumFloorDegrees` (naming it and the run it needs), a bend tighter than
-  half the width, an end part in the rock with its floor buried more than a step under the ground, a floor hanging in the air, both
-  ends wholly inside the rock, the tube reaching the terrain's border or another cave's reach, a mesh with modifiers or shared with another object, and caves that fail their integrity checks.
+  half the width, an end part in the rock with its floor buried more than a step under the ground (for a hall, any end part in the rock
+  and part in the open, or a ledge), a floor hanging in the air, both
+  ends wholly inside the rock, the tube reaching the terrain's border or another cave's reach, a mesh with modifiers or shared with another object, and caves that fail their integrity checks;
+  `wallShare` outside (0, 1]; a band reaching above the walls' straight part (wallShare of the height) at any path point (naming it),
+  bands overlapping, a band below the floor or not tall, a band material createMaterial did not make, a repeat not positive.
   Returns the faces and vertices it made, the shortest edges of the lining, the pieces of ground at the mouth, and the seam, each end's
-  kind, and the floor's level stretches (start, end, length, height, narrowest width: a stretch about 220 wide and long holds a stock
+  kind, each trim band's faces, and the floor's level stretches (start, end, length, height, narrowest width: a stretch about 220 wide and long holds a stock
   player plot). The cave is kept with its definition: the ground within its reach is fingerprinted, getObjectDetail and exports flag it
   stale once that ground moves, and editCave or regradeTerrain cuts it again to fit. Around a cave, shaping leaves its lining where it
   is (results count caveLiningLeft) and keeps its ring on the ground; strokes never slide its vertices sideways; contour cuts, turned
@@ -1675,17 +1712,20 @@ async def cutCave(
   return await callBridge(context, "cutCave", {
     "objectName": objectName, "name": name, "path": path, "widths": widths, "heights": heights, "wallMaterial": wallMaterial,
     "floorMaterial": floorMaterial, "worldUnitsPerRepeat": worldUnitsPerRepeat, "edgeLength": edgeLength, "wallShare": wallShare,
-    "breakup": breakup, "mouthFade": mouthFade, "maximumFloorDegrees": maximumFloorDegrees,
+    "breakup": breakup, "mouthFade": mouthFade, "maximumFloorDegrees": maximumFloorDegrees, "trimBands": trimBands,
   })
 
 
 @guardedTool()
 async def editCave(context: Context, objectName: str, name: str, changes: dict | None = None):
   """Change a cave cut into a terrain (cutCave) and cut it again in one step: `changes` holds any of its definition's path, widths,
-  heights, wallMaterial, floorMaterial, worldUnitsPerRepeat, edgeLength, wallShare, breakup, mouthFade, maximumFloorDegrees; the cave is
-  taken back and cut again from its definition with them merged in, against the ground as it now stands, and the strokes kept with its
-  lining are painted again. With no changes it refits the cave to the ground (after a sculpt at its mouth or a pass turned up). If the
-  new cut is refused, the cave stays exactly as it was. Returns what taking it back restored and what the new cut made."""
+  heights, wallMaterial, floorMaterial, worldUnitsPerRepeat, edgeLength, wallShare (1 for a hall), breakup, mouthFade,
+  maximumFloorDegrees, trimBands; the cave is taken back and cut again from its definition with them merged in, against the ground as it
+  now stands, its trim bands set again and the strokes kept with its lining painted again. With no changes it refits the cave to the ground (after a sculpt at its mouth or a pass turned up). A
+  facade dressed at its mouth (dressFacade) follows it: made again from what it was given (faceAt, width, height, apron, blend,
+  turnDegrees) on the changed cave, dressed again where its face moved (refitFacades), and refused when it would no longer frame the
+  cave (narrower than the cave plus 2, lower than it plus 1), naming the facade to dress again or take back. If the new cut or a facade
+  is refused, the cave and the ground stay exactly as they were. Returns what taking it back restored and what the new cut made."""
   return await callBridge(context, "editCave", {"objectName": objectName, "name": name, "changes": changes})
 
 
@@ -1695,6 +1735,44 @@ async def removeCave(context: Context, objectName: str, name: str):
   return on their vertices with every shaping pass made since, each carrying the surfacing and mapping its largest piece of ground held
   (painted or mapped since the cut). Returns the cave's definition, to cut it again with cutCave, and the strokes kept with its lining."""
   return await callBridge(context, "removeCave", {"objectName": objectName, "name": name})
+
+
+@guardedTool()
+async def dressFacade(
+  context: Context, objectName: str, cave: str, end: str, faceAt: float, width: float, height: float, apron: float, blend: float = 16.0,
+  turnDegrees: float = 0.0,
+):
+  """Dress the cliff at a cave's mouth into a carved face, so a hall (cutCave with wallShare 1) reads as cut into the rock rather than as
+  a cave mouth, as Crescent's halls open on dressed faces. The face stands on a vertical plane crossing the cave's path `faceAt` along
+  it in from its `end` ("start" or "end"), square to the path, or turned `turnDegrees` (clockwise from above, at most 45 either way) to
+  stand along the cliff's line where the hall enters it obliquely; `width` wide centered on the path, from the floor's height there (F)
+  up to F + `height`. On the terrain objectName: each ground edge crossing the face's line within its width has its front vertex slid
+  square onto the line at F and its back vertex onto the line at F + height, the vertices nearest the face's two sides slid along the
+  line onto them, so the face is a flat vertical rectangle with straight edges standing in a recess in the cliff (the cliff beside and
+  above it is not moved); the ground in front of it within `apron` and the width is set level at F, cut or filled, and the ground in
+  front of its line past the apron's edges eases back to the ground as it was over `blend` (smoothstep). The faces it moved are
+  box-mapped again from where they stand, each material at the repeat the faces it left alone show (remappedFaces), so the face and its
+  returns carry their texture unstretched. The ground read is the ground as it stands with the caves taken back (each cave's recorded
+  faces in place of its cut), so it dresses the same with the cave cut or not; a cave's lining never moves and the vertices where it
+  meets the ground follow that ground. It is a defined pass, "facade <cave> <end>", keeping the face itself (faceAt, turnDegrees,
+  center, facingDegrees, width, height, apron, blend), so regradeTerrain replays it in order with the routes and plots and then refits
+  stale caves, and editCave dresses it again on the changed cave; dressing again under that cave and end replaces it; removeShapingPass
+  takes it back and refits the cave. The cave is refit in the same call (refit, as editCave reports it), so it opens on the face;
+  staleCaves names others whose ground moved. foldedFaces counts faces left facing down, not the face's vertical returns. Then paint
+  the face and apron (paintSurface with a box around them), place a portal piece at the returned `frame` (its front facing out), and
+  look from the apron at eye height, from across the valley, from inside looking out, and in a section along the path.
+  Refused, changing nothing: no such cave or end; an end that is not open (blind or a ledge); faceAt not positive or past the end's first
+  bend; turnDegrees past 45; a width less than the cave's width where it crosses the face plus 2, or a height less than its height
+  there plus 1; the ground just behind the line lower than F + height anywhere across the width (nothing to dress: move faceAt into the
+  cliff, naming where); ground in front of the face (on the apron or easing back) higher than F + height (the face stands behind the
+  cliff's face there and would cut a notch through the rock: move faceAt out, raise the height, or turn the face, naming where); the
+  apron or blend reaching the ground within another cave's reach or the terrain's border; a mesh with modifiers. Returns the face's four
+  corners (foot left, foot right, top right, top left, looking at it), `frame` {center (the foot's middle), facingDegrees (outward),
+  width, height}, the face's vertices and all vertices moved, the apron's cut and fill, and the cave's refit."""
+  return await callBridge(context, "dressFacade", {
+    "objectName": objectName, "cave": cave, "end": end, "faceAt": faceAt, "width": width, "height": height, "apron": apron, "blend": blend,
+    "turnDegrees": turnDegrees,
+  })
 
 
 @guardedTool()
@@ -2156,7 +2234,8 @@ def problemText(problem):
 
 @guardedTool()
 async def renderRouteStrip(context: Context, spacing: float, route: str | None = None, path: list[list[float]] | None = None):
-  """walkRoute as a strip of eye-level frames: walks a saved review route (route) or a path [[x, y, z], ...] as walkRoute does, and
+  """walkRoute as a strip of eye-level frames: walks a saved review route or a bridge's, flight's, or walkway's walk line (route) or a
+  path [[x, y, z], ...] as walkRoute does, and
   renders a frame every `spacing` along it in plan (from its start) and one where each problem the walk meets starts, each standing
   where the walk stands there (eye 5.5 over the footing; no scale figure), heading along the route and pitched toward where the walk
   stands 30 further on, or toward the brink where it stops if sooner (a problem's frame looks past the problem: down past the brink of a
@@ -2513,7 +2592,8 @@ async def placeCopies(
   """Place many linked copies of an object (sharing its mesh, or its collection for a kit instance) in one call, each with its own
   location [x, y, z], rotationDegrees [x, y, z] (Blender's XYZ order, z turning counterclockwise seen from above, x and y tilting; EQ
   models face +X), uniform scale, and optional name: exactly what an EQ placement holds. With settle, each copy is then settled onto the
-  ground by its footprint as settleObjects does (its z is ignored; [x, y] will do). Returns each copy as placed (with settleObjects' report when settled), to edit copy by copy."""
+  ground by its footprint as settleObjects does (its z is ignored; [x, y] will do). A copy of a placed kit piece stands upright at scale
+  1 (rotationDegrees [0, 0, turn]); tilted or scaled ones are refused. Returns each copy as placed (with settleObjects' report when settled), to edit copy by copy."""
   return await callBridge(context, "placeCopies", {"source": source, "copies": copies, "collection": collection, "settle": settle, "depth": depth, "tiltShare": tiltShare})
 
 
@@ -2536,13 +2616,15 @@ async def generateCopies(
 
 @guardedTool()
 async def settleObjects(context: Context, names: list[str], depth: float = 0.0, tiltShare: float = 0.0, onto: str | None = None):
-  """Drop objects onto what lies below them by their footprint rather than their origin, from above the whole scene, or from their own
-  tops where rock lies over them (a cave's ceiling, an overhang), so one in a cave lands on its floor, not on the hill over it: onto
-  the ground (what players stand on, apart from the objects being settled), sunk to the lowest ground under the footprint so no edge
-  floats; or onto a named object, resting on it with no vertex below its surface (a crate on a table, or tilted on a ramp); then
-  `depth` lower. tiltShare (0 to 1) turns each that share of the way toward the slope of the ground under it, keeping its heading (and
-  replacing any tilt it had). Settling again after the ground changes puts everything back on it. Each result gives the ground's
-  lowest and highest under the footprint and the object's own bottom and top."""
+  """Drop objects onto what lies below them by their footprint rather than their origin, from above the whole scene, or where rock lies
+  over ground at their middle (a cave's ceiling, an overhang; looked for from halfway up each) from their own tops, or from just under
+  the rock where a top reaches it, so one in a cave lands on its floor, not on the hill over it, even a column up to a hall's ceiling
+  (one sunk into a solid with no ground under it, such as a ramp raised through it, rises onto its top): onto the ground (what
+  players stand on, apart from the objects being settled), sunk to the lowest ground under the footprint so no edge floats; or onto a
+  named object, resting on it with no vertex below its surface (a crate on a table, or tilted on a ramp); then `depth` lower. tiltShare
+  (0 to 1) turns each that share of the way toward the slope of the ground under it, keeping its heading (and replacing any tilt it
+  had); refused for a placed kit piece, which stands upright. Settling again after the ground changes puts everything back on it. Each
+  result gives the ground's lowest and highest under the footprint and the object's own bottom and top."""
   return await callBridge(context, "settleObjects", {"names": names, "depth": depth, "tiltShare": tiltShare, "onto": onto})
 
 
@@ -2591,6 +2673,408 @@ async def linkKitAsset(
   """Link a collection marked as an asset in a kit .blend (absolute path) and place an instance of it; the result gives its size. Its
   materials draw in the preview lit as the open file's own are."""
   return await callBridge(context, "linkKitAsset", {"kitPath": kitPath, "assetName": assetName, "instanceName": instanceName, "location": location, "rotationDegrees": rotationDegrees, "scale": scale, "collection": collection})
+
+
+# Kits
+
+kitPieceHelp = (
+  " A kit is a .blend of pieces (eqzones library\\kits\\<kitName>.blend, one per family): each piece a collection marked as an asset whose"
+  " name starts with the kit file's stem (hpTimberPlank in hpTimber.blend), holding its meshes and its record (kind, sockets, passable,"
+  " openings); its origin is its base center (the collection's instance_offset), its front faces +Y, its length runs along X and its"
+  " height up Z. A socket {name, at, direction} is a point of the piece where another meets it: two placed sockets within 0.01 facing"
+  " each other are joined. Client sizes: a 25 module (12.5 and 50 too), 30 a storey, about 10 thick, doors about 10 x 16; walls repeat"
+  " every 11 to 12.5, floorboards 10 to 15, beams and trims 2.5 to 5."
+)
+facingHelp = (
+  " facingDegrees is the way a placed piece's front (+Y) faces: 0 = +Y, clockwise; placements turn only about the vertical and keep"
+  " scale 1, as the client's structure placements do."
+)
+
+
+def requireKitPath(kitPath):
+  if kitPath is not None and (not os.path.isabs(kitPath) or not kitPath.lower().endswith(".blend") or not os.path.isfile(kitPath)):
+    raise ToolError(f"kitPath must be an absolute path to an existing .blend (or null for the open file's own pieces), got '{kitPath}'")
+
+
+@guardedTool(description=(
+  "Model one kit module to exact size, as the client's kits are made: a collection `name` holding one mesh object and mesh `name`, its"
+  " base center at `location` [x, y, z] in this file (so pieces lie side by side to look at) and that point its origin, marked as an"
+  " asset, its record written. `kind` is wall (a box without a bottom; roles face for front and back, edge for its ends and top;"
+  " sockets start and end at its base ends facing out along X, top up), floor (a slab; top, edge, under; start, end, front, back at the"
+  " base), post (an upright without a bottom; side, top; base down, top up), beam (a bar; side, end; start, end), plank (a board; top for"
+  " its broad faces, edge; start, end), rail (a bar; side, end; start, end; passable), ropeRail (a ribbon of two faces back to back;"
+  " rope, a cutout material; start, end; passable), or cap (a block without a bottom; side, top; base down). `size` is [length, depth,"
+  " height] along X, Y, Z (a ropeRail's depth exactly 0); `materials` and `worldUnitsPerRepeat` give exactly the kind's roles a material"
+  " createMaterial made and a repeat, each role box-mapped in the piece's frame from its start corner (-length/2, -depth/2, 0), so a 25"
+  " module at 12.5 a repeat tiles without a seam; a beam, plank, or rail runs its texture's v (the client's wood grain) along its length."
+  " `passable` overrides the kind's (rails and ropes pass players, as the client's do)."
+  " Refine with the mesh tools and cutOpening; markKitPiece if its sockets change. Returns the record, its size, module, triangles,"
+  " each material's texture and measured repeat, each role's measured repeat, and seams: materials whose repeat does not fit the"
+  " length (or height) the piece joins along a whole number of times, so a texture seam shows where two meet (reported, not refused)."
+  + kitPieceHelp
+))
+async def createKitPiece(
+  context: Context, name: str, kind: str, size: list[float], materials: dict[str, str], worldUnitsPerRepeat: dict[str, float],
+  location: list[float], passable: bool | None = None,
+):
+  return await callBridge(context, "createKitPiece", {
+    "name": name, "kind": kind, "size": size, "materials": materials, "worldUnitsPerRepeat": worldUnitsPerRepeat, "location": location, "passable": passable,
+  })
+
+
+@guardedTool(description=(
+  "Make a collection of this file a kit piece, or change a piece's kind, sockets, origin, or passability: its origin (instance_offset)"
+  " set to `origin` (file coordinates) or the base center of its meshes (the middle of their plan bounds at their lowest point),"
+  " marked as an asset, its record written. `kind` is any createKitPiece kind, roof, or custom (a corner block, a portal frame, a"
+  " bench; placed only); `sockets` [{name, at [x, y, z] in the piece frame, direction}] (each direction a unit vector, level or straight"
+  " up or down; each within 1 unit of the piece's bounds), or the kind's defaults from its bounds (custom has none); a wall, beam, plank,"
+  " rail, or ropeRail needs start and end facing apart; a corner is custom with turned sockets (a 10 x 10 block: start at (-5, 0, 0)"
+  " facing -X, end at (0, 5, 0) facing +Y), and so is a curved wall section (its module null: turned sockets span no module)."
+  " `passable` true marks its meshes passable, false takes the mark off, null keeps the piece's"
+  " (or takes the kind's for a new piece). Every face needs a material createMaterial made and texture coordinates. Placed instances"
+  " keep their transforms, so a moved origin or socket shows in them: look after. Returns the record, what is derived from it (as"
+  " createKitPiece), and unmappable: faces whose texture coordinates are not affine in position within 1 percent, which map oddly where"
+  " a span stretches or bends the piece." + kitPieceHelp
+))
+async def markKitPiece(
+  context: Context, collectionName: str, kind: str, sockets: list[dict] | None = None, origin: list[float] | None = None, passable: bool | None = None,
+):
+  return await callBridge(context, "markKitPiece", {"collectionName": collectionName, "kind": kind, "sockets": sockets, "origin": origin, "passable": passable})
+
+
+@guardedTool(description=(
+  "Cut a door or window through a wall piece of this file, or a custom one (a curved wall section, modeled with the middle of its wall"
+  " facing +Y), front to back along Y: centered `along` from its middle along X, its bottom `sill`"
+  " over the base (a door 0, a window above 0), `width` wide with jambs `height` tall; with `archRise` its head a round arch rising"
+  " that far over the jambs in `archSegments` straight pieces (a semicircle at half the width). The cut is an exact boolean of a prism"
+  " through the piece; its reveal takes the material and texture density of the faces it cuts through, or with `frame` {width, depth,"
+  " material, worldUnitsPerRepeat} the reveal and a band `width` wide round the opening on both faces (jambs, head, and a window's sill),"
+  " standing `depth` proud of the faces the opening goes through (however many framed openings the piece already has), take the frame's"
+  " material box-mapped at its repeat, as the client trims its openings. The opening and its"
+  " frame leave at least 1 unit of wall at each end and above (and below a window) and overlap no opening cut before; it is recorded in"
+  " the piece's openings. Zones that link the kit show it when next opened. Returns the opening's corners [x, z] in the piece frame,"
+  " its clear width and height as cut, the faces made, and the triangles before and after."
+))
+async def cutOpening(
+  context: Context, piece: str, kind: str, along: float, width: float, height: float, sill: float = 0.0, archRise: float | None = None,
+  archSegments: int = 8, frame: dict | None = None,
+):
+  return await callBridge(context, "cutOpening", {
+    "piece": piece, "kind": kind, "along": along, "width": width, "height": height, "sill": sill, "archRise": archRise, "archSegments": archSegments, "frame": frame,
+  })
+
+
+@guardedTool(description=(
+  "Model a roof as a kit piece (kind roof) at `location` (its wall plate's middle, its origin) for a rectangular `footprint` [length X,"
+  " depth Y], or for what the meshes or placed pieces of this file named in `over` stand on: measured square to them (they stand"
+  " turned alike, or a quarter turn apart; others are refused, naming the turn), a placed wall by its body between its faces, not the"
+  " frames standing proud of them; give exactly one. Each slope's"
+  " underside passes through the footprint's edges at the plate (z 0), so it sits on walls of that footprint; slopes at `pitchDegrees`"
+  " (5 to 60), running out `overhang` past every side (the eaves drop overhang x tan(pitch) under the plate), `thickness` thick square to"
+  " the slope. `kind` gable: two slopes meeting at a ridge along `ridgeAlong` (\"x\" or \"y\"), gable triangles closing its ends down to"
+  " the plate; hip: four slopes, the ridge along `ridgeAlong` (the longer side) shortened by hips at 45 degrees in plan, a point over a"
+  " square; shed: one slope rising toward the back (-Y), its ends closed by gable triangles. Each gable or shed end is two faces on"
+  " corners of their own, one looking out and one in, so a walk-in building's ends are seen from inside. Roles: roof (slope tops, mapped in their"
+  " plane, u level along the eaves and v up the slope, so shingles run level), under (undersides, the same), gable (gable and shed ends,"
+  " box-mapped; not hip), edge (fascia and verges, box-mapped). Socket plate (0, 0, 0) facing down. Returns the record, its ridge height"
+  " (the top), its eave height (the eaves' underside), size, triangles, and with `over`, plateOver and facingOver: where and how to"
+  " place it (placeKitPiece) to sit on those objects." + kitPieceHelp
+))
+async def addRoof(
+  context: Context, name: str, kind: str, pitchDegrees: float, overhang: float, thickness: float, materials: dict[str, str],
+  worldUnitsPerRepeat: dict[str, float], location: list[float], footprint: list[float] | None = None, over: list[str] | None = None,
+  ridgeAlong: str = "x",
+):
+  return await callBridge(context, "addRoof", {
+    "name": name, "kind": kind, "pitchDegrees": pitchDegrees, "overhang": overhang, "thickness": thickness, "materials": materials,
+    "worldUnitsPerRepeat": worldUnitsPerRepeat, "location": location, "footprint": footprint, "over": over, "ridgeAlong": ridgeAlong,
+  })
+
+
+@guardedTool(description=(
+  "Place one kit piece as the client places its kits: an empty instancing the piece's collection, linked from the kit at `kitPath`"
+  " (absolute) or the open file's own with null (as in a kit file), sharing the piece's one model with every other placement. Either at"
+  " `location` [x, y, z] (its base center) facing `facingDegrees`; or at [x, y] facing `facingDegrees`, settled by its footprint as"
+  " settleObjects settles (onto the lowest ground under it), then `depth` lower (refused where rock lies over ground: give z); or"
+  " snapped: `snapTo` {object, socket, pieceSocket} puts the piece where its pieceSocket meets the placed piece object's socket face to"
+  " face (Freeport's wall runs stand exactly 25.0 apart): a level pair turns the piece to meet it (no facingDegrees), a vertical pair"
+  " (a post on a wall's top) keeps facingDegrees, by default the object's. A socket already joined is refused, naming its partner, and"
+  " so is a snap to a piece tilted or scaled. A placed piece is an ordinary placement (transformObjects, deleteObjects, settleObjects"
+  " work on it, keeping it upright at scale 1), never in the terrain collection. Where rock lies over ground the refusal names the"
+  " object over it. Returns where it stands and faces, the piece {kit, piece, kind, size, module, passable, fingerprint}, its sockets in"
+  " the world each joined to another's or free, and settleObjects' report when settled, else footing {base, under: the lowest and"
+  " highest surface players stand on under its footprint, floats: how far its base stands over the lowest where more than a step,"
+  " else null} (a run snapped out over a drop says so)." + facingHelp + kitPieceHelp
+))
+async def placeKitPiece(
+  context: Context, name: str, kitPath: str | None, piece: str, location: list[float] | None = None, facingDegrees: float | None = None,
+  snapTo: dict | None = None, depth: float = 0.0, collection: str = "structures",
+):
+  requireKitPath(kitPath)
+  return await callBridge(context, "placeKitPiece", {
+    "name": name, "kitPath": kitPath, "piece": piece, "location": location, "facingDegrees": facingDegrees, "snapTo": snapTo, "depth": depth, "collection": collection,
+  })
+
+
+@guardedTool()
+async def swapKitPiece(context: Context, names: list[str], piece: str):
+  """Put another piece of the same kit in place of placed ones, each keeping where it stands and how it faces: a window section for a
+  plain one, without breaking the run. The new piece's sockets must be the old one's (names, places within 0.01, directions), so every
+  joint holds; otherwise none is swapped and each difference is named. In a kit, a prefab whose part it swaps has its footprint
+  measured again about its origin (its entrances kept: name a new doorway with assemblePrefab), and its placements go stale (kit) to be
+  laid again on it. Returns each placement with its new piece and its sockets, joined or free, and each prefab changed with its
+  footprint before and after and its entrances."""
+  return await callBridge(context, "swapKitPiece", {"names": names, "piece": piece})
+
+
+# Structures
+
+structureHelp = (
+  " A structure is one artist action kept with its definition: a collection named for it under structures (or terrain, for a span"
+  " exported as ground), holding its parts and its record (kind, order, the definition as the build tool took it, the fingerprints of"
+  " the kit pieces or prefab it was laid from) and every ground lookup the lay made (probes). Its geometry is always laid again from the"
+  " definition, the kit, and the ground: editStructure changes it (with no changes, lays it again after its ground or kit changed),"
+  " removeStructure takes it back, getStructures lists them with whether each is stale; parts refuse hand edits (transformObjects,"
+  " deleteObjects, mesh, material, and UV tools), naming those tools. A lay is whole or nothing: a refusal leaves the file as it was. It"
+  " casts against what players collide with but the boundaries, leaving out its own parts and every structure laid after it. kitPath is"
+  " the kit every piece or prefab comes from (absolute; null for the open file's own), kept relative to the saved .blend; a piece of the"
+  " wrong kind is refused naming the kind it needs. sink is how far posts, legs, anchors, and wall feet go under the ground. Every result"
+  " gives structure {name, kind, order}, its parts with their triangles and the export models they become, standsOn (the objects its"
+  " probes found), views (renderView views to judge it from, ready for saveReviewCamera; orbit: its parts for renderOrbit), and for a"
+  " deck or flight walk: walkRoute along its walk line (walkRoute and renderRouteStrip take the structure's name as route)."
+)
+railsHelp = (
+  " rails {piece, height, sides (\"both\", \"left\", \"right\" of travel; both by default)}: a rail piece as bars from post to post, their"
+  " tops `height` over the deck, each stretched to fit, or a ropeRail swept along the posts at that height following the deck, its"
+  " top at the height, hanging plumb however the deck slopes; rails and ropes pass players through (the kit's passable), so open sides"
+  " can be fallen from, as the client's can. Rails need posts on their sides and run the whole stretch: a railed post stands however"
+  " low the walk runs, and where what it stands on reaches the rail's height (a walkway's post at a flight's head) the rail meets that."
+)
+
+
+@guardedTool(description=(
+  "In a kit file, gather placed instances of the file's own pieces (placeKitPiece with kitPath null; a roof from addRoof placed over"
+  " the walls) into a building other files place whole, as the client splits its buildings into models placed together (Freeport's"
+  " inn: shell, interior, roof, rigging, entrance; Highpass's houses: exterior and interior): a collection `name` (starting with the"
+  " kit file's stem) holding a child collection per part, `<name><Part>`, with the named instances moved into them. `parts` maps each"
+  " part's camelCase name (exterior, interior, roof, or any) to its instances; each part becomes one model in an export, shared by every"
+  " placement of the building. Its floor is the exterior's lowest base (every part's without an exterior); its footprint is the convex"
+  " hull in plan of every part where it stands on the floor (geometry within a step of the floor: walls' feet, corners, floors, not a"
+  " roof's eaves), what seating and plinths are laid from; its origin (the prefab's and every part's instance_offset) is the middle of"
+  " the footprint's plan bounds at the floor. `entrances` [{name, at [x, y, z] in this file, facingDegrees}]: a doorway's threshold"
+  " middle and the way out of it, within a step of the footprint; a building with an interior part is walked into and names at least"
+  " one (NPC service buildings), a closed shell needs none. Assembling again under its name replaces its parts and entrances, and"
+  " instances no longer named go back to the scene collection, so a building is reworked by placing, deleting, and assembling again."
+  " Marked as an asset. Refuses an object that is not an instance of this file's pieces, one in two parts or in another prefab, an"
+  " empty part, a part name not camelCase, an interior without an entrance, an entrance more than a step outside the footprint, an"
+  " entrance facing into the building (the footprint running on further its way than behind it), and a"
+  " name taken by anything but this prefab. Returns its parts (instances, pieces, triangles each), footprint and its size, origin,"
+  " entrances in the prefab frame, triangles, and fingerprint." + kitPieceHelp
+))
+async def assemblePrefab(context: Context, name: str, parts: dict[str, list[str]], entrances: list[dict] | None = None):
+  return await callBridge(context, "assemblePrefab", {"name": name, "parts": parts, "entrances": entrances})
+
+
+@guardedTool(description=(
+  "Place one building as a structure `name`: one instance per part of the prefab `prefab` from the kit at `kitPath` (absolute; null for"
+  " the open file's own) (`<name><Part>`, each part one model shared by every placement), its front facing `facingDegrees`."
+  " `location` [x, y, z] sets its floor; [x, y] seats the floor at the highest ground under its footprint, found from above (refused"
+  " where rock lies over ground: give z), so no ground stands inside it. `plinth` {material (createMaterial), worldUnitsPerRepeat, sink"
+  " (2), margin (0)}: a skirt down the footprint's hull, offset out by margin, from the floor to sink under the lowest ground under it,"
+  " mapped along its sides so its courses run level, no top or bottom faces (Highpass's houses stand on stone bases), one mesh"
+  " `<name>Plinth` and one model of its own. Refuses ground inside the footprint more than a step above the floor (it would come up"
+  " through the floor: grade the site or raise the floor), and the floor more than a step above the ground under the footprint without"
+  " a plinth (it would float), each naming where and the floor that would fit (a plinth or grading alone where the ground under it runs"
+  " more than two steps); a prefab the kit does not hold; a taken name; the terrain collection; rock or anything else over the ground"
+  " under it, naming the object. Returns the floor, floorOn {object, at, ground} (what set a seated floor, with a warning when it is not"
+  " the ground: a loose piece clipping the footprint), the ground's lowest and highest under the footprint and where, the plinth's top, bottom, and"
+  " triangles, the parts with their triangles and the export models they become, each entrance (where it is and faces, the ground a"
+  " step outside it, the step up to its threshold, and for a building with an interior part a walk from 10 outside to 10 inside), the"
+  " objects its lookups stood on, and views (entrance<Name>: standing 25 out looking at it; orbit: its parts for renderOrbit)."
+  " editStructure moves, turns, or re-plinths it; it goes stale when the ground under its footprint moves or its prefab's footprint,"
+  " entrances, or parts (a piece swapped, moved, added, or taken out) change in the kit, and follows its pieces' own changes without"
+  " going stale." + structureHelp + facingHelp
+))
+async def placePrefab(
+  context: Context, name: str, kitPath: str | None, prefab: str, location: list[float], facingDegrees: float, plinth: dict | None = None,
+  collection: str = "structures",
+):
+  requireKitPath(kitPath)
+  return await callBridge(context, "placePrefab", {
+    "name": name, "kitPath": kitPath, "prefab": prefab, "location": location, "facingDegrees": facingDegrees, "plinth": plinth, "collection": collection,
+  })
+
+
+@guardedTool(description=(
+  "Lay one bridge between two anchors the artist picked, as one model, as the client's whole-span bridges are. `start` and `end` [x, y,"
+  " z] are the deck's top at its centerline at each end, each within a step over footing with no rock over it within a player's height"
+  " (grade the abutments first: gradeRoute). The deck runs straight between them, or by `profile` {\"sag\": d} hangs d under the chord at"
+  " mid-span (a parabola; the client's rope bridges sag about 9 percent of the span, Xorbb's 24 over 279, about 19 degrees at the ends) or"
+  " {\"arch\": r} rises r over it; level across its `width`. `deck`: a plank piece (planks across edge to edge, round(deck length / plank"
+  " depth) of them, each fitted to the width and to the deck length over their count, each turned to the deck's slope where it lies) or"
+  " a floor piece (swept along the deck, fitted to the width); the deck and stringers are cut square (vertical) at the anchors, so the deck's end meets the ground it starts from without a sloped sliver to step onto. `stringers`: a beam piece swept under both deck edges. `posts` {piece,"
+  " spacing, above (0), sides (the rails' sides; both without rails)}: post pieces just outside those edges (inner faces at the edges,"
+  " so the walk keeps the deck's width), at both ends"
+  " and evenly at most `spacing` apart, from the deck's underside up to the rails' height plus `above`; the end pairs reach down to"
+  " `sink` under the ground as anchors." + railsHelp + " `bents` {stations, post, beam}: trestle frames at those plan distances from the"
+  " start: the post piece stretched under each edge from the deck's underside (or the stringers', or under the beam) down to `sink`"
+  " under the ground below, and the beam piece (optional) across under the deck. Refused: ends under two plank depths apart in plan;"
+  " width over the chord; an end without footing or with rock over it; the deck steeper than `maximumDeckDegrees` anywhere (naming"
+  " where, and for a sag or arch the largest that fits); the deck's own underside (stringers may rest in the ground) meeting the ground"
+  " beyond a plank depth from the ends (naming where and how deep: it would run through the hill); rails without posts, or on a side"
+  " posts do not stand on; a bent station within a width of an end or past"
+  " it; an anchor or bent leg with no ground within 300. Returns the plan span, chord, deck length, each end's slope, the steepest, the"
+  " lowest deck point, the planks (count and run), posts and anchors with their lengths, rails, bents with each leg's length, the least"
+  " clearance under the deck and where, triangles." + structureHelp
+))
+async def buildBridge(
+  context: Context, name: str, kitPath: str | None, start: list[float], end: list[float], width: float, deck: str, profile: dict | None = None,
+  posts: dict | None = None, rails: dict | None = None, stringers: str | None = None, bents: dict | None = None, sink: float = 2.0,
+  maximumDeckDegrees: float = 30.0, collection: str = "structures",
+):
+  requireKitPath(kitPath)
+  return await callBridge(context, "buildBridge", {
+    "name": name, "kitPath": kitPath, "start": start, "end": end, "width": width, "deck": deck, "profile": profile, "posts": posts, "rails": rails,
+    "stringers": stringers, "bents": bents, "sink": sink, "maximumDeckDegrees": maximumDeckDegrees, "collection": collection,
+  })
+
+
+@guardedTool(description=(
+  "Lay one straight flight between a foot and a head the artist picked, as one model: `bottom` [x, y, z] within a step over footing"
+  " (ground, a floor, a deck laid earlier) and `top` [x, y, z] the floor it climbs to, within a step over footing. Its risers are equal,"
+  " as many as keep each at most `riser` (the client's timber flights rise 1.0 a step at about 21 degrees); each tread the plank piece"
+  " `tread` across, fitted to the width and to one step's run, so treads meet without a gap, the last at the head's height. `stringers`:"
+  " a beam piece swept along both sides under the treads' ends. `posts` {piece, spacing, sides (both by default)}: legs just outside the"
+  " edges, evenly at most `spacing` apart, from `sink` under the ground up to the rails' height where that side has rails (else to the"
+  " flight's underside), where the flight stands more than a step over the ground or that side has rails." + railsHelp + " A walkway's"
+  " stair legs are laid by the same code. Refused: steeper than 45 degrees (naming the run it needs); riser not above 0 or over 2 (a"
+  " step); a top not a riser higher than the bottom; a foot or head without footing within a step, or lying under what it stands on"
+  " (naming its top: the treads would lie in it); a head set back on the surface it climbs to, so the top tread would lie inside it"
+  " (set the head at its edge); the treads' underside meeting the ground beyond a step from its ends (naming where); a leg with no"
+  " ground within 300; rails without posts. Returns the risers (count and height), run per step, pitch, plan length, the legs and their"
+  " lengths, the least clearance, triangles; views fromFoot, fromHead (just behind the head, looking down it), and side (from the side"
+  " standing in the open, not inside a hill beside it)." + structureHelp
+))
+async def buildStairs(
+  context: Context, name: str, kitPath: str | None, bottom: list[float], top: list[float], width: float, tread: str, riser: float = 1.0,
+  stringers: str | None = None, posts: dict | None = None, rails: dict | None = None, sink: float = 2.0, collection: str = "structures",
+):
+  requireKitPath(kitPath)
+  return await callBridge(context, "buildStairs", {
+    "name": name, "kitPath": kitPath, "bottom": bottom, "top": top, "width": width, "tread": tread, "riser": riser, "stringers": stringers,
+    "posts": posts, "rails": rails, "sink": sink, "collection": collection,
+  })
+
+
+@guardedTool(description=(
+  "Lay one walkway (a deck on stilts or bracketed along a cliff, a dock, landings and their flights) along the artist's `points` [[x,"
+  " y, z], ...], each the deck's top at its centerline, as one model (or, with collection \"terrain\", as ground, as Crescent's walkways"
+  " are). At each inner point a level landing at its height spans both legs' end edges (the legs stop half a width short of the point:"
+  " a width-square landing at a right-angle turn); between landings each leg grades evenly; leg i runs from point i to point i + 1. A"
+  " leg steeper than `maximumGradeDegrees` is refused unless listed in `stairLegs`, where a flight is laid instead (buildStairs' code:"
+  " `treads`, `riser`); `deck` (plank or floor, as buildBridge's) covers the other legs and the landings (a landing's laid across the"
+  " incoming leg's direction and cut to the landing). `posts` {piece, spacing, sides (\"both\", \"left\", \"right\"; both by default)}:"
+  " legs just outside the given edges at every landing corner (on the miter where the edge turns, so a corner post stands out from both"
+  " edges) and evenly at most `spacing` apart along each leg, from `sink` under the"
+  " ground up to the rails' height (or the deck's underside where that side has no rail), as Crescent's stilts rise into its rail posts."
+  " `brackets` {piece, side, reach, legs}: on the listed legs and the landing edges carrying on from them, at the post stations where the deck stands higher than the beam over the ground, a beam piece level under the deck from its far edge"
+  " across into the rock beside its `side` edge (found within `reach` of that edge), stretched to sink `sink` into it, as walkways bolted along a cliff"
+  " are; there the brackets take that side and posts stand only on the other." + railsHelp + " Rails break at each flight's foot and"
+  " head. `stringers` as buildBridge's. The ends need not stand on ground (a dock ends over water, a lookout over air); each end's"
+  " footing gap is reported (null for none). Refused: fewer than two points or two at one place in plan; a turn over 150 degrees, or a"
+  " leg no longer than its landings take (naming it); a leg over maximumGradeDegrees not in stairLegs (naming its grade and the run it"
+  " needs); a stair leg steeper than 45 degrees; a deck leg or landing without `deck`, a stair leg without `treads`; the deck's or"
+  " treads' own underside meeting the ground anywhere off the ends' first step (naming where); the open ends are cut square; a post with no ground within 300; a bracket station with no"
+  " rock within reach (naming it); a stretch standing more than a step over the ground with an edge held by neither posts nor brackets"
+  " (naming it and the edge). Returns the legs (from, to, plan and laid length, grade, deck planks or flight risers), landings, posts with"
+  " the longest and shortest, brackets with their reach, each end's footing gap, triangles." + structureHelp
+))
+async def buildWalkway(
+  context: Context, name: str, kitPath: str | None, points: list[list[float]], width: float, deck: str | None = None, treads: str | None = None,
+  stairLegs: list[int] | None = None, riser: float = 1.0, posts: dict | None = None, brackets: dict | None = None, rails: dict | None = None,
+  stringers: str | None = None, sink: float = 2.0, maximumGradeDegrees: float = 15.0, collection: str = "structures",
+):
+  requireKitPath(kitPath)
+  return await callBridge(context, "buildWalkway", {
+    "name": name, "kitPath": kitPath, "points": points, "width": width, "deck": deck, "treads": treads, "stairLegs": stairLegs, "riser": riser,
+    "posts": posts, "brackets": brackets, "rails": rails, "stringers": stringers, "sink": sink, "maximumGradeDegrees": maximumGradeDegrees,
+    "collection": collection,
+  })
+
+
+@guardedTool(description=(
+  "Lay one wall or fence of kit sections end to end along the artist's `path` [[x, y] or [x, y, z], ...] (closed when its last point is"
+  " its first), as the client lays its wall runs; every path point is a joint. `frontSide` (\"left\" or \"right\" of travel) is the side"
+  " the sections' fronts face. `sections` names straight wall pieces of one depth and height, each its own module; each leg is filled"
+  " with the fewest sections, longest first, exactly (within 0.01): a leg no set of modules fills is refused, naming its length, the"
+  " nearest lengths that fill, and how far to move its end. `variants` {\"<section index>\": piece} puts another wall piece of the same"
+  " module and size in that place (a window, a door), indices counted along the whole path from 0. A turn (over 0.5 degrees) needs a"
+  " post. `posts` {piece, at (\"joints\": where every two sections meet and the ends; \"turns\": the turns and the ends)}: the post piece"
+  " there, its base `sink` under the lowest ground at its foot, as Freeport's pillars stand at its joints; wider and deeper than the wall,"
+  " else the sections' faces flicker through it. `follow` \"shear\" (the client's way): each section's foot and top slant together to the"
+  " ground's fall, verticals vertical: joint heights start at the ground under each joint less sink + shearStep / 2, are lowered until no"
+  " section's straight foot stands above the ground less that anywhere along it (sampled every 1 unit along both faces; a joint two"
+  " sections share lowered once, by the more either needs, so a wall on level ground stays level), then rounded down"
+  " by whole shear steps counted from the first joint, so every foot stays at least sink under; a section with rise 0 is an instance of"
+  " its piece, any other a mesh object sharing `<piece>Up<r>` or `<piece>Down<r>` (r the rise along the piece's +X in hundredths: the"
+  " piece sheared about its middle), so sections of one rise share one model across every wall in the file. `follow` \"step\": each"
+  " section level, its foot sink under the lowest ground under it. The ground is found from a step above each point's z when given (a"
+  " wall in a cave, on a deck), from above the scene without it (refused where rock lies over ground: give z). Refused: fewer than two"
+  " points or a leg shorter than the shortest section; sections of different depth or height (between their faces: a variant's frames"
+  " may stand proud); a leg the modules cannot fill; a variant of another module or past the last section; a turn without a post"
+  " (naming it and its angle); a post no wider or deeper than the wall, or one whose top stands under the wall's top beside it; shearStep"
+  " not positive; a section sheared steeper than 30 degrees (step the wall, or run it across the slope); a section buried more than"
+  " `maximumBurial` anywhere along it (the ground bulges over its line, or rises along a stepped one), naming it and how deep; the"
+  " terrain collection. Returns the legs (length, sections), joints (ground, and height when sheared or the bases of the sections"
+  " meeting there when stepped), sections (piece, base at each end, rise, model, deepest and shallowest burial), the shear models made"
+  " or reused, posts, the placements and triangles per model, and views front<leg> (standing on the ground in front of each leg, short of"
+  " any other leg in the way)." + structureHelp
+))
+async def buildWall(
+  context: Context, name: str, kitPath: str | None, path: list[list[float]], frontSide: str, sections: list[str], follow: str = "shear",
+  shearStep: float = 1.0, sink: float = 1.0, maximumBurial: float = 10.0, posts: dict | None = None, variants: dict[str, str] | None = None,
+  collection: str = "structures",
+):
+  requireKitPath(kitPath)
+  return await callBridge(context, "buildWall", {
+    "name": name, "kitPath": kitPath, "path": path, "frontSide": frontSide, "sections": sections, "follow": follow, "shearStep": shearStep,
+    "sink": sink, "maximumBurial": maximumBurial, "posts": posts, "variants": variants, "collection": collection,
+  })
+
+
+@guardedTool()
+async def editStructure(context: Context, name: str, changes: dict | None = None):
+  """Change a structure and lay it again: `changes` (any keys of its definition, as its build tool takes them, such as a placed prefab's
+  location, facingDegrees, or plinth; kitPath absolute) merged into its definition, laid against the ground and kit as they now are,
+  whole or not at all; with no changes, lay it again as defined (after the ground under it or its kit changed: getStructures and
+  regradeTerrain name the stale ones). Lay structures again in the order getStructures lists them, so a flight landing on a walkway
+  follows the walkway. Returns what its build tool returns, with the changes and how many of its probes had moved since it was last laid
+  (and the largest). Refused: no such structure (listing them); keys not in its kind's definition (listing them); whatever its build
+  refuses, the structure staying exactly as it was."""
+  if changes is not None and "kitPath" in changes:
+    requireKitPath(changes["kitPath"])
+  return await callBridge(context, "editStructure", {"name": name, "changes": changes})
+
+
+@guardedTool()
+async def removeStructure(context: Context, name: str):
+  """Take a structure back: its collection and parts (and a part's mesh no other object uses), and any shared shear mesh no other wall
+  uses. Returns its kind and definition (kitPath absolute), to build it again with its build tool."""
+  return await callBridge(context, "removeStructure", {"name": name})
+
+
+@guardedTool()
+async def getStructures(context: Context, names: list[str] | None = None):
+  """Every structure (or those named) in the order they were first laid: kind, order, definition (kitPath absolute), parts with their
+  triangles and the export models they become, standsOn (the objects its probes find now), and whether it is stale and why: ground
+  (its probes looked up again: how many moved more than 0.01, the largest change and where, and where a look down from over the scene
+  now meets something standing over the ground, overGround: that object, its top and underside, and the ground under it), kit (the
+  pieces or prefabs whose fingerprint changed since it was laid: a span bakes its pieces, so it follows the kit only when laid again; a
+  placed prefab follows its pieces at once and goes stale when its prefab's footprint, entrances, or parts change), or missing (its kit file, a piece, or a prefab
+  cannot be found); its walk line for a bridge, flight, or walkway; its views (orbit: its parts for renderOrbit). Also the loose kit
+  pieces placed by hand, counted by kit and piece. Each structure is looked up as its lay looked: leaving out its own parts and every
+  structure laid after it. Changes nothing."""
+  return await callBridge(context, "getStructures", {"names": names})
 
 
 # Water

@@ -1257,7 +1257,7 @@ def carveWaterBed(name, objectName, depth, shoreWidth):
     raise ValueError(f"'{name}' is a fall; a fall has no bed")
   if depth <= 0 or shoreWidth <= 0:
     raise ValueError(f"depth and shoreWidth must be positive, got {depth} and {shoreWidth}")
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "carveWaterBed")
   surface = bridgeMeshAccess.WaterSurface(waterObject)
   positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
   if not (surface.rise(positions) < -bridgeMeshAccess.waterlineTolerance).any():

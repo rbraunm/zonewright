@@ -15,6 +15,7 @@ import numpy
 
 import bridgeMeshAccess
 import bridgeObjects
+import bridgeStructureData
 import bridgeSwim
 
 boundaryCollectionName = "boundaries"
@@ -200,6 +201,7 @@ def markPassable(objects, passable):
   marked = []
   for name in objects:
     sceneObject = bridgeMeshAccess.requireObject(name)
+    bridgeStructureData.requireNotStructurePart(sceneObject, "markPassable")
     if sceneObject.type != "MESH" and not bridgeMeshAccess.isCollectionInstance(sceneObject):
       raise ValueError(f"'{name}' is a {sceneObject.type}; only meshes and collection instances are passed through")
     if bridgeMeshAccess.boundaryProperty in sceneObject:

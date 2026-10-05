@@ -17,6 +17,7 @@ import bridgeModels
 import bridgePointLights
 import bridgeReviewGuides
 import bridgeShadings
+import bridgeStructureData
 import bridgeSurfacing
 import bridgeSwim
 import skyDrawing
@@ -488,10 +489,11 @@ def applyLayoutShading(preview, bandHeight, heightColors):
 
 
 def subjectCorners(preview, names):
-  """World bounding-box corners of named objects as evaluated: meshes, and collection instances by their collection's meshes."""
+  """World bounding-box corners of named objects as evaluated: meshes, collection instances by their collection's meshes, and
+  structures by their parts."""
   depsgraph = preview.depsgraph()
   corners = []
-  for name in names:
+  for name in [part for given in names for part in bridgeStructureData.namedObjects(given)]:
     sceneObject = bpy.data.objects.get(name)
     if sceneObject is None:
       raise ValueError(f"No object named '{name}'")

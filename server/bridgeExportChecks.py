@@ -1,9 +1,10 @@
-"""Checks before a zone export, writing nothing and changing nothing. Failures stop an export: what no zone file can hold, and for a
-game export what it must have decided (blockout, swimming, the zone row's values, zone line targets, containment). Findings are for an
-artist to look at: texture coverage (the base material showing where no surfacing layer covers a face, ground borders without a
-transition strip, stretched or collapsed texture coordinates, faces wound against the rest of their surface), and for a test export
-what a game export would still refuse. Each names the object, material, image, and face count, with where the faces lie. The coverage
-view draws the same face statuses. Runs under Blender's Python."""
+"""Checks before a zone export, writing nothing and changing nothing. Failures stop an export: what no zone file can hold (among it a
+kit that cannot be found), and for a game export what it must have decided (blockout, swimming, the zone row's values, zone line
+targets, structures laid on ground or a kit that changed since, containment). Findings are for an artist to look at: texture coverage
+(the base material showing where no surfacing layer covers a face, ground borders without a transition strip, stretched or collapsed
+texture coordinates, faces wound against the rest of their surface), and for a test export what a game export would still refuse.
+Each names the object, material, image, and face count, with where the faces lie. The report also gives each structure's models and
+triangles and the triangles of every placement. The coverage view draws the same face statuses. Runs under Blender's Python."""
 import os
 
 import bpy
@@ -12,11 +13,15 @@ import numpy
 
 import bridgeAuthoring
 import bridgeBoundaries
+import bridgeCaveData
 import bridgeCaves
 import bridgeCommands
 import bridgeExport
 import bridgeHousing
+import bridgeKitData
 import bridgeMeshAccess
+import bridgeStructureData
+import bridgeStructures
 import bridgeSurfacing
 import bridgeSwim
 import bridgeViews
@@ -93,9 +98,9 @@ class ImageChecks:
     self.records = {}
 
   def record(self, image):
-    if image.name not in self.records:
-      self.records[image.name] = self.inspect(image)
-    return self.records[image.name]
+    if image.name_full not in self.records:
+      self.records[image.name_full] = self.inspect(image)
+    return self.records[image.name_full]
 
   def inspect(self, image):
     named = bridgeExport.imagePath(image) if image.filepath else image.name
@@ -135,7 +140,10 @@ def materialImages(material):
 
 
 def materialProblems(material, images, clashing):
-  """What stops a material exporting: [(problem, fields naming the image)]."""
+  """What stops a material exporting: [(problem, fields naming the image)]; nothing for a kit's material while its kit is missing, which
+  the kit's own failure names."""
+  if material.library is not None and material.library.is_missing:
+    return []
   if not isZonewrightMaterial(material):
     return [("material not made by createMaterial or createLiquidMaterial", {})]
   nodes = material.node_tree.nodes
@@ -332,11 +340,11 @@ def surveyFaces(shipped):
   failures, findings, blockouts = Entries(), Entries(), Entries()
   placed = []
   for sceneObject, part, matrix, role in placedParts(shipped):
-    if part.name not in readParts:
-      readParts[part.name] = readPart(part, depsgraph)
-    data = readParts[part.name]
+    if part.name_full not in readParts:
+      readParts[part.name_full] = readPart(part, depsgraph)
+    data = readParts[part.name_full]
     if not len(data["loopStarts"]):
-      failures.add("no faces", (), sceneObject.name, part.name, {})
+      failures.add("no faces", (), sceneObject.name, part.name_full, {})
       continue
     matrix = numpy.array(matrix)
     world = data["positions"] @ matrix[:3, :3].T + matrix[:3, 3]
@@ -345,12 +353,12 @@ def surveyFaces(shipped):
     faceCount = len(data["loopStarts"])
     areas = numpy.bincount(data["trianglePolygons"], weights=numpy.linalg.norm(crosses, axis=1) / 2, minlength=faceCount)
     centers = numpy.add.reduceat(world[data["loopVertices"]], data["loopStarts"]) / data["loopTotals"][:, None]
-    windingKey = (part.name, numpy.linalg.det(matrix[:3, :3]) < 0)
+    windingKey = (part.name_full, numpy.linalg.det(matrix[:3, :3]) < 0)
     if windingKey not in windings:
       windings[windingKey] = windingAgainst(data, corners, crosses, role == "terrain")
     placed.append({"owner": sceneObject, "part": part, "matrix": matrix, "role": role, "data": data, "corners": corners, "crosses": crosses, "areas": areas, "centers": centers, "back": windings[windingKey]})
   images = ImageChecks()
-  materials = {material.name: material for entry in placed for material in usedMaterials(entry["data"]) if material is not None}
+  materials = {material.name_full: material for entry in placed for material in usedMaterials(entry["data"]) if material is not None}
   for material in materials.values():
     if isZonewrightMaterial(material):
       for image in materialImages(material):
@@ -375,7 +383,7 @@ def surveyFaces(shipped):
     entry["scales"] = (repeat, elongation, textureArea, triangleArea, measured)
     for slot in numpy.unique(slots[measured]):
       pick = measured & (slots == slot)
-      repeats.setdefault(data["materials"][slot].name, []).append((repeat[pick], triangleArea[pick]))
+      repeats.setdefault(data["materials"][slot].name_full, []).append((repeat[pick], triangleArea[pick]))
   usual = {name: weightedMedian(numpy.concatenate([part[0] for part in parts]), numpy.concatenate([part[1] for part in parts])) for name, parts in repeats.items()}
   counts = dict.fromkeys(statusNames, 0)
   for entry in placed:
@@ -385,14 +393,14 @@ def surveyFaces(shipped):
     back = entry["back"]
     if back.any():
       at, pieceCount = pieces(entry["data"], back, entry["centers"], entry["areas"])
-      findings.add("back faces", (), entry["owner"].name, entry["part"].name, {}, int(back.sum()), at, pieceCount)
+      findings.add("back faces", (), entry["owner"].name, entry["part"].name_full, {}, int(back.sum()), at, pieceCount)
   counts["back"] = int(sum(entry["back"].sum() for entry in placed))
   return placed, failures.listed("failure"), findings.listed("finding"), blockouts, counts
 
 
 def placedStatuses(entry, problemsOf, usual, failures, findings, blockouts):
   """Each face's coverage status (an index into statusNames) for one placed mesh, recording why in the failures and findings."""
-  data, owner, part = entry["data"], entry["owner"].name, entry["part"].name
+  data, owner, part = entry["data"], entry["owner"].name, entry["part"].name_full
   faceCount = len(data["loopStarts"])
   centers, areas = entry["centers"], entry["areas"]
   materials = data["materials"]
@@ -413,14 +421,14 @@ def placedStatuses(entry, problemsOf, usual, failures, findings, blockouts):
       record(failures, "faces without a material", mask, {})
       error |= mask
       continue
-    for problem, fields in problemsOf[material.name]:
-      record(failures, problem, mask, {"material": material.name} | fields)
+    for problem, fields in problemsOf[material.name_full]:
+      record(failures, problem, mask, {"material": material.name_full} | fields)
       error |= mask
     if bridgeSurfacing.liquidOf(material) is not None and not isWater:
-      record(failures, "liquid material off a water body", mask, {"material": material.name})
+      record(failures, "liquid material off a water body", mask, {"material": material.name_full})
       error |= mask
     if isBlockout(material):
-      record(blockouts, "blockout", mask, {"material": material.name})
+      record(blockouts, "blockout", mask, {"material": material.name_full})
       blockout |= mask
   zero = numpy.zeros(faceCount, dtype=bool)
   stretch = numpy.zeros(faceCount, dtype=bool)
@@ -437,32 +445,44 @@ def placedStatuses(entry, problemsOf, usual, failures, findings, blockouts):
     for slot in numpy.unique(slots[measured]):
       material = slotMaterials[slot]
       pick = measured & (slots == slot)
-      ratio = numpy.maximum.reduce([elongation[pick], repeat[pick] / usual[material.name], usual[material.name] / repeat[pick]])
+      usualRepeat = usual[material.name_full]
+      ratio = numpy.maximum.reduce([elongation[pick], repeat[pick] / usualRepeat, usualRepeat / repeat[pick]])
       numpy.maximum.at(worst, polygons[pick], ratio)
       faces = numpy.zeros(faceCount, dtype=bool)
       faces[polygons[pick][ratio.round(stretchDigits) > stretchFactor]] = True
       if faces.any():
-        record(findings, "texture stretched or squeezed", faces, {"material": material.name, "usualRepeat": round(usual[material.name], 2)}, worst=float(worst[faces].max()))
+        record(findings, "texture stretched or squeezed", faces, {"material": material.name_full, "usualRepeat": round(usualRepeat, 2)}, worst=float(worst[faces].max()))
       stretch |= faces
     for slot in numpy.unique(slotOf[zero]):
       material = slotMaterials[slot]
-      record(findings, "zero texture area", zero & (slotOf == slot), {"material": None if material is None else material.name})
+      record(findings, "zero texture area", zero & (slotOf == slot), {"material": None if material is None else material.name_full})
   base = numpy.zeros(faceCount, dtype=bool)
   deciders = bridgeAuthoring.shownSurface(entry["part"])[1] if bridgeMeshAccess.surfaceLayers(entry["part"]) else None
+  # A cave's lining takes its materials from its definition, not from surfacing, and meets the ground at its mouth by design: it is
+  # surfaced as cut. (A terrain holding caves has no modifiers, so its faces are the exported ones.)
+  lining = caveLining(entry["part"]) if bridgeCaveData.holdsCaves(entry["part"]) else numpy.zeros(faceCount, dtype=bool)
   if deciders is not None and len(deciders) != faceCount:
     failures.add("surfacing layers unlike the exported faces", (), owner, part, {"message": f"'{part}' has modifiers that change its faces, so its surfacing layers cannot be checked against what it exports; apply or remove them"})
   elif deciders is not None:
-    base = deciders == -1
+    base = (deciders == -1) & ~lining
     for slot in numpy.unique(slotOf[base]):
       material = slotMaterials[slot]
-      record(findings, "base material showing", base & (slotOf == slot), {"material": None if material is None else material.name})
+      record(findings, "base material showing", base & (slotOf == slot), {"material": None if material is None else material.name_full})
   border = numpy.zeros(faceCount, dtype=bool)
   if entry["role"] == "terrain":
-    border = groundBorders(entry, slotOf, slotMaterials, base, findings)
+    border = groundBorders(entry, slotOf, slotMaterials, base | lining, findings)
   statuses = numpy.full(faceCount, statusNames.index("ok"))
   for name, mask in (("border", border), ("base", base), ("stretch", stretch), ("blockout", blockout), ("zeroTexture", zero), ("error", error)):
     statuses[mask] = statusNames.index(name)
   return statuses
+
+
+def caveLining(sceneObject):
+  """The faces of a terrain that are a cave's lining."""
+  lining = numpy.zeros(len(sceneObject.data.polygons), dtype=bool)
+  for name in bridgeCaveData.caves(sceneObject):
+    lining |= bridgeCaveData.faceTags(sceneObject, name) == bridgeCaveData.liningFaceTag
+  return lining
 
 
 def roundedPoint(point):
@@ -474,7 +494,7 @@ def groundBorders(entry, slotOf, slotMaterials, base, findings):
   between them, by pair of materials: the border's length and its stretches, each its center, bounds, and length; returns the faces
   along them."""
   data = entry["data"]
-  names = [material.name if isGround(material) else None for material in slotMaterials]
+  names = [material.name_full if isGround(material) else None for material in slotMaterials]
   faceNames = numpy.array([names[slot] or "" for slot in slotOf], dtype=object)
   ground = (faceNames != "") & ~base
   faceCross = numpy.stack([numpy.bincount(data["trianglePolygons"], weights=entry["crosses"][:, axis], minlength=len(slotOf)) for axis in range(3)], axis=1)
@@ -499,7 +519,7 @@ def groundBorders(entry, slotOf, slotMaterials, base, findings):
         "center": roundedPoint(points.mean(axis=0)), "minimum": roundedPoint(points.min(axis=0)), "maximum": roundedPoint(points.max(axis=0)),
         "length": round(length, 1),
       })
-    findings.add("border without a transition", (pair,), entry["owner"].name, entry["part"].name, {"materials": pair.split(" | ")}, stretches=stretches, length=sum(stretch["length"] for stretch in stretches))
+    findings.add("border without a transition", (pair,), entry["owner"].name, entry["part"].name_full, {"materials": pair.split(" | ")}, stretches=stretches, length=sum(stretch["length"] for stretch in stretches))
   return faces
 
 
@@ -512,6 +532,46 @@ def objectLocation(sceneObject):
   return [round(float(value), 1) for value in sceneObject.matrix_world.translation]
 
 
+def foreignMembers(collection):
+  """What a placed collection holds, to any depth, that no model can: rendered members that are neither meshes nor collection instances."""
+  found = []
+  for member in collection.all_objects:
+    if member.hide_render:
+      continue
+    if bridgeMeshAccess.isCollectionInstance(member):
+      found += foreignMembers(member.instance_collection)
+    elif member.type != "MESH":
+      found.append(member.name)
+  return found
+
+
+def missingCollections(collection):
+  """The collections a placed collection draws, to any depth, that are missing: their kit file gone, or the collection gone from it."""
+  if collection.is_missing or (collection.library is not None and collection.library.is_missing):
+    return [collection]
+  return [found for member in collection.all_objects if bridgeMeshAccess.isCollectionInstance(member) for found in missingCollections(member.instance_collection)]
+
+
+def missingKitFailures(shipped):
+  """Placed collections whose kit file is gone, or which are gone from it, by kit: nothing of them can be drawn or exported."""
+  kits = {}
+  for sceneObject, role in shipped:
+    if role == "instance":
+      for collection in missingCollections(sceneObject.instance_collection):
+        kit = kits.setdefault(bridgeKitData.kitPathOf(collection), {"collections": set(), "placedBy": set()})
+        kit["collections"].add(collection.name)
+        kit["placedBy"].add(sceneObject.name)
+  failures = []
+  for kitPath, kit in sorted(kits.items()):
+    collections = sorted(kit["collections"])
+    why = f"holds no {collections}" if os.path.isfile(kitPath) else "is gone"
+    failures.append({
+      "failure": "kit missing", "kit": kitPath, "collections": collections, "placedBy": sorted(kit["placedBy"])[:locationsShown], "placements": len(kit["placedBy"]),
+      "message": f"Kit {kitPath} {why}, so what places {collections} draws nothing and cannot export; put the kit back, or take back what places them",
+    })
+  return failures
+
+
 def placementFailures(shipped):
   failures = []
   stems = {}
@@ -522,14 +582,74 @@ def placementFailures(shipped):
       scale = tuple(round(component, 6) for component in sceneObject.matrix_world.to_scale())
       failures.append({"failure": "scale", "object": sceneObject.name, "at": objectLocation(sceneObject), "message": f"'{sceneObject.name}' is scaled {scale}; a placed model takes one positive scale"})
     if role == "instance":
-      others = [member.name for member in bridgeExport.collectionMembers(sceneObject.instance_collection) if member.type != "MESH"]
+      others = foreignMembers(sceneObject.instance_collection)
       if others:
         failures.append({"failure": "collection holds more than meshes", "object": sceneObject.name, "at": objectLocation(sceneObject), "collection": sceneObject.instance_collection.name, "members": others})
     key = bridgeExport.modelKey(sceneObject, role)
-    stems.setdefault(bridgeExport.modelStem(key), set()).add(key[1])
-  for stem, names in sorted(stems.items()):
-    if len(names) > 1 or not stem:
-      failures.append({"failure": "model names collide", "models": sorted(names), "message": f"Models {sorted(names)} are named '{stem}' once lowercased to letters, digits, and underscores; give them distinct names"})
+    stems.setdefault(bridgeExport.modelStem(key), set()).add(key)
+  for stem, keys in sorted(stems.items()):
+    if len(keys) > 1 or not stem:
+      names = sorted(modelLabel(key) for key in keys)
+      failures.append({"failure": "model names collide", "models": names, "message": f"Models {names} are named '{stem}' once lowercased to letters, digits, and underscores; give them distinct names"})
+  return failures + missingKitFailures(shipped)
+
+
+def modelLabel(key):
+  """A model by what it is made from: a mesh's name, or a collection's with the kit file it is linked from."""
+  if key[0] != "collection":
+    return key[1]
+  return f"{key[1]} (collection in {key[2]})" if key[2] else f"{key[1]} (collection)"
+
+
+def materialNameFailures(placed):
+  """Exported materials that would share one name in the archive (two kits of one file name holding materials of one name)."""
+  materials = {material.name_full: material for entry in placed for material in usedMaterials(entry["data"]) if material is not None}
+  named = {}
+  for fullName, exported in bridgeExport.exportedMaterialNames(materials.values()).items():
+    named.setdefault(exported, []).append(fullName)
+  return [
+    {"failure": "material names collide", "materials": sorted(fullNames), "message": f"Materials {sorted(fullNames)} would all be named '{exported}' in the archive; rename one or its kit file"}
+    for exported, fullNames in sorted(named.items()) if len(fullNames) > 1
+  ]
+
+
+def structureReport(shipped, placed):
+  """Each structure's export: the models its parts are placed as, with their triangles and placements, and its triangles in all (a
+  structure laid as ground has its triangles in the terrain and no model); and the triangles of every placement of every model."""
+  roles = {sceneObject.name: role for sceneObject, role in shipped}
+  triangles = {}
+  for entry in placed:
+    triangles[entry["owner"].name] = triangles.get(entry["owner"].name, 0) + len(entry["data"]["triangleLoops"])
+  structures = []
+  for collection in bridgeStructureData.structureCollections():
+    models, total = {}, 0
+    for part in bridgeStructureData.partsOf(collection):
+      role = roles.get(part.name)
+      if role is None:
+        continue
+      total += triangles.get(part.name, 0)
+      if role in ("mesh", "instance"):
+        modelFile = bridgeExport.modelFile(part, role)
+        models.setdefault(modelFile, {"file": modelFile, "triangles": triangles.get(part.name, 0), "placements": 0})["placements"] += 1
+    structures.append({
+      "structure": collection.name, "kind": bridgeStructureData.readStructure(collection)["kind"], "models": sorted(models.values(), key=lambda model: model["file"]),
+      "triangles": total, "terrain": bridgeStructures.isGround(collection),
+    })
+  placedTriangles = sum(count for name, count in triangles.items() if roles[name] in ("mesh", "instance"))
+  return structures, placedTriangles
+
+
+def structureFailures(stale, purpose):
+  """Structures whose kit is missing, for both purposes; for a game export, structures laid on ground or a kit that changed since."""
+  failures = [
+    {"failure": "kit missing", "structure": entry["structure"], "missing": entry["missing"], "message": f"Structure '{entry['structure']}' was laid from a kit that cannot be found: {entry['missing']}; put the kit back, or take it back (removeStructure)"}
+    for entry in stale if "missing" in entry["why"]
+  ]
+  if purpose == "game":
+    failures += [
+      {"failure": "stale structure", "structure": entry["structure"], "why": entry["why"], "message": f"Structure '{entry['structure']}' was laid on ground or a kit that has changed since ({', '.join(entry['why'])}): editStructure lays it again"}
+      for entry in stale if set(entry["why"]) & {"ground", "kit"}
+    ]
   return failures
 
 
@@ -549,9 +669,12 @@ def checkZoneExport(purpose):
     {"failure": "caves broken", "object": sceneObject.name, "message": problem}
     for sceneObject, role in shipped if sceneObject.type == "MESH" for problem in bridgeCaves.integrityProblems(sceneObject)
   ]
-  _, faceFailures, faceFindings, blockouts, coverage = surveyFaces(shipped)
-  failures += faceFailures
+  placed, faceFailures, faceFindings, blockouts, coverage = surveyFaces(shipped)
+  failures += faceFailures + materialNameFailures(placed)
   findings += faceFindings
+  structures, placedTriangles = structureReport(shipped, placed)
+  stale = bridgeStructures.staleStructures()
+  failures += structureFailures(stale, purpose)
   for label, errors in (("swim volume", bridgeSwim.structuralErrors()), ("boundary", bridgeBoundaries.boundaryErrors()), ("zone line", bridgeBoundaries.zoneLineErrors())):
     failures += [{"failure": label} | error for error in errors]
   decisions = bridgeSwim.swimDecisions()
@@ -562,14 +685,15 @@ def checkZoneExport(purpose):
   gapKey = "failure" if purpose == "game" else "finding"
   gaps = blockouts.listed(gapKey) + [{gapKey: f"swim {swimState}", "body": body.name, "at": bodyCenter(body)} for swimState, bodies in decisions.items() for body in bodies]
   gaps += [{gapKey: gap["gap"]} | {key: value for key, value in gap.items() if key != "gap"} for gap in zoneRowGaps() + bridgeBoundaries.zoneLineGaps()]
-  toConfirm = bridgeExport.decisionsToConfirm(shipped)
+  objectDecisions = bridgeExport.decisionsToConfirm(shipped)
+  toConfirm = objectDecisions + [{"structure": entry["structure"], "why": entry["why"]} for entry in stale]
   if purpose == "game":
     failures += [
       {
         "failure": "stale", "object": decision["object"], "staleCaves": decision["staleCaves"], "staleDefinedPasses": decision["staleDefinedPasses"],
         "message": f"The ground under caves {decision['staleCaves']} and defined passes {decision['staleDefinedPasses']} of '{decision['object']}' moved since they were made; regradeTerrain (or editCave) fits them to it",
       }
-      for decision in toConfirm if decision["staleCaves"] or decision["staleDefinedPasses"]
+      for decision in objectDecisions if decision["staleCaves"] or decision["staleDefinedPasses"]
     ]
     failures += gaps + [{"failure": "containment not checked", "message": "A game export must prove players cannot leave the play area except through zone lines; that needs reach mapping, which is not built yet, so no game export can be made"}]
   else:
@@ -578,6 +702,7 @@ def checkZoneExport(purpose):
     "purpose": purpose, "failures": failures, "findings": findings, "coverage": coverage, "excluded": excluded,
     "toConfirm": toConfirm, "swim": {swimState: [body.name for body in bodies] for swimState, bodies in decisions.items()},
     "boundaries": sorted(sceneObject.name for sceneObject, role in shipped if role == "boundary"), "zoneLines": [region["name"] for region in bridgeBoundaries.zoneLineRegions()],
+    "structures": structures, "placedTriangles": placedTriangles,
   }
 
 

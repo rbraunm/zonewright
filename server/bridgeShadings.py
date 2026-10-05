@@ -13,6 +13,7 @@ import numpy
 
 import bridgeExportChecks
 import bridgeMeshAccess
+import bridgeStructureData
 import bridgeSurfacing
 import bridgeViews
 
@@ -394,22 +395,27 @@ def labelPlaces(preview, copies, seen, labels):
   what shows of it nearest that projection; and the named objects the view does not show."""
   if not labels or len(set(labels)) != len(labels):
     raise ValueError(f"labels names the objects to label, each once, got {labels!r}")
+  members = {}
   for name in labels:
-    if bpy.data.objects.get(name) is None:
-      raise ValueError(f"No object named '{name}' to label")
-    if name not in seen.owners:
-      raise ValueError(f"'{name}' draws nothing in views: it is hidden from renders, a guide with guides off, or not a mesh or collection instance")
+    members[name] = bridgeStructureData.namedObjects(name)
+    for member in members[name]:
+      if bpy.data.objects.get(member) is None:
+        raise ValueError(f"No object named '{member}' to label")
+      if member not in seen.owners:
+        raise ValueError(f"'{member}' draws nothing in views: it is hidden from renders, a guide with guides off, or not a mesh or collection instance")
   height, width = seen.ownerPixels.shape
   shown, hidden = [], []
   for name in labels:
-    index = seen.owners.index(name)
-    if not seen.counts[index]:
+    indices = [seen.owners.index(member) for member in members[name]]
+    pixels = int(sum(seen.counts[index] for index in indices))
+    if not pixels:
       hidden.append(name)
       continue
-    low, high = copies.ownerBounds(index)
+    bounds = [copies.ownerBounds(index) for index in indices]
+    low, high = numpy.min([bound[0] for bound in bounds], axis=0), numpy.max([bound[1] for bound in bounds], axis=0)
     projected = bpy_extras.object_utils.world_to_camera_view(preview.scene, preview.camera, mathutils.Vector((low + high) / 2))
     x, y = projected.x * width, (1 - projected.y) * height
-    mask = seen.ownerPixels == index
+    mask = numpy.isin(seen.ownerPixels, indices)
     column, row = int(x), int(y)
     if projected.z > 0 and 0 <= column < width and 0 <= row < height and mask[row, column]:
       at = [column, row]
@@ -417,7 +423,7 @@ def labelPlaces(preview, copies, seen, labels):
       rows, columns = numpy.nonzero(deepestPixels(mask))
       nearest = int(numpy.argmin((columns - x) ** 2 + (rows - y) ** 2))
       at = [int(columns[nearest]), int(rows[nearest])]
-    shown.append({"object": name, "at": at, "pixels": int(seen.counts[index])})
+    shown.append({"object": name, "at": at, "pixels": pixels})
   return {"shown": shown, "notVisible": hidden}
 
 

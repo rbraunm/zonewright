@@ -365,7 +365,7 @@ def restoreEnvironmentLookups(lookups):
 
 
 def assignMaterial(objectName, materialName, selector):
-  sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
+  sceneObject = bridgeMeshAccess.requireEditableMesh(objectName, "assignMaterial")
   if bridgeMeshAccess.surfaceLayersProperty in sceneObject:
     raise ValueError(f"'{objectName}' is surfaced by layers, which set its face materials; paint into a layer with paintSurface instead")
   material = bpy.data.materials.get(materialName)

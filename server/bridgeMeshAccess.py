@@ -14,6 +14,7 @@ import numpy
 
 import bridgeCaveData
 import bridgeNoise
+import bridgeStructureData
 import playerScale
 
 selectorKeys = (
@@ -141,14 +142,27 @@ def isPlayerSolid(sceneObject, collision=False):
   return sceneObject.type == "MESH" or isCollectionInstance(sceneObject)
 
 
+def collectionParts(collection):
+  """Each rendered mesh a collection draws where it is instanced, with its matrix from the collection's instance_offset: its own meshes
+  and, to any depth, those of the collections its instance members instance (a prefab's part holding placed pieces)."""
+  offset = mathutils.Matrix.Translation(-collection.instance_offset)
+  parts = []
+  for member in collection.all_objects:
+    if member.hide_render:
+      continue
+    if member.type == "MESH":
+      parts.append((member, offset @ member.matrix_world))
+    elif isCollectionInstance(member):
+      parts.extend((mesh, offset @ member.matrix_world @ matrix) for mesh, matrix in collectionParts(member.instance_collection))
+  return parts
+
+
 def objectParts(sceneObject):
-  """A mesh with its world matrix, or each rendered mesh of a collection instance as placed."""
+  """A mesh with its world matrix, or each rendered mesh of a collection instance as placed, nested instances included."""
   if sceneObject.type == "MESH":
     return [(sceneObject, sceneObject.matrix_world.copy())]
   if isCollectionInstance(sceneObject):
-    collection = sceneObject.instance_collection
-    placement = sceneObject.matrix_world @ mathutils.Matrix.Translation(-collection.instance_offset)
-    return [(member, placement @ member.matrix_world) for member in collection.all_objects if member.type == "MESH" and not member.hide_render]
+    return [(member, sceneObject.matrix_world @ matrix) for member, matrix in collectionParts(sceneObject.instance_collection)]
   raise ValueError(f"'{sceneObject.name}' is a {sceneObject.type}; it has no mesh")
 
 
@@ -381,12 +395,25 @@ def rockOverGround(castWithNormal, x, y, top):
   return highest[0].z, underside[0].z, floor[0].z
 
 
-def describeRockOverGround(where, levels):
-  top, underside, floor = levels
-  return (
-    f"rock lies over ground at {where}: the highest ground there, at {top:.1f}, is the top of rock whose underside is at {underside:.1f},"
-    f" over ground at {floor:.1f} (a cave or an overhang)"
-  )
+def overGroundOn(surfaces, x, y, top):
+  """rockOverGround on PlayerSurfaces, with the name of the object whose underside stands over the ground: its levels and that name, or
+  None."""
+  levels = rockOverGround(surfaces.castWithNormal, x, y, top)
+  if levels is None:
+    return None
+  over = surfaces.castOn(mathutils.Vector((x, y, levels[1] - castNudge)), up, levels[0] - levels[1] + 2 * castNudge)
+  return levels, None if over is None else over[2]
+
+
+def describeRockOverGround(where, levels, name=None):
+  """A refusal's account of rock over ground, naming the object over the ground when known (a placed roof, a hill over a cave)."""
+  top, underside, floor = (round(level, 1) + 0.0 for level in levels)
+  if name is None:
+    return (
+      f"rock lies over ground at {where}: the highest ground there, at {top:.1f}, is the top of rock whose underside is at {underside:.1f},"
+      f" over ground at {floor:.1f} (a cave or an overhang)"
+    )
+  return f"'{name}' stands over the ground at {where}: the highest ground there, at {top:.1f}, is the top of '{name}', whose underside, at {underside:.1f}, stands over ground at {floor:.1f}"
 
 
 def swimSurfaces(leftOut=(), added=None):
@@ -602,6 +629,13 @@ def requireMeshObject(name):
   sceneObject = requireObject(name)
   if sceneObject.type != "MESH":
     raise ValueError(f"'{name}' is a {sceneObject.type}, not a mesh")
+  return sceneObject
+
+
+def requireEditableMesh(name, action):
+  """A mesh the tool named by action may change: not part of a structure laid from its definition."""
+  sceneObject = requireMeshObject(name)
+  bridgeStructureData.requireNotStructurePart(sceneObject, action)
   return sceneObject
 
 
