@@ -912,7 +912,7 @@ def caveCuts(legs, followed):
             nearest = int(numpy.argmin(numpy.linalg.norm(samples[:, :2] - numpy.array(start[:2]), axis=1)))
             if nearest == index:
               marks.append({"s": s0, "z": start[2], "label": f"{branch} leaves"})
-        crossing = ~alongLeg & (sides[:-1] * sides[1:] < 0) & (sines >= math.sin(math.radians(alongDegrees)))
+        crossing = ~alongLeg & ((sides[:-1] > 0) != (sides[1:] > 0)) & (sines >= math.sin(math.radians(alongDegrees)))
         for index in numpy.flatnonzero(crossing):
           share = sides[index] / (sides[index] - sides[index + 1])
           s = distances[index] + share * (distances[index + 1] - distances[index])

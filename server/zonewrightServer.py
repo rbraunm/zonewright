@@ -2344,13 +2344,16 @@ async def renderSection(
   what plans cannot show: a cave's climb, landings, and headroom, one passage over another and the rock between, swim volumes against
   the surface and the bed, a plot's pad against the slope, stacked floors and the stairs between them, an arch's span, a wall's height
   over the ground and a lid's over a path. Refused: no line, or more than one; a path under two points or with two in one place; an
-  unknown cave or run. The result also gives the cuts as numbers (s along the line, z height)."""
+  unknown cave or run. The result also gives the cuts as numbers (s along the line, z height), closedSpaces (how many closed shapes
+  the ground makes in it: rooms and passages cut across, one over another), and at each bend the ground's heights where its two legs
+  meet (groundAtJoins)."""
   cuts = await callBridge(context, "sectionCuts", {"start": start, "end": end, "path": path, "cave": cave, "bottom": bottom, "top": top, "layers": layers})
   outputPath = newRenderPath()
   drawn = await anyio.to_thread.run_sync(planDrawing.drawSection, outputPath, cuts)
   summary = {
     "outputPath": str(outputPath), "length": cuts["length"], "bottom": cuts["bottom"], "top": cuts["top"], "bends": cuts["bends"],
     "gridStep": drawn["gridStep"], "unitsPerPixel": drawn["unitsPerPixel"], "groundSegments": len(cuts["ground"]), "groundAtJoins": cuts["groundAtJoins"],
+    "closedSpaces": planDrawing.closedLoops(cuts["ground"]),
     "water": [{"name": entry["name"], "levels": [min(min(z0, z1) for _, z0, _, z1 in entry["segments"]), max(max(z0, z1) for _, z0, _, z1 in entry["segments"])]} for entry in cuts["water"]],
     "swim": cuts["swim"],
     "massing": [{"name": entry["name"], "label": entry["label"]} for entry in cuts["massing"]],

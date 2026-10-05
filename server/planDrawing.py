@@ -530,6 +530,35 @@ def clippedSegment(segment, length, bottom, top):
   return (s0 + enter * (s1 - s0), z0 + enter * (z1 - z0), s0 + leave * (s1 - s0), z0 + leave * (z1 - z0))
 
 
+def closedLoops(segments):
+  """How many closed shapes a section's ground segments make (a room or a passage cut across, a hole through an arch): groups of
+  segments joined end to end where every end meets exactly one other. A segment with no length (where the plane passes through a
+  vertex) joins nothing."""
+  ends = {}
+  segments = [segment for segment in segments if (round(segment[0], 2), round(segment[1], 2)) != (round(segment[2], 2), round(segment[3], 2))]
+  for index, (s0, z0, s1, z1) in enumerate(segments):
+    for end in ((round(s0, 2), round(z0, 2)), (round(s1, 2), round(z1, 2))):
+      ends.setdefault(end, []).append(index)
+  parent = list(range(len(segments)))
+
+  def root(index):
+    while parent[index] != index:
+      parent[index] = parent[parent[index]]
+      index = parent[index]
+    return index
+
+  for members in ends.values():
+    for other in members[1:]:
+      parent[root(other)] = root(members[0])
+  groups, openGroups = set(), set()
+  for index in range(len(segments)):
+    groups.add(root(index))
+  for members in ends.values():
+    if len(members) != 2:
+      openGroups.update(root(member) for member in members)
+  return len(groups - openGroups)
+
+
 def sectionFit(cuts, size):
   """The scale (pixels per unit) that fits a section's length and height into a drawing of size."""
   return min((size[0] - 2 * sectionPadding[0]) / cuts["length"], (size[1] - 2 * sectionPadding[1]) / (cuts["top"] - cuts["bottom"]))

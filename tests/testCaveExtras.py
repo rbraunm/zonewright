@@ -334,6 +334,84 @@ def testBranchRefusals(stageBlenderServer, tmp_path):
   assert detail["caves"] == []
 
 
+# A branch leaving the room's west wall, climbing south at x -100 to 60, then running east over the tunnel at y 30 (its vault at 47).
+over = {"name": "over", "from": "main", "path": [[-40, 150, 2], [-100, 150, 2], [-100, 30, 60], [60, 30, 60]], "widths": [30] * 4, "heights": [30] * 4}
+# A second cave from its own approach 150 east, falling under the room (its floor at 2) to end blind beneath it.
+cellar = {
+  "objectName": "ground", "name": "cellar", "path": [[150, -60, 2], [150, 10, 2], [150, 80], [100, 160], [-40, 160]], "grades": [None, -28, -10, 0],
+  "widths": [24] * 5, "heights": [24] * 5,
+} | caveMaterials
+# What a ray up from a point meets: each surface's height and whether it faces down.
+rayUp = r"""
+import mathutils
+depsgraph = bpy.context.evaluated_depsgraph_get()
+hits, origin = [], mathutils.Vector(start)
+for _ in range(6):
+  hit, location, normal, _, _, _ = bpy.context.scene.ray_cast(depsgraph, origin, mathutils.Vector((0, 0, 1)))
+  if not hit:
+    break
+  hits.append([round(location.z, 3), normal.z < 0])
+  origin = location + mathutils.Vector((0, 0, 1e-3))
+result = hits
+"""
+
+
+def testABranchPassesOverItsParentWithTheRockBetween(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    cut = await session.expectSuccess("cutCave", room | {"name": "spiral", "breakup": None, "branches": [over]})
+    hits = (await session.expectSuccess("runPython", {"code": "start = [0, 30, 3]\n" + rayUp}))["result"]
+    checked = (await session.expectSuccess("runPython", {"code": checkCaveNamed("spiral")}))["result"]
+    _, section = await session.expectImage("renderSection", {"start": [-40, -10], "end": [40, 70], "layers": ["ground", "caves"]})
+    await session.expectSuccess("removeCave", {"objectName": "ground", "name": "spiral"})
+    thin = await session.expectError("cutCave", room | {"name": "spiral", "breakup": None, "branches": [over | {"path": [[-40, 150, 2], [-100, 150, 2], [-100, 30, 51], [60, 30, 51]]}]})
+    return cut, hits, checked, section, thin
+
+  cut, hits, checked, section, thin = stageBlenderServer.session(steps)
+  # Up from the tunnel's floor: its vault, facing down, then the branch's floor over it, met from below, with the rock between.
+  (vault, vaultDown), (floor, floorDown) = hits[0], hits[1]
+  assert vaultDown and not floorDown and abs(floor - 60) <= 0.01 and floor - vault >= 8
+  assert checked["edgesOnThreeOrMoreFaces"] == 0 and checked["openEdges"] == borderEdges
+  # Across the crossing the section cuts both as closed shapes, the branch's over the tunnel's.
+  assert section["closedSpaces"] == 2
+  boxes = {entry["run"]: entry["crossings"][0]["z"] for entry in section["caves"]}
+  assert boxes["over"][0] - boxes["main"][1] >= 8
+  assert "The cave's runs 'main' and 'over' come within 4." in thin and "less than minimumRock (8)" in thin
+
+
+def testTwoCavesCrossInsideTheRockAndEachIsTakenBackAlone(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    await session.expectSuccess("gradeRoute", {"objectName": "ground", "name": "eastApproach", "points": [[150, -140, 2], [150, -50, 2]], "width": 56})
+    await session.expectSuccess("cutCave", room)
+    await session.expectSuccess("cutCave", cellar)
+    hits = (await session.expectSuccess("runPython", {"code": "start = [-20, 160, -60]\n" + rayUp}))["result"]
+    mouths = await session.expectError("cutCave", room | {"name": "beside", "path": [[45, -60, 2], [45, 30, 6], [45, 150, 8]], "widths": [40] * 3, "heights": [45] * 3})
+    roomBefore = (await session.expectSuccess("runPython", {"code": lining("room")}))["result"]
+    await session.expectSuccess("removeCave", {"objectName": "ground", "name": "cellar"})
+    roomAfter = (await session.expectSuccess("runPython", {"code": lining("room")}))["result"]
+    roomChecked = (await session.expectSuccess("runPython", {"code": checkCaveNamed("room")}))["result"]
+    await session.expectSuccess("cutCave", cellar)
+    cellarBefore = (await session.expectSuccess("runPython", {"code": lining("cellar")}))["result"]
+    await session.expectSuccess("removeCave", {"objectName": "ground", "name": "room"})
+    cellarAfter = (await session.expectSuccess("runPython", {"code": lining("cellar")}))["result"]
+    cellarChecked = (await session.expectSuccess("runPython", {"code": checkCaveNamed("cellar")}))["result"]
+    return hits, mouths, roomBefore, roomAfter, roomChecked, cellarBefore, cellarAfter, cellarChecked
+
+  hits, mouths, roomBefore, roomAfter, roomChecked, cellarBefore, cellarAfter, cellarChecked = stageBlenderServer.session(steps)
+  # Up from under the cellar: the cellar's floor, its vault, then the room's floor over it with the rock between.
+  heights = [height for height, _ in hits]
+  assert [down for _, down in hits[:3]] == [False, True, False] and heights[2] - heights[1] >= 8 and abs(heights[2] - 2) <= 1e-3
+  assert "Cave 'beside' would reach the mouth of cave(s) ['room']" in mouths
+  # Taking either back leaves the other's lining exactly as it was cut, and whole.
+  def ordered(vertices):
+    vertices = numpy.array(vertices)
+    return vertices[numpy.lexsort(vertices.T[::-1])]
+  assert numpy.array_equal(ordered(roomBefore), ordered(roomAfter)) and numpy.array_equal(ordered(cellarBefore), ordered(cellarAfter))
+  for checked in (roomChecked, cellarChecked):
+    assert checked["edgesOnThreeOrMoreFaces"] == 0 and checked["openEdges"] == borderEdges and checked["largestRingMiss"] <= 1e-4
+
+
 def testPointsWithoutHeightsTakeTheEvenGradeAndAGradedSegmentSetsItsEnd(stageBlenderServer, tmp_path):
   async def steps(session):
     await caveCanyon(session, tmp_path)
