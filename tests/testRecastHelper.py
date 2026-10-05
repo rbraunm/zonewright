@@ -11,9 +11,9 @@ from PIL import Image
 from conftest import StagedServer, junction, pinnedBlender, pinnedRecast
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
-import navDrawing
 import planDrawing
 import recastHelper
+import serverMapDrawing
 import serverMapFiles
 import serverNav
 
@@ -273,11 +273,11 @@ def testNavPlansDrawAreasComponentsAndDifferences(recastToolingRoot, tmp_path):
   dryInspection = serverNav.inspectNav(dry, safePoint, [], recastToolingRoot, noProgress)
   wetInspection = serverNav.inspectNav(wet, safePoint, [], recastToolingRoot, noProgress)
   panels = [
-    navDrawing.areaPanel("by area", wetInspection), navDrawing.componentPanel("islands", wetInspection),
-    navDrawing.differencePanel("with water against without", wetInspection, dryInspection), navDrawing.differencePanel("against itself", wetInspection, wetInspection),
+    serverMapDrawing.areaPanel("by area", wetInspection), serverMapDrawing.componentPanel("islands", wetInspection),
+    serverMapDrawing.differencePanel("with water against without", wetInspection, dryInspection), serverMapDrawing.differencePanel("against itself", wetInspection, wetInspection),
   ]
   sheetPath = tmp_path / "navPlans.png"
-  drawn = navDrawing.drawNav(sheetPath, panels, panelWidth=400)
+  drawn = serverMapDrawing.drawNav(sheetPath, panels, panelWidth=400)
   # The water box repartitions the whole floor it lies on (36 polygons where there were 17); the two other floors are unchanged.
   assert drawn["legends"] == [
     ["Normal: 51 polygons", "Water: 3 polygons"],
@@ -295,13 +295,13 @@ def testNavPlansDrawAreasComponentsAndDifferences(recastToolingRoot, tmp_path):
       return sheet.getpixel((round(left + x), round(top + y)))
 
     def filled(color):
-      return {color, navDrawing.darker(color)}
+      return {color, serverMapDrawing.darker(color)}
 
-    assert colorAt(0, (72, 72)) in filled(navDrawing.areaColors[1])
-    assert colorAt(0, (12, 88)) in filled(navDrawing.areaColors[0])
-    assert colorAt(1, (85, 15)) in filled(navDrawing.mainPieceColor)
-    assert colorAt(1, (208, 32)) in filled(navDrawing.islandColor)
-    assert colorAt(1, (165, 65)) == navDrawing.background[:3]
-    assert colorAt(2, (72, 72)) in filled(navDrawing.differenceColor)
-    assert colorAt(2, (208, 32)) in filled(navDrawing.contextColor)
-    assert colorAt(3, (72, 72)) in filled(navDrawing.contextColor)
+    assert colorAt(0, (72, 72)) in filled(serverMapDrawing.areaColors[1])
+    assert colorAt(0, (12, 88)) in filled(serverMapDrawing.areaColors[0])
+    assert colorAt(1, (85, 15)) in filled(serverMapDrawing.mainPieceColor)
+    assert colorAt(1, (208, 32)) in filled(serverMapDrawing.islandColor)
+    assert colorAt(1, (165, 65)) == serverMapDrawing.navBackground[:3]
+    assert colorAt(2, (72, 72)) in filled(serverMapDrawing.differenceColor)
+    assert colorAt(2, (208, 32)) in filled(serverMapDrawing.contextColor)
+    assert colorAt(3, (72, 72)) in filled(serverMapDrawing.contextColor)

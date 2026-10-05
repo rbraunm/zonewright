@@ -45,7 +45,7 @@ heavyGroups = {
   "serverMaps": {f"server/{name}.py" for name in ("serverMapFiles", "serverMapDrawing", "eqgFiles", "eqArchive")}
     | {"tests/serverReference.py", "tests/serverReference.json"},
   "serverNav": {f"server/{name}.py" for name in (
-    "serverNav", "recastHelper", "serverMapFiles", "eqgFiles", "eqArchive", "navDrawing", "planDrawing", "machineProfile", "toolingManifest", "toolingSync",
+    "serverNav", "recastHelper", "serverMapFiles", "eqgFiles", "eqArchive", "serverMapDrawing", "planDrawing", "machineProfile", "toolingManifest", "toolingSync",
   )} | {"toolingManifest.json", "tests/serverReference.py", "tests/serverReference.json"} | {f"recastHelper/{name}" for name in (
     "CMakeLists.txt", "main.cpp", "helperIO.h", "helperIO.cpp", "navMode.cpp", "inspectMode.cpp",
   )},

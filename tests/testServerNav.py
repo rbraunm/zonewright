@@ -10,8 +10,8 @@ from serverReference import referenceBytes
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
 import machineProfile
-import navDrawing
 import recastHelper
+import serverMapDrawing
 import serverMapFiles
 import serverNav
 
@@ -208,10 +208,10 @@ def testIslandsAndProbeOnHighpassHold(recastToolingRoot, tmp_path):
   assert {key: theirs[key] for key in ("mainPiece", "islands", "probes", "findings")} == {key: inspection[key] for key in ("mainPiece", "islands", "probes", "findings")}
 
   areas = ["Normal: 7,692 polygons", "Water: 452 polygons", "Disabled: 53 polygons"]
-  byArea = navDrawing.drawNav(tmp_path / "highpassholdNavByArea.png", [
-    navDrawing.areaPanel("Peridot's highpasshold.nav", theirs), navDrawing.areaPanel("ours, from Peridot's .map and .wtr", inspection),
-    navDrawing.differencePanel("polygons that differ", inspection, theirs),
+  byArea = serverMapDrawing.drawNav(tmp_path / "highpassholdNavByArea.png", [
+    serverMapDrawing.areaPanel("Peridot's highpasshold.nav", theirs), serverMapDrawing.areaPanel("ours, from Peridot's .map and .wtr", inspection),
+    serverMapDrawing.differencePanel("polygons that differ", inspection, theirs),
   ])
   assert byArea["legends"] == [areas, areas, ["0 polygons the other lacks", "0 polygons only the other has"]]
-  islandsPlan = navDrawing.drawNav(tmp_path / "highpassholdIslands.png", [navDrawing.componentPanel("NPC islands of our highpasshold.nav", inspection)], panelWidth=1600)
+  islandsPlan = serverMapDrawing.drawNav(tmp_path / "highpassholdIslands.png", [serverMapDrawing.componentPanel("NPC islands of our highpasshold.nav", inspection)], panelWidth=1600)
   assert islandsPlan["legends"] == [["main piece: 3,677 polygons", "640 islands, 297 at snap risk", "Disabled and zone line: 53 polygons"]]
