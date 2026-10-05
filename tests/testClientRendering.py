@@ -184,6 +184,26 @@ def testObjectsAZoneParksBelowTheWorldStandThereWithoutStretchingLayoutBands(sta
   assert layout["heightRange"] == [-468.469, 727.938]
 
 
+@pytest.mark.clientData("clientFiles")
+def testAViewsCharacterSetsTheSpecialAmbientOfTheFloorItStandsOn(stageBlenderServer):
+  view = {"eye": [-2061.1, -665.3, 95.5], "target": [-2000, -665.3, 92]}
+
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    await session.expectSuccess("importZone", {"zone": "cauldron"})
+    await session.expectSuccess("setZoneProperties", environment)
+    bare, _ = await session.expectImage("renderView", {"view": view})
+    standing, described = await session.expectImage("renderView", {"view": view, "carriedLight": {"lightType": 0, "at": [-2061.1, -665.3, 90.0], "headingDegrees": 0}})
+    return bare, standing, described
+
+  bare, standing, described = stageBlenderServer.session(steps)
+  # The Cauldron's floor there carries alpha about 11 at its corners, below the least share of scene light, 0.1: a character standing on
+  # it takes the special ambient 0.08 times 0.9, 18/255 in each channel, in place of the zone's own 0.05, 0, 0, and carries no light.
+  assert described["viewer"] == {"share": 0.1, "specialAmbientColor": [18 / 255] * 3, "character": "HUM of height 6"} and "carriedLight" not in described
+  bareMean, standingMean = (numpy.asarray(Image.open(io.BytesIO(image)).convert("RGB"), dtype=float).mean(axis=(0, 1)) for image in (bare, standing))
+  assert standingMean[1] > bareMean[1] + 1 and standingMean[2] > bareMean[2] + 1
+
+
 def pixelAt(image, x, y):
   return Image.open(io.BytesIO(image)).convert("RGB").getpixel((x, y))
 

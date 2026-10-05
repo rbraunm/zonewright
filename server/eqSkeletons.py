@@ -55,6 +55,17 @@ def bindTransforms(worldFile, dags):
   return [frameTransform(trackFrames(worldFile, trackInstance(worldFile, dag["track"])[0])[0]) for dag in dags]
 
 
+def boundingSphere(skeletonFragment):
+  """A skeleton's bounding sphere (0x10): its center's offset (flag 0x1, else none) and radius (flag 0x2); the radius MQPeridotEmu's
+  dumps show a hierarchical actor holding (+0x144) is this times the actor's scale."""
+  body = skeletonFragment.body
+  flags = struct.unpack_from("<I", body, 4)[0]
+  if not flags & 2:
+    raise ValueError(f"Skeleton '{skeletonFragment.name}' stores no bounding radius")
+  center = numpy.array(struct.unpack_from("<3f", body, 16)) if flags & 1 else numpy.zeros(3)
+  return {"center": center, "radius": struct.unpack_from("<f", body, 16 + (12 if flags & 1 else 0))[0]}
+
+
 def readSkeleton(worldFile, skeletonFragment):
   """Bones (dags) with their tracks, children, and attachment; and, when flag 0x200 is set, the skinned meshes' references (0x2D)."""
   body = skeletonFragment.body

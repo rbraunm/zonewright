@@ -16,6 +16,7 @@ import eqRaces
 import eqWorldFile
 import eqZones
 import loadTimeLight
+import viewerLight
 import zoneGeometry
 import zoneSources
 
@@ -180,6 +181,20 @@ def testPlacedObjectsWithoutColorsTakeTheLightTheClientGivesThemAtLoad():
       part = eqModels.wldStaticParts(eqArchive.EQArchive(everquestClient / f"{zoneName}_obj.s3d"), classicActor(f"{zoneName}_obj.s3d", actor), {}, None)["parts"][0]
       colors = d3dColors(loadTimeLight.placedColors(part, placement, eqZones.placementRotation(placement), lights, floors))
       assert (int(colors[0]), fnv1a(colors)) == (first, hashed), (zoneName, actor, x, y)
+
+
+@pytest.mark.clientData("clientFiles")
+def testAViewsCharacterTakesTheSpecialAmbientOfTheFloorItStandsOn(tmp_path):
+  # The RoF2 player's actor held these shares of scene light in MQPeridotEmu's dumps: 0.1992185 standing in Grimling Forest's cave
+  # (its floor's corners at alpha 51), 0.9960927 on the Plane of Knowledge's cobbles. The special ambient is 0.08 times one less the
+  # share, each channel truncated to a byte: 16/255 in the cave, nothing on the cobbles.
+  body = viewerLight.viewerBody(everquestClient, tmp_path, False)
+  assert abs(body["sphere"]["radius"] - 5.17805) < 1e-4 and abs(body["avatarHeight"] - 3.75) < 1e-9
+  for zoneName, feet, share, level in (("grimling", (869.1, 1905.9, -271.58), 0.1992185, 16), ("poknowledge", (575.2, 672.0, -120.75), 0.9960927, 0)):
+    archive = eqArchive.EQArchive(everquestClient / f"{zoneName}.s3d")
+    floors = loadTimeLight.ShareFloors(eqWorldFile.WorldFile(archive.read(f"{zoneName}.wld"), f"{zoneName}.wld").meshes(), eqZones.colorlessRegionColor[3])
+    found = viewerLight.viewerShare(floors, feet, body)
+    assert abs(found - share) < 1e-6 and viewerLight.specialAmbient(found) == [level / 255] * 3
 
 
 @pytest.mark.clientData("clientFiles")

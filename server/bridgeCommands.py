@@ -292,8 +292,11 @@ def previewZone(sky):
   return zone | sky["environment"] if sky is not None else zone
 
 
-def renderView(view, outputPath, figureModel, shading, bandHeight, guides, sky, swimVolumes, labels, emitters, frame=None, carriedLight=None):
-  return bridgeViews.renderView(bpy.context.scene, previewZone(sky), sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes, labels, emitters, frame, carriedLight)
+def renderView(view, outputPath, figureModel, shading, bandHeight, guides, sky, swimVolumes, labels, emitters, frame=None, carriedLight=None, viewerSpecialAmbient=None):
+  """A view rendered; viewerSpecialAmbient, the special ambient the client gives the view's character where it stands, replaces the
+  zone's own specialAmbientColor when given."""
+  zone = previewZone(sky) | ({} if viewerSpecialAmbient is None else {"specialAmbientColor": viewerSpecialAmbient})
+  return bridgeViews.renderView(bpy.context.scene, zone, sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes, labels, emitters, frame, carriedLight)
 
 
 def pick(view, pixel, sky):

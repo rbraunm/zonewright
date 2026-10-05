@@ -32,13 +32,17 @@ import eqgExport
 import eqModels
 import eqRaces
 import eqRecording
+import eqArchive
 import eqSky
+import eqWorldFile
 import eqZones
 import extensionCatalog
+import loadTimeLight
 import machineProfile
 import planDrawing
 import skyDrawing
 import toolingLog
+import viewerLight
 import viewSheets
 import toolingManifest
 import toolingStatus
@@ -777,7 +781,8 @@ async def setZoneProperties(
 
 
 def viewersCarriedLight(zone, carriedLight):
-  """The light the view's character carries (clientPointLights.carriedLight) from a view's carriedLight, or None without one."""
+  """The light the view's character carries (clientPointLights.carriedLight) from a view's carriedLight, or None without one or for a
+  character carrying none (light type 0)."""
   if carriedLight is None:
     return None
   keys = {"lightType", "at", "headingDegrees"}
@@ -788,12 +793,57 @@ def viewersCarriedLight(zone, carriedLight):
     raise ToolError(f"carriedLight's at is the character's feet [x, y, z], got {at!r}")
   if isinstance(carriedLight["lightType"], bool) or not isinstance(carriedLight["lightType"], int):
     raise ToolError(f"carriedLight's lightType is the spawn's light, an integer, got {carriedLight['lightType']!r}")
+  if carriedLight["lightType"] == 0:
+    return None
   if "zoneId" not in zone:
     raise ToolError("A carried light's reach depends on the zone's id (the zone header's ZoneID): set zoneId with setZoneProperties")
   try:
     return clientPointLights.carriedLight(carriedLight["lightType"], at, float(carriedLight["headingDegrees"]), zone["zoneId"])
   except ValueError as error:
     raise ToolError(str(error)) from error
+
+
+classicZoneFloors = {}
+
+
+def zoneFloors(clientRoot, zoneName):
+  """The floors a drop in a client zone lands on (loadTimeLight.ShareFloors), kept for the server's life by the zone's archive and its
+  state; None for a zone the client loads as an EQG or EQ terrain zone."""
+  source = zoneSources.loadedVariant(clientRoot, zoneName)[1]
+  if source["format"] != "wld":
+    return None
+  state = source["archive"].stat()
+  key = (str(source["archive"]), state.st_size, state.st_mtime_ns)
+  if key not in classicZoneFloors:
+    archive = eqArchive.EQArchive(source["archive"])
+    meshes = eqWorldFile.WorldFile(archive.read(f"{zoneName}.wld"), f"{source['archive'].name}:{zoneName}.wld").meshes()
+    classicZoneFloors[key] = loadTimeLight.ShareFloors(meshes, eqZones.colorlessRegionColor[3])
+  return classicZoneFloors[key]
+
+
+async def viewersSpecialAmbient(context, zone, carriedLight):
+  """The special ambient the client gives a view's character where it stands (viewerLight), with the share of scene light it stands
+  in, for a view that says where its character stands (carriedLight) in an imported classic zone; for an EQG or EQ terrain zone, why
+  the zone's own specialAmbientColor stands; None without a character or an imported zone."""
+  if carriedLight is None:
+    return None
+  imported = (await callBridge(context, "importedZones", {}))["zones"]
+  if not imported:
+    return None
+  if len(imported) > 1:
+    raise ToolError(f"The share of scene light under a view's character is found in one imported zone, and the scene holds {[entry['name'] for entry in imported]}")
+  if not imported[0]["asImported"]:
+    raise ToolError(f"'{imported[0]['name']}' has moved since importZone placed it; the share of scene light under a view's character is found on the zone as the client places it")
+  clientRoot = zoneSources.resolveClientRoot()
+  try:
+    floors = await anyio.to_thread.run_sync(zoneFloors, clientRoot, imported[0]["name"])
+    if floors is None:
+      return {"share": None, "why": "how the client finds the share of scene light under a character in an EQG or EQ terrain zone is not traced; the zone's specialAmbientColor stands"}
+    body = await anyio.to_thread.run_sync(viewerLight.viewerBody, clientRoot, toolingRoot / "models", bool(zone["newEngineZone"]))
+  except (OSError, ValueError) as error:
+    raise ToolError(str(error)) from error
+  share = viewerLight.viewerShare(floors, carriedLight["at"], body)
+  return {"share": round(share, 6), "specialAmbientColor": viewerLight.specialAmbient(share), "character": f"{viewerLight.viewerModel} of height {viewerLight.viewerHeight}"}
 
 
 async def zoneFigureModel(zone):
@@ -815,18 +865,19 @@ async def renderView(
   context: Context, view: dict, shading: str = "client", bandHeight: float = 50.0, guides: bool = True, swimVolumes: bool = False, labels: list[str] | None = None,
   carriedLight: dict | None = None,
 ):
-  """Render the EQ preview of a view: {"camera": name} (a review camera saved from a standAt view stands the scale figure again where she stood, her ground found as figureAt's is; one matched to concept art renders at the art's aspect and its own field of view), {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], never what they pass through (as walkRoute), or with z on the ground found from 3 above z down to 50 below it, for caves, under overhangs, and on ledges; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera, or stood by hand facing the camera with "figureAt": [x,y] or [x,y,z] in the view, its ground found as standAt's is, on a ledge or ramp too narrow to walk her ahead on), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, the game's north (+X) up and east (-Y) right as the in-game map draws, `width` units across (along y), without fog. {"frame": {"objects": [names], "headingDegrees": h, "pitchDegrees": p}} looks at the named meshes or collection instances from that heading and pitch, standing back so they fit (its result's eye and target reproduce that camera). shading "client" draws the zone as the client does, its point lights and particle emitters with it (the result's pointLights counts the lights and the objects they light, and emitters the emitters drawn, their particles, and those not drawn, grouped by why); "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout; "coverage" draws only what exportZone would export, each face in the color of its export check status (checkExport): black where it cannot export, red for zero texture area, brown for a blockout material, yellow for texture stretched or squeezed, orange where the base material shows, magenta along a ground border without a transition strip, grey when fine, and blue wherever a face is seen from its back, lit from the northwest as layout is, softer so no shaded face reads as black, and without fog; the result counts the exported faces by status. The value shadings draw every mesh (each part of a collection instance as placed, and the scale figure) from a value of its own, lit softly from the northwest, without fog, the result giving the scale: "objects" draws each object in its own flat color, the ones the view shows most of first (blue, orange, green, red, purple, yellow, cyan, magenta, lime, pink, teal, lavender, brown, olive, then grey for the rest), with a legend of the objects the view shows, each with its color and share of the view; "curvature" draws convex forms warm (orange), concave cool (blue), and flat neutral grey, a ridge or trough curved to a radius of 16 at half color and sharper ones fuller, from the bend of the edges around each vertex (so where two meshes meet without sharing edges, as a rock sunk into the ground, there is none); "triangleDensity" draws each face's triangles per 10,000 square units of its own area over fixed decades, blue 1, cyan 10, green 100, yellow 1,000, red 10,000 (the client's EQG terrains run from 8 to 5,083, 244 at the median), with the range the view shows; "texelDensity" draws each face's texture pixels per world unit (its diffuse texture's pixels over the area its texture coordinates spread them across) blue lowest through cyan, green, and yellow to red highest across the range the view shows (the result gives it and each color's value), dark grey where a face has no diffuse texture or texture coordinates: coverage's stretch check compares a face with its own material's usual scale, texelDensity compares materials with each other. labels [names] writes each named object's name on the view by its place (where its middle projects when the object shows there, else the middle of what shows of it), marked with a white dot, but only for the objects the view shows; the result lists the places and the named objects it does not show (an object hidden from renders, a guide with guides off, or one that is not a mesh or collection instance is refused). Guides (plot outlines, sketch massing) draw unless guides is false, and with them, in every shading, the view is tinted red where the boundaries (walls, lids, floors) stand, which the client never draws, a wall as a slab thick enough to show from above, and green where the zone lines stand, seen through the water but hidden behind and under the ground; with swimVolumes, the view is tinted where the swim volumes stand (cyan water, magenta lava), each box seen through the water, so its top shows evenly under a surface it meets or lies just below, but hidden behind and under the ground. carriedLight {"lightType": n, "at": [x, y, z], "headingDegrees": h} draws, in client shading, the light the character the view belongs to carries, as the client draws a character's light source: n is its light type (the dumps' spawn light, 1-15; 0 carries none, so leave carriedLight out), at its feet and h its heading (0 = +Y, clockwise); the light takes its type's color and reach (capped by the zone's zoneId, which must be set), stands 4 above the feet and 2 toward +X (within 5 degrees), outranks the zone's lights, and lights baked geometry too; the result gives it."""
+  """Render the EQ preview of a view: {"camera": name} (a review camera saved from a standAt view stands the scale figure again where she stood, her ground found as figureAt's is; one matched to concept art renders at the art's aspect and its own field of view), {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], never what they pass through (as walkRoute), or with z on the ground found from 3 above z down to 50 below it, for caves, under overhangs, and on ledges; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera, or stood by hand facing the camera with "figureAt": [x,y] or [x,y,z] in the view, its ground found as standAt's is, on a ledge or ramp too narrow to walk her ahead on), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, the game's north (+X) up and east (-Y) right as the in-game map draws, `width` units across (along y), without fog. {"frame": {"objects": [names], "headingDegrees": h, "pitchDegrees": p}} looks at the named meshes or collection instances from that heading and pitch, standing back so they fit (its result's eye and target reproduce that camera). shading "client" draws the zone as the client does, its point lights and particle emitters with it (the result's pointLights counts the lights and the objects they light, and emitters the emitters drawn, their particles, and those not drawn, grouped by why); "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout; "coverage" draws only what exportZone would export, each face in the color of its export check status (checkExport): black where it cannot export, red for zero texture area, brown for a blockout material, yellow for texture stretched or squeezed, orange where the base material shows, magenta along a ground border without a transition strip, grey when fine, and blue wherever a face is seen from its back, lit from the northwest as layout is, softer so no shaded face reads as black, and without fog; the result counts the exported faces by status. The value shadings draw every mesh (each part of a collection instance as placed, and the scale figure) from a value of its own, lit softly from the northwest, without fog, the result giving the scale: "objects" draws each object in its own flat color, the ones the view shows most of first (blue, orange, green, red, purple, yellow, cyan, magenta, lime, pink, teal, lavender, brown, olive, then grey for the rest), with a legend of the objects the view shows, each with its color and share of the view; "curvature" draws convex forms warm (orange), concave cool (blue), and flat neutral grey, a ridge or trough curved to a radius of 16 at half color and sharper ones fuller, from the bend of the edges around each vertex (so where two meshes meet without sharing edges, as a rock sunk into the ground, there is none); "triangleDensity" draws each face's triangles per 10,000 square units of its own area over fixed decades, blue 1, cyan 10, green 100, yellow 1,000, red 10,000 (the client's EQG terrains run from 8 to 5,083, 244 at the median), with the range the view shows; "texelDensity" draws each face's texture pixels per world unit (its diffuse texture's pixels over the area its texture coordinates spread them across) blue lowest through cyan, green, and yellow to red highest across the range the view shows (the result gives it and each color's value), dark grey where a face has no diffuse texture or texture coordinates: coverage's stretch check compares a face with its own material's usual scale, texelDensity compares materials with each other. labels [names] writes each named object's name on the view by its place (where its middle projects when the object shows there, else the middle of what shows of it), marked with a white dot, but only for the objects the view shows; the result lists the places and the named objects it does not show (an object hidden from renders, a guide with guides off, or one that is not a mesh or collection instance is refused). Guides (plot outlines, sketch massing) draw unless guides is false, and with them, in every shading, the view is tinted red where the boundaries (walls, lids, floors) stand, which the client never draws, a wall as a slab thick enough to show from above, and green where the zone lines stand, seen through the water but hidden behind and under the ground; with swimVolumes, the view is tinted where the swim volumes stand (cyan water, magenta lava), each box seen through the water, so its top shows evenly under a surface it meets or lies just below, but hidden behind and under the ground. carriedLight {"lightType": n, "at": [x, y, z], "headingDegrees": h} draws, in client shading, the light the character the view belongs to carries, as the client draws a character's light source: n is its light type (the dumps' spawn light, 1-15, or 0 for a character carrying none), at its feet and h its heading (0 = +Y, clockwise); the light takes its type's color and reach (capped by the zone's zoneId, which must be set), stands 4 above the feet and 2 toward +X (within 5 degrees), outranks the zone's lights, and lights baked geometry too; the result gives it. In an imported classic zone the character also sets the view's special ambient as the client sets it for the player: the floor of its vision (0.08) times one less the share of scene light of the floor under it, found by the drop the client makes under the player's actor, the character taken to be a human of height 6; the result's viewer gives the share and the color, or, for an EQG or EQ terrain zone, why the zone's specialAmbientColor stands."""
   outputPath = newRenderPath()
   zone = await callBridge(context, "getZoneProperties", {})
   carried = viewersCarriedLight(zone, carriedLight)
+  viewer = await viewersSpecialAmbient(context, zone, carriedLight)
   description = await callBridge(context, "renderView", {
     "view": view, "outputPath": str(outputPath), "figureModel": await scaleFigureModel(zone, view), "shading": shading, "bandHeight": bandHeight,
     "guides": guides, "sky": await zoneSky(zone), "swimVolumes": swimVolumes, "labels": labels, "emitters": await previewEmitterAssets(),
-    "carriedLight": carried,
+    "carriedLight": carried, "viewerSpecialAmbient": viewer and viewer.get("specialAmbientColor"),
   })
   if labels is not None:
     await anyio.to_thread.run_sync(viewSheets.writeNames, outputPath, description["labels"]["shown"])
-  return [Image(data=outputPath.read_bytes(), format="png"), description | ({} if carried is None else {"carriedLight": carried})]
+  return [Image(data=outputPath.read_bytes(), format="png"), description | ({} if carried is None else {"carriedLight": carried}) | ({} if viewer is None else {"viewer": viewer})]
 
 
 placementHelp = (
@@ -2093,8 +2144,8 @@ async def compareToConcept(
   pitchDegrees}, or {frame} view as renderView takes them; no scale figure is drawn) and move it until the art and the render line up;
   keep it with saveAs (a name) and note (what to judge from it): a review camera that holds the art's path (relative to the .blend once it
   is saved), its frame, and its field of view, which renderView {"camera": name}, renderReviewSet, and compareToConcept camera render as
-  matched. compareToConcept camera compares a kept one with its art again. carriedLight draws the light the view's character carries,
-  as renderView's does (for art that is a client screenshot of a character carrying a light source)."""
+  matched. compareToConcept camera compares a kept one with its art again. carriedLight draws the light the view's character carries
+  and sets the special ambient it stands in, as renderView's does (for art that is a client screenshot taken by a character)."""
   if camera is not None:
     if concept is not None or view is not None or saveAs is not None or note is not None:
       raise ToolError("compareToConcept takes a kept camera alone, or concept and view (with saveAs and note to keep the camera)")
@@ -2121,10 +2172,12 @@ async def compareToConcept(
   zone = await callBridge(context, "getZoneProperties", {})
   sky = await zoneSky(zone)
   carried = viewersCarriedLight(zone, carriedLight)
+  viewer = await viewersSpecialAmbient(context, zone, carriedLight)
   renderPath = newRenderPath()
   described = await callBridge(context, "renderView", {
     "view": renderedView, "outputPath": str(renderPath), "figureModel": None, "shading": "client", "bandHeight": 50.0, "guides": guides,
     "sky": sky, "swimVolumes": False, "labels": None, "emitters": await previewEmitterAssets(), "frame": frame, "carriedLight": carried,
+    "viewerSpecialAmbient": viewer and viewer.get("specialAmbientColor"),
   })
   sheetPath = newRenderPath().with_suffix(".jpg")
   try:
@@ -2144,7 +2197,7 @@ async def compareToConcept(
     "frameSize": [width, height], "verticalFieldOfViewDegrees": fieldOfView,
     "horizontalFieldOfViewDegrees": round(math.degrees(2 * math.atan(math.tan(math.radians(fieldOfView) / 2) * width / height)), 2),
     "keptCamera": keptCamera,
-  } | compared | ({} if carried is None else {"carriedLight": carried})]
+  } | compared | ({} if carried is None else {"carriedLight": carried}) | ({} if viewer is None else {"viewer": viewer})]
 
 
 @guardedTool()

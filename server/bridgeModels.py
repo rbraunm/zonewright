@@ -221,6 +221,16 @@ def placeModel(modelFolder, name, location, rotationDegrees, scale, avatarHeight
   return bridgeObjects.describeTransform(placed) | {"ground": ground and bridgeObjects.roundVector(ground), "dimensions": bridgeObjects.roundVector(placed.dimensions)}
 
 
+def importedZones():
+  """The client zones importZone placed in the scene: each object's name (the zone's short name) and whether it still stands where the
+  import placed it (unmoved, unturned, unscaled)."""
+  return {"zones": [
+    {"name": sceneObject.name, "asImported": sceneObject.matrix_world == mathutils.Matrix.Identity(4)}
+    for sceneObject in bpy.context.scene.objects if sceneObject.type == "MESH" and sceneObject.get(bridgeMeshAccess.clientContentProperty) == "zone"
+  ]}
+
+
 commands = {
   "placeModel": (placeModel, True),
+  "importedZones": (importedZones, False),
 }
