@@ -591,6 +591,8 @@ caveSectionLead = 30.0
 sectionAlongLateral = 2.0
 # A section fitted to the ground it cuts reaches past it by at least this above and below.
 sectionFitMargin = 10.0
+# Where a run crosses a section's line at a bend of the line, both legs meeting there find the crossing; closer than this it is one.
+crossingSeparation = 0.5
 # Cuts reaching past the drawing by this share of its size are dropped; the drawing clips the rest.
 sectionMargin = 0.1
 waterSectionStep = 0.5
@@ -764,7 +766,11 @@ def sectionLine(start, end, path, cave):
     leads = [max(caveSectionLead, guide["samples"][row][3]) for row in (0, -1)]
     points = numpy.vstack([polyline[0] - leads[0] * starting / numpy.linalg.norm(starting), polyline, polyline[-1] + leads[1] * ending / numpy.linalg.norm(ending)])
     marks = [(1 + guide["polylineAlongs"].index(station), str(index)) for index, station in enumerate(guide["stations"])]
-    return points, marks, {"cave": cave["name"], "run": run, "object": cave["objectName"]}
+    samples = numpy.array(guide["samples"])
+    # Fitted, a run's own section reaches from under its lowest floor to a run's height over its highest vault, so the rock over it
+    # shows without a mountain above shrinking it.
+    reach = (float(samples[:, 2].min()) - 2 * sectionFitMargin, float((samples[:, 2] + samples[:, 4]).max() + samples[:, 4].max()))
+    return points, marks, {"cave": cave["name"], "run": run, "object": cave["objectName"], "reach": reach}
   if path is not None:
     if not isinstance(path, list) or len(path) < 2 or any(not isinstance(point, list) or len(point) != 2 for point in path):
       raise ValueError(f"A section's path is at least two [x, y] points, got {path!r}")
@@ -887,14 +893,17 @@ def caveCuts(legs, followed):
           floor.append([s0, z0, s1, z1])
           vault.append([s0, z0 + samples[index, 4], s1, z1 + samples[index + 1, 4]])
           along0, along1 = samples[index, 5], samples[index + 1, 5]
+          # Where the section's line passes across the run here: its point beside the run's middle, and how far across the run that is.
+          linePoints = samples[[index, index + 1], :2] - sides[[index, index + 1], None] * leg.normal
+          runDirection = (samples[index + 1, :2] - samples[index, :2]) / max(steps[index], 1e-9)
+          lineAcross = float(-sides[index] * (leg.normal @ numpy.array([runDirection[1], -runDirection[0]])))
           for stroke in run["strokes"]:
-            if stroke["kind"] in ("level", "pad") and along0 >= stroke["from"] - 1e-6 and along1 <= stroke["to"] + 1e-6:
-              height = (z0, z1) if stroke["kind"] == "level" else (stroke["top"], stroke["top"])
-              strokes.append({"name": stroke["name"], "kind": stroke["kind"], "segment": [s0, height[0], s1, height[1]]})
-            elif stroke["kind"] == "rough":
-              inside = bridgeCaveRuns.pointsInPolygon(samples[[index, index + 1], :2], numpy.array(stroke["outline"]))
-              if inside.all():
-                strokes.append({"name": stroke["name"], "kind": "rough", "segment": [s0, z0 + stroke["rise"], s1, z1 + stroke["rise"]]})
+            if stroke["kind"] in ("level", "pad"):
+              if along0 >= stroke["from"] - 1e-6 and along1 <= stroke["to"] + 1e-6 and stroke["across"][0] - 1e-6 <= lineAcross <= stroke["across"][1] + 1e-6:
+                height = (z0, z1) if stroke["kind"] == "level" else (stroke["top"], stroke["top"])
+                strokes.append({"name": stroke["name"], "kind": stroke["kind"], "segment": [s0, height[0], s1, height[1]]})
+            elif bridgeCaveRuns.pointsInPolygon(linePoints, numpy.array(stroke["outline"])).all():
+              strokes.append({"name": stroke["name"], "kind": "rough", "segment": [s0, z0 + stroke["rise"], s1, z1 + stroke["rise"]]})
           for landing in run["landings"]:
             middle = sum(landing["arc"]) / 2
             if along0 <= middle < along1:
@@ -912,7 +921,8 @@ def caveCuts(legs, followed):
           width, height = samples[index, 3], samples[index, 4]
           base = samples[index, 2] + share * (samples[index + 1, 2] - samples[index, 2])
           half = min(width / 2 / sines[index], 3 * width)
-          boxes.append({"s": [s + leg.offset - half, s + leg.offset + half], "z": [base, base + height]})
+          if not any(abs(box["s"][0] + half - (s + leg.offset)) < crossingSeparation for box in boxes):
+            boxes.append({"s": [s + leg.offset - half, s + leg.offset + half], "z": [base, base + height]})
       if isFollowed and floor:
         marks += followedGrades(run, legs)
       if floor or boxes:
@@ -957,6 +967,13 @@ def sectionCuts(start, end, path, cave, bottom, top, layers):
   positions, triangles = bridgeMeshAccess.playerSolidTriangles()
   groundByLeg = legCuts(legs, positions, triangles)
   ground = numpy.vstack(groundByLeg)
+  caveEntries = caveCuts(legs, followed) if "caves" in layers or followed is not None else []
+  if followed is not None:
+    # A passage crossing the run shows whole, as a closed shape over or under it.
+    crossingTop = max((box["z"][1] for entry in caveEntries for box in entry["crossings"]), default=-math.inf) + sectionFitMargin
+    crossingBottom = min((box["z"][0] for entry in caveEntries for box in entry["crossings"]), default=math.inf) - sectionFitMargin
+    bottom = min(followed["reach"][0], crossingBottom) if bottom is None else bottom
+    top = max(followed["reach"][1], crossingTop) if top is None else top
   bottom, top = fittedRange(ground, bottom, top)
   # Where two legs meet, the ground each cuts ends at the heights the other's begins at.
   joins = [
@@ -1028,7 +1045,7 @@ def sectionCuts(start, end, path, cave, bottom, top, layers):
         if span is not None:
           cuts["zoneLines"].append({"name": line.name, "s": [rounded(value + leg.offset, 2) for value in span], "z": [round(center[2] - half[2], 2), round(center[2] + half[2], 2)]})
   if "caves" in layers:
-    cuts["caves"] = caveCuts(legs, followed)
+    cuts["caves"] = caveEntries
   return cuts
 
 

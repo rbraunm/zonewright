@@ -223,6 +223,117 @@ def testAPlotOnAPadMeasuresThePad(stageBlenderServer, tmp_path):
   assert walk["walkable"] is True and walk["problems"] == []
 
 
+# The room with a branch leaving its east wall at 200 (along 260) for a blind alcove, and one leaving its west wall at 160.
+side = {"name": "side", "from": "main", "path": [[0, 200, 2], [90, 200], [150, 200]], "grades": [0, 0], "widths": [30, 30, 50], "heights": [30, 30, 40]}
+west = {"name": "west", "from": "main", "path": [[0, 160, 2], [-80, 160], [-125, 160]], "grades": [0, 0], "widths": [30, 30, 50], "heights": [30, 30, 40]}
+branched = room | {"name": "branched", "branches": [side]}
+
+
+def checkCaveNamed(name):
+  return checkCave.replace("hall", name)
+
+
+def testABranchIsCutWithItsParentSealedAndWalkedThroughItsJunction(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    cut = await session.expectSuccess("cutCave", branched)
+    checked = (await session.expectSuccess("runPython", {"code": checkCaveNamed("branched")}))["result"]
+    vertices = (await session.expectSuccess("runPython", {"code": lining("branched")}))["result"]
+    walk = await session.expectSuccess("walkRoute", {"cave": {"objectName": "ground", "name": "branched", "run": "side"}})
+    await session.expectSuccess("removeCave", {"objectName": "ground", "name": "branched"})
+    await session.expectSuccess("cutCave", branched | {"breakup": None})
+    unbroken = (await session.expectSuccess("runPython", {"code": lining("branched")}))["result"]
+    return cut, checked, vertices, walk, unbroken
+
+  cut, checked, vertices, walk, unbroken = stageBlenderServer.session(steps)
+  # Sealed: no edge on three or more faces and no open edge but the grid's border.
+  assert checked["edgesOnThreeOrMoreFaces"] == 0 and checked["openEdges"] == borderEdges and checked["largestLiningMove"] == 0.0
+  # The junction is where the branch leaves the room's east wall, framed facing back into the room.
+  assert cut["junctions"] == [{
+    "branch": "side", "from": "main", "start": [0.0, 200.0, 2.0], "rise": 0.0, "overlook": False,
+    "frame": {"center": [60.0, 200.0, 2.0], "facingDegrees": 270.0, "width": 30.0, "height": 30.0},
+  }]
+  assert [(end["run"], end["end"], end["kind"]) for end in cut["ends"]] == [("main", "start", "open"), ("main", "end", "blind"), ("side", "start", "junction"), ("side", "end", "blind")]
+  # It opens only at its mouth in front of the cliff: the branch breaks through nowhere.
+  assert cut["openings"] and all(opening["middle"][1] < 0 for opening in cut["openings"])
+  # Within half the fade of the opening the lining stands unbroken: the branch's within 8 of the room's wall, and the room's wall within 8
+  # of the branch, are where the same cave cut without breakup puts them.
+  vertices, unbroken = numpy.array(vertices), numpy.array(unbroken)
+  x, y, z = vertices.T
+  nearOpening = (numpy.abs(y - 200) < 15 + 8) & (((x > 60 + 1e-3) & (x < 68)) | ((numpy.abs(x - 60) < 3) & (z < 2 + 0.35 * 70)))
+  distances = numpy.linalg.norm(vertices[nearOpening][:, None, :] - unbroken[None, :, :], axis=2).min(axis=1)
+  assert nearOpening.sum() >= 10 and distances.max() <= 1e-4
+  # Walked from the cave's mouth through the junction to the branch's end.
+  assert walk["walkable"] is True and walk["problems"] == [] and walk["length"] > 260 + 150 - 1
+
+
+def testEditingOneBranchLeavesTheOtherRunsAsCut(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    await session.expectSuccess("cutCave", branched | {"branches": [side, west]})
+    before = (await session.expectSuccess("runPython", {"code": lining("branched")}))["result"]
+    edited = await session.expectSuccess("editCave", {"objectName": "ground", "name": "branched", "changes": {"branches": {"side": {"widths": [26, 26, 44]}}}})
+    after = (await session.expectSuccess("runPython", {"code": lining("branched")}))["result"]
+    removed = await session.expectSuccess("editCave", {"objectName": "ground", "name": "branched", "changes": {"branches": {"west": None}}})
+    detail = await session.expectSuccess("getObjectDetail", {"name": "ground"})
+    return before, edited, after, removed, detail
+
+  before, edited, after, removed, detail = stageBlenderServer.session(steps)
+  # Everything west of the room's middle (the west branch and the room's west half), beyond the side branch's reach, is as it was cut.
+  def westOf(vertices):
+    vertices = numpy.array(vertices)
+    kept = vertices[vertices[:, 0] < -10]
+    return kept[numpy.lexsort(kept.T[::-1])]
+  assert len(westOf(before)) > 100 and numpy.array_equal(westOf(before), westOf(after))
+  assert [junction["frame"]["width"] for junction in edited["cut"]["junctions"]] == [26.0, 30.0]
+  assert [junction["branch"] for junction in removed["cut"]["junctions"]] == ["side"]
+  assert detail["caves"][0]["branches"] == ["side"]
+
+
+def testTakingABranchedCaveBackLeavesTheGroundAsAnUncutCopyGivenTheSameChange(stageBlenderServer, tmp_path):
+  readShown = r"""
+import bridgeMeshAccess
+result = {name: bridgeMeshAccess.readVertexArrays(bpy.data.objects[name])[0].tolist() for name in ('ground', 'control')}
+"""
+
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    copies = await session.expectSuccess("duplicateObjects", {"names": ["ground"], "offset": [0, 0, 0]})
+    await session.expectSuccess("organize", {"renames": {copies["ground"]: "control"}})
+    await session.expectSuccess("runPython", {"code": "bpy.data.objects['control'].hide_render = True"})
+    await session.expectSuccess("cutCave", branched | {"branches": [side, west]})
+    for name in ("ground", "control"):
+      await session.expectSuccess("setShapingPass", {"objectName": name, "name": "cliff", "strength": 1.1})
+    removed = await session.expectSuccess("removeCave", {"objectName": "ground", "name": "branched"})
+    shown = (await session.expectSuccess("runPython", {"code": readShown}))["result"]
+    return removed, shown
+
+  removed, shown = stageBlenderServer.session(steps)
+  ground, control = numpy.array(shown["ground"]), numpy.array(shown["control"])
+  assert ground.shape == control.shape and numpy.abs(ground - control).max() <= 1e-5
+  assert [branch["name"] for branch in removed["definition"]["branches"]] == ["side", "west"]
+
+
+def testBranchRefusals(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    outside = await session.expectError("cutCave", branched | {"branches": [side | {"path": [[80, 200, 2], [120, 200], [150, 200]]}]})
+    hole = await session.expectError("cutCave", branched | {"branches": [side | {"path": [[0, 200, -1], [90, 200], [150, 200]]}]})
+    raised = await session.expectError("cutCave", branched | {"branches": [side | {"path": [[0, 200, 6], [90, 200], [150, 200]]}]})
+    twice = await session.expectError("cutCave", branched | {"branches": [side, side]})
+    unknown = await session.expectError("cutCave", branched | {"branches": [side | {"from": "nowhere"}]})
+    detail = await session.expectSuccess("getObjectDetail", {"name": "ground"})
+    return outside, hole, raised, twice, unknown, detail
+
+  outside, hole, raised, twice, unknown, detail = stageBlenderServer.session(steps)
+  assert "Branch 'side' starts at [80.0, 200.0, 2.0] with its first section reaching 20.7 out of its parent 'main''s walls (at [80.0, 200.0, 32.0])" in outside
+  assert "Branch 'side''s floor where it starts" in hole and "lies 3.00 under its parent 'main''s floor there" in hole
+  assert "Branch 'side' starts 4.0 over its parent 'main''s floor, more than a step (2)" in raised and "overlook" in raised
+  assert "Two branches are named 'side'" in twice
+  assert "Branch 'side' leaves 'nowhere', which is not the main run or a branch named before it (['main'])" in unknown
+  assert detail["caves"] == []
+
+
 def testPointsWithoutHeightsTakeTheEvenGradeAndAGradedSegmentSetsItsEnd(stageBlenderServer, tmp_path):
   async def steps(session):
     await caveCanyon(session, tmp_path)

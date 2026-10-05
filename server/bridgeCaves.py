@@ -72,8 +72,13 @@ notGround = mathutils.Vector((math.nan, math.nan, math.nan))
 junctionTolerance = 1e-3
 # A branch is clear of its parent this far along past where it leaves the parent's walls: a share of its section plus the rock.
 junctionReachShare = 1.5
-# Rock between runs and between caves is measured at the tubes' vertices and face middles.
-shortestRun = 1e-6
+# Whether a point lies inside a tube is counted along rays leaning off every axis, so none runs along a row or a wall, stepping past
+# each crossing: one up, one down, and one across.
+parityDirections = tuple(mathutils.Vector(direction).normalized() for direction in ((0.1234, 0.2345, 0.9643), (-0.2711, 0.1517, -0.9506), (0.9311, -0.3127, 0.1873)))
+parityStep = 1e-4
+parityCrossings = 64
+# A flap pressed onto a neighbour faces back along it within this.
+flapAntiparallel = 0.99
 
 
 def replayStrokes(sceneObject, name, strokes):
@@ -564,12 +569,29 @@ def surfaceTree(vertices, faces):
   return mathutils.bvhtree.BVHTree.FromPolygons(numpy.asarray(vertices).tolist(), [list(face) for face in faces])
 
 
+def insideClosed(tree, point):
+  """Whether a point lies inside a closed surface: rays from it cross the surface an odd number of times, by the vote of rays in three
+  directions, so one grazing a wall along its tangent does not decide it."""
+  votes = 0
+  for direction in parityDirections:
+    crossings, origin = 0, point
+    for _ in range(parityCrossings):
+      location, _, _, _ = tree.ray_cast(origin, direction)
+      if location is None:
+        break
+      crossings += 1
+      origin = location + direction * parityStep
+    votes += crossings % 2
+  return votes * 2 > len(parityDirections)
+
+
 def signedDistances(tree, points):
-  """Each point's distance from a closed surface wound outward: negative inside it."""
+  """Each point's distance from a closed surface: negative inside it."""
   distances = numpy.empty(len(points))
   for index, point in enumerate(numpy.asarray(points).tolist()):
-    location, normal, _, distance = tree.find_nearest(mathutils.Vector(point))
-    distances[index] = distance if (mathutils.Vector(point) - location).dot(normal) >= 0 else -distance
+    origin = mathutils.Vector(point)
+    distance = tree.find_nearest(origin)[3]
+    distances[index] = -distance if insideClosed(tree, origin) else distance
   return distances
 
 
@@ -603,8 +625,10 @@ def brokenTube(definition, worked, rows, unbroken, surface, junctionTrees):
       tree.balance()
       weights *= numpy.clip(numpy.array([tree.find(point)[2] for point in vertices.tolist()]) / fade, 0, 1)
     if fade > 0:
+      # Within half the fade of a tube it meets at a junction the section is left unbroken, so the opening is the meeting of two clean
+      # sections; past that the breakup eases in over the rest of the fade.
       for junctionTree in junctionTrees:
-        weights *= numpy.clip(nearestDistances(junctionTree, vertices) / fade, 0, 1)
+        weights *= bridgeCaveRuns.smoothstep(numpy.clip(2 * nearestDistances(junctionTree, vertices) / fade - 1, 0, 1))
     values = bridgeNoise.fractalNoise(bridgeNoise.noiseSamplePoints(vertices, breakup["featureSize"], breakup["seed"]), breakupOctaves, breakupRoughness)
     vertices = vertices + (breakup["amplitude"] * values * weights)[:, None] * outward
   vertices = vertices.reshape(count, size, 3).copy()
@@ -748,13 +772,7 @@ def junctionOf(branch, parent, rows, unbroken, parentTree):
   line, parentLine, owner = branch["line"], parent["line"], branch["owner"]
   own = numpy.flatnonzero(rows["scales"] == 1.0)
   first = unbroken["sections"][own[0]]
-  reach = signedDistances(parentTree, first)
   start = line.at(numpy.array([0.0]))[0][0]
-  if reach.max() > junctionTolerance:
-    raise ValueError(
-      f"{bridgeCaveRuns.capitalized(owner)} starts at {roundedPoint(start)} with its first section reaching {reach.max():.1f} out of its parent"
-      f" '{parent['name']}''s walls (at {roundedPoint(first[int(reach.argmax())])}); start it inside its parent, its whole width and height within the parent's"
-    )
   floorPoints = first[:rows["shape"]["floorCount"] + 1]
   parentFloors = numpy.array([parentFloorAt(parentLine, point) for point in floorPoints])
   drop = parentFloors - floorPoints[:, 2]
@@ -769,6 +787,12 @@ def junctionOf(branch, parent, rows, unbroken, parentTree):
       f"{bridgeCaveRuns.capitalized(owner)} starts {rise:.1f} over its parent '{parent['name']}''s floor, more than a step ({playerScale.stepHeight:g}):"
       " a branch starts on its parent's floor; an opening high in the parent's wall that nobody walks through (a balcony, a window) is an"
       " overlook: give the branch overlook true"
+    )
+  reach = signedDistances(parentTree, first)
+  if reach.max() > junctionTolerance:
+    raise ValueError(
+      f"{bridgeCaveRuns.capitalized(owner)} starts at {roundedPoint(start)} with its first section reaching {reach.max():.1f} out of its parent"
+      f" '{parent['name']}''s walls (at {roundedPoint(first[int(reach.argmax())])}); start it inside its parent, its whole width and height within the parent's"
     )
   alongs = line.samples(1.0)
   floors, directions, widths, heights = line.at(alongs)
@@ -1056,19 +1080,17 @@ def booleanCut(patchPositions, patchFaces, ring, tubeParts):
   faces.append(tuple(count + index for index in reversed(range(len(ring)))))
   sources.append(-1)
   solid = temporaryObject("zonewrightCaveSolid", positions, faces, sources)
-  operands = bpy.data.collections.new("zonewrightCaveTubes")
-  bpy.context.scene.collection.children.link(operands)
-  tubes = [temporaryObject("zonewrightCaveTube", vertices, tubeFaces, [-2 - first - index for index in range(len(tubeFaces))], operands) for vertices, tubeFaces, first in tubeParts]
+  tubes = [temporaryObject("zonewrightCaveTube", vertices, tubeFaces, [-2 - first - index for index in range(len(tubeFaces))]) for vertices, tubeFaces, first in tubeParts]
+  temporary = [solid] + tubes
   try:
+    tube = tubes[0] if len(tubes) == 1 else unitedTubes(tubes, temporary)
     modifier = solid.modifiers.new("cut", "BOOLEAN")
-    modifier.operand_type, modifier.collection, modifier.operation, modifier.solver = "COLLECTION", operands, "DIFFERENCE", "EXACT"
+    modifier.object, modifier.operation, modifier.solver = tube, "DIFFERENCE", "EXACT"
     depsgraph = bpy.context.evaluated_depsgraph_get()
     cut = bpy.data.meshes.new_from_object(solid.evaluated_get(depsgraph), preserve_all_data_layers=True, depsgraph=depsgraph)
   finally:
-    removeTemporary(solid)
-    for tube in tubes:
-      removeTemporary(tube)
-    bpy.data.collections.remove(operands)
+    for sceneObject in temporary:
+      removeTemporary(sceneObject)
   try:
     cutPositions = numpy.empty(len(cut.vertices) * 3)
     cut.vertices.foreach_get("co", cutPositions)
@@ -1114,16 +1136,18 @@ def simpleLoops(corners):
 def groundedFloor(positions, faces, sources, normals, patchPositions, patchFaces):
   """The faces' sources with each face of the tube's floor that lies in the ground's own plane (where the tube runs out in the open in
   front of its mouth, its floor level with the ground, the exact boolean may keep the tube's floor there rather than the ground's) taken
-  as a piece of the ground face it lies on, so the open ground in front of a mouth stays ground."""
+  as a piece of the ground face it lies on, so the open ground in front of a mouth stays ground; and one facing down there (the tube's
+  floor met from below where it only touches the ground, enclosing nothing over the ground's own faces) dropped as the solid's sides
+  are (-1)."""
   tree = mathutils.bvhtree.BVHTree.FromPolygons(patchPositions.tolist(), patchFaces)
   sources = list(sources)
   for index, (face, source, normal) in enumerate(zip(faces, sources, normals)):
-    if source > -2 or normal[2] <= floorNormalZ:
+    if source > -2 or abs(normal[2]) <= floorNormalZ:
       continue
     middle = mathutils.Vector(positions[face].mean(axis=0).tolist())
     location, _, patchFace, _ = tree.ray_cast(middle + up * groundPlaneTolerance, down, 2 * groundPlaneTolerance)
     if location is not None:
-      sources[index] = patchFace
+      sources[index] = patchFace if normal[2] > 0 else -1
   return sources
 
 
@@ -1165,12 +1189,37 @@ def withoutSlivers(positions, faces, sources, normals):
   return [faces[index] for index in keep], [sources[index] for index in keep], [normals[index] for index in keep]
 
 
-def temporaryObject(name, positions, faces, sources, collection=None):
+def unitedTubes(tubes, temporary):
+  """The runs' tubes as one closed solid, their union by the exact boolean (the others a collection operand of the first), each face
+  keeping its tube face's source; added to temporary, to be removed."""
+  operands = bpy.data.collections.new("zonewrightCaveTubes")
+  bpy.context.scene.collection.children.link(operands)
+  try:
+    for tube in tubes[1:]:
+      bpy.context.scene.collection.objects.unlink(tube)
+      operands.objects.link(tube)
+    modifier = tubes[0].modifiers.new("union", "BOOLEAN")
+    modifier.operand_type, modifier.collection, modifier.operation, modifier.solver = "COLLECTION", operands, "UNION", "EXACT"
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    united = bpy.data.meshes.new_from_object(tubes[0].evaluated_get(depsgraph), preserve_all_data_layers=True, depsgraph=depsgraph)
+    tubes[0].modifiers.remove(modifier)
+  finally:
+    for tube in tubes[1:]:
+      operands.objects.unlink(tube)
+      bpy.context.scene.collection.objects.link(tube)
+    bpy.data.collections.remove(operands)
+  sceneObject = bpy.data.objects.new("zonewrightCaveTubes", united)
+  bpy.context.scene.collection.objects.link(sceneObject)
+  temporary.append(sceneObject)
+  return sceneObject
+
+
+def temporaryObject(name, positions, faces, sources):
   mesh = bpy.data.meshes.new(name)
   mesh.from_pydata([tuple(point) for point in positions.tolist()], [], faces)
   mesh.attributes.new("caveSource", "INT", "FACE").data.foreach_set("value", numpy.asarray(sources, dtype=numpy.int32))
   sceneObject = bpy.data.objects.new(name, mesh)
-  (collection or bpy.context.scene.collection).objects.link(sceneObject)
+  bpy.context.scene.collection.objects.link(sceneObject)
   return sceneObject
 
 
@@ -1268,6 +1317,21 @@ def weldMouth(editor, faces, rankOf, pointOf, shortest):
     bmesh.ops.weld_verts(editor, targetmap=targets)
     welded += len(targets)
   return welded
+
+
+def foldedFlaps(caveFaces):
+  """Faces a weld pressed flat over a neighbour, turned over: a face on an edge three faces share, facing opposite one of the others it
+  lies on, with an edge of its own no other face shares. It encloses nothing; taking it out leaves the other two."""
+  flaps = set()
+  for face in caveFaces:
+    if not face.is_valid or not any(len(edge.link_faces) == 1 for edge in face.edges):
+      continue
+    for edge in face.edges:
+      if len(edge.link_faces) != 3:
+        continue
+      if any(other is not face and other.normal.dot(face.normal) < -flapAntiparallel for other in edge.link_faces):
+        flaps.add(face)
+  return flaps
 
 
 def requireApart(name, owners, mask):
@@ -1605,27 +1669,37 @@ def spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, pa
     for vertex in made.values():
       if vertex.is_valid and not vertex.link_faces:
         editor.verts.remove(vertex)
+  caveFaces = {face for face in caveFaces if face.is_valid}
+  editor.normal_update()
+  flaps = foldedFlaps(caveFaces)
+  if flaps:
+    flapEdges = {edge for face in flaps for edge in face.edges}
+    bmesh.ops.delete(editor, geom=list(flaps), context="FACES_ONLY")
+    for edge in flapEdges:
+      if edge.is_valid and not edge.link_faces:
+        editor.edges.remove(edge)
   caveFaces = [face for face in caveFaces if face.is_valid]
-  requireSealed(caveFaces)
+  requireSealed(caveFaces, pointOf)
   liningFaces = [face for face in caveFaces if face[layers["face"]] == bridgeCaveData.liningFaceTag]
   bandFaces = mapLining(editor, liningFaces, pointOf, definition, tube, layers["tube"])
   return {
     "object": sceneObject.name, "cave": name, "patchFaces": len(patch), "plugFaces": len(changed), "plugVertices": len(plugIdentifiers),
-    "ringVertices": ringCount, "liningVertices": liningCount, "pieces": pieces, "liningFaces": lining, "weldedAtMouth": welded, "doubledFacesRemoved": len(doubled),
+    "ringVertices": ringCount, "liningVertices": liningCount, "pieces": pieces, "liningFaces": lining, "weldedAtMouth": welded, "doubledFacesRemoved": len(doubled), "foldedFlapsRemoved": len(flaps),
     "tubeFaces": len(tube["faces"]), "records": records,
     "trimBands": [{"fromFloor": band["fromFloor"], "height": band["height"], "material": band["material"], "faces": count} for band, count in zip(definition["trimBands"], bandFaces)],
   } | cutReport(caveFaces, liningFaces, pointOf)
 
 
-def requireSealed(caveFaces):
+def requireSealed(caveFaces, pointOf):
   """Refuse a cut that came out broken: an edge at the cave on three or more faces, or open where its lining should meet the ground."""
   edges = {edge for face in caveFaces for vertex in face.verts for edge in vertex.link_edges}
-  overUsed = sum(1 for edge in edges if len(edge.link_faces) > 2)
-  open = sum(1 for edge in edges if len(edge.link_faces) == 1)
-  if overUsed or open:
+  broken = [edge for edge in edges if len(edge.link_faces) not in (0, 2)]
+  if broken:
+    overUsed = sum(1 for edge in broken if len(edge.link_faces) > 2)
+    where = roundedPoint((pointOf[broken[0].verts[0]] + pointOf[broken[0].verts[1]]) / 2) if broken[0].verts[0] in pointOf and broken[0].verts[1] in pointOf else None
     raise ValueError(
-      f"The cut came out broken at the cave: {overUsed} edges on three or more faces and {open} open edges where its lining meets the"
-      " ground; nothing was changed. A slightly different path, width, or breakup cuts it cleanly"
+      f"The cut came out broken at the cave: {overUsed} edges on three or more faces and {len(broken) - overUsed} open edges where its lining"
+      f" meets the ground{'' if where is None else f', first near {where}'}; nothing was changed. A slightly different path, width, or breakup cuts it cleanly"
     )
 
 
@@ -1975,7 +2049,9 @@ def caveWalkPath(objectName, cave, run):
       stop, _ = line.nearestAlong(branchStart)
     alongs = line.samples(guideSpacing)
     floors, _, _, _ = line.at(numpy.append(alongs[alongs < stop], stop))
-    path += floors.round(3).tolist()
+    for point in floors.round(3).tolist():
+      if not path or math.dist(path[-1][:2], point[:2]) > 1e-6:
+        path.append(point)
   return path
 
 

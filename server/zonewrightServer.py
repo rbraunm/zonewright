@@ -1701,7 +1701,19 @@ async def cutCave(
   the floor, easing to the floor over `edge` past the outline, banked up the wall foot to twice its rise where it meets a wall, the wall's
   straight part lifted evenly above the bank so it never folds. A level way wins over everything and a pad over rubble; a floor with no
   strokes stays level wall to wall, a deliberate choice for a hall. `material` gives a level way or a pad's top its own material, its
-  border on the stroke's exact edges. Rubble wants a finer floor: its featureSize at least twice edgeLength (a cave with rubble at 8). A bend turns on an arc the width in radius (less where the points are
+  border on the stroke's exact edges. Rubble wants a finer floor: its featureSize at least twice edgeLength (a cave with rubble at 8).
+  `branches` [{name, from, path, widths, heights, grades?, landings?, daylight?, overlook?}] are runs of their own leaving the main run
+  ("main") or a branch named before: a side passage, a side room, a fork, a second mouth. A branch's first point stands inside its parent
+  (its whole first section within the parent's walls), on its parent's floor (its height may be left out to take the parent's floor
+  there) unless it is an `overlook` (a balcony or window high in the parent's wall that nobody walks through); it takes the cave's
+  section, breakup, materials, and edgeLength, and its far end is open, a ledge, or blind as any end. Every run is cut at once, the
+  tubes united by the exact boolean, so a junction is one opening where the branch leaves its parent's wall; the breakup is left out
+  within half of mouthFade of the tube each run meets there and eases in over the rest, so the opening is the meeting of two clean
+  sections, a clean arch. Runs of one cave may pass over or under each other (a passage over a room, a spiral round a shaft) with at
+  least `minimumRock` (default 8) of rock between them, measured between the tubes as cut, breakup included, anywhere but at their own
+  junction. Separate caves keep their mouths apart, but inside the rock one may pass over or under another with minimumRock (the larger
+  of the two caves') between their linings; the cut takes only ground into its patch, never another cave's lining, so each is taken back
+  alone. Every choice is the author's: where a branch leaves, at what angle, and what it climbs to. A bend turns on an arc the width in radius (less where the points are
   close). `breakup` {featureSize, amplitude, seed} moves the walls and vault along their outward directions by noise, the floor kept
   flat, fading out within `mouthFade` (default twice edgeLength) of wherever the tube lies in the open, so the lip stays a clean arch.
   Each end is open, some of its floor within a step of walkable ground (a mouth, its section in the open but for a sill a step deep;
@@ -1722,16 +1734,22 @@ async def cutCave(
   no height, a landing at an end or at a point where the path does not bend; a floor stroke reaching past its run's walls or ends
   (naming how far), on an unknown run, named twice, or malformed; rubble finer than twice edgeLength (naming the edgeLength it needs);
   relief raising a wall's foot to within a step of the lowest trim band or of the top of the walls' straight part (naming the wall and
-  where); a pad sunk where no rock lies under it; a bend tighter than half the width, an end part in the rock with its floor buried more than a step under the ground (for a hall, any end part in the rock
+  where); a pad sunk where no rock lies under it; a branch whose first section reaches out of its parent (naming how far and where),
+  whose floor where it starts lies under its parent's (a hole) or more than a step over it without overlook, that never leaves its
+  parent, named twice or "main", or leaving an unknown run; two runs closer than minimumRock away from their junction, or a run passing
+  that close to itself (naming the runs, the place, and the rock); another cave's lining within minimumRock of the tubes, or crossed by
+  them (naming the cave and the place); another cave's mouth within reach; a bend tighter than half the width, an end part in the rock with its floor buried more than a step under the ground (for a hall, any end part in the rock
   and part in the open, or a ledge), a floor hanging in the air, both
-  ends wholly inside the rock, the tube reaching the terrain's border or another cave's reach, a mesh with modifiers or shared with another object, and caves that fail their integrity checks;
+  ends wholly inside the rock, the tube reaching the terrain's border or another cave's mouth, a mesh with modifiers or shared with another object, and caves that fail their integrity checks;
   `wallShare` outside (0, 1]; a band reaching above the walls' straight part (wallShare of the height) at any path point (naming it),
   bands overlapping, a band below the floor or not tall, a band material createMaterial did not make, a repeat not positive.
   Returns its profile, a picture: the section along its run's centerline, unrolled, as renderSection draws it with a cave (ground,
   floor, vault, grades, landings); the faces and vertices it made, the shortest edges of the lining, the pieces of ground at the mouth,
   and the seam, each end's kind, each trim band's faces, each run's worked-out floor heights, stations (distance along at each point),
   segment grades and runs, and landings, each floor stroke as placed (a level way's and a pad's ends along the run and sides, a pad's
-  top), and the floor's level stretches (start, end, length, height, narrowest width: a stretch about
+  top), each junction (branch, the run it leaves, its start, how far its floor stands over its parent's, overlook, and the `frame` of
+  its opening for a portal piece: {center (the floor's middle where it leaves the parent's walls), facingDegrees (back into the parent),
+  width, height}), each run's ends, and the floor's level stretches (start, end, length, height, narrowest width: a stretch about
   220 wide and long holds a stock player plot). The cave is kept with its definition: the ground within its reach is fingerprinted, getObjectDetail and exports flag it
   stale once that ground moves, and editCave or regradeTerrain cuts it again to fit. Around a cave, shaping leaves its lining where it
   is (results count caveLiningLeft) and keeps its ring on the ground; strokes never slide its vertices sideways; contour cuts, turned
@@ -1752,9 +1770,11 @@ async def cutCave(
 @guardedTool()
 async def editCave(context: Context, objectName: str, name: str, changes: dict | None = None):
   """Change a cave cut into a terrain (cutCave) and cut it again in one step: `changes` holds any of its definition's path, widths,
-  heights, wallMaterial, floorMaterial, worldUnitsPerRepeat, edgeLength, wallShare (1 for a hall), breakup, mouthFade,
-  maximumFloorDegrees, trimBands; the cave is taken back and cut again from its definition with them merged in, against the ground as it
-  now stands, its trim bands set again and the strokes kept with its lining painted again. With no changes it refits the cave to the ground (after a sculpt at its mouth or a pass turned up). A
+  heights, grades, landings, daylight, wallMaterial, floorMaterial, worldUnitsPerRepeat, edgeLength, wallShare (1 for a hall), breakup,
+  mouthFade, maximumFloorDegrees, trimBands, minimumRock; and `branches` and `floor` by name, {name: entry or null}: null takes a branch
+  or floor stroke back, an entry's keys merge into the one of that name, and a new name adds one whole. The cave is taken back and cut
+  again from its definition with them merged in, against the ground as it now stands, its trim bands set again and the strokes kept
+  with its lining painted again; cutting is deterministic, so runs a change did not touch come back exactly as they were. With no changes it refits the cave to the ground (after a sculpt at its mouth or a pass turned up). A
   facade dressed at its mouth (dressFacade) follows it: made again from what it was given (faceAt, width, height, apron, blend,
   turnDegrees) on the changed cave, dressed again where its face moved (refitFacades), and refused when it would no longer frame the
   cave (narrower than the cave plus 2, lower than it plus 1), naming the facade to dress again or take back. If the new cut or a facade
