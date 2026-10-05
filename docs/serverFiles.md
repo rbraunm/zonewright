@@ -1,6 +1,6 @@
 # Server files
 
-An EQEmu server loads three map files per zone from its `maps` folder: the collision map `base/<short>.map`, the region map `water/<short>.wtr` and the nav mesh `nav/<short>.nav`. Peridot's are EQEmu's public map pack, made with zone-utilities (azone, awater, map_edit). zonewright writes the `.map` and `.wtr` itself and reads all three, in `server/serverMapFiles.py` (pure Python); `server/serverMapDrawing.py` draws them. Every server file derives from the zone archive's bytes, the archive the client loads. Line references are to EQEmu 4aceae1 and zone-utilities b361e63, read for behaviour only: no code is copied or translated from either (GPL).
+An EQEmu server loads three map files per zone from its `maps` folder: the collision map `base/<short>.map`, the region map `water/<short>.wtr` and the nav mesh `nav/<short>.nav`. Peridot's are EQEmu's public map pack, made with zone-utilities (azone, awater, map_edit). zonewright writes the `.map` and `.wtr` itself and reads all three, in `server/serverMapFiles.py` (pure Python); it builds the `.nav` from them with the Recast helper and inspects it as the server loads and searches it, in `server/serverNav.py`; `server/serverMapDrawing.py` draws them. Every server file derives from the zone archive's bytes, the archive the client loads. Line references are to EQEmu 4aceae1 and zone-utilities b361e63, read for behaviour only: no code is copied or translated from either (GPL).
 
 ## Frames
 
@@ -18,7 +18,8 @@ An EQEmu server loads three map files per zone from its `maps` folder: the colli
 |---|---|---|
 | `base/<short>.map` | The inflate result is unchecked (map.cpp:456); a placement naming no model is skipped (:621); with no file, line of sight always passes, Z is never fixed, NPCs move straight, and fear dereferences null | `mapBytes` derives every size; `readMap` refuses a stream that ends before its last block, bytes after it, and an inflated size other than the header's, and decodes the payload to the last byte; `mapCollision` refuses a placement naming no model |
 | `water/<short>.wtr` | "Loaded Water Map" is logged when parsing failed and the map was dropped (water_map.cpp:48-52, 59-63); no file or a bad one turns nav pathing off (mob_movement_manager.cpp:1035) | `waterBytes([])` is the valid 18-byte empty file; `readWater` decodes to the exact length and refuses a file cut short |
-| `nav/<short>.nav` | A zero tile reference or size drops the whole mesh (pathfinder_nav_mesh.cpp:473-491) | `readNav` refuses either, naming the tile and its offset |
+| `nav/<short>.nav` | A zero tile reference or size drops the whole mesh (pathfinder_nav_mesh.cpp:473-491); a tile `addTile` rejects is lost without a word; Detour reads and writes a tile by its header's counts, never checking them against its size; map_edit drops a triangle outside its bounds or at or below z -15000, and marks a Normal region with Recast's null area, cutting a hole | `readNav` refuses a zero reference or size, a tile whose size is not the one its counts make, a count below zero, and bytes after the last tile or the zlib stream, naming the tile and its offset; `navFile` refuses to write a payload `readNav` would refuse; the helper refuses each of map_edit's drops, a region type no nav area maps, a turned region, and a failed `dtCreateNavMeshData` or `addTile`; inspect loads each tile at its stored reference, as the server does |
+| NPC search | Peridot searches 1,024 nodes (Pathing:MaxNavmeshNodes); an NPC stands on the nearest polygon within (5, 100, 5), and a path's goal is the nearest within (10, 200, 10), so an NPC can snap onto mesh up to 100 above or below it | `inspectNav` reports every island apart from the safe point's piece with its snap risk, and probes paths from the safe point with the server's filter and limits; each failed probe is a finding |
 
 ## Collision map (`.map` V2)
 
@@ -76,18 +77,50 @@ On Highpass Hold it gives 272,230 triangles in the order the zone reader (`eqgFi
 
 `readWater` recognizes and refuses a V1 file (the BSP tree of an S3D zone, such as qeynos2's).
 
-## Nav mesh container (`.nav`)
+## Nav mesh (`.nav`)
 
 **Container:** `EQNAVMESH`, uint32 version 2, uint32 compressed size, uint32 inflated size, then zlib of: uint32 tile count, `dtNavMeshParams` (origin[3], tile width and height, maximum tiles and polygons; 28 bytes), then per tile uint32 tile reference, int32 size and the raw Detour tile.
 
 **Tile** (Detour DNAV version 7): a 100-byte header, then vertices, polygons (32 bytes, six vertices), links (12 bytes), detail meshes, detail vertices, detail triangles, bounding-volume nodes and off-mesh connections. A polygon's area is its `areaAndType` & 0x3F.
 
-`readNav` decodes all of it to the last byte and refuses a zero tile reference or size, naming the tile; `navPayload` and `navFile` encode it back. Peridot's six reference navs re-encode to identical payloads; Highpass Hold's has origin (-839.33337, -410.35071, -1650.574), 409.6-unit tiles, 64 maximum tiles, 65,536 maximum polygons, and 28 tiles whose polygons are 7,692 Normal (0), 452 Water (1) and 53 Disabled (11).
+**Reading and writing.** `readNav` decodes all of it to the last byte. It refuses a zero tile reference or size, naming the tile; a tile whose size is not the one its header's counts make (Detour's `addTile` reads and writes by the counts and never checks them), and a count below zero; and bytes after the last tile or the zlib stream. `navPayload` and `navFile` encode it back, and `navFile` first reads the payload as `readNav` does, so nothing is written that the reader would refuse. Peridot's six reference navs re-encode to identical payloads; Highpass Hold's has origin (-839.33337, -410.35071, -1650.574), 409.6-unit tiles, 64 maximum tiles, 65,536 maximum polygons, and 28 tiles whose polygons are 7,692 Normal (0), 452 Water (1) and 53 Disabled (11).
+
+### Building
+
+`serverNav.navBytes(mapBytes, waterBytes)` builds the `.nav` map_edit would build from a zone's `.map` and `.wtr`: `navFromCollision` over the collision `mapCollision` rebuilds and the records `readWater` reads. The Recast helper (README, Recast helper) builds the tiles with map_edit's defaults (`serverNavSettings`, recovered from Highpass Hold's header and project; they describe the NPC, never the player):
+
+| Setting | Value |
+|---|---|
+| cell size / cell height | 0.8 / 0.4 |
+| agent height / radius / climb | 6.55 / 1.31 / 6.55 |
+| max slope | 60 |
+| region minimum / merge | 8 / 20 |
+| edge length / error | 12 / 1.3 |
+| vertices per polygon | 6 |
+| detail sample distance / error | 18 / 1 |
+| tile size / border | 512 cells / 5 cells |
+| partitioning | watershed |
+
+The bounds are the collidable extents. The grid is map_edit's: (int)(extent / cell size + 0.5) cells each way, in tiles of 512; the tile bits are counted over the whole grid, not the tiles that hold polygons (Highpass Hold: 5 x 9 = 45 grid tiles, 6 tile bits, 16 polygon bits, 28 tiles built). Each `.wtr` record marks a volume after erosion: Water 1, Lava 2, PvP 4, Slime 5, Ice 6, VWater 7, GeneralArea 8 and PreferPathing as Prefer 10; a zone line becomes Disabled 11, as map_edit has no ZoneLine case. A Normal or DisableNavMesh record, an unknown type, and a turned record are refused. Islands are kept, and no bounding-volume tree is built. Tiles build on parallel threads and are added in (ty, tx) order, so tile references, file order and bytes are the same run to run; map_edit added tiles as its threads finished, so Peridot's references and order are never compared, and tiles are matched by their header's (x, y, layer).
+
+**Against Peridot.** From Peridot's own `.map` and `.wtr`, Highpass Hold's 28 tiles and thulehouse2's 22 match Peridot's tile for tile: the parameters, every header but its detail counts, the vertices, the polygons, and the links between them. The detail meshes differ: the pinned Recast (EQEmu `710dabe`) carries upstream `13dc549` ("Improve triangulateHull"), which the 2017 copy that built Peridot's navs lacked, so 4,709 of Highpass Hold's 8,197 polygons and 1,865 of thulehouse2's 3,560 have another detail triangulation. thulehouse2's nav was built from a map_edit project (`thulehouse2.navprj`) whose bounds' top was lowered by hand to 255.2, below the collision's 270.25, so map_edit dropped the two triangles reaching above it, which also set the collision's x and y extents; its test gives the helper the project's bounds and the triangles map_edit kept. Exports always take the collidable extents.
+
+From our own Highpass Hold `.map` (the client's archive and loose `.zon`), the nav has Peridot's parameters and 28 tiles, and the number of tiles whose polygons differ from Peridot's is 0: the file is byte-identical to the nav of Peridot's `.map`. Our turns are the `.zon`'s and Peridot's are azone's round trip of them (up to 2.4e-7 rad apart, which moves 33,184 of the 272,230 collision triangles by up to 3.2e-4), and no voxel changes. Every built tile holds placed-model triangles (five hold nothing else), so no tile's input is bit-identical to Peridot's, and all 28 are compared.
+
+### Inspecting
+
+`serverNav.inspectNav(navFile, safePoint, targets)` loads a `.nav` as the server does (each tile at the slot its stored reference names) and labels its polygons into components across links, cross-tile links included, under the server's ground filter: Disabled and ZoneLine polygons belong to none. The main piece is the component of the polygon nearest the safe point within (5, 100, 5), the search that decides the polygon an NPC stands on; when no polygon lies within it, the largest component stands in and the result says so. Every other component is an island, numbered by area, with its bounds, its center (the middle of its largest polygon) and its snap risk: some main-piece polygon lies within 100 vertically over its footprint, where the server's nearest-polygon search can put an NPC onto it.
+
+A path probe runs a Detour search with Peridot's limits (1,024 nodes, a 256-polygon path, the server's area costs, goals the nearest polygon the filter allows within (10, 200, 10)) from the safe point to each target. A partial or failed path is a finding: "NPCs cannot path from the safe point to X within Peridot's 1,024 search nodes", with the reason.
+
+On Highpass Hold, from the safe point (zone -148, -219, -24), our nav and Peridot's give the same answer: of 8,197 polygons, 53 are Disabled; the main piece holds 3,677 polygons, and there are 640 islands, 297 of them at snap risk; the two largest are the backdrop mountains west and east of the pass. Of the five zone lines, records 4 and 5 are reached, records 2 and 3 at the pass's far ends are past what 1,024 nodes search (partial paths of 46 and 145 polygons), and record 6's center lies more than 10 across from any polygon the filter walks, its own slab being Disabled.
 
 ## Pictures
 
 `serverMapDrawing.drawCollision` draws a collision plan north up, as renderSketch's plans are drawn: the highest collision over each pixel shaded by height and by slope away from a north-west light (faces seen edge-on from above, such as upright walls, show only as the edges between heights), the `.wtr` boxes outlined in their type's color and numbered in file order, a grid, a scale bar and north. `drawCollisionComparison` sets two collisions side by side in one frame, each with its own `.wtr`'s boxes, with a third plan of the triangles that differ by more than a tolerance (matched in order) in red over the first faded: blank when they agree.
 
+`drawNav` sets nav plans side by side on one frame, each titled and with its legend, from `inspectNav`'s polygons: by nav area (`areaPanel`), by component with the main piece green and the islands orange and numbered (`componentPanel`), or as a difference against another nav (`differencePanel`): polygons the other lacks red, polygons only the other has outlined purple, tiles matched by (x, y, layer) and polygons by area and outline; blank when they agree.
+
 ## Reference files
 
-Tests compare against Peridot's own files: EQEmu/maps at `fbd3b191286e0d232a7103dff4a451d2e51a819f`, which Peridot's maps are byte-identical to. `tests/serverReference.py` fetches each file `tests/serverReference.json` lists (path, size, SHA-256) into `%LOCALAPPDATA%\zonewrightTests\serverReference\fbd3b191\<path>` when missing, under a lock, and fails on any size or hash that differs. They are server data, so they stay under the test root and never go into git. Their tests are the `serverMaps` group of the client data tier, which also reads the client's archives and loose `.zon` files in place; a whole-suite run takes it when the server map code, the zone readers it builds on (`eqgFiles`, `eqArchive`), or the fixture changed.
+Tests compare against Peridot's own files: EQEmu/maps at `fbd3b191286e0d232a7103dff4a451d2e51a819f`, which Peridot's maps are byte-identical to. `tests/serverReference.py` fetches each file `tests/serverReference.json` lists (path, size, SHA-256) into `%LOCALAPPDATA%\zonewrightTests\serverReference\fbd3b191\<path>` when missing, under a lock, and fails on any size or hash that differs. They are server data, so they stay under the test root and never go into git. Their tests are two groups of the client data tier, which also read the client's archives and loose `.zon` files in place: `serverMaps`, taken by a whole-suite run when the server map code, the zone readers it builds on (`eqgFiles`, `eqArchive`), or the fixture changed; and `serverNav`, taken when the nav code, the Recast helper's sources, the server map code and readers it builds on, the drawing, or the helper's pin, build and thread count changed.
