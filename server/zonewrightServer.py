@@ -1401,12 +1401,13 @@ async def getObjectDetail(context: Context, name: str):
   """One object in depth: transform (rotation as XYZ Euler degrees whatever its rotation mode), size, world bounds (for a collection
   instance, its instanced meshes'; null when it instances none), parent, collections, modifiers; for meshes the mesh's name, the
   vertex, face, and triangle counts, faces per material, UV layers, world units per texture repeat, vertex groups, shaping passes,
-  surfacing layers, its defined passes (graded routes, dressed facades, the plots graded on it, in the order made) and its caves (cutCave), each with
-  whether its ground moved since it was made (stale: grading it again would move it, or the ground within the cave's reach moved, and
-  how far), which regradeTerrain or editCave puts right. A placed kit piece gives kitPiece: its kit, piece, kind, module, passable,
-  fingerprint, facing, and its sockets in the world, each joined to another's or free; a kit piece's own mesh gives kitPiece: its
-  record (kind, sockets, passable, openings), size, module, triangles, each material's texture and measured repeat, seams, and
-  fingerprint. A structure's part gives structurePart: its structure, kind, and role (span, section, or post)."""
+  surfacing layers, its defined passes (graded routes, dressed facades, the plots graded on it, in the order made) and its caves
+  (cutCave), each with whether its ground moved since it was made (stale: grading it again would move it, or the ground within the
+  cave's reach moved, and how far), which regradeTerrain or editCave puts right. A placed kit piece gives kitPiece: its kit, piece,
+  kind, module, passable, fingerprint, facing, and its sockets in the world, each joined to another's or free; a kit piece's own mesh
+  gives kitPiece: its record (kind, sockets, passable, openings), size, module, triangles, each material's texture and measured repeat,
+  seams, and fingerprint. A structure's part gives structurePart: its structure, kind, and role (span, section, or post; a building's
+  part by name: exterior, interior, roof, plinth). A placed piece gathered into a prefab gives prefabPart: its prefab and part."""
   return await callBridge(context, "getObjectDetail", {"name": name})
 
 
@@ -2692,17 +2693,17 @@ async def swapKitPiece(context: Context, names: list[str], piece: str):
 
 structureHelp = (
   " A structure is one artist action kept with its definition: a collection named for it under structures (or terrain, for a span"
-  " exported as ground), holding its parts and its record (kind, order, the definition as the build tool took it, the kit pieces'"
-  " fingerprints) and every ground lookup the lay made (probes). Its geometry is always laid again from the definition, the kit, and the"
-  " ground: editStructure changes it (with no changes, lays it again after its ground or kit changed), removeStructure takes it back,"
-  " getStructures lists them with whether each is stale; parts refuse hand edits (transformObjects, deleteObjects, mesh, material, and"
-  " UV tools), naming those tools. A lay is whole or nothing: a refusal leaves the file as it was. It casts against what players collide"
-  " with but the boundaries, leaving out its own parts and every structure laid after it. kitPath is the kit every piece comes from"
-  " (absolute; null for the open file's own pieces), kept relative to the saved .blend; a piece of the wrong kind is refused naming the"
-  " kind it needs. sink is how far posts, legs, anchors, and wall feet go under the ground. Every result gives structure {name, kind,"
-  " order}, its parts with their triangles and the export models they become, standsOn (the objects its probes found), views (renderView"
-  " views to judge it from, ready for saveReviewCamera), and for a deck or flight walk: walkRoute along its walk line (walkRoute and"
-  " renderRouteStrip take the structure's name as route)."
+  " exported as ground), holding its parts and its record (kind, order, the definition as the build tool took it, the fingerprints of"
+  " the kit pieces or prefab it was laid from) and every ground lookup the lay made (probes). Its geometry is always laid again from the"
+  " definition, the kit, and the ground: editStructure changes it (with no changes, lays it again after its ground or kit changed),"
+  " removeStructure takes it back, getStructures lists them with whether each is stale; parts refuse hand edits (transformObjects,"
+  " deleteObjects, mesh, material, and UV tools), naming those tools. A lay is whole or nothing: a refusal leaves the file as it was. It"
+  " casts against what players collide with but the boundaries, leaving out its own parts and every structure laid after it. kitPath is"
+  " the kit every piece or prefab comes from (absolute; null for the open file's own), kept relative to the saved .blend; a piece of the"
+  " wrong kind is refused naming the kind it needs. sink is how far posts, legs, anchors, and wall feet go under the ground. Every result"
+  " gives structure {name, kind, order}, its parts with their triangles and the export models they become, standsOn (the objects its"
+  " probes found), views (renderView views to judge it from, ready for saveReviewCamera; orbit: its parts for renderOrbit), and for a"
+  " deck or flight walk: walkRoute along its walk line (walkRoute and renderRouteStrip take the structure's name as route)."
 )
 railsHelp = (
   " rails {piece, height, sides (\"both\", \"left\", \"right\" of travel; both by default)}: a rail piece as bars from post to post, their"
@@ -2710,6 +2711,55 @@ railsHelp = (
   " top at the height; rails and ropes pass players through (the kit's passable), so open sides can be fallen from, as the client's can."
   " Rails need posts."
 )
+
+
+@guardedTool(description=(
+  "In a kit file, gather placed instances of the file's own pieces (placeKitPiece with kitPath null; a roof from addRoof placed over"
+  " the walls) into a building other files place whole, as the client splits its buildings into models placed together (Freeport's"
+  " inn: shell, interior, roof, rigging, entrance; Highpass's houses: exterior and interior): a collection `name` (starting with the"
+  " kit file's stem) holding a child collection per part, `<name><Part>`, with the named instances moved into them. `parts` maps each"
+  " part's camelCase name (exterior, interior, roof, or any) to its instances; each part becomes one model in an export, shared by every"
+  " placement of the building. Its floor is the exterior's lowest base (every part's without an exterior); its footprint is the convex"
+  " hull in plan of every part where it stands on the floor (geometry within a step of the floor: walls' feet, corners, floors, not a"
+  " roof's eaves), what seating and plinths are laid from; its origin (the prefab's and every part's instance_offset) is the middle of"
+  " the footprint's plan bounds at the floor. `entrances` [{name, at [x, y, z] in this file, facingDegrees}]: a doorway's threshold"
+  " middle and the way out of it, within a step of the footprint; a building with an interior part is walked into and names at least"
+  " one (NPC service buildings), a closed shell needs none. Assembling again under its name replaces its parts and entrances, and"
+  " instances no longer named go back to the scene collection, so a building is reworked by placing, deleting, and assembling again."
+  " Marked as an asset. Refuses an object that is not an instance of this file's pieces, one in two parts or in another prefab, an"
+  " empty part, a part name not camelCase, an interior without an entrance, an entrance more than a step outside the footprint, and a"
+  " name taken by anything but this prefab. Returns its parts (instances, pieces, triangles each), footprint and its size, origin,"
+  " entrances in the prefab frame, triangles, and fingerprint." + kitPieceHelp
+))
+async def assemblePrefab(context: Context, name: str, parts: dict[str, list[str]], entrances: list[dict] | None = None):
+  return await callBridge(context, "assemblePrefab", {"name": name, "parts": parts, "entrances": entrances})
+
+
+@guardedTool(description=(
+  "Place one building as a structure `name`: one instance per part of the prefab `prefab` from the kit at `kitPath` (absolute; null for"
+  " the open file's own) (`<name><Part>`, each part one model shared by every placement), its front facing `facingDegrees`."
+  " `location` [x, y, z] sets its floor; [x, y] seats the floor at the highest ground under its footprint, found from above (refused"
+  " where rock lies over ground: give z), so no ground stands inside it. `plinth` {material (createMaterial), worldUnitsPerRepeat, sink"
+  " (2), margin (0)}: a skirt down the footprint's hull, offset out by margin, from the floor to sink under the lowest ground under it,"
+  " mapped along its sides so its courses run level, no top or bottom faces (Highpass's houses stand on stone bases), one mesh"
+  " `<name>Plinth` and one model of its own. Refuses ground inside the footprint more than a step above the floor (it would come up"
+  " through the floor: grade the site or raise the floor), and the floor more than a step above the ground under the footprint without"
+  " a plinth (it would float), each naming where and the floor that would fit; a prefab the kit does not hold; a taken name; the"
+  " terrain collection. Returns the floor, the ground's lowest and highest under the footprint and where, the plinth's top, bottom, and"
+  " triangles, the parts with their triangles and the export models they become, each entrance (where it is and faces, the ground a"
+  " step outside it, the step up to its threshold, and for a building with an interior part a walk from 10 outside to 10 inside), the"
+  " objects its lookups stood on, and views (entrance<Name>: standing 25 out looking at it; orbit: its parts for renderOrbit)."
+  " editStructure moves, turns, or re-plinths it; it goes stale when the ground under its footprint moves or its prefab's footprint or"
+  " entrances change in the kit, and follows its pieces' changes without going stale." + structureHelp + facingHelp
+))
+async def placePrefab(
+  context: Context, name: str, kitPath: str | None, prefab: str, location: list[float], facingDegrees: float, plinth: dict | None = None,
+  collection: str = "structures",
+):
+  requireKitPath(kitPath)
+  return await callBridge(context, "placePrefab", {
+    "name": name, "kitPath": kitPath, "prefab": prefab, "location": location, "facingDegrees": facingDegrees, "plinth": plinth, "collection": collection,
+  })
 
 
 @guardedTool(description=(
@@ -2840,12 +2890,13 @@ async def buildWall(
 
 @guardedTool()
 async def editStructure(context: Context, name: str, changes: dict | None = None):
-  """Change a structure and lay it again: `changes` (any keys of its definition, as its build tool takes them; kitPath absolute) merged
-  into its definition, laid against the ground and kit as they now are, whole or not at all; with no changes, lay it again as defined
-  (after the ground under it or its kit changed: getStructures and regradeTerrain name the stale ones). Lay structures again in the
-  order getStructures lists them, so a flight landing on a walkway follows the walkway. Returns what its build tool returns, with the
-  changes and how many of its probes had moved since it was last laid (and the largest). Refused: no such structure (listing them);
-  keys not in its kind's definition (listing them); whatever its build refuses, the structure staying exactly as it was."""
+  """Change a structure and lay it again: `changes` (any keys of its definition, as its build tool takes them, such as a placed prefab's
+  location, facingDegrees, or plinth; kitPath absolute) merged into its definition, laid against the ground and kit as they now are,
+  whole or not at all; with no changes, lay it again as defined (after the ground under it or its kit changed: getStructures and
+  regradeTerrain name the stale ones). Lay structures again in the order getStructures lists them, so a flight landing on a walkway
+  follows the walkway. Returns what its build tool returns, with the changes and how many of its probes had moved since it was last laid
+  (and the largest). Refused: no such structure (listing them); keys not in its kind's definition (listing them); whatever its build
+  refuses, the structure staying exactly as it was."""
   if changes is not None and "kitPath" in changes:
     requireKitPath(changes["kitPath"])
   return await callBridge(context, "editStructure", {"name": name, "changes": changes})
@@ -2853,8 +2904,8 @@ async def editStructure(context: Context, name: str, changes: dict | None = None
 
 @guardedTool()
 async def removeStructure(context: Context, name: str):
-  """Take a structure back: its collection and parts, and any shared shear mesh no other wall uses. Returns its kind and definition
-  (kitPath absolute), to build it again with its build tool."""
+  """Take a structure back: its collection and parts (and a part's mesh no other object uses), and any shared shear mesh no other wall
+  uses. Returns its kind and definition (kitPath absolute), to build it again with its build tool."""
   return await callBridge(context, "removeStructure", {"name": name})
 
 
@@ -2862,10 +2913,12 @@ async def removeStructure(context: Context, name: str):
 async def getStructures(context: Context, names: list[str] | None = None):
   """Every structure (or those named) in the order they were first laid: kind, order, definition (kitPath absolute), parts with their
   triangles and the export models they become, standsOn (the objects its probes find now), and whether it is stale and why: ground
-  (its probes looked up again: how many moved more than 0.01, the largest change and where), kit (the pieces whose fingerprint changed
-  since it was laid: a span bakes its pieces, so it follows the kit only when laid again), or missing (its kit file or a piece cannot be
-  found); its walk line for a bridge, flight, or walkway; its views. Also the loose kit pieces placed by hand, counted by kit and piece.
-  Each structure is looked up as its lay looked: leaving out its own parts and every structure laid after it. Changes nothing."""
+  (its probes looked up again: how many moved more than 0.01, the largest change and where), kit (the pieces or prefabs whose
+  fingerprint changed since it was laid: a span bakes its pieces, so it follows the kit only when laid again; a placed prefab follows
+  its pieces at once and goes stale when its prefab's footprint or entrances change), or missing (its kit file, a piece, or a prefab
+  cannot be found); its walk line for a bridge, flight, or walkway; its views (orbit: its parts for renderOrbit). Also the loose kit
+  pieces placed by hand, counted by kit and piece. Each structure is looked up as its lay looked: leaving out its own parts and every
+  structure laid after it. Changes nothing."""
   return await callBridge(context, "getStructures", {"names": names})
 
 

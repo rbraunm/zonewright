@@ -133,14 +133,27 @@ def isPlayerSolid(sceneObject, collision=False):
   return sceneObject.type == "MESH" or isCollectionInstance(sceneObject)
 
 
+def collectionParts(collection):
+  """Each rendered mesh a collection draws where it is instanced, with its matrix from the collection's instance_offset: its own meshes
+  and, to any depth, those of the collections its instance members instance (a prefab's part holding placed pieces)."""
+  offset = mathutils.Matrix.Translation(-collection.instance_offset)
+  parts = []
+  for member in collection.all_objects:
+    if member.hide_render:
+      continue
+    if member.type == "MESH":
+      parts.append((member, offset @ member.matrix_world))
+    elif isCollectionInstance(member):
+      parts.extend((mesh, offset @ member.matrix_world @ matrix) for mesh, matrix in collectionParts(member.instance_collection))
+  return parts
+
+
 def objectParts(sceneObject):
-  """A mesh with its world matrix, or each rendered mesh of a collection instance as placed."""
+  """A mesh with its world matrix, or each rendered mesh of a collection instance as placed, nested instances included."""
   if sceneObject.type == "MESH":
     return [(sceneObject, sceneObject.matrix_world.copy())]
   if isCollectionInstance(sceneObject):
-    collection = sceneObject.instance_collection
-    placement = sceneObject.matrix_world @ mathutils.Matrix.Translation(-collection.instance_offset)
-    return [(member, placement @ member.matrix_world) for member in collection.all_objects if member.type == "MESH" and not member.hide_render]
+    return [(member, sceneObject.matrix_world @ matrix) for member, matrix in collectionParts(sceneObject.instance_collection)]
   raise ValueError(f"'{sceneObject.name}' is a {sceneObject.type}; it has no mesh")
 
 

@@ -1,8 +1,8 @@
-"""Defined structures: one artist action laying kit pieces between anchors, along points, or along a path the artist gave, kept with its
-definition and laid again from it. The ground a lay stands on (StructureGround), every lookup it made (probes, replayed to tell when the
-ground moved), the kit fingerprints it was laid from, the whole-or-nothing lay, staleness, walk lines, and the views each kind is judged
-from; the commands that build, edit, take back, and list structures. Kinds register their lays here (bridgeSpans, bridgeWalls). Runs
-under Blender's Python."""
+"""Defined structures: one artist action laying kit pieces between anchors, along points, or along a path, or placing a building where
+the artist gave, kept with its definition and laid again from it. The ground a lay stands on (StructureGround), every lookup it made
+(probes, replayed to tell when the ground moved), the kit fingerprints it was laid from, the whole-or-nothing lay, staleness, walk lines,
+and the views each kind is judged from; the commands that build, edit, take back, and list structures. Kinds register their lays here
+(bridgeSpans, bridgeWalls, bridgePrefabs). Runs under Blender's Python."""
 import math
 import numbers
 import os
@@ -27,7 +27,7 @@ structuresCollectionName = "structures"
 layingSuffix = "Laying"
 # Two lookups of one probe agree when this close; a probe that moves further makes its structure stale.
 probeTolerance = 0.01
-# Posts, legs, and anchors find the ground within this far below them.
+# Posts, legs, anchors, and floors find the ground within this far below them.
 groundReach = 300.0
 # Decks are probed for clearance this often along their edges and centerline, and walked in samples this far apart.
 clearanceSpacing = 4.0
@@ -39,7 +39,9 @@ castNudge = bridgeMeshAccess.castNudge
 up = mathutils.Vector((0.0, 0.0, 1.0))
 down = mathutils.Vector((0.0, 0.0, -1.0))
 sideNames = ("both", "left", "right")
-# Each kind: its definition's keys, its lay, its walk line (or None), and its views.
+# What each kind is, as placed parts rather than ground, refused in the terrain collection.
+placedKinds = {"wall": "A wall is placed sections", "prefab": "A building is placed parts"}
+# Each kind: its definition's keys, its lay, its walk line (or None), its views, and what it reports once laid (or None).
 kinds = {}
 
 
@@ -49,12 +51,12 @@ def placeCollections():
 
 
 class Kind:
-  def __init__(self, keys, lay, walkLine, views, indexKeys=()):
-    self.keys, self.lay, self.walkLine, self.views, self.indexKeys = keys, lay, walkLine, views, indexKeys
+  def __init__(self, keys, lay, walkLine, views, indexKeys=(), finish=None):
+    self.keys, self.lay, self.walkLine, self.views, self.indexKeys, self.finish = keys, lay, walkLine, views, indexKeys, finish
 
 
-def registerKind(kind, keys, lay, walkLine, views, indexKeys=()):
-  kinds[kind] = Kind(keys, lay, walkLine, views, indexKeys)
+def registerKind(kind, keys, lay, walkLine, views, indexKeys=(), finish=None):
+  kinds[kind] = Kind(keys, lay, walkLine, views, indexKeys, finish)
 
 
 def isNumber(value):
@@ -124,7 +126,7 @@ def shownDefinition(definition):
 
 
 class Kit:
-  """The pieces a lay takes from one kit (None: the open file's own), each read once and fingerprinted."""
+  """The pieces or prefab a lay takes from one kit (None: the open file's own), each read once and fingerprinted."""
 
   def __init__(self, kitPath):
     self.kitPath = kitPath
@@ -141,6 +143,13 @@ class Kit:
     if data["record"]["kind"] not in allowed:
       raise ValueError(f"{role} '{name}' is a {data['record']['kind']} piece; {role} takes a {' or '.join(allowed)} piece")
     return data
+
+  def prefab(self, name):
+    if not isinstance(name, str):
+      raise ValueError(f"prefab names a prefab of the kit, got {name!r}")
+    collection = bridgeKitData.requirePrefab(self.kitPath, name)
+    self.used[name] = bridgeKitData.prefabFingerprint(collection)
+    return collection
 
 
 def size(data, axis):
@@ -245,7 +254,7 @@ class Laying:
     instance.rotation_euler = (0.0, 0.0, math.radians(-facingDegrees))
     return self.link(instance, finalName)
 
-  def addSharedMeshObject(self, finalName, mesh, location, facingDegrees):
+  def addMeshObject(self, finalName, mesh, location, facingDegrees):
     meshObject = bpy.data.objects.new(finalName + layingSuffix, mesh)
     meshObject.location = location
     meshObject.rotation_euler = (0.0, 0.0, math.radians(-facingDegrees))
@@ -260,10 +269,15 @@ def requireNewStructureName(name):
     raise ValueError(f"name names the structure, got {name!r}")
   if bridgeStructureData.findStructure(name) is not None:
     raise ValueError(f"'{name}' is already a structure (editStructure changes it, removeStructure takes it back)")
-  if bpy.data.collections.get(name) is not None:
+  if any(collection.name == name and collection.library is None for collection in bpy.data.collections):
     raise ValueError(f"'{name}' is already the name of a collection in this file")
-  if bpy.data.objects.get(name) is not None:
+  if localObject(name) is not None:
     raise ValueError(f"'{name}' is already the name of an object in this file")
+
+
+def localObject(name):
+  """The open file's own object of a name; a kit's linked objects (a prefab's placed pieces) keep names of their own."""
+  return next((found for found in bpy.data.objects if found.name == name and found.library is None), None)
 
 
 def skippedNames(order):
@@ -272,19 +286,19 @@ def skippedNames(order):
 
 
 def partRole(structureName, part):
+  """What a part is to its structure: a span's whole, a wall's numbered section or post, or the rest of its name after the structure's
+  (a building's exterior or plinth)."""
   if part.name == structureName:
     return "span"
-  if part.name.startswith(structureName + "Section"):
-    return "section"
-  if part.name.startswith(structureName + "Post"):
-    return "post"
-  return "part"
+  rest = part.name[len(structureName):] if part.name.startswith(structureName) else part.name
+  for numbered in ("Section", "Post"):
+    if rest.startswith(numbered) and rest[len(numbered):].isdigit():
+      return numbered.lower()
+  return rest[:1].lower() + rest[1:]
 
 
 def partTriangles(part):
-  if part.type == "MESH":
-    return bridgeMeshAccess.triangleCount(part)
-  return sum(bridgeMeshAccess.triangleCount(member) for member in bridgeKitData.pieceMembers(part.instance_collection))
+  return sum(bridgeMeshAccess.triangleCount(mesh) for mesh, _ in bridgeMeshAccess.objectParts(part))
 
 
 def isGround(collection):
@@ -293,7 +307,7 @@ def isGround(collection):
 
 
 def exportModel(part, collection):
-  """The model file an export writes a part into, or None for a span laid as ground (its triangles go into the terrain)."""
+  """The model file an export writes a part into, or None for a structure laid as ground (its triangles go into the terrain)."""
   if isGround(collection):
     return None
   role = "mesh" if part.type == "MESH" else "instance"
@@ -341,7 +355,7 @@ def commit(laying, kind, order, existing):
   oldParts = bridgeStructureData.partsOf(existing) if existing is not None else []
   oldNames = {part.name for part in oldParts}
   for _, finalName in laying.parts:
-    taken = bpy.data.objects.get(finalName)
+    taken = localObject(finalName)
     if taken is not None and taken.name not in oldNames:
       raise ValueError(f"Part name '{finalName}' is taken by an object outside structure '{name}'; rename it (organize) or name the structure otherwise")
   removeParts(oldParts)
@@ -380,18 +394,20 @@ def layStructure(name, kind, definition, existing):
     report = spec.lay(laying)
     collection = commit(laying, kind, order, existing)
   result = {"structure": {"name": name, "kind": kind, "order": order}} | report | {
-    "parts": describeParts(collection), "standsOn": sorted(laying.lookups.standsOn), "views": spec.views(definition, groundHeight),
+    "parts": describeParts(collection), "standsOn": sorted(laying.lookups.standsOn), "views": spec.views(definition, groundHeight) | orbitView(collection),
   }
   if spec.walkLine is not None:
     result["walk"] = bridgeReview.walkRoute(walkLine(collection), walkSpacing)
+  if spec.finish is not None:
+    result |= spec.finish(collection, report)
   return result
 
 
 def requireCollectionArgument(collection, kind):
   if collection not in placeCollections():
     raise ValueError(f"collection is one of {list(placeCollections())}, got {collection!r}")
-  if kind == "wall" and collection == bridgeExport.terrainCollectionName:
-    raise ValueError("A wall is placed sections, not ground; lay it in 'structures'")
+  if kind in placedKinds and collection == bridgeExport.terrainCollectionName:
+    raise ValueError(f"{placedKinds[kind]}, not ground; lay it in '{structuresCollectionName}'")
 
 
 def buildStructure(kind, name, arguments):
@@ -426,18 +442,18 @@ def replayProbes(collection, ground):
 
 
 def kitState(record):
-  """The pieces whose fingerprints differ from the lay's, and what cannot be found."""
+  """The pieces and prefabs whose fingerprints differ from the lay's, and what cannot be found."""
   changed, missing = [], []
   kitPath = absoluteKitPath(record["definition"]["kitPath"])
-  for piece, fingerprint in sorted(record["kit"].items()):
+  for source, fingerprint in sorted(record["kit"].items()):
     try:
-      collection = bridgeKitData.requirePiece(kitPath, piece)
+      collection = bridgeKitData.requireSource(kitPath, source)
       if collection.library is not None and collection.library.is_missing:
         raise FileNotFoundError(f"Kit '{kitPath}' is missing")
-      if bridgeKitData.fingerprint(collection) != fingerprint:
-        changed.append(piece)
+      if bridgeKitData.sourceFingerprint(collection) != fingerprint:
+        changed.append(source)
     except (FileNotFoundError, ValueError) as error:
-      missing.append({"piece": piece, "why": str(error)})
+      missing.append({"piece": source, "why": str(error)})
   return changed, missing
 
 
@@ -510,6 +526,11 @@ def lookView(eye, target):
   return {"eye": roundVector(eye), "target": roundVector(target)}
 
 
+def orbitView(collection):
+  """orbit: the structure's parts, for renderOrbit."""
+  return {"orbit": {"objects": [part.name for part in bridgeStructureData.partsOf(collection)]}}
+
+
 def editStructure(name, changes):
   collection = bridgeStructureData.requireStructure(name)
   record = bridgeStructureData.readStructure(collection)
@@ -568,7 +589,7 @@ def getStructures(names):
       entry = {
         "name": collection.name, "kind": record["kind"], "order": record["order"], "definition": shownDefinition(record["definition"]),
         "parts": describeParts(collection), "standsOn": [owner for owner in standsOn if owner not in {part.name for part in bridgeStructureData.partsOf(collection)}],
-      } | state | {"views": spec.views(record["definition"], groundHeight)}
+      } | state | {"views": ({} if state["missing"] else spec.views(record["definition"], groundHeight)) | orbitView(collection)}
       if spec.walkLine is not None:
         entry["walkLine"] = [roundVector(point) for point in walkLine(collection)]
       described.append(entry)

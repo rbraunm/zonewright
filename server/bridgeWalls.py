@@ -279,7 +279,7 @@ def layWall(laying):
       model, shear = f"obj_{bridgeExport.fileStem(data['piece'])}.mod", None
     else:
       mesh, state = shearMesh(laying, data, rise, shearMade)
-      laying.addSharedMeshObject(name, mesh, location, facing)
+      laying.addMeshObject(name, mesh, location, facing)
       model, shear = f"obj_{bridgeExport.fileStem(shearMeshName(data['piece'], rise))}.mod", state
     entry = placements.setdefault(model, {"placements": 0, "triangles": sum(face - 2 for face in data["loopTotals"].tolist())})
     entry["placements"] += 1

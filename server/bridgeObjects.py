@@ -406,11 +406,9 @@ def deleteObjects(names):
 def organize(renames, parents, collections):
   if renames is None and parents is None and collections is None:
     raise ValueError("Nothing to organize: pass renames, parents, or collections")
-  for oldName in renames or {}:
-    bridgeStructureData.requireNotStructurePart(bridgeMeshAccess.requireObject(oldName), "organize")
-  for name in list(parents or {}) + [parent for parent in (parents or {}).values() if parent is not None] + list(collections or {}):
-    if bpy.data.objects.get(name) is not None:
-      bridgeStructureData.requireNotStructurePart(bpy.data.objects[name], "organize")
+  renamedFrom = {newName: oldName for oldName, newName in (renames or {}).items()}
+  for name in list(renames or {}) + [renamedFrom.get(name, name) for name in list(parents or {}) + [parent for parent in (parents or {}).values() if parent is not None] + list(collections or {})]:
+    bridgeStructureData.requireNotStructurePart(bridgeMeshAccess.requireObject(name), "organize")
   for oldName, newName in (renames or {}).items():
     sceneObject = bridgeMeshAccess.requireObject(oldName)
     requireNewName(newName)
@@ -485,6 +483,9 @@ def getObjectDetail(name):
   part = bridgeStructures.describePart(sceneObject)
   if part is not None:
     detail["structurePart"] = part
+  gathered = bridgeKitData.prefabPartOf(sceneObject)
+  if gathered is not None:
+    detail["prefabPart"] = gathered
   return detail
 
 

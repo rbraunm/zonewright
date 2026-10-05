@@ -65,6 +65,57 @@ async def testKit(session, folder):
   return kitPath
 
 
+houseCenter = (500.0, 300.0)
+# The test house, placed in the test kit about houseCenter: each instance's piece, [x, y] from the center, and facing. Walls stand on a
+# 50 x 37.5 rectangle with a post at each corner, so the footprint is the posts' outer corners, 62 x 49.5.
+houseWalls = {
+  "houseNorthDoor": ("testKitWall25Door", [-12.5, 18.75], 0), "houseNorth": ("testKitWall25", [12.5, 18.75], 0),
+  "houseSouthWest": ("testKitWall25", [-12.5, -18.75], 180), "houseSouthEast": ("testKitWall25", [12.5, -18.75], 180),
+  "houseEastSouth": ("testKitWall25", [25, -6.25], 90), "houseEastNorth": ("testKitWall12", [25, 12.5], 90),
+  "houseWestSouth": ("testKitWall12", [-25, -12.5], 270), "houseWestNorth": ("testKitWall25", [-25, 6.25], 270),
+}
+housePosts = {f"housePost{corner}": ("testKitPost", [x, y], 0) for corner, (x, y) in {"NE": (25, 18.75), "SE": (25, -18.75), "SW": (-25, -18.75), "NW": (-25, 18.75)}.items()}
+houseFootprintHalf = (31.0, 24.75)
+houseDoor = {"name": "front", "at": [houseCenter[0] - 12.5, houseCenter[1] + 18.75, 0.0], "facingDegrees": 0}
+houseParts = {"exterior": list(houseWalls) + list(housePosts), "interior": ["houseFloor"], "roof": ["houseRoof"]}
+houseDoorHeight = 16.0
+
+
+async def placeHousePiece(session, name, piece, offset, facing, z=0.0):
+  await session.expectSuccess("placeKitPiece", {
+    "name": name, "kitPath": None, "piece": piece, "location": [houseCenter[0] + offset[0], houseCenter[1] + offset[1], z], "facingDegrees": facing,
+  })
+
+
+async def testPrefab(session, folder):
+  """The test kit with a door section, a floor, a roof over the house's walls, and the test house assembled as prefab testKitHouse
+  (exterior: walls and corner posts; interior: the floor, its top at the walls' base; roof); returns the kit path."""
+  kitPath = await testKit(session, folder)
+  wall = {"face": ("testKitStone", 12.5), "edge": ("testKitTrim", 5)}
+  extras = {
+    "testKitWall25Door": ("wall", [25, 10, 30], [100, 60, 0], wall),
+    "testKitFloor": ("floor", [60, 47.5, 1], [100, 120, 0], {"top": ("testKitTimber", 12.5), "edge": ("testKitTrim", 5), "under": ("testKitStone", 12.5)}),
+  }
+  for name, (kind, size, location, roles) in extras.items():
+    await session.expectSuccess("createKitPiece", {
+      "name": name, "kind": kind, "size": size, "location": location,
+      "materials": {role: material for role, (material, _) in roles.items()}, "worldUnitsPerRepeat": {role: repeat for role, (_, repeat) in roles.items()},
+    })
+  await session.expectSuccess("cutOpening", {"piece": "testKitWall25Door", "kind": "door", "along": 0, "width": 10, "height": houseDoorHeight})
+  for name, (piece, offset, facing) in (houseWalls | housePosts).items():
+    await placeHousePiece(session, name, piece, offset, facing)
+  await placeHousePiece(session, "houseFloor", "testKitFloor", [0, 0], 0, -1.0)
+  roofRoles = {"roof": "testKitTimber", "under": "testKitStone", "gable": "testKitStone", "edge": "testKitTrim"}
+  roof = await session.expectSuccess("addRoof", {
+    "name": "testKitGableRoof", "kind": "gable", "pitchDegrees": 35, "overhang": 3, "thickness": 1, "over": list(houseWalls), "location": [100, 200, 0],
+    "materials": roofRoles, "worldUnitsPerRepeat": dict.fromkeys(roofRoles, 5),
+  })
+  await session.expectSuccess("placeKitPiece", {"name": "houseRoof", "kitPath": None, "piece": "testKitGableRoof", "location": roof["plateOver"], "facingDegrees": 0})
+  await session.expectSuccess("assemblePrefab", {"name": "testKitHouse", "parts": houseParts, "entrances": [houseDoor]})
+  await session.expectSuccess("saveFile", {})
+  return kitPath
+
+
 def slopeHeight(y):
   return (slopeStart - y) * math.tan(math.radians(slopeDegrees))
 
