@@ -1,15 +1,19 @@
 """A zone's server rows as SQL files the owner applies with the mariadb command-line client (akk-stack's database); zonewright never
-connects to a database. <short>.sql is one transaction: guards that SIGNAL naming what they found, then the zone row upserted (inserted,
-when the short name has no version-0 row, with every column zonewright does not write copied from the template zone's version-0 row;
-then its written columns updated, never zoneidnumber, which other tables reference), then the zone_points rows of its own zone lines
-replaced: only numbers zonewright has written for this short name are deleted, so a reused slot's other rows stay.
-<short>_waysIn.sql points neighbours' zone_points rows at the zone's zoneIn entries, each guarded to exactly one row. Column lists are
-EQEmu's (base_zone_repository.h, base_zone_points_repository.h at 4aceae1), numbers Python's shortest round trip, strings single-quoted
-with ' and \\ doubled. The readers parse exactly what the writers write and raise on anything else."""
+connects to a database. Each file is one compound statement between DELIMITER lines: an exit handler that rolls back and raises again
+any error, the transaction, guards that SIGNAL naming what they found, the writes, and the commit. So a guard's SIGNAL or a failed write
+undoes every write whether or not the client stops at the error (a sourced file, --force, a client that goes on).
+<short>.sql upserts the zone row (inserted, when the short name has no version-0 row, with every column zonewright does not write copied
+from the template zone's version-0 row; then its written columns updated, never zoneidnumber, which other tables reference), then
+replaces the zone_points rows of its own zone lines: it deletes only rows equal to one an export of this short name wrote, and refuses
+a number it writes where any other row stands, so a reused slot's other rows stay. <short>_waysIn.sql points neighbours' zone_points
+rows at the zone's zoneIn entries, each guarded to exactly one row. Column lists are EQEmu's (base_zone_repository.h,
+base_zone_points_repository.h at 4aceae1), numbers Python's shortest round trip, strings single-quoted with ' and \\ doubled. The
+readers parse exactly what the writers write and raise on anything else."""
 import math
 import re
 
 import eqAxes
+import playerScale
 
 zoneColumns = (
   "zoneidnumber", "version", "short_name", "long_name", "min_status", "map_file_name", "note", "min_expansion", "max_expansion",
@@ -49,7 +53,14 @@ allClientVersions = 4294967295
 # MariaDB keeps at most 128 characters of a SIGNAL's MESSAGE_TEXT.
 messageLimit = 128
 templateAlias = "templateRow"
-literalPattern = r"(?:NULL|-?[0-9]+(?:\.[0-9]+)?(?:e[+-]?[0-9]+)?|'(?:[^'\\]|''|\\\\)*')"
+numberPattern = r"-?[0-9]+(?:\.[0-9]+)?(?:e[+-]?[0-9]+)?"
+literalPattern = rf"(?:NULL|{numberPattern}|'(?:[^'\\]|''|\\\\)*')"
+blockStart = ("DELIMITER //", "BEGIN NOT ATOMIC", "  DECLARE EXIT HANDLER FOR SQLEXCEPTION BEGIN ROLLBACK; RESIGNAL; END;", "  START TRANSACTION;")
+blockEnd = ("  COMMIT;", "END//", "DELIMITER ;")
+# The columns a zone line decides in its zone_points row, by which a row an earlier export wrote is known again.
+ownershipFloatColumns = ("x", "y", "z", "target_x", "target_y", "target_z", "target_heading")
+# zone_points holds these as FLOAT, which gives a written value back within half a float32 step: under 0.004 below 65536.
+storedFloatTolerance = 0.01
 signalTail = r" THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = (?P<message>'(?:[^'\\]|''|\\\\)*'); END IF;$"
 
 
@@ -61,7 +72,7 @@ def entryGateColumns(entryGate):
     status = entryGate["minStatus"]
     if isinstance(status, int) and not isinstance(status, bool) and 0 <= status <= 255:
       return status, ""
-  if entryGate == {"zoneFlag": True}:
+  if isinstance(entryGate, dict) and set(entryGate) == {"zoneFlag"} and entryGate["zoneFlag"] is True:
     return 0, "1"
   raise ValueError(f"{entryGateRule}; got {entryGate!r}")
 
@@ -96,12 +107,21 @@ def numberList(numbers):
   return ", ".join(str(number) for number in numbers)
 
 
-def numbersNamed(numbers, room):
-  """The numbers as a list fitting in room characters, or the first of them and how many in all."""
-  text = numberList(numbers)
-  if len(text) <= room:
-    return text
-  return f"{numbers[0]} and {len(numbers) - 1} more"
+def rowMatch(row):
+  """A condition true of a zone_points row that holds what `row` holds in the columns a zone line decides, as the table stores them."""
+  near = [f"ABS({column} - ({literal(row[column])})) < {literal(storedFloatTolerance)}" for column in ownershipFloatColumns]
+  return "(" + " AND ".join(near + [f"target_zone_id = {literal(row['target_zone_id'])}"]) + ")"
+
+
+def ownedRows(record, short):
+  """The record's distinct rows (every zone_points row an export of this short name wrote, as rowsFiles gives them), by number and the
+  columns a zone line decides."""
+  owned = {}
+  for row in record:
+    if not isinstance(row, dict) or set(row) != set(zonePointColumns) or (row["zone"], row["version"]) != (short, 0):
+      raise ValueError(f"The record holds {short}'s version-0 zone_points rows as rowsFiles gives them, got {row!r}")
+    owned[(row["number"], *(row[column] for column in ownershipFloatColumns), row["target_zone_id"])] = row
+  return [owned[key] for key in sorted(owned)]
 
 
 def requireKeys(zone, keys, why):
@@ -183,10 +203,11 @@ def zonePointRows(zone, zoneLines, clientZones):
   return sorted(rows, key=lambda row: row["number"])
 
 
-def zoneGuards(zone, targets, foreign):
+def zoneGuards(zone, targets, written, owned):
   """The guards before any write, each a SIGNAL naming what it found: the id another zone's, the row's id another, two version-0 rows, no
-  row and no single template row to copy, a zone line target without its row under the client's id ({short name: id}), and zone_points
-  rows of this zone at the numbers written now that no export wrote (foreign): someone else's, never overwritten."""
+  row and no single template row to copy, a zone line target without its row under the client's id ({short name: id}), and per
+  zone_points number written now, a row of this zone there that is none an export of this short name wrote (owned): someone else's, or
+  changed on the server since, never overwritten."""
   short, zoneID, template = zone["shortName"], zone["zoneId"], zone["serverTemplate"]
   guards = [
     signal(f"EXISTS (SELECT 1 FROM zone WHERE zoneidnumber = {zoneID} AND short_name <> {literal(short)})", f"zoneidnumber {zoneID} belongs to a zone other than {short}"),
@@ -205,74 +226,107 @@ def zoneGuards(zone, targets, foreign):
       f"NOT EXISTS (SELECT 1 FROM zone WHERE short_name = {literal(name)} AND version = 0 AND zoneidnumber = {targetID})",
       f"zone line target {name} has no version-0 zone row with the client's id {targetID}",
     ))
-  if foreign:
-    lead, tail = f"{short} zone_points ", " are not zonewright's: renumber the zone lines or remove those rows"
+  for number in written:
+    versions = [row for row in owned if row["number"] == number]
+    exclusion = f" AND NOT ({' OR '.join(rowMatch(row) for row in versions)})" if versions else ""
     guards.append(signal(
-      f"EXISTS (SELECT 1 FROM zone_points WHERE zone = {literal(short)} AND version = 0 AND number IN ({numberList(foreign)}))",
-      lead + numbersNamed(foreign, messageLimit - len(lead) - len(tail)) + tail,
+      f"EXISTS (SELECT 1 FROM zone_points WHERE zone = {literal(short)} AND version = 0 AND number = {number}{exclusion})",
+      f"{short} zone_points {number} is not zonewright's: renumber the zone line or remove that row",
     ))
   return guards
 
 
 def rowsFiles(zone, zoneLines, entries, clientZones, skyFogColor, record, archiveSHA256):
-  """The zone's server rows: {rows: <short>.sql, waysIn: <short>_waysIn.sql or None, numbersWritten, numbersDeleted, waysInToAdd}.
-  zone is the zone's properties (getZoneProperties), zoneLines getZoneLines' zoneLines, entries getEntries' entries, clientZones the
-  client's registrations (short name to id), skyFogColor the fog color of the zone's sky at its hour when it draws one, record every
-  zone_points number an export of this short name wrote before, and archiveSHA256 the archive's, as the manifest records it. zoneIn
-  entries with fromNumber point that neighbour row at their footing; those without are listed in waysInToAdd."""
+  """The zone's server rows: {rows: <short>.sql, waysIn: <short>_waysIn.sql or None, zonePoints, numbersWritten, numbersDeleted,
+  waysInToAdd}. zone is the zone's properties (getZoneProperties), zoneLines getZoneLines' zoneLines, entries getEntries' entries,
+  clientZones the client's registrations (short name to id), skyFogColor the fog color of the zone's sky at its hour when it draws one,
+  record every zone_points row an export of this short name wrote before (the zonePoints each gave), and archiveSHA256 the archive's,
+  as the manifest records it. zonePoints are the rows written now, for the record; numbersDeleted the numbers of the record's rows,
+  which <short>.sql deletes where the table still holds them as written. zoneIn entries with fromNumber point that neighbour row at
+  them; those without are listed in waysInToAdd."""
   values = zoneRowValues(zone, skyFogColor)
   short = zone["shortName"]
   lines = [line for line in zoneLines if "clientContent" not in line]
   rows = zonePointRows(zone, lines, clientZones)
+  owned = ownedRows(record, short)
+  waysIn = zoneInEntries(zone, entries)
   targets = {line["target"]["zone"]: clientZones[line["target"]["zone"]] for line in lines if line["target"]["zone"] != short}
   written = [row["number"] for row in rows]
-  deleted = sorted(set(written) | set(record))
+  deleted = sorted({row["number"] for row in owned})
   text = [
     f"-- zonewright server rows: zone {short}", f"-- archive sha256: {archiveSHA256}", f"-- template: {zone['serverTemplate']}",
     f"-- zone_points written: {numberList(written) or 'none'}", f"-- zone_points deleted: {numberList(deleted) or 'none'}",
-    "START TRANSACTION;", "DELIMITER //", "BEGIN NOT ATOMIC",
-    *zoneGuards(zone, targets, sorted(set(written) - set(record))),
-    "END//", "DELIMITER ;",
+    *blockStart, *zoneGuards(zone, targets, written, owned),
   ]
   selected = [literal(values[column]) if column in values else f"{templateAlias}.{column}" for column in zoneColumns]
   text.append(
-    f"INSERT INTO zone ({', '.join(zoneColumns)}) SELECT {', '.join(selected)} FROM zone AS {templateAlias} WHERE {templateAlias}.short_name ="
+    f"  INSERT INTO zone ({', '.join(zoneColumns)}) SELECT {', '.join(selected)} FROM zone AS {templateAlias} WHERE {templateAlias}.short_name ="
     f" {literal(zone['serverTemplate'])} AND {templateAlias}.version = 0 AND NOT EXISTS (SELECT 1 FROM zone WHERE short_name = {literal(short)} AND version = 0);"
   )
   updated = [f"{column} = {literal(values[column])}" for column in zoneColumns if column in values and column not in keyColumns]
-  text.append(f"UPDATE zone SET {', '.join(updated)} WHERE short_name = {literal(short)} AND version = 0;")
-  if deleted:
-    text.append(f"DELETE FROM zone_points WHERE zone = {literal(short)} AND version = 0 AND number IN ({numberList(deleted)});")
+  text.append(f"  UPDATE zone SET {', '.join(updated)} WHERE short_name = {literal(short)} AND version = 0;")
+  text += [f"  DELETE FROM zone_points WHERE zone = {literal(short)} AND version = 0 AND number = {row['number']} AND {rowMatch(row)};" for row in owned]
   if rows:
-    text.append(f"INSERT INTO zone_points ({', '.join(zonePointColumns)}) VALUES")
-    text += [f"  ({', '.join(literal(row[column]) for column in zonePointColumns)})" + ("," if index < len(rows) - 1 else ";") for index, row in enumerate(rows)]
-  text.append("COMMIT;")
-  waysIn = [entry for entry in entries if entry["source"] == "placeEntry" and entry["kind"] == "zoneIn"]
+    text.append(f"  INSERT INTO zone_points ({', '.join(zonePointColumns)}) VALUES")
+    text += [f"    ({', '.join(literal(row[column]) for column in zonePointColumns)})" + ("," if index < len(rows) - 1 else ";") for index, row in enumerate(rows)]
+  text += blockEnd
   return {
     "rows": "\n".join(text) + "\n", "waysIn": waysInFile(zone, [entry for entry in waysIn if entry["fromNumber"] is not None], archiveSHA256),
-    "numbersWritten": written, "numbersDeleted": deleted,
+    "zonePoints": rows, "numbersWritten": written, "numbersDeleted": deleted,
     "waysInToAdd": [{"entry": entry["name"], "fromZone": entry["fromZone"]} for entry in waysIn if entry["fromNumber"] is None],
   }
 
 
+def zoneInEntries(zone, entries):
+  """The placed zoneIn entries, each fromNumber a neighbour's zone_points number: a uint16, and never this zone's own row, which
+  <short>.sql writes from its zone lines."""
+  found = [entry for entry in entries if entry["source"] == "placeEntry" and entry["kind"] == "zoneIn"]
+  for entry in found:
+    number = entry["fromNumber"]
+    if number is None:
+      continue
+    if isinstance(number, bool) or not isinstance(number, int) or not 1 <= number <= zonePointNumberLimit:
+      raise ValueError(f"zoneIn '{entry['name']}' names fromNumber {number!r}: a zone_points number is a whole number from 1 to {zonePointNumberLimit}")
+    if entry["fromZone"] == zone["shortName"]:
+      raise ValueError(
+        f"zoneIn '{entry['name']}' names {entry['fromZone']} zone_points {number}, this zone's own row, which {entry['fromZone']}.sql writes"
+        " from its zone lines; fromNumber names a neighbour's row"
+      )
+  return found
+
+
+def arrivalPoint(entry):
+  """Where a ways-in row puts a player arriving on a zoneIn entry's footing, in the server's axes: the server sets a player's origin to
+  a zone point's target as to the safe point (zoning.cpp:261-320), and the client stands an origin avatarHeight over the floor (3.75 for
+  the walked human male), so the target is playerHeight over the footing, the top of the space placeEntry keeps clear there, and the
+  player settles onto it rather than arriving with the origin in the floor."""
+  x, y, z = entry["at"]
+  return [float(value) for value in eqAxes.serverFromZone([x, y, z + playerScale.playerHeight])]
+
+
 def waysInFile(zone, entries, archiveSHA256):
-  """<short>_waysIn.sql for zoneIn entries naming their neighbour's row, or None without any: per entry a block that SIGNALs unless
+  """<short>_waysIn.sql for zoneIn entries naming their neighbour's row, or None without any: a guard per entry that SIGNALs unless
   exactly one version-0 row of the neighbour holds the number (counted, as ROW_COUNT() reads 0 for an update that changes nothing, and
-  a number two rows hold is refused, never both rewritten), then points that row at the entry's footing."""
+  a number two rows hold is refused, never both rewritten), then an update per entry pointing that row at the entry's arrival point."""
   if not entries:
     return None
-  text = [f"-- zonewright ways in: zone {zone['shortName']}", f"-- archive sha256: {archiveSHA256}", "START TRANSACTION;", "DELIMITER //"]
-  for entry in sorted(entries, key=lambda found: (found["fromZone"], found["fromNumber"])):
-    where = f"zone = {literal(entry['fromZone'])} AND version = 0 AND number = {entry['fromNumber']}"
-    serverAt = [float(value) for value in eqAxes.serverFromZone(entry["at"])]
-    text += [
-      "BEGIN NOT ATOMIC",
-      signal(f"(SELECT COUNT(*) FROM zone_points WHERE {where}) <> 1", f"ways in: {entry['fromZone']} zone_points number {entry['fromNumber']} is not exactly one version-0 row"),
+  ordered = sorted(entries, key=lambda found: (found["fromZone"], found["fromNumber"]))
+
+  def where(entry):
+    return f"zone = {literal(entry['fromZone'])} AND version = 0 AND number = {entry['fromNumber']}"
+
+  text = [f"-- zonewright ways in: zone {zone['shortName']}", f"-- archive sha256: {archiveSHA256}", *blockStart]
+  text += [
+    signal(f"(SELECT COUNT(*) FROM zone_points WHERE {where(entry)}) <> 1", f"ways in: {entry['fromZone']} zone_points number {entry['fromNumber']} is not exactly one version-0 row")
+    for entry in ordered
+  ]
+  for entry in ordered:
+    serverAt = arrivalPoint(entry)
+    text.append(
       f"  UPDATE zone_points SET target_zone_id = {zone['zoneId']}, target_x = {literal(serverAt[0])}, target_y = {literal(serverAt[1])},"
-      f" target_z = {literal(serverAt[2])}, target_heading = {literal(eqAxes.eqHeadingFromHeading(entry['headingDegrees']))} WHERE {where};",
-      "END//",
-    ]
-  text += ["DELIMITER ;", "COMMIT;"]
+      f" target_z = {literal(serverAt[2])}, target_heading = {literal(eqAxes.eqHeadingFromHeading(entry['headingDegrees']))} WHERE {where(entry)};"
+    )
+  text += blockEnd
   return "\n".join(text) + "\n"
 
 
@@ -327,27 +381,57 @@ guardPatterns = {
     rf" short_name = (?P<template>{shortNameLiteral}) AND version = 0\) <> 1"
   ),
   "target": rf"NOT EXISTS \(SELECT 1 FROM zone WHERE short_name = (?P<target>{shortNameLiteral}) AND version = 0 AND zoneidnumber = (?P<targetID>[0-9]+)\)",
-  "foreignZonePoints": rf"EXISTS \(SELECT 1 FROM zone_points WHERE zone = (?P<shortName>{shortNameLiteral}) AND version = 0 AND number IN \((?P<numbers>[0-9]+(?:, [0-9]+)*)\)\)",
+  "foreignZonePoints": (
+    rf"EXISTS \(SELECT 1 FROM zone_points WHERE zone = (?P<shortName>{shortNameLiteral}) AND version = 0 AND number = (?P<number>[0-9]+)"
+    r"(?: AND NOT \((?P<owned>.+)\))?\)"
+  ),
 }
+rowMatchPattern = re.compile(
+  r"\(" + " AND ".join(rf"ABS\({column} - \((?P<{column}>{numberPattern})\)\) < {re.escape(literal(storedFloatTolerance))}" for column in ownershipFloatColumns)
+  + r" AND target_zone_id = (?P<target_zone_id>[0-9]+)\)"
+)
+
+
+def readRowMatches(text, what):
+  """The rows a list of rowMatch conditions joined by OR names, each by the columns a zone line decides."""
+  rows, position = [], 0
+  while True:
+    match = rowMatchPattern.match(text, position)
+    if match is None:
+      raise ValueError(f"{what}: expected a zonewright row's condition at {text[position:]!r}")
+    rows.append({column: parseLiteral(value) for column, value in match.groupdict().items()})
+    position = match.end()
+    if position == len(text):
+      return rows
+    if not text.startswith(" OR ", position):
+      raise ValueError(f"{what}: expected OR or the end of the conditions at {text[position:]!r}")
+    position += len(" OR ")
 
 
 def readGuard(lines):
   line = lines.peek()
   for kind, pattern in guardPatterns.items():
-    match = re.fullmatch(r"  IF " + pattern + signalTail, line or "")
+    match = re.fullmatch(r"  IF " + pattern + signalTail, line)
     if match is not None:
       lines.index += 1
       found = {"guard": kind}
       for name, value in match.groupdict().items():
-        found[name] = [int(number) for number in value.split(", ")] if name == "numbers" else parseLiteral(value) if value.startswith("'") else int(value)
+        if name == "owned":
+          found[name] = [] if value is None else readRowMatches(value, f"{lines.fileName} line {lines.index}")
+        else:
+          found[name] = parseLiteral(value) if value.startswith("'") else int(value)
       return found
-  raise ValueError(f"{lines.fileName} line {lines.index + 1}: expected a guard or END//, got {line!r}")
+  raise ValueError(f"{lines.fileName} line {lines.index + 1}: expected a guard, got {line!r}")
+
+
+def startsWith(lines, prefix):
+  return lines.peek() is not None and lines.peek().startswith(prefix)
 
 
 def readRows(text, fileName="the rows file"):
   """What <short>.sql holds: its header, its guards (each kind with its values and message), the zone row's insert (the written values,
-  the columns copied, the template, the short name whose absence it needs), its update, and the zone_points numbers deleted and rows
-  inserted."""
+  the columns copied, the template, the short name whose absence it needs), its update, the zone_points rows deleted (each by number and
+  the columns a zone line decides), and the rows inserted."""
   lines = Lines(text, fileName)
   header = {
     "shortName": lines.take(r"-- zonewright server rows: zone ([a-z0-9]{1,31})", "the header's zone").group(1),
@@ -356,15 +440,13 @@ def readRows(text, fileName="the rows file"):
     "numbersWritten": numbersOf(lines.take(r"-- zone_points written: (none|[0-9]+(?:, [0-9]+)*)", "the numbers written").group(1)),
     "numbersDeleted": numbersOf(lines.take(r"-- zone_points deleted: (none|[0-9]+(?:, [0-9]+)*)", "the numbers deleted").group(1)),
   }
-  for statement in ("START TRANSACTION;", "DELIMITER //", "BEGIN NOT ATOMIC"):
+  for statement in blockStart:
     lines.exact(statement)
   guards = []
-  while lines.peek() != "END//":
+  while startsWith(lines, "  IF "):
     guards.append(readGuard(lines))
-  lines.exact("END//")
-  lines.exact("DELIMITER ;")
   insert = lines.take(
-    rf"INSERT INTO zone \((?P<columns>[a-z_0-9, ]+)\) SELECT (?P<selected>.+) FROM zone AS {templateAlias} WHERE {templateAlias}\.short_name ="
+    rf"  INSERT INTO zone \((?P<columns>[a-z_0-9, ]+)\) SELECT (?P<selected>.+) FROM zone AS {templateAlias} WHERE {templateAlias}\.short_name ="
     rf" (?P<template>{shortNameLiteral}) AND {templateAlias}\.version = 0 AND NOT EXISTS \(SELECT 1 FROM zone WHERE short_name = (?P<shortName>{shortNameLiteral}) AND version = 0\);",
     "the zone row's insert",
   )
@@ -381,7 +463,7 @@ def readRows(text, fileName="the rows file"):
       copied.append(column)
     else:
       written[column] = parseLiteral(item)
-  update = lines.take(rf"UPDATE zone SET (?P<assignments>.+) WHERE short_name = (?P<shortName>{shortNameLiteral}) AND version = 0;", "the zone row's update")
+  update = lines.take(rf"  UPDATE zone SET (?P<assignments>.+) WHERE short_name = (?P<shortName>{shortNameLiteral}) AND version = 0;", "the zone row's update")
   assignments = re.findall(rf"([a-z_0-9]+) = ({literalPattern})(?:, |$)", update["assignments"])
   if ", ".join(f"{column} = {value}" for column, value in assignments) != update["assignments"]:
     raise ValueError(f"{fileName}: the zone row's update sets {update['assignments']!r}, not column = literal pairs")
@@ -389,22 +471,26 @@ def readRows(text, fileName="the rows file"):
   unknown = sorted(set(updated) - set(zoneColumns))
   if unknown or len(updated) != len(assignments):
     raise ValueError(f"{fileName}: the zone row's update sets unknown or repeated columns {unknown or [column for column, _ in assignments]}")
-  deleted = None
-  if lines.peek() is not None and lines.peek().startswith("DELETE"):
-    match = lines.take(rf"DELETE FROM zone_points WHERE zone = ({shortNameLiteral}) AND version = 0 AND number IN \(([0-9]+(?:, [0-9]+)*)\);", "the zone_points delete")
-    deleted = {"zone": parseLiteral(match.group(1)), "numbers": numbersOf(match.group(2))}
+  deleted = []
+  while startsWith(lines, "  DELETE"):
+    match = lines.take(rf"  DELETE FROM zone_points WHERE zone = ({shortNameLiteral}) AND version = 0 AND number = ([0-9]+) AND (\(.+\));", "a zone_points delete")
+    row = readRowMatches(match.group(3), f"{fileName} line {lines.index}")
+    if len(row) != 1:
+      raise ValueError(f"{fileName} line {lines.index}: a zone_points delete names {len(row)} rows, not one")
+    deleted.append({"zone": parseLiteral(match.group(1)), "number": int(match.group(2))} | row[0])
   zonePoints = []
-  if lines.peek() is not None and lines.peek().startswith("INSERT INTO zone_points"):
-    lines.exact(f"INSERT INTO zone_points ({', '.join(zonePointColumns)}) VALUES")
+  if startsWith(lines, "  INSERT INTO zone_points"):
+    lines.exact(f"  INSERT INTO zone_points ({', '.join(zonePointColumns)}) VALUES")
     while True:
-      match = lines.take(r"  \((.+)\)([,;])", "a zone_points row")
+      match = lines.take(r"    \((.+)\)([,;])", "a zone_points row")
       values = literals(match.group(1), f"{fileName} line {lines.index}")
       if len(values) != len(zonePointColumns):
         raise ValueError(f"{fileName} line {lines.index}: a zone_points row of {len(values)} values, not {len(zonePointColumns)}")
       zonePoints.append(dict(zip(zonePointColumns, values)))
       if match.group(2) == ";":
         break
-  lines.exact("COMMIT;")
+  for statement in blockEnd:
+    lines.exact(statement)
   lines.finish()
   return header | {
     "guards": guards,
@@ -419,29 +505,31 @@ def readWaysIn(text, fileName="the ways-in file"):
   lines = Lines(text, fileName)
   shortName = lines.take(r"-- zonewright ways in: zone ([a-z0-9]{1,31})", "the header's zone").group(1)
   archiveSHA256 = lines.take(r"-- archive sha256: ([0-9a-f]{64})", "the archive's SHA-256").group(1)
-  lines.exact("START TRANSACTION;")
-  lines.exact("DELIMITER //")
-  rows = []
+  for statement in blockStart:
+    lines.exact(statement)
   where = rf"zone = (?P<fromZone>{shortNameLiteral}) AND version = 0 AND number = (?P<fromNumber>[0-9]+)"
-  while lines.peek() == "BEGIN NOT ATOMIC":
-    lines.index += 1
-    guard = lines.take(r"  IF \(SELECT COUNT\(\*\) FROM zone_points WHERE " + where + r"\) <> 1" + signalTail, "the guard counting the neighbour's row")
-    update = lines.take(
+  guards = []
+  while not guards or startsWith(lines, "  IF "):
+    guards.append(lines.take(r"  IF \(SELECT COUNT\(\*\) FROM zone_points WHERE " + where + r"\) <> 1" + signalTail, "the guard counting the neighbour's row"))
+  updates = []
+  while startsWith(lines, "  UPDATE "):
+    updates.append(lines.take(
       rf"  UPDATE zone_points SET target_zone_id = (?P<zoneID>[0-9]+), target_x = (?P<x>{literalPattern}), target_y = (?P<y>{literalPattern}),"
       rf" target_z = (?P<z>{literalPattern}), target_heading = (?P<heading>{literalPattern}) WHERE {where};",
       "the neighbour row's update",
-    )
-    if (guard["fromZone"], guard["fromNumber"]) != (update["fromZone"], update["fromNumber"]):
-      raise ValueError(f"{fileName} line {lines.index}: the update's row is not the one its guard counts")
-    lines.exact("END//")
-    rows.append({
+    ))
+  counted, pointed = ([(match["fromZone"], match["fromNumber"]) for match in found] for found in (guards, updates))
+  if counted != pointed:
+    raise ValueError(f"{fileName}: the updates' rows {pointed} are not the rows the guards count {counted}")
+  for statement in blockEnd:
+    lines.exact(statement)
+  lines.finish()
+  rows = [
+    {
       "fromZone": parseLiteral(guard["fromZone"]), "fromNumber": int(guard["fromNumber"]), "message": parseLiteral(guard["message"]),
       "target_zone_id": int(update["zoneID"]), "target_x": parseLiteral(update["x"]), "target_y": parseLiteral(update["y"]),
       "target_z": parseLiteral(update["z"]), "target_heading": parseLiteral(update["heading"]),
-    })
-  if not rows:
-    raise ValueError(f"{fileName} line {lines.index + 1}: expected a guarded block, got {lines.peek()!r}")
-  lines.exact("DELIMITER ;")
-  lines.exact("COMMIT;")
-  lines.finish()
+    }
+    for guard, update in zip(guards, updates)
+  ]
   return {"shortName": shortName, "archiveSHA256": archiveSHA256, "rows": rows}

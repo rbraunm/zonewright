@@ -2682,7 +2682,8 @@ async def placeEntry(
 ):
   """Place an entry, where players arrive, as an arrow at its footing facing headingDegrees (0 = +Y, clockwise): kind "zoneIn", where a
   neighbour's zone line lands players (fromZone, the neighbour's short name, a zone the client registers or this zone's own shortName;
-  fromNumber, that line's zone_points number, when known), or "landing", where a port inside the world lands them (a teleport door, an NPC port). isolated marks an area reached only by its own
+  fromNumber, that line's zone_points number, 1 to 65535, when known, and never for this zone's own shortName, whose rows its zone
+  lines write), or "landing", where a port inside the world lands them (a teleport door, an NPC port). isolated marks an area reached only by its own
   port. at [x, y] takes the highest footing there, [x, y, z] the footing from 3 above z down to 50 below it, as standAt finds it, on
   what the zone ships and the client collides with: reference zones, placed client objects, guides, and what players pass through are
   no ground. Refused, changing nothing: no footing, footing steeper than players walk or with less headroom than a player's height

@@ -81,8 +81,11 @@ def testPlaceEntryStandsOnShippedFooting(stageBlenderServer, tmp_path):
       "noFromZone": await session.expectError("placeEntry", entryArguments("nowhere", [0, 30], "zoneIn")),
       "badFromZone": await session.expectError("placeEntry", entryArguments("spaced", [0, 30], "zoneIn", fromZone="Qeynos 2")),
       "badFromNumber": await session.expectError("placeEntry", entryArguments("zeroed", [0, 30], "zoneIn", fromZone="qeynos2", fromNumber=0)),
+      "farFromNumber": await session.expectError("placeEntry", entryArguments("beyond", [0, 30], "zoneIn", fromZone="qeynos2", fromNumber=65536)),
       "landingFrom": await session.expectError("placeEntry", entryArguments("landed", [0, 30], fromZone="qeynos2")),
     }
+    await session.expectSuccess("setZoneProperties", {"shortName": "entrytest"})
+    refusals["ownRow"] = await session.expectError("placeEntry", entryArguments("fromHere", [0, 30], "zoneIn", fromZone="entrytest", fromNumber=10))
     listed = await session.expectSuccess("getEntries", {})
     return view, placed, dais, underPool, underTerrace, again, refusals, listed
 
@@ -121,7 +124,10 @@ def testPlaceEntryStandsOnShippedFooting(stageBlenderServer, tmp_path):
   assert "An entry's kind is one of ['zoneIn', 'landing'], got 'portal'" in refusals["kind"]
   assert "A zoneIn needs fromZone" in refusals["noFromZone"]
   assert "fromZone is a zone's short name" in refusals["badFromZone"] and "'Qeynos 2'" in refusals["badFromZone"]
-  assert "fromNumber is the neighbour's zone_points number, a whole number of at least 1, got 0" in refusals["badFromNumber"]
+  fromNumberRule = "fromNumber is the neighbour's zone_points number, a whole number from 1 to 65535 (the row's 16-bit number), got"
+  assert f"{fromNumberRule} 0" in refusals["badFromNumber"] and f"{fromNumberRule} 65536" in refusals["farFromNumber"]
+  # The zone's own rows are its zone lines': a zoneIn from the zone itself names no row.
+  assert "fromNumber names a neighbour's zone_points row, and 'entrytest' is this zone, whose own rows are written from its zone lines" in refusals["ownRow"]
   assert "fromZone and fromNumber are a zoneIn's" in refusals["landingFrom"]
 
 

@@ -19,6 +19,7 @@ import bridgeObjects
 import bridgeSwim
 import bridgeViews
 import eqgFiles
+import serverRows
 from playerScale import playerHeight, steepestWalkableDegrees, walkableNormalZ
 
 entryCollectionName = "entries"
@@ -149,8 +150,14 @@ def requireEntryValues(name, at, headingDegrees, kind, fromZone, fromNumber, iso
       raise ValueError(f"fromZone is a zone's short name, {eqgFiles.zoneNameRule}, got {fromZone!r}")
   elif fromZone is not None or fromNumber is not None:
     raise ValueError("fromZone and fromNumber are a zoneIn's: a landing is reached by a port inside the world")
-  if fromNumber is not None and (isinstance(fromNumber, bool) or not isinstance(fromNumber, int) or fromNumber < 1):
-    raise ValueError(f"fromNumber is the neighbour's zone_points number, a whole number of at least 1, got {fromNumber!r}")
+  if fromNumber is not None:
+    if isinstance(fromNumber, bool) or not isinstance(fromNumber, int) or not 1 <= fromNumber <= serverRows.zonePointNumberLimit:
+      raise ValueError(f"fromNumber is the neighbour's zone_points number, a whole number from 1 to {serverRows.zonePointNumberLimit} (the row's 16-bit number), got {fromNumber!r}")
+    if fromZone == bridgeCommands.readZoneProperties(bpy.context.scene).get("shortName"):
+      raise ValueError(
+        f"fromNumber names a neighbour's zone_points row, and '{fromZone}' is this zone, whose own rows are written from its zone lines:"
+        " a zone line leading here (placeZoneLine with this zone as its target) lands players on its target"
+      )
   if not bridgeCommands.isFiniteNumber(headingDegrees) or not 0 <= headingDegrees < 360:
     raise ValueError(f"headingDegrees runs from 0 up to 360 (0 = +Y, clockwise), got {headingDegrees!r}")
   if not isinstance(isolated, bool):
