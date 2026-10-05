@@ -79,7 +79,6 @@ waterfrontDistance = 40.0
 surroundingRadii = (200.0, 400.0, 600.0)
 enclosureReach = 300.0
 enclosureDirections = 32
-eyeHeight = 6.0
 houseHeight = 20.0
 secludedNeighbourDistance = 300.0
 secludedRouteDistance = 150.0
@@ -894,7 +893,7 @@ def assessPlot(address):
           for radius in surroundingRadii for angle in numpy.linspace(0, 2 * math.pi, 24, endpoint=False)]
   ring = [height for height in ring if height is not None]
   standsAbove = round(float(center[2] - statistics.median(ring)), 1) if ring else None
-  eye = mathutils.Vector((center[0], center[1], center[2] + eyeHeight))
+  eye = mathutils.Vector((center[0], center[1], center[2] + playerScale.eyeHeight))
   blocked = 0
   for angle in numpy.linspace(0, 2 * math.pi, enclosureDirections, endpoint=False):
     for elevation in (0.0, math.radians(15)):
@@ -923,7 +922,7 @@ def assessPlot(address):
           if height is None:
             continue
           inRange += 1
-          viewer = mathutils.Vector((x, y, height + eyeHeight))
+          viewer = mathutils.Vector((x, y, height + playerScale.eyeHeight))
           toTarget = target - viewer
           hit = ground.tree.ray_cast(viewer, toTarget.normalized(), toTarget.length)
           seen += hit[0] is None or (hit[0] - target).length < 10

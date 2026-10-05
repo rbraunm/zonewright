@@ -23,6 +23,7 @@ import bridgeReview
 import bridgeShaping
 import bridgeStructures
 import bridgeSurfacing
+from playerScale import stepHeight
 
 routePassPrefix = "route "
 routeKind = "route"
@@ -34,8 +35,6 @@ maximumReach = 600.0
 # width, so its landing spans no more of a hillside than it must, and the landing takes in the ground within half the width of that
 # arc's center, so its inner corner is a curve the grid can carry rather than a point.
 landingTurnDegrees = 90.0
-# A ledge's bench may stand this far over the ground under it, a step up from it.
-ledgeStandOff = 2.0
 # Two parts of a route clash when their benches differ in height by more than the cut batter spans between them, beyond this.
 clashTolerance = 0.01
 # A vertex snapped onto its bench's edge lies on it to within this.
@@ -463,7 +462,7 @@ def requireNoClash(name, bench, tanCut, cutBatterDegrees):
 
 def requireFooting(name, centerline, standing, alongs, edgeLength):
   """Refuse a ledge (no fill batter) where its bench would stand more than a step over the ground, naming each span where it would."""
-  over = standing > ledgeStandOff + 1e-6
+  over = standing > stepHeight + 1e-6
   if not over.any():
     return
   order = numpy.argsort(alongs[over])
@@ -477,7 +476,7 @@ def requireFooting(name, centerline, standing, alongs, edgeLength):
       f" {alongRun[-1]:.1f} along it) up to {float(standingRun.max()):.1f}"
     )
   raise ValueError(
-    f"Route '{name}' has no fill batter, so it is a ledge, but its bench would stand more than {ledgeStandOff:g} over the ground"
+    f"Route '{name}' has no fill batter, so it is a ledge, but its bench would stand more than {stepHeight:g} (a step, playerScale) over the ground"
     f" {'; '.join(spans)}. Move it into the slope there, change its heights, or give it a fillBatterDegrees"
   )
 

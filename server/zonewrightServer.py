@@ -816,12 +816,59 @@ async def scaleFigureModel(zone, view):
   return await zoneFigureModel(zone) if {"standAt", "camera"} & set(view) else None
 
 
-@guardedTool()
+@guardedTool(description=(
+  "Render the EQ preview of a view: {\"camera\": name} (a review camera saved from a standAt view stands the scale figure again where"
+  " she stood, her ground found as figureAt's is; one matched to concept art renders at the art's aspect and its own field of view),"
+  " {\"eye\": [x,y,z], \"target\": [x,y,z]}, or {\"standAt\": [x,y] or [x,y,z], \"headingDegrees\": h, \"pitchDegrees\": p} (on the"
+  " highest ground players stand on at [x,y], never what they pass through (as walkRoute), or with z on the ground found from 3 above"
+  " z down to 50 below it, for caves, under overhangs, and on ledges; heading 0 = +Y, clockwise;"
+  f" eye {playerScale.eyeHeight:g} above the ground"
+  ", or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race"
+  " default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera, or stood"
+  " by hand facing the camera with \"figureAt\": [x,y] or [x,y,z] in the view, its ground found as standAt's is, on a ledge or ramp"
+  " too narrow to walk her ahead on), or {\"map\": {\"center\": [x,y], \"width\": w}}: the layout from straight above, orthographic,"
+  " the game's north (+X) up and east (-Y) right as the in-game map draws, `width` units across (along y), without fog. {\"frame\":"
+  " {\"objects\": [names], \"headingDegrees\": h, \"pitchDegrees\": p}} looks at the named meshes, collection instances, or"
+  " structures (all their parts) from that heading and pitch, standing back so they fit (its result's eye and target reproduce that"
+  " camera). shading \"client\" draws the zone as the client does, its point lights and particle emitters with it (the result's"
+  " pointLights counts the lights and the objects they light, and emitters the emitters drawn, their particles, and those not drawn,"
+  " grouped by why); \"relief\" is layout's drawing in quiet greys (the base renderSketch draws plans over); \"layout\" draws every"
+  " surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in"
+  " the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest,"
+  " without fog and out to the whole scene: for judging shape and layout; \"coverage\" draws only what exportZone would export, each"
+  " face in the color of its export check status (checkExport): black where it cannot export, red for zero texture area, brown for a"
+  " blockout material, yellow for texture stretched or squeezed, orange where the base material shows, magenta along a ground border"
+  " without a transition strip, grey when fine, and blue wherever a face is seen from its back, lit from the northwest as layout is,"
+  " softer so no shaded face reads as black, and without fog; the result counts the exported faces by status. The value shadings draw"
+  " every mesh (each part of a collection instance as placed, and the scale figure) from a value of its own, lit softly from the"
+  " northwest, without fog, the result giving the scale: \"objects\" draws each object in its own flat color, the ones the view shows"
+  " most of first (blue, orange, green, red, purple, yellow, cyan, magenta, lime, pink, teal, lavender, brown, olive, then grey for"
+  " the rest), with a legend of the objects the view shows, each with its color and share of the view; \"curvature\" draws convex"
+  " forms warm (orange), concave cool (blue), and flat neutral grey, a ridge or trough curved to a radius of 16 at half color and"
+  " sharper ones fuller, from the bend of the edges around each vertex (so where two meshes meet without sharing edges, as a rock"
+  " sunk into the ground, there is none); \"triangleDensity\" draws each face's triangles per 10,000 square units of its own area"
+  " over fixed decades, blue 1, cyan 10, green 100, yellow 1,000, red 10,000 (the client's EQG terrains run from 8 to 5,083, 244 at"
+  " the median), with the range the view shows; \"texelDensity\" draws each face's texture pixels per world unit (its diffuse"
+  " texture's pixels over the area its texture coordinates spread them across) blue lowest through cyan, green, and yellow to red"
+  " highest across the range the view shows (the result gives it and each color's value), dark grey where a face has no diffuse"
+  " texture or texture coordinates: coverage's stretch check compares a face with its own material's usual scale, texelDensity"
+  " compares materials with each other. labels [names] writes each named object's (or structure's, all its parts together) name on"
+  " the view by its place (where its middle projects when the object shows there, else the middle of what shows of it), marked with a"
+  " white dot, but only for the objects the view shows; the result lists the places and the named objects it does not show (an object"
+  " hidden from renders, a guide with guides off, or one that is not a mesh or collection instance is refused). Guides (plot"
+  " outlines, sketch massing) draw unless guides is false, and with them, in every shading, the view is tinted red where the"
+  " boundaries (walls, lids, floors) stand, which the client never draws, a wall as a slab thick enough to show from above, and green"
+  " where the zone lines stand, seen through the water but hidden behind and under the ground; with swimVolumes, the view is tinted"
+  " where the swim volumes stand (cyan water, magenta lava), each box seen through the water, so its top shows evenly under a surface"
+  " it meets or lies just below, but hidden behind and under the ground. Liquids draw as they stand at effect time 0, or at"
+  " `liquidTime` seconds on the client's effect clock, each layer scrolled by its slides as the client's effects scroll it (time"
+  " modulo 100): two views a second or two apart show which way and how fast a fall or river moves (liquid materials made before"
+  " previews scrolled are refused, to be made again); emitters draw at the same moment of their steady state either way."
+))
 async def renderView(
   context: Context, view: dict, shading: str = "client", bandHeight: float = 50.0, guides: bool = True, swimVolumes: bool = False, labels: list[str] | None = None,
   liquidTime: float | None = None,
 ):
-  """Render the EQ preview of a view: {"camera": name} (a review camera saved from a standAt view stands the scale figure again where she stood, her ground found as figureAt's is; one matched to concept art renders at the art's aspect and its own field of view), {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], never what they pass through (as walkRoute), or with z on the ground found from 3 above z down to 50 below it, for caves, under overhangs, and on ledges; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera, or stood by hand facing the camera with "figureAt": [x,y] or [x,y,z] in the view, its ground found as standAt's is, on a ledge or ramp too narrow to walk her ahead on), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, the game's north (+X) up and east (-Y) right as the in-game map draws, `width` units across (along y), without fog. {"frame": {"objects": [names], "headingDegrees": h, "pitchDegrees": p}} looks at the named meshes, collection instances, or structures (all their parts) from that heading and pitch, standing back so they fit (its result's eye and target reproduce that camera). shading "client" draws the zone as the client does, its point lights and particle emitters with it (the result's pointLights counts the lights and the objects they light, and emitters the emitters drawn, their particles, and those not drawn, grouped by why); "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout; "coverage" draws only what exportZone would export, each face in the color of its export check status (checkExport): black where it cannot export, red for zero texture area, brown for a blockout material, yellow for texture stretched or squeezed, orange where the base material shows, magenta along a ground border without a transition strip, grey when fine, and blue wherever a face is seen from its back, lit from the northwest as layout is, softer so no shaded face reads as black, and without fog; the result counts the exported faces by status. The value shadings draw every mesh (each part of a collection instance as placed, and the scale figure) from a value of its own, lit softly from the northwest, without fog, the result giving the scale: "objects" draws each object in its own flat color, the ones the view shows most of first (blue, orange, green, red, purple, yellow, cyan, magenta, lime, pink, teal, lavender, brown, olive, then grey for the rest), with a legend of the objects the view shows, each with its color and share of the view; "curvature" draws convex forms warm (orange), concave cool (blue), and flat neutral grey, a ridge or trough curved to a radius of 16 at half color and sharper ones fuller, from the bend of the edges around each vertex (so where two meshes meet without sharing edges, as a rock sunk into the ground, there is none); "triangleDensity" draws each face's triangles per 10,000 square units of its own area over fixed decades, blue 1, cyan 10, green 100, yellow 1,000, red 10,000 (the client's EQG terrains run from 8 to 5,083, 244 at the median), with the range the view shows; "texelDensity" draws each face's texture pixels per world unit (its diffuse texture's pixels over the area its texture coordinates spread them across) blue lowest through cyan, green, and yellow to red highest across the range the view shows (the result gives it and each color's value), dark grey where a face has no diffuse texture or texture coordinates: coverage's stretch check compares a face with its own material's usual scale, texelDensity compares materials with each other. labels [names] writes each named object's (or structure's, all its parts together) name on the view by its place (where its middle projects when the object shows there, else the middle of what shows of it), marked with a white dot, but only for the objects the view shows; the result lists the places and the named objects it does not show (an object hidden from renders, a guide with guides off, or one that is not a mesh or collection instance is refused). Guides (plot outlines, sketch massing) draw unless guides is false, and with them, in every shading, the view is tinted red where the boundaries (walls, lids, floors) stand, which the client never draws, a wall as a slab thick enough to show from above, and green where the zone lines stand, seen through the water but hidden behind and under the ground; with swimVolumes, the view is tinted where the swim volumes stand (cyan water, magenta lava), each box seen through the water, so its top shows evenly under a surface it meets or lies just below, but hidden behind and under the ground. Liquids draw as they stand at effect time 0, or at `liquidTime` seconds on the client's effect clock, each layer scrolled by its slides as the client's effects scroll it (time modulo 100): two views a second or two apart show which way and how fast a fall or river moves (liquid materials made before previews scrolled are refused, to be made again); emitters draw at the same moment of their steady state either way."""
   outputPath = newRenderPath()
   zone = await callBridge(context, "getZoneProperties", {})
   description = await callBridge(context, "renderView", {
@@ -1535,7 +1582,8 @@ steepestWalkableDegrees = math.degrees(math.acos(playerScale.walkableNormalZ))
   " bridge, flight, or walkway named `route` (its centerline at deck height, run on 5 past each end that stands on footing), whose"
   " heights only need to be within a step of the footing (so a route can run over an arch or under it). Judged for the player of"
   f" playerScale, {playerScale.playerHeight:g} units tall, who walks faces up to {steepestWalkableDegrees:.1f} degrees and steps up"
-  f" {playerScale.stepHeight:g} (both measured in the RoF2 client), in half-unit strides whatever `sampleSpacing`, which sets only the"
+  f" {playerScale.stepHeight:g} (the steepest face and the highest riser a player was seen to climb in the RoF2 client, so the"
+  " client's own limits lie at or past them; playerScale.sources), in half-unit strides whatever `sampleSpacing`, which sets only the"
   " profile's rows (give `path` or `route`, not both; renderRouteStrip shows the walk in pictures). Returns the length walked, the"
   " steepest face stood on, the steepest grade climbed or descended between two profile rows (steepestGrade: a stair's level treads"
   " stand at 0 but climb at its pitch), the narrowest footing (how far it runs to each side before a drop of more than a player's"
@@ -1636,8 +1684,8 @@ async def gradeRoute(
   A bend turns on an arc the route's width in radius, so the bench stays level across it; a turn over 90 degrees (a hairpin) turns on
   an arc of half the width and is a flat landing, at least `landingLength` long (by default the width) and at least the arc, centered
   on the turn. Ground above the bench is cut down to it, meeting the ground at cutBatterDegrees; ground below is filled up to it,
-  meeting the ground at fillBatterDegrees (null makes a ledge whose outside drops away, refused where its bench would stand more than 2
-  over the ground, naming each span). The whole route is graded as one: inside its bench the bench's height wins, elsewhere the lowest
+  meeting the ground at fillBatterDegrees (null makes a ledge whose outside drops away, refused where its bench would stand more than a
+  step (playerScale) over the ground, naming each span). The whole route is graded as one: inside its bench the bench's height wins, elsewhere the lowest
   cut and the highest fill, and where those disagree (between two legs) the cut, so a lower leg is never buried; the ground between two
   legs close together is dressed into one straight bank from one's edge to the other's, and between legs further apart nothing is left
   standing above the higher of them, so no ridge or berm stands between a switchback's legs. Refused where one part's
@@ -2250,17 +2298,19 @@ def problemText(problem):
   return text
 
 
-@guardedTool()
+@guardedTool(description=(
+  "walkRoute as a strip of eye-level frames: walks a saved review route or a bridge's, flight's, or walkway's walk line (route) or a"
+  " path [[x, y, z], ...] as walkRoute does, and renders a frame every `spacing` along it in plan (from its start) and one where each"
+  " problem the walk meets starts, each standing where the walk stands there ("
+  f"eye {playerScale.eyeHeight:g} over the footing"
+  "; no scale figure), heading along the route and pitched toward where the walk stands 30 further on, or toward the brink where it"
+  " stops if sooner (a problem's frame looks past the problem: down past the brink of a drop), laid out on one sheet in order along"
+  " the route, each labeled with its distance and any problem (up to 16 frames). Places the walk cannot reach, between a stop and"
+  " where it walks on, get no frame (stationsNotStoodOn); the problem's frame shows why. The result gives the walk (length in plan,"
+  " walkable, problems, oneWay) and each frame's distance, view (renderView renders it, adding the scale figure), problem, and render"
+  " path."
+))
 async def renderRouteStrip(context: Context, spacing: float, route: str | None = None, path: list[list[float]] | None = None):
-  """walkRoute as a strip of eye-level frames: walks a saved review route or a bridge's, flight's, or walkway's walk line (route) or a
-  path [[x, y, z], ...] as walkRoute does, and
-  renders a frame every `spacing` along it in plan (from its start) and one where each problem the walk meets starts, each standing
-  where the walk stands there (eye 5.5 over the footing; no scale figure), heading along the route and pitched toward where the walk
-  stands 30 further on, or toward the brink where it stops if sooner (a problem's frame looks past the problem: down past the brink of a
-  drop), laid out on one sheet in order along the route, each labeled with its distance and any problem (up to 16 frames). Places the
-  walk cannot reach, between a stop and where it walks on, get no frame (stationsNotStoodOn); the problem's frame shows why. The result
-  gives the walk (length in plan, walkable, problems, oneWay) and each frame's distance, view (renderView renders it, adding the scale
-  figure), problem, and render path."""
   planned = await callBridge(context, "planRouteStrip", {"path": path, "route": route, "spacing": spacing})
   frames, problems, length = planned["frames"], len(planned["problems"]), planned["length"]
   if len(frames) > sheetViews:
@@ -3005,8 +3055,8 @@ async def buildBridge(
   " a beam piece swept along both sides under the treads' ends. `posts` {piece, spacing, sides (both by default)}: legs just outside the"
   " edges, evenly at most `spacing` apart, from `sink` under the ground up to the rails' height where that side has rails (else to the"
   " flight's underside), where the flight stands more than a step over the ground or that side has rails." + railsHelp + " A walkway's"
-  " stair legs are laid by the same code. Refused: steeper than 45 degrees (naming the run it needs); riser not above 0 or over 2 (a"
-  " step); a top not a riser higher than the bottom; a foot or head without footing within a step, or lying under what it stands on"
+  " stair legs are laid by the same code. Refused: steeper than 45 degrees (naming the run it needs); riser not above 0 or over"
+  f" {playerScale.stepHeight:g} (a step, playerScale); a top not a riser higher than the bottom; a foot or head without footing within a step, or lying under what it stands on"
   " (naming its top: the treads would lie in it); a head set back on the surface it climbs to, so the top tread would lie inside it"
   " (set the head at its edge); the treads' underside meeting the ground beyond a step from its ends (naming where); a leg with no"
   " ground within 300; rails without posts. Returns the risers (count and height), run per step, pitch, plan length, the legs and their"

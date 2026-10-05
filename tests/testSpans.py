@@ -5,7 +5,7 @@ from pathlib import Path
 import structurePlots
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
-from playerScale import stepHeight
+from playerScale import eyeHeight, stepHeight
 
 # Anchors on the gorge's lips: a deck sagging from an anchor back on the rim would dip into the rim's flat ground, and one from the wall
 # below the lip leaves a notch to step into.
@@ -325,7 +325,7 @@ def testAFlightIsRailedHeadToFootAndRefusesAHeadInOrOnWhatItLandsOn(stageBlender
     assert stations[0] == foot[0] and stations[-1] == head[0], (side, stations)
   assert abs(built["rails"]["length"] - 2 * math.hypot(run, rise)) <= 0.01
   assert abs(built["walk"]["steepestGrade"]["degrees"] - math.degrees(math.atan2(rise, run))) <= 3 and built["walk"]["steepest"]["slopeDegrees"] == 0.0
-  assert built["views"]["fromHead"] == {"standAt": [-17.0, -60.0, 0.0], "headingDegrees": 270.0, "pitchDegrees": round(-math.degrees(math.atan2(5.5 + rise / 2, 3 + run / 2)), 2)}
+  assert built["views"]["fromHead"] == {"standAt": [-17.0, -60.0, 0.0], "headingDegrees": 270.0, "pitchDegrees": round(-math.degrees(math.atan2(eyeHeight + rise / 2, 3 + run / 2)), 2)}
   assert "The flight's head [-20.0, -100.0, -2.0] lies 2.00 under what it stands on there (the top of 'ground' at 0.00)" in refusals["buried"]
   assert "The flight's top tread would lie inside what its head stands on ('ground', its top at 0.00)" in refusals["onto"]
 

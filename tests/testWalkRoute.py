@@ -7,7 +7,7 @@ from testModelsAndDressing import freshScene
 from testWater import basin, liquidMaterials
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
-from playerScale import playerHeight, stepHeight, walkableNormalZ
+from playerScale import eyeHeight, playerHeight, stepHeight, walkableNormalZ
 
 
 def near(point, x, tolerance=0.6):
@@ -225,7 +225,7 @@ def testPlayersStandOnTheBedUnderWaterAndOnInstancesButNotOnGuides(stageBlenderS
   assert offStep["oneWay"] == [{"kind": "ledge", "at": [20.0, 150.0, instancedStepHeight], "height": round(instancedStepHeight, 1)}]
   # In the middle a player swims, eye a unit over the surface; at 70 out the water is 1 deep and the player stands on the bed.
   assert deep["swimming"] is True and deep["waterDepth"] == 15.0 and abs(deep["eye"][2] - (-4.0)) < 1e-3
-  assert shallow["swimming"] is False and abs(shallow["waterDepth"] - 1.0) < 0.1 and abs(shallow["eye"][2] - (shallow["ground"][2] + 5.5)) < 1e-3
+  assert shallow["swimming"] is False and abs(shallow["waterDepth"] - 1.0) < 0.1 and abs(shallow["eye"][2] - (shallow["ground"][2] + eyeHeight)) < 1e-3
 
 
 def testEveryLookupForGroundPassesThroughACanopyAndWhatIsMarkedPassable(stageBlenderServer, tmp_path):
@@ -259,7 +259,7 @@ def testEveryLookupForGroundPassesThroughACanopyAndWhatIsMarkedPassable(stageBle
   under, mossy, measured, sketched, placed, settled, nested, walked, section, bareSection = stageBlenderServer.session(steps)
   # The cutout canopy 20 up and the crate marked passable are passed through by every lookup for the ground, as walkRoute passes them:
   # the views stand on the ground under them, and the stones land and settle on it.
-  assert under["ground"] == [0.0, 0.0, 0.0] and under["eye"] == [0.0, 0.0, 5.5] and under["figure"] == [10.0, 0.0, 0.0]
+  assert under["ground"] == [0.0, 0.0, 0.0] and under["eye"] == [0.0, 0.0, eyeHeight] and under["figure"] == [10.0, 0.0, 0.0]
   assert mossy["ground"] == [60.0, 60.0, 0.0]
   assert measured["points"] == [[0.0, 0.0, 0.0], [60.0, 60.0, 0.0]]
   assert [shape["ground"] for shape in sketched["shapes"]] == [0.0, 0.0]
