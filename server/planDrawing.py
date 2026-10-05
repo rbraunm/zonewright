@@ -486,10 +486,11 @@ labelOrder = ("point", "footprint", "note", "path", "area")
 
 def drawPlan(basePath, outputPath, center, width, overlays):
   """Lay the overlays over the base render, scaled up so lines and labels stay crisp, and save the drawing: water, swim volumes,
-  boundaries, zone lines, the regions' access fills and outlines, then every sheet's area fills, footprint fills and path widths each
-  composited in turn, then every line and mark (the entries' arrows last), then the labels: swim volumes' names inside them first,
-  then the sketch's, the entries', the plots', the boundaries', the zone lines', and the regions', each set beside the ground's spot
-  heights where it can be, and the spot heights giving way to them where it cannot."""
+  boundaries, zone lines, the regions' access fills and outlines, the caves' runs, then every sheet's area fills, footprint fills and
+  path widths each composited in turn, then every line and mark (the entries' arrows last), then the labels: swim volumes' names
+  inside them first, then the sketch's, the entries', the plots', the boundaries', the zone lines', the regions', and the caves' (their
+  floor heights and names), each set beside the ground's spot heights where it can be, and the spot heights giving way to them where
+  it cannot."""
   with Image.open(basePath) as base:
     size = (round(base.width * planScale), round(base.height * planScale))
     image = base.convert("RGB").resize(size, Image.Resampling.BICUBIC).convert("RGBA")
