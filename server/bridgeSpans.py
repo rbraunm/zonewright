@@ -78,7 +78,7 @@ def railOut(rail, postDepth):
 
 def cutSquare(geometry, planes):
   """Cut off what lies in front of vertical planes at a span's open ends, so its end stands square there (a deck's sloped end face would
-  be a steep sliver to step onto); the cut is closed mapped as the face beside it."""
+  be a steep sliver to step onto); the cut is closed in the material and mapping of the piece's own end."""
   inWorld = geometry | {"gradients": bridgeKitGeometry.faceGradients(geometry)}
   return bridgeKitGeometry.bisected(inWorld, planes, clearOuter=True)
 

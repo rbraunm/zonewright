@@ -127,6 +127,22 @@ def testATrestleStandsItsBentsOnTheGround(stageBlenderServer, tmp_path):
   assert all(len(bent["legs"]) == 2 for bent in built["bents"])
 
 
+def testASaggingDecksSquareCutEndsTakeTheirPlanksEndTexture(stageBlenderServer, tmp_path):
+  async def steps(session):
+    kitPath = await kitAndPlot(session, tmp_path)
+    await session.expectSuccess("buildBridge", bridgeArguments(kitPath, profile={"sag": 8}))
+    await session.expectSuccess("saveFile", {})
+    checked = await session.expectSuccess("checkExport", {"path": str(tmp_path / "spans.eqg"), "purpose": "test"})
+    return checked, await structurePlots.faces(session, "gorgeBridge")
+
+  checked, found = stageBlenderServer.session(steps)
+  # The first and last planks, tilted with the sag, are cut square at the anchors: each closing face stands in the end's plane in the
+  # plank's end material (its edge role), textured at that face's scale, neither stretched nor without texture.
+  ends = [face for face in found for x in (bridgeStart[0], bridgeEnd[0]) if all(abs(point[0] - x) < 1e-4 for point in face["points"])]
+  assert len(ends) == 2 and [face["material"] for face in ends] == ["testKitTrim", "testKitTrim"]
+  assert [finding for finding in checked["findings"] if finding.get("object") == "gorgeBridge"] == []
+
+
 def testAFlightHasEqualRisersAtMostTheRiserAndWalksFootToHead(stageBlenderServer, tmp_path):
   foot, head = [-75.0, -60.0, -40.0], [-20.0, -60.0, 0.0]
 

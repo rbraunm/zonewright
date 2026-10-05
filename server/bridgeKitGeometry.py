@@ -434,12 +434,27 @@ def fromEditor(meshEditor, geometry):
   }
 
 
+def faceNormals(geometry):
+  """Each face's unit normal from its corners' winding (Newell's)."""
+  corners = geometry["positions"][geometry["loopVertices"]]
+  normals, start = [], 0
+  for total in geometry["loopTotals"]:
+    points = corners[start:start + total] - corners[start:start + total].mean(0)
+    normal = numpy.cross(points, numpy.roll(points, -1, axis=0)).sum(0)
+    normals.append(normal / max(float(numpy.linalg.norm(normal)), 1e-12))
+    start += total
+  return numpy.array(normals).reshape(-1, 3)
+
+
 def bisected(geometry, planes, clearOuter=False):
   """Cut along planes (point, normal); with clearOuter what lies in front of each plane is taken off and the opening closed by a face
-  mapped as the face beside it is."""
+  taking the material and mapping of the piece's face that faced the way the plane does (a plank's end, where a deck's end is cut
+  square), so its texture lies on it at that face's scale."""
   meshEditor = toEditor(geometry)
   uvLayer = meshEditor.loops.layers.uv[bridgeSurfacing.uvLayerName]
   sourceLayer = meshEditor.faces.layers.int["source"]
+  normals = faceNormals(geometry) if clearOuter else None
+  starts = numpy.cumsum(geometry["loopTotals"]) - geometry["loopTotals"]
   for point, normal in planes:
     geom = list(meshEditor.verts) + list(meshEditor.edges) + list(meshEditor.faces)
     result = bmesh.ops.bisect_plane(meshEditor, geom=geom, dist=onCut, plane_co=point, plane_no=normal, clear_outer=clearOuter)
@@ -448,14 +463,14 @@ def bisected(geometry, planes, clearOuter=False):
     cutEdges = [element for element in result["geom_cut"] if isinstance(element, bmesh.types.BMEdge) and element.is_valid and element.is_boundary]
     if not cutEdges:
       continue
-    made = bmesh.ops.holes_fill(meshEditor, edges=cutEdges, sides=0)["faces"]
-    for face in made:
-      neighbor = next(other for edge in face.edges for other in edge.link_faces if other is not face)
-      face[sourceLayer] = neighbor[sourceLayer]
-      reference = neighbor.loops[0]
-      gradient = geometry["gradients"][neighbor[sourceLayer]]
+    source = int(numpy.argmax(normals @ (numpy.asarray(normal, dtype=numpy.float64) / numpy.linalg.norm(normal))))
+    referencePoint = geometry["positions"][geometry["loopVertices"][starts[source]]]
+    referenceUV = geometry["uvs"][starts[source]]
+    gradient = geometry["gradients"][source]
+    for face in bmesh.ops.holes_fill(meshEditor, edges=cutEdges, sides=0)["faces"]:
+      face[sourceLayer] = source
       for loop in face.loops:
-        uv = numpy.array(reference[uvLayer].uv) + gradient @ (numpy.array(loop.vert.co) - numpy.array(reference.vert.co))
+        uv = referenceUV + gradient @ (numpy.array(loop.vert.co) - referencePoint)
         loop[uvLayer].uv = (float(uv[0]), float(uv[1]))
   if clearOuter:
     bmesh.ops.recalc_face_normals(meshEditor, faces=list(meshEditor.faces))
