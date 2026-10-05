@@ -1137,19 +1137,48 @@ def simpleLoops(corners):
 def groundedFloor(positions, faces, sources, normals, patchPositions, patchFaces):
   """The faces' sources with each face of the tube's floor that lies in the ground's own plane (where the tube runs out in the open in
   front of its mouth, its floor level with the ground, the exact boolean may keep the tube's floor there rather than the ground's) taken
-  as a piece of the ground face it lies on, so the open ground in front of a mouth stays ground; and one facing down there (the tube's
-  floor met from below where it only touches the ground, enclosing nothing over the ground's own faces) dropped as the solid's sides
-  are (-1)."""
+  as a piece of the ground face it lies on, so the open ground in front of a mouth stays ground; and one facing down there dropped as
+  the solid's sides are (-1) where it is a flap, the tube's floor met from below where it only touches the ground: one whose every edge
+  the faces left still close (flapEdgesClosed). One that closes the surface stays."""
   tree = mathutils.bvhtree.BVHTree.FromPolygons(patchPositions.tolist(), patchFaces)
   sources = list(sources)
+  facingDown = []
   for index, (face, source, normal) in enumerate(zip(faces, sources, normals)):
     if source > -2 or abs(normal[2]) <= floorNormalZ:
       continue
     middle = mathutils.Vector(positions[face].mean(axis=0).tolist())
     location, _, patchFace, _ = tree.ray_cast(middle + up * groundPlaneTolerance, down, 2 * groundPlaneTolerance)
     if location is not None:
-      sources[index] = patchFace if normal[2] > 0 else -1
+      if normal[2] > 0:
+        sources[index] = patchFace
+      else:
+        facingDown.append(index)
+  for index in flapEdgesClosed(faces, facingDown):
+    sources[index] = -1
   return sources
+
+
+def flapEdgesClosed(faces, candidates):
+  """The candidate faces that can go without opening the surface: taken out together, every edge of theirs is left on an even number
+  of faces. While one of their edges would be left on an odd number, the first candidate on it stays, as it closes the surface."""
+  def edgesOf(face):
+    return [tuple(sorted((face[position], face[(position + 1) % len(face)]))) for position in range(len(face))]
+
+  left = {}
+  for face in faces:
+    for edge in edgesOf(face):
+      left[edge] = left.get(edge, 0) + 1
+  dropped = list(candidates)
+  for index in dropped:
+    for edge in edgesOf(faces[index]):
+      left[edge] -= 1
+  while True:
+    needed = next((index for index in dropped if any(left[edge] % 2 for edge in edgesOf(faces[index]))), None)
+    if needed is None:
+      return sorted(dropped)
+    dropped.remove(needed)
+    for edge in edgesOf(faces[needed]):
+      left[edge] += 1
 
 
 def isFlat(points):

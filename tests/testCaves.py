@@ -182,6 +182,34 @@ def testACaveIsCutSealedWalkableAndSurfacedAndItsLiningStrokesComeBack(stageBlen
   assert recut["cut"]["liningFaces"] > 0 and repainted == {"floor": ["rock"], "walls": ["caveRock"]}
 
 
+def testFineCutsCloseWhereTheFloorMeetsTheGroundAndOnlyFlapsGo(stageBlenderServer, tmp_path):
+  # A closed tetrahedron, and the same with a flap: its first face again, turned over, back to back with it.
+  flaps = r"""
+import bridgeCaves
+closed = [[0, 1, 2], [0, 3, 1], [1, 3, 2], [2, 3, 0]]
+result = {'flap': bridgeCaves.flapEdgesClosed(closed + [[0, 2, 1]], [4]), 'closing': bridgeCaves.flapEdgesClosed(closed, [0]),
+  'pairBothNamed': bridgeCaves.flapEdgesClosed(closed + [[0, 2, 1]], [0, 4])}
+"""
+  fine = hall | {"path": [[0, -60, 2], [0, 10, 2], [0, 60, 2], [0, 90, 2], [0, 250, 2]], "breakup": None}
+
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    dropped = (await session.expectSuccess("runPython", {"code": flaps}))["result"]
+    checks = []
+    for edgeLength, breakup in ((8, None), (8, {"featureSize": 40, "amplitude": 3, "seed": 11}), (12, None)):
+      await session.expectSuccess("cutCave", fine | {"edgeLength": edgeLength, "breakup": breakup})
+      checks.append((await session.expectSuccess("runPython", {"code": checkCave}))["result"])
+      await session.expectSuccess("removeCave", {"objectName": "ground", "name": "hall"})
+    return dropped, checks
+
+  dropped, checks = stageBlenderServer.session(steps)
+  # A flap goes, a face that closes the surface stays, and of a back-to-back pair both named, one goes.
+  assert dropped == {"flap": [4], "closing": [], "pairBothNamed": [4]}
+  # At every edgeLength the floor running out level onto the ground in front of the mouth leaves the cut sealed.
+  for checked in checks:
+    assert checked["edgesOnThreeOrMoreFaces"] == 0 and checked["openEdges"] == borderEdges
+
+
 def testTakingACaveBackLeavesTheGroundAsAnUncutCopyGivenTheSameChange(stageBlenderServer, tmp_path):
   async def steps(session):
     await caveCanyon(session, tmp_path)
