@@ -225,3 +225,23 @@ async def testPlot(session, folder):
   await session.expectSuccess("projectUVs", {"objectName": "ground", "method": "box", "worldUnitsPerRepeat": 16})
   await session.expectSuccess("saveFile", {"path": str(plotPath)})
   return plotPath
+
+
+# The zone's own material named as the test kit's stone, and the block it covers, at a repeat six times finer than the kit's.
+zoneStoneColor = (40, 90, 160, 255)
+zoneStoneRepeat = 2.0
+
+
+async def sameNamedMaterials(session, folder):
+  """The test kit; the test plot with a material of its own named as the kit's testKitStone (another texture, zoneStone.png) on a block
+  in the plaza, and a testKitWall25 placed beside it; saved. Returns the kit path."""
+  kitPath = await testKit(session, folder)
+  await testPlot(session, folder)
+  zoneStone = writePNG(folder / "textures" / "zoneStone.png", 4, 4, zoneStoneColor)
+  await session.expectSuccess("createMaterial", {"name": "testKitStone", "diffuseTexture": str(zoneStone)})
+  await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "zoneBlock", "size": [8, 8, 8], "location": [60, -14, 0]})
+  await session.expectSuccess("assignMaterial", {"objectName": "zoneBlock", "materialName": "testKitStone"})
+  await session.expectSuccess("projectUVs", {"objectName": "zoneBlock", "method": "box", "worldUnitsPerRepeat": zoneStoneRepeat})
+  await session.expectSuccess("placeKitPiece", {"name": "plazaWall", "kitPath": str(kitPath), "piece": "testKitWall25", "location": [30, -14, 0], "facingDegrees": 0})
+  await session.expectSuccess("saveFile", {})
+  return kitPath

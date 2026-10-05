@@ -310,8 +310,7 @@ def exportModel(part, collection):
   """The model file an export writes a part into, or None for a structure laid as ground (its triangles go into the terrain)."""
   if isGround(collection):
     return None
-  role = "mesh" if part.type == "MESH" else "instance"
-  return f"obj_{bridgeExport.modelStem(bridgeExport.modelKey(part, role))}.mod"
+  return bridgeExport.modelFile(part, "mesh" if part.type == "MESH" else "instance")
 
 
 def describeParts(collection):
@@ -472,14 +471,14 @@ def describeStaleness(collection, ground):
 
 
 def staleStructures():
-  """Every structure stale now, with why."""
+  """Every structure stale now, with why, and what cannot be found when its kit is missing."""
   stale = []
   with bridgeKitData.linkingUndone(always=True):
     ground = StructureGround()
     for collection in bridgeStructureData.structureCollections():
       state, _ = describeStaleness(collection, ground)
       if state["stale"]:
-        stale.append({"structure": collection.name, "why": state["why"]})
+        stale.append({"structure": collection.name, "why": state["why"]} | ({"missing": state["missing"]} if state["missing"] else {}))
   return stale
 
 

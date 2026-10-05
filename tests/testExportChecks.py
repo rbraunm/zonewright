@@ -3,6 +3,7 @@ import io
 import numpy
 from PIL import Image
 
+import structurePlots
 from conftest import writePNG
 
 environment = {
@@ -128,3 +129,30 @@ def testCoverageFindingsNameWhatThePicturesShowAndClearAsEachIsFixed(stageBlende
   assert [failure["failure"] for failure in viewed["failures"]] == ["containment not checked"]
   assert "exportZone (game) refused, nothing written: 1 failure(s)" in refused and "reach mapping" in refused
   assert written["failures"] == [] and written["findings"] == [] and archivePath.is_file()
+
+
+def testTwoKitsOfOneFileNameAreRefusedForTheNamesTheirModelsAndMaterialsWouldShare(stageBlenderServer, tmp_path):
+  async def steps(session):
+    kits = []
+    for folder in ("first", "second"):
+      (tmp_path / folder).mkdir()
+      kits.append(str(await structurePlots.testKit(session, tmp_path / folder)))
+    await structurePlots.testPlot(session, tmp_path)
+    for index, kitPath in enumerate(kits):
+      await session.expectSuccess("placeKitPiece", {"name": f"plazaWall{index}", "kitPath": kitPath, "piece": "testKitWall25", "location": [30 + 40 * index, -14, 0], "facingDegrees": 0})
+    await session.expectSuccess("saveFile", {})
+    return await session.expectSuccess("checkExport", {"path": str(tmp_path / "twokits.eqg"), "purpose": "test"})
+
+  checked = stageBlenderServer.session(steps)
+  failures = {}
+  for failure in checked["failures"]:
+    failures.setdefault(failure["failure"], []).append(failure)
+  assert sorted(failures) == ["images share a DDS name", "material names collide", "model names collide"]
+  # Each kit's wall is a model of its own, so the two would be written under one name.
+  assert [failure["models"] for failure in failures["model names collide"]] == [[
+    "testKitWall25 (collection in //first\\testKit.blend)", "testKitWall25 (collection in //second\\testKit.blend)",
+  ]]
+  collided = {failure["materials"][0].split(" ")[0]: failure for failure in failures["material names collide"]}
+  assert sorted(collided) == ["testKitStone", "testKitTrim"]
+  assert all(len(set(failure["materials"])) == 2 for failure in collided.values())
+  assert "would all be named 'testKitStone_testKit'" in collided["testKitStone"]["message"]

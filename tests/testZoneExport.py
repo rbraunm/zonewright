@@ -352,6 +352,53 @@ def testExportNamesEveryOtherHardErrorWithItsObject(stageBlenderServer, tmp_path
   assert failures["AWT_pond"] == {"failure": "swim volume", "object": "AWT_pond", "at": [-20.0, 0.0, -2.5], "message": "'AWT_pond' is turned; swim volumes stay square to the axes"}
 
 
+nestedKit = """
+inner = bpy.data.collections.new('innerKit')
+inner.objects.link(bpy.data.objects.new('innerBox', bpy.data.objects['crate'].data))
+outer = bpy.data.collections.new('outerKit')
+nested = bpy.data.objects.new('nestedInner', None)
+nested.instance_type = 'COLLECTION'
+nested.instance_collection = inner
+nested.location = (3, 0, 4)
+outer.objects.link(nested)
+placed = bpy.data.objects.new('outerPlaced', None)
+placed.instance_type = 'COLLECTION'
+placed.instance_collection = outer
+placed.location = (-40, -40, 0)
+bpy.context.scene.collection.objects.link(placed)
+result = [list(vertex.co) for vertex in bpy.data.objects['crate'].data.vertices]
+"""
+nestedLamp = """
+bpy.data.collections['innerKit'].objects.link(bpy.data.objects.new('innerLamp', bpy.data.lights.new('innerLamp', 'POINT')))
+"""
+
+
+def testANestedCollectionIsOneModelOfItsNestedMeshesAndALightInItIsRefused(stageBlenderServer, tmp_path):
+  texture = tmp_path / "ground.png"
+  Image.fromarray(patternedRGBA(16, 4)).save(texture)
+  archivePath = tmp_path / "testplot.eqg"
+
+  async def steps(session):
+    await buildPlot(session, texture, texture, tmp_path / "plot.blend")
+    crate = (await session.expectSuccess("runPython", {"code": nestedKit}))["result"]
+    await session.expectSuccess("saveFile", {})
+    exported = await session.expectSuccess("exportZone", {"path": str(archivePath), "purpose": "test"})
+    await session.expectSuccess("runPython", {"code": nestedLamp})
+    await session.expectSuccess("saveFile", {})
+    checked = await session.expectSuccess("checkExport", {"path": str(archivePath), "purpose": "test"})
+    return crate, exported, checked
+
+  crate, exported, checked = stageBlenderServer.session(steps)
+  archive = eqArchive.EQArchive(archivePath)
+  outer = eqgFiles.parseModel(archive.read("obj_outerkit.mod"), "obj_outerkit.mod")
+  # The outer collection's model is the crate's mesh where the nested instance puts it.
+  assert sorted({tuple(vertex) for vertex in outer["vertices"].round(4).tolist()}) == sorted({tuple(round(value, 4) for value in numpy.add(vertex, (3, 0, 4))) for vertex in crate})
+  assert exported["modelTriangles"]["obj_outerkit.mod"] == 12
+  zone = eqgFiles.parseZone(archive.read("testplot.zon"), "testplot.zon")
+  assert [placement["position"] for placement in zone["placements"] if placement["model"] == "obj_outerkit.mod"] == [(-40.0, -40.0, 0.0)]
+  assert checked["failures"] == [{"failure": "collection holds more than meshes", "object": "outerPlaced", "at": [-40.0, -40.0, 0.0], "collection": "outerKit", "members": ["innerLamp"]}]
+
+
 replaceLaterEmitters = """
 bpy.data.objects['campfire01'].location = (-30, 40, 1)
 """

@@ -342,6 +342,7 @@ comparedMeasures = {
   "construction.terrainSteepShare": "Share of terrain area steeper than 50 degrees: cliffs and walls modeled into the ground.",
   "construction.steepOnTerrainShare": "Share of all steep area that is terrain rather than placed models.",
   "construction.terrainPaintedShare": "Share of terrain area painted from palette maps or blended in the shader.",
+  "construction.placedTriangles": "Triangles of the placed models, each counted at every placement (the zone's export gives the same total).",
   "content.placementCount": "Objects placed on the terrain.",
 }
 comparedFormats = ("wld", "eqgz", "eqtzp")
@@ -369,10 +370,12 @@ def percentileRank(values, value):
 @guardedTool()
 async def compareWithClientZones(context: Context, formats: list[str] = ["eqgz"], zones: list[str] | None = None):
   """Measure the open scene's zone as the zone survey measures the client's (its terrain collection as the terrain, every other rendered
-  mesh and collection instance as placed on it) and place each measure among the client's zones of the given formats (wld, eqgz, eqtzp;
-  EQG zones by default, the 2011-era target), or among the named `zones` (such as the references a zone is modeled on): the zone's
-  value, the client zones' 10th, 25th, 50th, 75th, and 90th percentiles, and the zone's percentile among them. Use it after each pass to
-  steer by how the client's own zones are built rather than by taste alone."""
+  mesh and collection instance as placed on it, a placed building's nested pieces included) and place each measure among the client's
+  zones of the given formats (wld, eqgz, eqtzp; EQG zones by default, the 2011-era target), or among the named `zones` (such as the
+  references a zone is modeled on): the zone's value, the client zones' 10th, 25th, 50th, 75th, and 90th percentiles, and the zone's
+  percentile among them. `construction.placedTriangles` sets the triangles of every placement of every placed model (kit pieces,
+  buildings, spans, wall sections; the same total checkExport gives) beside the client's (classic zones' placed objects are not
+  measured). Use it after each pass to steer by how the client's own zones are built rather than by taste alone."""
   unknown = sorted(set(formats) - set(comparedFormats))
   if unknown or not formats:
     raise ToolError(f"formats are among {list(comparedFormats)}, got {formats}")
@@ -982,8 +985,11 @@ def groupedExclusions(excluded, shownPerReason=25):
 
 exportChecksHelp = (
   " purpose is \"test\" (quick renders and test loads) or \"game\" (files for the EQ client and server). Both refuse the hard errors:"
-  " the file unsaved; objects export cannot take (a non-mesh in the terrain collection or among a placed collection's members, a placed"
-  " model scaled unevenly, model names that collide); faces with no material or a material createMaterial or createLiquidMaterial did not"
+  " the file unsaved; objects export cannot take (a non-mesh in the terrain collection, or among a placed collection's members, to any"
+  " depth, anything but meshes and collection instances; a placed model scaled unevenly; model names that collide); a placed kit piece or"
+  " building, or a structure, whose kit file or collection cannot be found; two materials that would share one name in the archive (a"
+  " kit's material and the zone's own of one name export apart, the kit's as <name>_<kit file stem>);"
+  " faces with no material or a material createMaterial or createLiquidMaterial did not"
   " make; a missing, packed, generated, or other-drive image, a non-DDS image whose sides are not powers of two, DDS data under another"
   " extension, two images that would share one DDS name, a cutout with a normal map; meshes without texture coordinates; a liquid"
   " material on anything but a water body; a mesh with surfacing layers whose modifiers change its faces; swim volumes a zone file"
@@ -992,7 +998,8 @@ exportChecksHelp = (
   " refuses blockout materials (createMaterial blockout) on exported faces, pools and rivers whose swimming is undecided or changed"
   " since their boxes were accepted, missing view values (fogOn, minClip, maxClip, sky or sky \"none\" stated, and the fog's start, end, and density"
   " when it is on), a missing safe point or underworld, a safe point over no ground above the underworld, zone lines without a target or sharing a"
-  " number, and, until reach mapping exists, any zone: containment cannot be checked yet. A test export lists all of these but"
+  " number, structures laid on ground or a kit that has changed since (stale: editStructure lays them again), and, until reach mapping"
+  " exists, any zone: containment cannot be checked yet. A test export lists all of these but"
   " containment as findings. Findings, never refusals, for both: texture coverage, each with where it lies: the base material showing where no unmuted"
   " surfacing layer covers a face; ground borders on the terrain where two ground materials meet, walkable ground on at least one side,"
   " with no paintTransition strip between them, as a length per border and its stretches (each a center, bounds, and length); texture stretched or squeezed (a texel lying over 2x longer one way than the other"
@@ -1003,8 +1010,11 @@ exportChecksHelp = (
   " `coverage` counts the exported faces by status; `excluded` lists what is not the zone's own geometry by reason (guides, plot borders,"
   " regions, anything hidden from renders, placed client content); `toConfirm` lists shipped meshes with shaping passes off or surfacing"
   " layers muted, which leave the zone as if never made, and caves and defined passes whose ground moved since they were made"
-  " (stale; a game export refuses them, and caves broken by a change outside their guards refuse both); `swim` the undecided and changed pools and rivers; `boundaries` and `zoneLines`"
-  " what goes into the terrain as invisible walls and into the .zon as zone lines."
+  " (stale; a game export refuses them, and caves broken by a change outside their guards refuse both), and stale structures with why"
+  " (ground, kit, missing); `swim` the undecided and changed pools and rivers; `boundaries` and `zoneLines`"
+  " what goes into the terrain as invisible walls and into the .zon as zone lines; `structures` each structure's models (file,"
+  " triangles, placements) and triangles (one laid as ground has its triangles in the terrain and no model), and `placedTriangles`"
+  " the triangles of every placement of every placed model, which compareWithClientZones sets beside the client's zones."
 )
 
 
@@ -1052,7 +1062,7 @@ def replaceExportFiles(archivePath, archiveBytes, sideContents):
 def exportReport(report):
   return {key: report[key] for key in ("purpose", "failures", "findings", "coverage")} | {
     "excluded": groupedExclusions(report["excluded"]), "toConfirm": report["toConfirm"], "swim": report["swim"],
-    "boundaries": report["boundaries"], "zoneLines": report["zoneLines"],
+    "boundaries": report["boundaries"], "zoneLines": report["zoneLines"], "structures": report["structures"], "placedTriangles": report["placedTriangles"],
   }
 
 
@@ -1074,14 +1084,18 @@ async def checkExport(context: Context, path: str, purpose: str):
   " archive goes in last, and a failure at any point puts every file back as it was, so a refused or failed export never replaces the"
   " last good archive or its side files and leaves no partial file. The `terrain` collection's meshes become the zone's terrain;"
   " every other rendered mesh becomes a model placed at its object's transform (copies sharing a mesh and without modifiers share one"
-  " model) and every collection instance a model of its collection's meshes. createMaterial materials export as the client's shaders:"
+  " model) and every collection instance a model of its collection's meshes and, to any depth, of the collections its members instance."
+  " So a kit piece is one model however often placed, a placed building one model per part shared by its placements and its plinth one"
+  " of its own, a bridge, flight, or walkway one model (or terrain, laid in the terrain collection), and a wall its section piece's"
+  " model, one model per distinct shear, and its post's. createMaterial materials export as the client's shaders:"
   " diffuse and normal map as Opaque_MaxCB1.fx, diffuse only as Opaque_MaxC1.fx, a cutout (diffuse only) as Chroma_MPLBasicAT.fx;"
   " createLiquidMaterial materials as its water, waterfall, and lava shaders with their values. DDS textures are stored unchanged, others"
   " as uncompressed DDS. The swim volumes go into the .zon as AWT_ (water) and ALV_ (lava) regions as they stand (export derives none)"
   " and the zone lines as ATP_ regions, unturned. The boundaries (placeBoundaryWall, placeBoundaryPlane) go into the terrain as"
   " triangles without a material, which the client never draws but collides with (flag 0), a wall's facing both ways and a lid's down"
   " and a floor's up, as they face in the scene; triangles of liquid materials, cutout"
-  " materials, and objects marked passable (markPassable) are flagged 0x1, which the client lets players through."
+  " materials, objects marked passable (markPassable), and faces flagged passable (a span's ropes and rails) are flagged 0x1, which the"
+  " client lets players through."
   " Point lights placed with placeLights go into the .zon; emitters placed with placeEmitters go into <zone>_EnvironmentEmitters.txt"
   " beside the archive (the client reads that list loose from its own folder). A zone with housing (setZoneHousing) also gets"
   " <zone>_housing.json beside the archive, its plots as Peridot's plot content gives them (address, border door, center and heading in"

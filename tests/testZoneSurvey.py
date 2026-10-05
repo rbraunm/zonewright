@@ -4,7 +4,9 @@ from pathlib import Path
 
 import pytest
 
+import structurePlots
 from conftest import everquestClient, pinnedBlender, writePNG, zoneSurveySkill
+from testSpans import bridgeArguments, legs, ropes
 
 pytestmark = pytest.mark.clientData("survey")
 procedureVersionPattern = re.compile(r"^Interpretive procedure version: (\d+)$", re.MULTILINE)
@@ -259,6 +261,25 @@ def testChangedZoneFileMakesTheInterpretationStale(stageServer, tmp_path):
 
   assert survey["interpreted"]["state"] == "stale"
   assert survey["interpreted"]["staleBecause"] == {"zoneFilesChanged": ["befallen.s3d"]}
+
+
+def testComparingAZoneWithStructuresSetsItsPlacedTrianglesBesideTheClients(stageBlenderServer, tmp_path):
+  async def steps(session):
+    kitPath = str(await structurePlots.testPrefab(session, tmp_path))
+    await structurePlots.testPlot(session, tmp_path)
+    await session.expectSuccess("placeKitPiece", {"name": "stripWall", "kitPath": kitPath, "piece": "testKitWall25", "location": [-10, 60, 0], "facingDegrees": 90})
+    await session.expectSuccess("buildBridge", bridgeArguments(kitPath, posts=legs, rails=ropes))
+    await session.expectSuccess("placePrefab", {"name": "housePlaza", "kitPath": kitPath, "prefab": "testKitHouse", "location": [60, -14], "facingDegrees": 0})
+    await session.expectSuccess("saveFile", {})
+    checked = await session.expectSuccess("checkExport", {"path": str(tmp_path / "structplot.eqg"), "purpose": "test"})
+    return checked, await session.expectSuccess("compareWithClientZones", {"zones": ["highpasshold"]})
+
+  checked, compared = stageBlenderServer.session(steps)
+  placed = compared["measures"]["construction.placedTriangles"]
+  # The loose wall, the bridge, and the house's three parts, each placed once, and the house's parts holding their nested pieces.
+  assert placed["zone"] == checked["placedTriangles"] > 0
+  assert compared["measures"]["content.placementCount"]["zone"] == 5
+  assert placed["clientZones"] == 1 and placed["median"] > placed["zone"]
 
 
 def testZoneNotesForUnknownZoneFail(stageServer):

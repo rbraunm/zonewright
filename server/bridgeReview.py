@@ -59,12 +59,13 @@ def triangulated(sceneObject, depsgraph, matrix):
     mesh.loop_triangles.foreach_get("material_index", materialIndices)
   finally:
     evaluated.to_mesh_clear()
-  slotNames = [slot.material.name if slot.material else None for slot in sceneObject.material_slots]
+  slotNames = [slot.material.name_full if slot.material else None for slot in sceneObject.material_slots]
   return positions, triangles.reshape(-1, 3), [slotNames[index] if index < len(slotNames) else None for index in materialIndices]
 
 
 def collectConstruction(outputPath):
-  """Writes the zone's triangles to outputPath (.npz) and returns its texture names and placement count."""
+  """Writes the zone's triangles to outputPath (.npz), each placement's model at its placement (a placed collection's meshes and, to any
+  depth, those of the collections it instances), and returns its texture names (materials by full name) and placement count."""
   depsgraph = bpy.context.evaluated_depsgraph_get()
   shipped, _ = bridgeExport.exportedObjects()
   parts, placements = [], 0
@@ -74,11 +75,7 @@ def collectConstruction(outputPath):
       parts.append((not isTerrain, triangulated(sceneObject, depsgraph, sceneObject.matrix_world)))
       placements += not isTerrain
     elif role == "instance":
-      collection = sceneObject.instance_collection
-      offset = mathutils.Matrix.Translation(-collection.instance_offset)
-      for member in collection.all_objects:
-        if member.type == "MESH" and not member.hide_render:
-          parts.append((True, triangulated(member, depsgraph, sceneObject.matrix_world @ offset @ member.matrix_world)))
+      parts += [(True, triangulated(member, depsgraph, matrix)) for member, matrix in bridgeMeshAccess.objectParts(sceneObject)]
       placements += 1
   textureNames, vertexChunks, triangleChunks, textureChunks, objectChunks, vertexCount = {}, [], [], [], [], 0
   for isObject, (positions, triangles, materialNames) in parts:

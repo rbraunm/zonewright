@@ -1,10 +1,14 @@
 """What an EQG zone export takes from the open scene. The `terrain` collection's meshes become the zone's terrain, merged in world
 coordinates with the boundaries (bridgeBoundaries) as triangles without a material; every other rendered mesh becomes a model placed
 at its object's transform (copies sharing a mesh and without modifiers share one model), and every collection instance a model of its
-collection's meshes. Each triangle carries whether players pass through it (a liquid or cutout material, or an object marked
-passable). What is not the zone's own geometry (guides, plot borders, regions, placed client content, anything hidden from renders) is
-left out and listed with why. Collecting assumes the scene passed bridgeExportChecks; it writes the meshes to modelArrays.npz and
-returns the models, materials, placements, swim volumes and zone lines as regions, and the zone's housing. Runs under Blender's Python."""
+collection's meshes and, to any depth, of the collections its members instance (a placed building's part holding placed pieces). Each
+triangle carries whether players pass through it (a liquid or cutout material, an object marked passable, or a face flagged passable,
+as a span's ropes and rails are). Materials are told apart by their full names, so a kit's material and the zone's own of one name
+both export, the kit's under its name and its kit file's stem. What is not the zone's own geometry (guides, plot borders, regions,
+placed client content, anything hidden from renders) is left out and listed with why. Collecting assumes the scene passed
+bridgeExportChecks; it writes the meshes to modelArrays.npz and returns the models, materials, placements, swim volumes and zone lines
+as regions, and the zone's housing. Runs under Blender's Python."""
+import collections
 import os
 import re
 
@@ -144,7 +148,7 @@ def materialRecord(material):
 def meshArrays(sceneObject, depsgraph, matrix, materialNames, marked):
   """An object's evaluated mesh as the file keeps it: one vertex per distinct position, corner normal, and texture coordinate (v up
   from the texture's top, as static EQG models store it), transformed by matrix, and each triangle's material name and whether players
-  pass through it (its material's, or every triangle when marked)."""
+  pass through it (its material's, its face's passable flag, or every triangle when marked)."""
   evaluated = sceneObject.evaluated_get(depsgraph)
   mesh = evaluated.to_mesh()
   try:
@@ -162,6 +166,12 @@ def meshArrays(sceneObject, depsgraph, matrix, materialNames, marked):
     mesh.loop_triangles.foreach_get("loops", triangleLoops)
     triangleSlots = numpy.empty(len(mesh.loop_triangles), dtype=numpy.int64)
     mesh.loop_triangles.foreach_get("material_index", triangleSlots)
+    trianglePolygons = numpy.empty(len(mesh.loop_triangles), dtype=numpy.int64)
+    mesh.loop_triangles.foreach_get("polygon_index", trianglePolygons)
+    flaggedFaces = numpy.zeros(len(mesh.polygons), dtype=bool)
+    attribute = mesh.attributes.get(bridgeMeshAccess.passableAttribute)
+    if attribute is not None and attribute.domain == "FACE":
+      attribute.data.foreach_get("value", flaggedFaces)
     slotMaterials = [slot.material for slot in evaluated.material_slots]
   finally:
     evaluated.to_mesh_clear()
@@ -177,7 +187,7 @@ def meshArrays(sceneObject, depsgraph, matrix, materialNames, marked):
     "positions": positions[loopVertices[firstLoop]], "normals": normals[firstLoop], "uvs": uvs[firstLoop],
     "triangles": loopToVertex[triangleLoops].reshape(-1, 3),
     "materials": [materialNames(slotMaterials[slot]) for slot in triangleSlots],
-    "passable": marked | numpy.array([bridgeSurfacing.isPassableMaterial(slotMaterials[slot]) for slot in triangleSlots], dtype=bool),
+    "passable": marked | flaggedFaces[trianglePolygons] | numpy.array([bridgeSurfacing.isPassableMaterial(slotMaterials[slot]) for slot in triangleSlots], dtype=bool),
   }
 
 
@@ -222,9 +232,23 @@ def modelStem(key):
   return fileStem(key[1]) + ("_passable" if key[-1] else "")
 
 
-def collectionMembers(collection):
-  """What a collection's model is made of: its rendered objects other than lights and cameras."""
-  return [member for member in collection.all_objects if not member.hide_render and member.type not in ("LIGHT", "CAMERA")]
+def modelFile(sceneObject, role):
+  """The model file a shipped mesh or collection instance is placed as."""
+  return f"obj_{modelStem(modelKey(sceneObject, role))}.mod"
+
+
+def libraryStem(material):
+  return os.path.splitext(os.path.basename(bpy.path.abspath(material.library.filepath)))[0]
+
+
+def exportedMaterialNames(materials):
+  """Each material's name in the archive, by its full name: its own, or, where another exported material has the same name, a linked
+  one's name and its kit file's stem (<name>_<stem>)."""
+  counts = collections.Counter(material.name for material in materials)
+  return {
+    material.name_full: material.name if counts[material.name] == 1 or material.library is None else f"{material.name}_{libraryStem(material)}"
+    for material in materials
+  }
 
 
 def collectZoneExport(outputFolder, zoneName):
@@ -232,9 +256,8 @@ def collectZoneExport(outputFolder, zoneName):
   materials = {}
 
   def materialName(material):
-    if material.name not in materials:
-      materials[material.name] = materialRecord(material)
-    return material.name
+    materials.setdefault(material.name_full, material)
+    return material.name_full
 
   shipped, _ = exportedObjects()
   regions = bridgeSwim.swimRegions() + bridgeBoundaries.zoneLineRegions()
@@ -256,15 +279,16 @@ def collectZoneExport(outputFolder, zoneName):
     if key not in models and role == "mesh":
       models[key] = {"stem": modelStem(key), "arrays": meshArrays(sceneObject, depsgraph, numpy.identity(4), materialName, key[-1])}
     elif key not in models:
-      collection = sceneObject.instance_collection
-      offset = numpy.identity(4)
-      offset[:3, 3] = -numpy.array(collection.instance_offset)
-      parts = [meshArrays(member, depsgraph, offset @ numpy.array(member.matrix_world), materialName, key[-1] or bridgeMeshAccess.passableProperty in member) for member in collectionMembers(collection)]
+      parts = [
+        meshArrays(member, depsgraph, numpy.array(matrix), materialName, key[-1] or bridgeMeshAccess.passableProperty in member)
+        for member, matrix in bridgeMeshAccess.collectionParts(sceneObject.instance_collection)
+      ]
       models[key] = {"stem": modelStem(key), "arrays": mergeArrays(parts)}
     placements.append({"key": key, "object": sceneObject.name} | placementTransform(sceneObject))
+  exportedNames = exportedMaterialNames(materials.values()) | {None: None}
   arrays, modelList = {}, []
   for index, (key, model) in enumerate(models.items()):
-    modelList.append({"file": f"obj_{model['stem']}.mod", "materials": model["arrays"]["materials"], "arrays": f"model{index}"})
+    modelList.append({"file": f"obj_{model['stem']}.mod", "materials": [exportedNames[name] for name in model["arrays"]["materials"]], "arrays": f"model{index}"})
     model["file"] = modelList[-1]["file"]
     for field in ("positions", "normals", "uvs", "triangles", "passable"):
       arrays[f"model{index}_{field}"] = model["arrays"][field]
@@ -283,7 +307,9 @@ def collectZoneExport(outputFolder, zoneName):
       "position": placement["position"], "rotation": placement["rotation"], "scale": placement["scale"],
     })
   return {
-    "zone": zoneName, "arrays": os.path.join(outputFolder, modelArraysFileName), "terrain": {"file": f"ter_{zoneName}.ter", "materials": terrain["materials"], "arrays": "terrain"},
-    "models": modelList, "materials": list(materials.values()), "placements": placementList, "lights": lights, "emitters": emitters,
+    "zone": zoneName, "arrays": os.path.join(outputFolder, modelArraysFileName),
+    "terrain": {"file": f"ter_{zoneName}.ter", "materials": [exportedNames[name] for name in terrain["materials"]], "arrays": "terrain"},
+    "models": modelList, "materials": [materialRecord(material) | {"name": exportedNames[name]} for name, material in materials.items()],
+    "placements": placementList, "lights": lights, "emitters": emitters,
     "regions": regions, "housing": bridgeHousing.collectHousing(),
   }
