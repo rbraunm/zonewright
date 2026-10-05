@@ -16,7 +16,7 @@ An EQEmu server loads three map files per zone from its `maps` folder: the colli
 
 | Input | Quiet failure | Answer here |
 |---|---|---|
-| `base/<short>.map` | The inflate result is unchecked (map.cpp:456); a placement naming no model is skipped (:621); with no file, line of sight always passes, Z is never fixed, NPCs move straight, and fear dereferences null | `mapBytes` derives every size; `readMap` inflates the whole stream to the size its header gives and decodes to the last byte; `mapCollision` refuses a placement naming no model |
+| `base/<short>.map` | The inflate result is unchecked (map.cpp:456); a placement naming no model is skipped (:621); with no file, line of sight always passes, Z is never fixed, NPCs move straight, and fear dereferences null | `mapBytes` derives every size; `readMap` refuses a stream that ends before its last block, bytes after it, and an inflated size other than the header's, and decodes the payload to the last byte; `mapCollision` refuses a placement naming no model |
 | `water/<short>.wtr` | "Loaded Water Map" is logged when parsing failed and the map was dropped (water_map.cpp:48-52, 59-63); no file or a bad one turns nav pathing off (mob_movement_manager.cpp:1035) | `waterBytes([])` is the valid 18-byte empty file; `readWater` decodes to the exact length and refuses a file cut short |
 | `nav/<short>.nav` | A zero tile reference or size drops the whole mesh (pathfinder_nav_mesh.cpp:473-491) | `readNav` refuses either, naming the tile and its offset |
 
@@ -32,7 +32,7 @@ An EQEmu server loads three map files per zone from its `maps` folder: the colli
 4. **Models,** bytewise ascending by name (azone keeps them in a `std::map`). Each is its map name and a 0 byte, uint32 vertex and polygon counts, float32[3] vertices in model space as the `.mod` stores them, then 13-byte polygons: uint32 v1, v2, v3 and uint8 `vis`, 0 when the triangle's flags have 0x1 (players pass through it), else 1. Only models some non-terrain placement places are written.
 5. **Placements,** in `.zon` order, terrain left out. Each is its model's map name and a 0 byte, float32 x, y, z from the `.zon`, the turns about X, Y and Z (the `.zon` fields 2, 1 and 0), and the scale three times.
 
-**Map names.** A model's map name is the `.zon`'s own spelling of its file name with `)` written `_` (eqg_loader.cpp:103-106), so `eqgFiles.parseZone` keeps the spellings (`modelFileNames`) beside the lowercased names. Placements carry that same string; the server matches them to models exactly and skips a mismatch (map.cpp:621). Highpass Hold holds `OBJ_Forge_Bellowss_A_.MOD`.
+**Map names.** A model's map name is the `.zon` model entry's own spelling of its file name with `)` written `_` (eqg_loader.cpp:103-106), and each placement carries its entry's (:138), so `eqgFiles.parseZone` gives each placement its entry's spelling (`modelFileName`) beside the lowercased name. The server matches placements to models by that string exactly and skips a mismatch (map.cpp:621). Two entries spelling one file differently are two models of the same shape, as azone writes them. Highpass Hold holds `OBJ_Forge_Bellowss_A_.MOD`.
 
 **Terrain.** A placement whose name starts `TER` or whose map name ends `.ter` (both case-sensitive, azone map.cpp:660) is baked into the lists and not placed; its position is ignored, as the client ignores it. Its triangles go in file order, corners swapped into server axes: those flagged 0x1 to the non-collidable list, the rest to the collidable list. Each list keeps each distinct float32 position once, in first-seen order, -0.0 the same as 0.0 and the first spelling kept (azone's `AddFace`). Boundaries (material -1, flag 0) are collidable, as the client's walls are.
 
@@ -43,7 +43,6 @@ An EQEmu server loads three map files per zone from its `maps` folder: the colli
 - a placement whose model the zone's files do not hold (azone would drop it, and the server would have no collision for it);
 - two models whose map names coincide (the server would place one for both);
 - a placement named `TER...` of a model that is not a terrain (azone would bake it unplaced where the client places it), and a terrain whose file ends `.TER` placed under another name (azone would place it where the client draws it at its own vertices);
-- one `.zon` model named in two spellings that lowercase alike (which placement uses which is not read);
 - a number that is not finite.
 
 **Zone files.** `zoneFilesOf(archiveBytes, looseZon)` gathers the `.zon` (the archive's one `.zon`, or the loose `.zon` the client loads in its place) and every model file it names that the archive holds. Models only another archive holds are not gathered yet, so a zone placing them is refused: guildhall's loose `.zon` places six.
@@ -62,7 +61,7 @@ On Highpass Hold it gives 272,230 triangles in the order the zone reader (`eqgFi
 
 **Records** (`waterBytes(regions)`, the `.zon` regions as `eqgFiles.parseZone` reads them, in their order): the center, rotation 0, scale 1, and the half extents as stored. Ours are positive; client files hold negative ones, which the server swaps into its box's low and high (oriented_bounding_box.cpp:74), so signs pass through.
 
-**Types,** by prefix, from zonewright's own table (`waterRegionTypes`), never awater's (which writes an unknown prefix as Water):
+**Types,** by prefix, from zonewright's own table (`waterRegionTypes`), never awater's (which writes an unknown prefix as Water). Prefixes match in their case, as awater matches them (water_map.cpp:258); how the client reads a prefix in another case is untraced, so `awt_` is refused as unknown.
 
 | Prefix | Type | Evidence |
 |---|---|---|
@@ -87,8 +86,8 @@ On Highpass Hold it gives 272,230 triangles in the order the zone reader (`eqgFi
 
 ## Pictures
 
-`serverMapDrawing.drawCollision` draws a collision plan north up, as renderSketch's plans are drawn: the highest collision over each pixel shaded by height and by slope away from a north-west light (faces seen edge-on from above, such as upright walls, show only as the edges between heights), the `.wtr` boxes outlined in their type's color and numbered in file order, a grid, a scale bar and north. `drawCollisionComparison` sets two collisions side by side in one frame, with a third plan of the triangles that differ by more than a tolerance (matched in order) in red over the first faded: blank when they agree.
+`serverMapDrawing.drawCollision` draws a collision plan north up, as renderSketch's plans are drawn: the highest collision over each pixel shaded by height and by slope away from a north-west light (faces seen edge-on from above, such as upright walls, show only as the edges between heights), the `.wtr` boxes outlined in their type's color and numbered in file order, a grid, a scale bar and north. `drawCollisionComparison` sets two collisions side by side in one frame, each with its own `.wtr`'s boxes, with a third plan of the triangles that differ by more than a tolerance (matched in order) in red over the first faded: blank when they agree.
 
 ## Reference files
 
-Tests compare against Peridot's own files: EQEmu/maps at `fbd3b191286e0d232a7103dff4a451d2e51a819f`, which Peridot's maps are byte-identical to. `tests/serverReference.py` fetches each file `tests/serverReference.json` lists (path, size, SHA-256) into `%LOCALAPPDATA%\zonewrightTests\serverReference\fbd3b191\<path>` when missing, under a lock, and fails on any size or hash that differs. They are server data, so they stay under the test root and never go into git. Their tests are the `serverMaps` group of the client data tier, which also reads the client's archives and loose `.zon` files in place.
+Tests compare against Peridot's own files: EQEmu/maps at `fbd3b191286e0d232a7103dff4a451d2e51a819f`, which Peridot's maps are byte-identical to. `tests/serverReference.py` fetches each file `tests/serverReference.json` lists (path, size, SHA-256) into `%LOCALAPPDATA%\zonewrightTests\serverReference\fbd3b191\<path>` when missing, under a lock, and fails on any size or hash that differs. They are server data, so they stay under the test root and never go into git. Their tests are the `serverMaps` group of the client data tier, which also reads the client's archives and loose `.zon` files in place; a whole-suite run takes it when the server map code, the zone readers it builds on (`eqgFiles`, `eqArchive`), or the fixture changed.

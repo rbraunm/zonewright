@@ -23,7 +23,8 @@ waterMagic = b"EQEMUWATER"
 waterVersion = 2
 waterRecord = struct.Struct("<I12f")
 # The server's region types (water_map.h) by .zon region prefix: the three zonewright writes, and APK_, which Peridot's freeporteast.wtr
-# gives type 4 for freeporteast.zon's APK_01. awater writes an unknown prefix as Water; this table refuses it.
+# gives type 4 for freeporteast.zon's APK_01. awater writes an unknown prefix as Water, and matches case-sensitively (water_map.cpp:258);
+# how the client reads a prefix in another case is untraced. This table refuses both.
 waterRegionTypes = {"AWT_": 1, "ALV_": 2, "ATP_": 3, "APK_": 4}
 waterRegionTypeNames = {0: "Normal", 1: "Water", 2: "Lava", 3: "ZoneLine", 4: "PvP", 5: "Slime", 6: "Ice", 7: "VWater"}
 navMagic = b"EQNAVMESH"
@@ -139,18 +140,15 @@ def indexedVertices(corners):
 
 def mapContent(zoneFiles):
   """azone's collision map of a zone's files (map.cpp:636-740): terrain triangles baked into the collidable and non-collidable lists,
-  each placed model under its map name (the .zon's spelling, ')' written '_', eqg_loader.cpp:103), and each other placement with its
-  turns in radians as the .zon stores them. Refuses what azone or the server would drop or place apart from the client, naming it."""
+  each placed model under its map name (the .zon's spelling of it in the placement's model entry, ')' written '_', eqg_loader.cpp:103,
+  so two spellings of one file are two models), and each other placement with its turns in radians as the .zon stores them. Refuses
+  what azone or the server would drop or place apart from the client, naming it."""
   zone = eqgFiles.parseZone(zoneFiles["zon"], "the .zon")
-  spellings = {}
-  for name, spelling in zip(zone["modelNames"], zone["modelFileNames"]):
-    if spellings.setdefault(name, spelling) != spelling:
-      raise ValueError(f"The .zon names model {name} as both '{spellings[name]}' and '{spelling}', which the .map would keep apart; which placement uses which spelling is not read")
   parsedModels, mapModels, placements = {}, {}, []
   terrainCorners, terrainPassable = [], []
   for index, placement in enumerate(zone["placements"]):
     archiveName = placement["model"]
-    mapName = spellings[archiveName].replace(")", "_")
+    mapName = placement["modelFileName"].replace(")", "_")
     label = f"Placement {index} '{placement['name']}' of {mapName}"
     if archiveName not in zoneFiles["models"]:
       raise ValueError(f"{label}: the zone's files hold no {archiveName}; azone would drop the placement and the server would have no collision for it")
@@ -233,27 +231,27 @@ def readMap(data, source="the .map"):
   reader = ByteReader(inflated(data[mapFileHeader.size:], inflatedSize, source, mapFileHeader.size), f"{source} (inflated)")
   vertexCount, indexCount, nonCollidableVertexCount, nonCollidableIndexCount, modelCount, placementCount, groupCount, tileCount, quadsPerTile, unitsPerVertex = reader.values(mapHeader, "header")
   if groupCount or tileCount or quadsPerTile or unitsPerVertex:
-    raise ValueError(f"{source}: {groupCount} placement groups and {tileCount} terrain tiles ({quadsPerTile} quads per tile, {unitsPerVertex} units per vertex); zonewright reads EQG zone maps, which hold none")
+    raise ValueError(f"{reader.source}: {groupCount} placement groups and {tileCount} terrain tiles ({quadsPerTile} quads per tile, {unitsPerVertex} units per vertex); zonewright reads EQG zone maps, which hold none")
   content = {}
   for key, dtype, count, listCount in (("collidableVertices", ("<f4", 3), vertexCount, None), ("collidableIndices", "<u4", indexCount, vertexCount),
       ("nonCollidableVertices", ("<f4", 3), nonCollidableVertexCount, None), ("nonCollidableIndices", "<u4", nonCollidableIndexCount, nonCollidableVertexCount)):
     start = reader.offset
     content[key] = reader.array(dtype, count, key)
     if listCount is not None and (count % 3 or (count and int(content[key].max()) >= listCount)):
-      raise ValueError(f"{source}: the {count} {key} from byte {start} are not whole triangles of indices under {listCount}")
+      raise ValueError(f"{reader.source}: the {count} {key} from byte {start} are not whole triangles of indices under {listCount}")
   content["models"], names = [], {}
   for index in range(modelCount):
     start = reader.offset
     name = reader.string(f"model {index}'s name")
     if name in names:
-      raise ValueError(f"{source}: model {index} at byte {start} is named {name}, as model {names[name]} is; the server keeps the last")
+      raise ValueError(f"{reader.source}: model {index} at byte {start} is named {name}, as model {names[name]} is; the server keeps the last")
     names[name] = index
     modelVertexCount, polygonCount = reader.values(countPair, f"model {name}'s counts")
     vertices = reader.array(("<f4", 3), modelVertexCount, f"model {name}'s vertices")
     polygonStart = reader.offset
     polygons = reader.array(modelPolygonType, polygonCount, f"model {name}'s polygons")
     if polygonCount and int(polygons["indices"].max()) >= modelVertexCount:
-      raise ValueError(f"{source}: model {name}'s polygons from byte {polygonStart} index past its {modelVertexCount} vertices")
+      raise ValueError(f"{reader.source}: model {name}'s polygons from byte {polygonStart} index past its {modelVertexCount} vertices")
     content["models"].append({"name": name, "vertices": vertices, "polygons": polygons})
   content["placements"] = []
   for index in range(placementCount):
@@ -309,15 +307,16 @@ def inRecastAxes(serverPoints):
 
 
 def waterBytes(regions):
-  """A V2 .wtr of .zon regions (eqgFiles.parseZone's), in their order: each its type by prefix (waterRegionTypes), center, no turn,
-  scale 1, and half extents as stored, signs included (the server swaps a negative extent into its box's low and high,
-  oriented_bounding_box.cpp:74). Refuses an unknown prefix, a turned region, a zero extent, and a number that is not finite."""
+  """A V2 .wtr of .zon regions (eqgFiles.parseZone's), in their order: each its type by prefix (waterRegionTypes, matched in its case,
+  as awater matches them), center, no turn, scale 1, and half extents as stored, signs included (the server swaps a negative extent
+  into its box's low and high, oriented_bounding_box.cpp:74). Refuses an unknown prefix, a turned region, a zero extent, and a number
+  that is not finite."""
   records = []
   for region in regions:
     name = region["name"]
-    prefix = name[:4].upper()
+    prefix = name[:4]
     if prefix not in waterRegionTypes:
-      raise ValueError(f"Region '{name}': no server region type for its prefix (known: {', '.join(waterRegionTypes)}); awater would write it as Water")
+      raise ValueError(f"Region '{name}': no server region type for its prefix (known, in this case: {', '.join(waterRegionTypes)})")
     finiteValues([*region["center"], *region["rotation"], *region["halfExtents"]], f"Region '{name}'")
     if any(region["rotation"]):
       raise ValueError(f"Region '{name}' is turned {list(region['rotation'])}; zonewright writes unturned regions, and the .zon turn's unit is unsettled")

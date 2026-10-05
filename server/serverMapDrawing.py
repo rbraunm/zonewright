@@ -169,10 +169,10 @@ def differingTriangles(first, second, tolerance):
   return numpy.concatenate([moved, numpy.arange(shared, max(len(first), len(second)))])
 
 
-def drawCollisionComparison(first, second, regions, titles, longSide=900, tolerance=1e-3):
-  """Two collisions (server-axis triangles in the server's order) in one frame side by side, each with the region boxes, and a third
-  plan with the triangles that differ by more than tolerance (differingTriangles) drawn in red over the first faded: blank when the
-  two agree. The third plan's title gives the count."""
+def drawCollisionComparison(first, firstRegions, second, secondRegions, titles, longSide=900, tolerance=1e-3):
+  """Two collisions (server-axis triangles in the server's order) in one frame side by side, each with its own .wtr's region boxes,
+  and a third plan with the triangles that differ by more than tolerance (differingTriangles) drawn in red over the first faded: blank
+  when the two agree. The third plan's title gives the count."""
   frame = collisionFrame(numpy.concatenate([first, second]), longSide)
   size = frame.size
   differing = differingTriangles(first, second, tolerance)
@@ -183,7 +183,7 @@ def drawCollisionComparison(first, second, regions, titles, longSide=900, tolera
   for triangle in serverMapFiles.inZoneAxes(longer[differing]).astype(numpy.float64):
     draw.polygon([frame.pixel(corner[:2]) for corner in triangle], fill=(*differenceColor, 255), outline=(*differenceColor, 255))
   difference = Image.alpha_composite(faded.convert("RGBA"), marks).convert("RGB")
-  panels = [drawCollision(first, regions, frame), drawCollision(second, regions, frame), difference]
+  panels = [drawCollision(first, firstRegions, frame), drawCollision(second, secondRegions, frame), difference]
   labels = [*titles, f"differ by over {tolerance:g}: {len(differing):,} of {max(len(first), len(second)):,} triangles"]
   sheet = Image.new("RGB", (len(panels) * size[0] + (len(panels) - 1) * panelGap, size[1] + titleHeight), (255, 255, 255))
   sheetDraw = ImageDraw.Draw(sheet)

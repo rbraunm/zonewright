@@ -168,6 +168,10 @@ def testMapWriterRefusesWhatTheServerWouldDrop():
   unplaceable = zoneFiles(base | {"obj_crate.mod": crateFile()}, [terrainPlacement, ("obj_crate.mod", "OBJ_crate01", (5, float("inf"), 0), (0, 0, 0), 1.0)])
   with pytest.raises(ValueError, match=r"Placement 1 'OBJ_crate01' of obj_crate.mod holds a number that is not finite"):
     serverMapFiles.mapBytes(unplaceable)
+  brokenCrate = modelFile("mod", [[0, 0, 0], [2, 0, 0], [0, float("nan"), 0], [0, 0, 2]], [[0, 1, 2], [0, 1, 3], [0, 2, 3], [1, 2, 3]])
+  unreadable = zoneFiles(base | {"obj_crate.mod": brokenCrate}, [terrainPlacement, ("obj_crate.mod", "OBJ_crate01", (5, 5, 0), (0, 0, 0), 1.0)])
+  with pytest.raises(ValueError, match=r"^Model obj_crate\.mod's vertices holds a number that is not finite$"):
+    serverMapFiles.mapBytes(unreadable)
   upperTerrain = zoneFiles({"TER_test.TER": terrain}, [("TER_test.TER", "ground", (0, 0, 0), (0, 0, 0), 1.0)])
   with pytest.raises(ValueError, match=r"Placement 0 'ground' of TER_test.TER: azone would place a terrain"):
     serverMapFiles.mapBytes(upperTerrain)
@@ -206,7 +210,7 @@ def testMapCollisionPlacesATurnedModelAsTheZoneReaderDoes():
 
 def testWaterWriterWritesEachPrefixsTypeAndTheExtentsAsStored():
   regions = [{"name": name, "center": (10.0 * index, -5.0, 2.0), "rotation": (0.0, 0.0, 0.0), "halfExtents": (4.0, -6.0, 3.0)}
-    for index, name in enumerate(["AWT_pond", "ALV_pit", "ATP_10_west", "apk_arena"])]
+    for index, name in enumerate(["AWT_pond", "ALV_pit", "ATP_10_west", "APK_arena"])]
   records = serverMapFiles.readWater(serverMapFiles.waterBytes(regions))
   assert [record["type"] for record in records] == [1, 2, 3, 4]
   assert all(record["position"] == region["center"] and record["rotation"] == (0, 0, 0) and record["scale"] == (1, 1, 1) and record["halfExtents"] == (4, -6, 3)
@@ -216,8 +220,10 @@ def testWaterWriterWritesEachPrefixsTypeAndTheExtentsAsStored():
 def testWaterWriterRefusesAnUnknownPrefixATurnAndAZeroExtent():
   def region(name="AWT_pond", rotation=(0.0, 0.0, 0.0), halfExtents=(4.0, 6.0, 3.0), center=(0.0, 0.0, 0.0)):
     return {"name": name, "center": center, "rotation": rotation, "halfExtents": halfExtents}
-  with pytest.raises(ValueError, match=r"Region 'ASL_goo': no server region type for its prefix .*awater would write it as Water"):
-    serverMapFiles.waterBytes([region(), region("ASL_goo")])
+  # awater matches prefixes in their case (water_map.cpp:258), and how the client reads another case is untraced.
+  for name in ("ASL_goo", "awt_pond", "Apk_arena"):
+    with pytest.raises(ValueError, match=rf"^Region '{name}': no server region type for its prefix \(known, in this case: AWT_, ALV_, ATP_, APK_\)$"):
+      serverMapFiles.waterBytes([region(), region(name)])
   with pytest.raises(ValueError, match=r"Region 'AWT_pond' is turned \[-128.0, 0.0, 0.0\]"):
     serverMapFiles.waterBytes([region(rotation=(-128.0, 0.0, 0.0))])
   with pytest.raises(ValueError, match=r"Region 'AWT_pond' has a zero half extent: \[4.0, 0.0, 3.0\]"):
@@ -244,53 +250,190 @@ def oneTileNav():
   return {"parameters": {"origin": (0.0, 0.0, 0.0), "tileWidth": 409.5, "tileHeight": 409.5, "maximumTiles": 1, "maximumPolygons": 4}, "tiles": [tile]}
 
 
-def testReadersRefuseTrailingAndMissingBytes():
-  files = zoneFiles({"ter_test.ter": modelFile("ter", *squareTerrain(50))}, [("ter_test.ter", "TER_test", (0, 0, 0), (0, 0, 0), 1.0)])
-  data = serverMapFiles.mapBytes(files)
-  assert len(serverMapFiles.mapCollision(data)) == 2
-  with pytest.raises(ValueError, match=rf"stream from byte 12 ends at byte {len(data)}, the file at byte {len(data) + 1}"):
-    serverMapFiles.readMap(data + b"\0")
-  water = serverMapFiles.waterBytes([{"name": "AWT_pond", "center": (0.0, 0.0, 0.0), "rotation": (0.0, 0.0, 0.0), "halfExtents": (4.0, 6.0, 3.0)}])
-  assert len(serverMapFiles.readWater(water)) == 1
-  with pytest.raises(ValueError, match=r"region 0 at byte 18 needs 52 bytes; 51 remain"):
-    serverMapFiles.readWater(water[:-1])
+def mapFileOf(stream, compressedSize, inflatedSize):
+  return struct.pack("<3I", 0x02000000, compressedSize, inflatedSize) + stream
+
+
+def crateZoneFiles():
+  return zoneFiles({"ter_test.ter": modelFile("ter", *squareTerrain(50)), "obj_crate.mod": crateFile()},
+    [("ter_test.ter", "TER_test", (0, 0, 0), (0, 0, 0), 1.0), ("obj_crate.mod", "OBJ_crate01", (5, 5, 0), (0, 0, 0), 1.0)])
+
+
+def testMapReaderRefusesTrailingAndMissingBytesInTheFileTheStreamAndThePayload():
+  payload = serverMapFiles.mapPayload(serverMapFiles.mapContent(crateZoneFiles()))
+  stream = zlib.compress(payload)
+  assert len(serverMapFiles.mapCollision(mapFileOf(stream, len(stream), len(payload)))) == 2 + 4
+  with pytest.raises(ValueError, match=rf"^the \.map: the header's {len(stream)}-byte stream from byte 12 ends at byte {12 + len(stream)}, the file at byte {13 + len(stream)}$"):
+    serverMapFiles.readMap(mapFileOf(stream, len(stream), len(payload)) + b"\0")
+  longer, shorter = zlib.compress(payload + b"\0"), zlib.compress(payload[:-1])
+  with pytest.raises(ValueError, match=rf"^the \.map \(inflated\): 1 bytes follow the placements, from byte {len(payload)}$"):
+    serverMapFiles.readMap(mapFileOf(longer, len(longer), len(payload) + 1))
+  with pytest.raises(ValueError, match=rf"^the \.map \(inflated\): placement 0 \(obj_crate\.mod\) at byte {len(payload) - 36} needs 36 bytes; 35 remain$"):
+    serverMapFiles.readMap(mapFileOf(shorter, len(shorter), len(payload) - 1))
+  # The server inflates without checking the result (map.cpp:456); the reader checks the stream's end, what follows it, and its size.
+  with pytest.raises(ValueError, match=r"^the \.map: the zlib stream from byte 12 ends before its last block$"):
+    serverMapFiles.readMap(mapFileOf(stream[:-4], len(stream) - 4, len(payload)))
+  with pytest.raises(ValueError, match=rf"^the \.map: 2 bytes follow the zlib stream, from byte {12 + len(stream)}$"):
+    serverMapFiles.readMap(mapFileOf(stream + b"\0\0", len(stream) + 2, len(payload)))
+  with pytest.raises(ValueError, match=rf"^the \.map: the zlib stream from byte 12 inflates to {len(payload)} bytes; the header says {len(payload) + 5}$"):
+    serverMapFiles.readMap(mapFileOf(stream, len(stream), len(payload) + 5))
   with pytest.raises(ValueError, match="a V1 map"):
     serverMapFiles.readMap(struct.pack("<I", 0x01000000) + bytes(48))
+
+
+def testMapReaderRefusesIndicesPastTheirVerticesARepeatedModelAndPlacementGroupsOrTerrainTiles():
+  content = serverMapFiles.readMap(serverMapFiles.mapBytes(crateZoneFiles()))
+  assert [len(content[key]) for key in ("collidableVertices", "collidableIndices", "nonCollidableVertices", "nonCollidableIndices")] == [4, 6, 0, 0]
+
+  def refusal(changed):
+    with pytest.raises(ValueError) as refused:
+      serverMapFiles.readMap(serverMapFiles.mapFile(serverMapFiles.mapPayload(content | changed)))
+    return str(refused.value)
+  pastEnd = content["collidableIndices"].copy()
+  pastEnd[4] = 4
+  indicesStart = 40 + 4 * 12
+  assert refusal({"collidableIndices": pastEnd}) == f"the .map (inflated): the 6 collidableIndices from byte {indicesStart} are not whole triangles of indices under 4"
+  assert refusal({"collidableIndices": content["collidableIndices"][:5]}) == f"the .map (inflated): the 5 collidableIndices from byte {indicesStart} are not whole triangles of indices under 4"
+  polygonStart = indicesStart + 6 * 4 + len(b"obj_crate.mod\0") + 8 + 4 * 12
+  crate = content["models"][0]
+  polygons = crate["polygons"].copy()
+  polygons["indices"][3, 2] = 4
+  assert refusal({"models": [crate | {"polygons": polygons}]}) == f"the .map (inflated): model obj_crate.mod's polygons from byte {polygonStart} index past its 4 vertices"
+  assert refusal({"models": [crate, crate]}) == f"the .map (inflated): model 1 at byte {polygonStart + 4 * 13} is named obj_crate.mod, as model 0 is; the server keeps the last"
+  payload = serverMapFiles.mapPayload(content)
+  for offset, layout, value, counts in ((24, "<I", 1, "1 placement groups and 0 terrain tiles (0 quads per tile, 0.0"),
+      (28, "<I", 2, "0 placement groups and 2 terrain tiles (0 quads per tile, 0.0"), (32, "<I", 3, "0 placement groups and 0 terrain tiles (3 quads per tile, 0.0"),
+      (36, "<f", 1.0, "0 placement groups and 0 terrain tiles (0 quads per tile, 1.0")):
+    header = bytearray(payload[:40])
+    struct.pack_into(layout, header, offset, value)
+    with pytest.raises(ValueError) as refused:
+      serverMapFiles.readMap(serverMapFiles.mapFile(bytes(header) + payload[40:]))
+    assert str(refused.value) == f"the .map (inflated): {counts} units per vertex); zonewright reads EQG zone maps, which hold none"
+
+
+def testMapCollisionRefusesAPlacementNamingNoModel():
+  content = serverMapFiles.readMap(serverMapFiles.mapBytes(crateZoneFiles()))
+  content["placements"][0]["name"] = "obj_barrel.mod"
+  with pytest.raises(ValueError, match=r"^the \.map: placement 0 names model obj_barrel\.mod, which the map does not hold; the server would skip it$"):
+    serverMapFiles.mapCollision(serverMapFiles.mapFile(serverMapFiles.mapPayload(content)))
+
+
+def testMapWriterMergesNegativeZeroWithZeroKeepingTheFirstSeen():
+  for first, second in ((-0.0, 0.0), (0.0, -0.0)):
+    positions = [[-50, -50, first], [50, -50, 0], [50, 50, 0], [-50, -50, second], [50, 50, 0], [-50, 50, 0]]
+    files = zoneFiles({"ter_test.ter": modelFile("ter", positions, [[0, 1, 2], [3, 4, 5]])}, [("ter_test.ter", "TER_test", (0, 0, 0), (0, 0, 0), 1.0)])
+    content = serverMapFiles.readMap(serverMapFiles.mapBytes(files))
+    assert content["collidableVertices"].tolist() == [[-50, -50, 0], [-50, 50, 0], [50, 50, 0], [50, -50, 0]]
+    assert content["collidableIndices"].tolist() == [0, 1, 2, 0, 2, 3]
+    assert numpy.signbit(content["collidableVertices"][:, 2]).tolist() == [bool(numpy.signbit(first)), False, False, False]
+
+
+def testMapWriterNamesEachPlacementsModelAsItsModelEntrySpellsIt():
+  # azone names each .zon model entry by its own spelling and each placement by its entry's (eqg_loader.cpp:103-138), so two spellings
+  # of one file are two models of the same shape.
+  files = zoneFiles({"ter_test.ter": modelFile("ter", *squareTerrain(50)), "OBJ_Crate.MOD": crateFile(), "obj_crate.mod": crateFile()},
+    [("ter_test.ter", "TER_test", (0, 0, 0), (0, 0, 0), 1.0), ("OBJ_Crate.MOD", "OBJ_crate01", (5, 5, 0), (0, 0, 0), 1.0),
+      ("obj_crate.mod", "OBJ_crate02", (9, 5, 0), (0, 0, 0), 1.0), ("OBJ_Crate.MOD", "OBJ_crate03", (13, 5, 0), (0, 0, 0), 1.0)])
+  content = serverMapFiles.readMap(serverMapFiles.mapBytes(files))
+  assert [model["name"] for model in content["models"]] == ["OBJ_Crate.MOD", "obj_crate.mod"]
+  assert numpy.array_equal(content["models"][0]["vertices"], content["models"][1]["vertices"])
+  assert [placement["name"] for placement in content["placements"]] == ["OBJ_Crate.MOD", "obj_crate.mod", "OBJ_Crate.MOD"]
+  assert len(serverMapFiles.collisionTriangles(content)) == 2 + 3 * 4
+
+
+def testWaterReaderRefusesTrailingAndMissingBytesAndOtherFormats():
+  water = serverMapFiles.waterBytes([{"name": "AWT_pond", "center": (1.0, 2.0, 3.0), "rotation": (0.0, 0.0, 0.0), "halfExtents": (4.0, 6.0, 3.0)}])
+  assert serverMapFiles.readWater(water) == [{"type": 1, "position": (1.0, 2.0, 3.0), "rotation": (0.0, 0.0, 0.0), "scale": (1.0, 1.0, 1.0), "halfExtents": (4.0, 6.0, 3.0)}]
+  with pytest.raises(ValueError, match=r"^the \.wtr: 1 bytes follow the 1 regions, from byte 70$"):
+    serverMapFiles.readWater(water + b"\0")
+  # Cut short, the server would log "Loaded Water Map" and drop it.
+  with pytest.raises(ValueError, match=r"^the \.wtr: region 0 at byte 18 needs 52 bytes; 51 remain$"):
+    serverMapFiles.readWater(water[:-1])
   with pytest.raises(ValueError, match="a V1 water map"):
     serverMapFiles.readWater(b"EQEMUWATER" + struct.pack("<2I", 1, 0))
+  with pytest.raises(ValueError, match=r"^the \.wtr: version 3 at byte 10 is not 2$"):
+    serverMapFiles.readWater(b"EQEMUWATER" + struct.pack("<2I", 3, 0))
+  with pytest.raises(ValueError, match=r"^the \.wtr: magic b'EQEMUWATRR' at byte 0 is not b'EQEMUWATER'$"):
+    serverMapFiles.readWater(b"EQEMUWATRR" + water[10:])
+
+
+def testNavReaderRefusesTrailingBytesAZeroTileReferenceOrSizeAndOtherFormats():
   nav = oneTileNav()
-  decoded = serverMapFiles.readNav(serverMapFiles.navFile(serverMapFiles.navPayload(nav)))
+  payload = serverMapFiles.navPayload(nav)
+  data = serverMapFiles.navFile(payload)
+  decoded = serverMapFiles.readNav(data)
   assert decoded["tiles"][0]["reference"] == 1 and numpy.array_equal(decoded["tiles"][0]["vertices"], nav["tiles"][0]["vertices"])
-  nav["tiles"][0]["reference"] = 0
-  with pytest.raises(ValueError, match=r"tile 0 at byte 32 has reference 0 and size \d+; the server drops the whole mesh"):
-    serverMapFiles.readNav(serverMapFiles.navFile(serverMapFiles.navPayload(nav)))
+  # One tile: the tile count and parameters (32 bytes), its reference and size (8), then its data to the payload's end.
+  tileSize = len(payload) - 40
+  assert struct.unpack_from("<Ii", payload, 32) == (1, tileSize)
+
+  def withTileEntry(reference, size, tail=b""):
+    return serverMapFiles.navFile(payload[:32] + struct.pack("<Ii", reference, size) + payload[40:] + tail)
+  with pytest.raises(ValueError, match=rf"^the \.nav: the header's {len(data) - 21}-byte stream from byte 21 ends at byte {len(data)}, the file at byte {len(data) + 1}$"):
+    serverMapFiles.readNav(data + b"\0")
+  with pytest.raises(ValueError, match=rf"^the \.nav \(inflated\): 1 bytes follow the 1 tiles, from byte {len(payload)}$"):
+    serverMapFiles.readNav(serverMapFiles.navFile(payload + b"\0"))
+  with pytest.raises(ValueError, match=rf"^the \.nav, tile 0 \(reference 1\): 1 bytes follow the off-mesh connections, from byte {tileSize}$"):
+    serverMapFiles.readNav(withTileEntry(1, tileSize + 1, b"\0"))
+  # The server drops the whole mesh on a zero tile reference or size (pathfinder_nav_mesh.cpp:473-491).
+  for reference, size in ((0, tileSize), (1, 0)):
+    with pytest.raises(ValueError, match=rf"^the \.nav \(inflated\): tile 0 at byte 32 has reference {reference} and size {size}; the server drops the whole mesh"):
+      serverMapFiles.readNav(withTileEntry(reference, size))
+  with pytest.raises(ValueError, match=r"^the \.nav: magic b'EQNAVMESX' at byte 0 is not b'EQNAVMESH'$"):
+    serverMapFiles.readNav(b"EQNAVMESX" + data[9:])
+  with pytest.raises(ValueError, match=r"^the \.nav: version 3 at byte 9 is not 2$"):
+    serverMapFiles.readNav(data[:9] + struct.pack("<I", 3) + data[13:])
+  for magic, version in ((0x44414E56, serverMapFiles.detourVersion), (serverMapFiles.detourMagic, 8)):
+    foreign = oneTileNav()
+    foreign["tiles"][0]["header"] |= {"magic": magic, "version": version}
+    with pytest.raises(ValueError, match=rf"^the \.nav, tile 0 \(reference 1\): magic {magic:#x} and version {version} at byte 0 are not Detour's 0x444e4156 and 7$"):
+      serverMapFiles.readNav(serverMapFiles.navFile(serverMapFiles.navPayload(foreign)))
 
 
-def testDrawCollisionShowsTheTopSurfaceAndTheBoxes():
+def testDrawCollisionShowsTheTopSurfaceAndEachBoxWhereItIs():
   floor, floorTriangles = squareTerrain(50)
   plateau, plateauTriangles = squareTerrain(10, 10.0, (-25, -35))
   terrain = modelFile("ter", floor + plateau, floorTriangles + [[index + 4 for index in triangle] for triangle in plateauTriangles])
   files = zoneFiles({"ter_test.ter": terrain}, [("ter_test.ter", "TER_test", (0, 0, 0), (0, 0, 0), 1.0)])
   collision = serverMapFiles.mapCollision(serverMapFiles.mapBytes(files))
-  regions = serverMapFiles.readWater(serverMapFiles.waterBytes([{"name": "AWT_pond", "center": (0.0, 0.0, 0.0), "rotation": (0.0, 0.0, 0.0), "halfExtents": (10.0, 10.0, 5.0)}]))
-  frame = serverMapDrawing.collisionFrame(collision, 200)
-  assert frame.size == (200, 200)
+  # Two boxes off the origin, of two types, one longer along x and one along y, so a box drawn at the origin, with x and y swapped, or
+  # labelled with another box's type puts its sides or its label elsewhere.
+  regions = serverMapFiles.readWater(serverMapFiles.waterBytes([
+    {"name": "AWT_pond", "center": (20.0, -15.0, 0.0), "rotation": (0.0, 0.0, 0.0), "halfExtents": (12.0, 5.0, 5.0)},
+    {"name": "ALV_pit", "center": (-20.0, 20.0, 0.0), "rotation": (0.0, 0.0, 0.0), "halfExtents": (5.0, 15.0, 5.0)},
+  ]))
+  water, lava = serverMapDrawing.regionColors[1], serverMapDrawing.regionColors[2]
+  frame = serverMapDrawing.collisionFrame(collision, 400)
+  assert frame.size == (400, 400)
   image = serverMapDrawing.drawCollision(collision, regions, frame)
 
-  def at(point):
-    return image.getpixel(tuple(int(value) for value in frame.pixel(point)))
-  # The floor in the lowest height's color, the plateau over it in the highest's, both lit from the north-west; the margin bare;
-  # the box's east side in the water color.
-  assert at((25, 25)) == (45, 73, 104) and at((-25, -35)) == (212, 211, 204)
-  assert at((-52, -52)) == serverMapDrawing.backgroundColor
-  assert at((0, -10)) == serverMapDrawing.regionColors[1]
-  # Raised plateau triangles differ, in red on the third plan; the floor matches and stays faded.
+  def at(picture, point, left=0, top=0):
+    x, y = frame.pixel(point)
+    return picture.getpixel((int(x) + left, int(y) + top))
+
+  def sidesOf(region):
+    """A point just inside the middle of each side of a box: north, south, west, east."""
+    (x, y, _), (halfX, halfY, _) = region["position"], region["halfExtents"]
+    return [(x + halfX - 0.25, y), (x - halfX + 0.25, y), (x, y + halfY - 0.25), (x, y - halfY + 0.25)]
+
+  def labelColorsAbove(picture, region, left=0, top=0):
+    """The region colors in the strip just above a box, where its number and type are written."""
+    (x, y, _), (halfX, _, _) = region["position"], region["halfExtents"]
+    column, row = frame.pixel((x + halfX, y))
+    strip = numpy.asarray(picture)[int(row) + top - 22:int(row) + top - 2, int(column) + left - 30:int(column) + left + 30]
+    return [color for color in (water, lava) if (strip == color).all(axis=2).any()]
+  # The floor in the lowest height's color, the plateau over it in the highest's, both lit from the north-west; the margin bare.
+  assert at(image, (35, 25)) == (45, 73, 104) and at(image, (-25, -35)) == (212, 211, 204)
+  assert at(image, (-52, -52)) == serverMapDrawing.backgroundColor
+  assert [at(image, point) for point in sidesOf(regions[0])] == [water] * 4 and [at(image, point) for point in sidesOf(regions[1])] == [lava] * 4
+  assert labelColorsAbove(image, regions[0]) == [water] and labelColorsAbove(image, regions[1]) == [lava]
+  # Each panel draws its own boxes; raised plateau triangles differ, in red on the third plan; the floor matches and stays faded.
   raised = collision.copy()
   raised[2:, :, 2] += 5
-  sheet = serverMapDrawing.drawCollisionComparison(collision, raised, regions, ("before", "after"), 200)
-  assert sheet.size == (3 * 200 + 2 * serverMapDrawing.panelGap, 200 + serverMapDrawing.titleHeight)
-
-  def onDifference(point):
-    x, y = frame.pixel(point)
-    return sheet.getpixel((int(x) + 2 * (200 + serverMapDrawing.panelGap), int(y) + serverMapDrawing.titleHeight))
-  assert onDifference((-25, -35)) == serverMapDrawing.differenceColor and onDifference((25, 25)) not in (serverMapDrawing.differenceColor, (45, 73, 104))
+  sheet = serverMapDrawing.drawCollisionComparison(collision, regions[:1], raised, regions[1:], ("before", "after"), 400)
+  assert sheet.size == (3 * 400 + 2 * serverMapDrawing.panelGap, 400 + serverMapDrawing.titleHeight)
+  first, second, difference = [(index * (400 + serverMapDrawing.panelGap), serverMapDrawing.titleHeight) for index in range(3)]
+  assert [at(sheet, point, *first) for point in sidesOf(regions[0])] == [water] * 4 and lava not in [at(sheet, point, *first) for point in sidesOf(regions[1])]
+  assert [at(sheet, point, *second) for point in sidesOf(regions[1])] == [lava] * 4 and water not in [at(sheet, point, *second) for point in sidesOf(regions[0])]
+  assert labelColorsAbove(sheet, regions[0], *first) == [water] and labelColorsAbove(sheet, regions[1], *second) == [lava]
+  assert at(sheet, (-25, -35), *difference) == serverMapDrawing.differenceColor and at(sheet, (35, 25), *difference) not in (serverMapDrawing.differenceColor, (45, 73, 104))
