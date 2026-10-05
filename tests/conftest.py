@@ -92,12 +92,14 @@ class ToolSession:
 
 class StagedServer:
   """A copy of the server, and of the zone-survey skill it reads its interpretive procedure from, with its own tooling root. Its tool
-  calls share one server process, as a client's calls do, until close; each session gets a process of its own."""
+  calls share one server process, as a client's calls do, until close; each session gets a process of its own. Its EVERQUEST_CLIENT is
+  the real client's unless clientFolder names another."""
 
-  def __init__(self, rootPath, manifest, localAppData=None):
+  def __init__(self, rootPath, manifest, localAppData=None, clientFolder=None):
     self.repositoryPath = rootPath / "repository"
     self.localAppData = localAppData if localAppData is not None else rootPath / "localAppData"
     self.toolingRoot = self.localAppData / "zonewright"
+    self.clientFolder = str(clientFolder) if clientFolder is not None else everquestClient
     shutil.copytree(repositoryRoot / "server", self.repositoryPath / "server", ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copytree(repositoryRoot / "recastHelper", self.repositoryPath / "recastHelper")
     shutil.copytree(repositoryRoot / zoneSurveySkill, self.repositoryPath / zoneSurveySkill)
@@ -131,7 +133,7 @@ class StagedServer:
     return StdioServerParameters(
       command=sys.executable,
       args=[str(self.repositoryPath / "server" / "zonewrightServer.py")],
-      env={"LOCALAPPDATA": str(self.localAppData), "EVERQUEST_CLIENT": everquestClient} if environment is None else environment,
+      env={"LOCALAPPDATA": str(self.localAppData), "EVERQUEST_CLIENT": self.clientFolder} if environment is None else environment,
     )
 
   def session(self, steps):

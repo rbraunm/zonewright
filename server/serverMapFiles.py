@@ -280,21 +280,33 @@ def turned(points, turns):
   return numpy.stack([x, y, z], axis=-1)
 
 
-def collisionTriangles(content, source="the .map"):
-  """The server's collision from a decoded map (map.cpp LoadV2): the collidable list as stored, then each placement's polygons marked
-  vis, turned, scaled, moved and swapped into server axes, in float32. A placement naming no model in the map raises, where the
-  server would skip it."""
-  vertices = content["collidableVertices"]
-  parts = [vertices[content["collidableIndices"]].reshape(-1, 3, 3)]
+def mapTriangles(content, collidable, source):
+  """A decoded map's triangles of one kind, in float32 server axes: the terrain list as stored, then each placement's polygons of that
+  kind (vis marks the collidable ones), turned, scaled, moved and swapped into server axes as the server places them. A placement
+  naming no model in the map raises, where the server would skip it."""
+  listKey = "collidable" if collidable else "nonCollidable"
+  vertices = content[f"{listKey}Vertices"]
+  parts = [vertices[content[f"{listKey}Indices"]].reshape(-1, 3, 3)]
   models = {model["name"]: model for model in content["models"]}
   for index, placement in enumerate(content["placements"]):
     if placement["name"] not in models:
       raise ValueError(f"{source}: placement {index} names model {placement['name']}, which the map does not hold; the server would skip it")
     model = models[placement["name"]]
-    corners = model["vertices"][model["polygons"]["indices"][model["polygons"]["vis"] != 0]]
+    corners = model["vertices"][model["polygons"]["indices"][(model["polygons"]["vis"] != 0) == collidable]]
     placed = turned(corners, placement["rotation"]) * placement["scale"] + placement["position"]
     parts.append(placed[..., [1, 0, 2]])
   return numpy.concatenate(parts).astype(numpy.float32)
+
+
+def collisionTriangles(content, source="the .map"):
+  """The server's collision from a decoded map (map.cpp LoadV2): the collidable list, then each placement's polygons marked vis."""
+  return mapTriangles(content, True, source)
+
+
+def passableTriangles(content, source="the .map"):
+  """What a decoded map holds that the server never collides with: the non-collidable list (map.cpp:527 skips it), then each
+  placement's polygons not marked vis, placed as the collidable ones are."""
+  return mapTriangles(content, False, source)
 
 
 def mapCollision(data, source="the .map"):
