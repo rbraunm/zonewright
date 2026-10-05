@@ -131,3 +131,10 @@ class ModelLibrary:
       holder = next((archive for archive in self.archives if modelName in archive.entries), None)
       self.models[modelName] = eqgFiles.parseModel(holder.read(modelName), f"{self.zoneName}:{modelName}") if holder else None
     return self.models[modelName]
+
+  def animationTracks(self, resource):
+    """An animation the archives register by resource name (an .ani entry's name without .ani): its tracks from the first archive
+    holding it, or None."""
+    entry = resource.lower() + ".ani"
+    holder = next((archive for archive in self.archives if entry in archive.entries), None)
+    return eqgFiles.parseAnimation(holder.read(entry), f"{holder.archivePath.name}:{entry}") if holder else None

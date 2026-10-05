@@ -52,8 +52,8 @@ def placeEmitters(emitters, collection, clientContent):
   destination = bridgeObjects.targetCollection(collection)
   placed = []
   for emitter in emitters:
-    if not isinstance(emitter["definition"], int) or emitter["definition"] < 0:
-      raise ValueError(f"Emitter '{emitter['name']}' needs a non-negative definition index, got {emitter['definition']!r}")
+    if not isinstance(emitter["definition"], int):
+      raise ValueError(f"Emitter '{emitter['name']}' needs an integer definition index, got {emitter['definition']!r}")
     if not isinstance(emitter["lifespan"], int):
       raise ValueError(f"Emitter '{emitter['name']}' needs an integer lifespan, got {emitter['lifespan']!r}")
     emitterObject = bpy.data.objects.new(emitter["name"], None)

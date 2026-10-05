@@ -25,6 +25,7 @@ import checkpoints
 import conceptComparison
 import emitterAssets
 import eqCalibration
+import eqEmitterDefinitions
 import eqEmitters
 import eqgExport
 import eqModels
@@ -932,13 +933,26 @@ def bridgeEmitters(emitters):
   return [{key: list(value) if key == "position" else value for key, value in emitter.items()} | {"name": emitter["name"] or f"emitter{emitter['definition']}"} for emitter in emitters]
 
 
+def emittersNotMade(emitters):
+  """The list's lines the client makes no emitter for, grouped by why (eqEmitters.notMadeReason), against the client's environment
+  emitter definitions."""
+  try:
+    definitionsPath = eqEmitterDefinitions.environmentDefinitionsPath(zoneSources.resolveClientRoot())
+    definitionCount = len(eqEmitterDefinitions.parseDefinitions(definitionsPath.read_bytes(), definitionsPath.name))
+  except (OSError, ValueError) as error:
+    raise ToolError(str(error)) from error
+  return eqEmitters.notMadeGroups(emitters, definitionCount)
+
+
 async def placeZoneEnvironment(context, zone, lights, emitters, clientContent):
-  """A placed zone's lights and emitters, each set in its own collection named for the zone; None for what is not read."""
-  placed = {"lights": None if lights is None else 0, "emitters": 0}
+  """A placed zone's lights and emitters, each set in its own collection named for the zone, the emitters as its list holds them
+  with the lines the client makes no emitter for listed (none drawn in previews); None for what is not read."""
+  placed = {"lights": None if lights is None else 0, "emitters": 0, "emittersNotMade": []}
   if lights:
     placed["lights"] = (await callBridge(context, "placeLights", {"lights": bridgeLights(lights), "collection": f"{zone} lights", "clientContent": clientContent}))["lights"]
   if emitters:
     placed["emitters"] = (await callBridge(context, "placeEmitters", {"emitters": bridgeEmitters(emitters), "collection": f"{zone} emitters", "clientContent": clientContent}))["emitters"]
+    placed["emittersNotMade"] = emittersNotMade(emitters)
   return placed
 
 
@@ -965,9 +979,14 @@ async def importZone(context: Context, zone: str, collection: str | None = None)
   the client lights it by: a classic (WLD) zone's region meshes and the objects its objects.wld places, or an EQ terrain zone's tiles
   (each ecosystem's cover and detail textures blended as the client blends them) and the objects and object groups its tiles place on
   the ground, or an EQG (EQGZ) zone's terrain and placed models (the loose .zon beside the archive when the client has one, as it
-  loads it), with baked light where its count fits each model. It keeps the zone file's coordinates, which the scene shares (Blender
+  loads it), with baked light where its count fits each model. A skinned (boned) model an EQG or EQ terrain zone places is posed at
+  the first key of its <model>_DEFAULT animation, which the client loops from a random point (the bind pose without one). The result's
+  source counts what the build left out or drew in another way by model (bakedLightNotFitting, bakedLightPastFileEnd, animatedModels),
+  never by placement. It keeps the zone file's coordinates, which the scene shares (Blender
   x, y are the server's y, x). The zone's lights (classic and EQG zones) come in as point lights in "<zone> lights" and its emitters as
-  empties in "<zone> emitters", as placeLights and placeEmitters make them. An EQG zone's zone-line regions come in as zone-line guides in
+  empties in "<zone> emitters", as placeLights and placeEmitters make them, every line of its emitter list among them; emittersNotMade
+  groups the lines the client makes no emitter for (a negative or too high definition index, a lifespan of 0 or less), which previews
+  do not draw. An EQG zone's zone-line regions come in as zone-line guides in
   "<zone> zone lines", as placeZoneLine makes them, named as the zone file names them (the number the client reads from the name) and
   turned about Z as it turns them, with no target (the zone file never says where one leads; the server's zone points do); getZoneLines
   lists them and plans and views draw them. Those with a tilt field set, whose reading is untraced, are listed in zoneLinesTilted, not
@@ -998,8 +1017,9 @@ async def importZoneFile(context: Context, path: str, collection: str | None = N
   archivePath = Path(path)
   if not archivePath.is_absolute() or archivePath.suffix.lower() != ".eqg" or not archivePath.is_file():
     raise ToolError(f"'{path}' is not an absolute path to an existing .eqg file")
+  clientRoot = zoneSources.resolveClientRoot()
   try:
-    folder, details = await anyio.to_thread.run_sync(eqZones.buildZoneFile, toolingRoot / "models", archivePath)
+    folder, details = await anyio.to_thread.run_sync(eqZones.buildZoneFile, clientRoot, toolingRoot / "models", archivePath)
   except (OSError, ValueError) as error:
     raise ToolError(f"{type(error).__name__}: {error}") from error
   placed = await callBridge(context, "placeModel", {
@@ -1819,7 +1839,8 @@ async def placeEmitters(context: Context, emitters: list[dict], collection: str 
   """Place particle emitters: [{name, position [x,y,z], definition (the client emitter definition index), lifespan (the list's lifespan
   field; 4000000 on most of the client's emitters)}] as empties in `collection`. exportZone writes them to <zone>_EnvironmentEmitters.txt
   beside the archive, and client-shaded views draw their particles as they stand at a moment of the client's steady state, from its
-  EnvironmentEmittersNew.edd (docs/clientRendering.md, Particle emitters); the client makes no emitter whose lifespan is 0. The asset
+  EnvironmentEmittersNew.edd (docs/clientRendering.md, Particle emitters); the client makes no emitter whose definition index is
+  negative or past its definitions or whose lifespan is 0 or less. The asset
   catalog (findAssets kind emitter) says what each definition shows and under which names client zones place it."""
   return await callBridge(context, "placeEmitters", {"emitters": [emitter | {"alwaysVisible": None} for emitter in emitters], "collection": collection, "clientContent": None})
 

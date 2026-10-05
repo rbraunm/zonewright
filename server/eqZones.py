@@ -15,12 +15,13 @@ import eqArchive
 import eqgFiles
 import eqgTerrain
 import eqModels
+import eqRaces
 import eqTerrainTextures
 import eqTextures
 import eqWorldFile
 import zoneSources
 
-zoneCacheFormat = 7
+zoneCacheFormat = 8
 readFormats = ("wld", "eqtzp", "eqgz")
 # A model's vertex light where its file gives none: no baked light and the full share of scene light, an assumption until the client's
 # lighting of EQG objects is traced.
@@ -226,18 +227,49 @@ def litColors(litBytes, vertexCount, sourceName):
   return bytesRGBA(numpy.frombuffer(litBytes, dtype="<u4", count=count, offset=4))
 
 
-def placedEQGPart(model, transform, position, colors):
-  """A static EQG model placed by a transform (rotation and scale) and a position, its normals turned with it, lit by colors (RGBA per
-  vertex), with the triangles its file lets players through."""
+def placedEQGPart(model, transform, position, colors, posed=None):
+  """An EQG model placed by a transform (rotation and scale) and a position, its normals turned with it, lit by colors (RGBA per
+  vertex), with the triangles its file lets players through: a static model as stored, a skinned one in its pose ((vertices, normals),
+  PlacedPoses), whose texture coordinates the skinned effects read unflipped (docs/clientRendering.md, Texture orientation)."""
   textures, alphaModes = eqModels.eqgMaterialTextures(model["materials"], model["triangleMaterials"], {})
-  normals = model["normals"] @ numpy.linalg.inv(transform)
+  vertices, normals = (model["vertices"], model["normals"]) if posed is None else posed
+  normals = normals @ numpy.linalg.inv(transform)
   normals /= numpy.maximum(numpy.linalg.norm(normals, axis=1, keepdims=True), 1e-12)
-  return eqModels.meshPart(model["vertices"] @ transform.T + position, model["triangles"], eqModels.staticEQGUVs(model["uvs"]), textures, alphaModes,
+  uvs = eqModels.staticEQGUVs(model["uvs"]) if posed is None else model["uvs"]
+  return eqModels.meshPart(vertices @ transform.T + position, model["triangles"], uvs, textures, alphaModes,
     {"normals": normals, "colors": colors}, eqModels.eqgLiquids(model["materials"], model["triangleMaterials"]), model["triangleFlags"] & eqgFiles.passableFlag)
 
 
+def defaultAnimation(modelName):
+  """The animation the client loops on a skinned model a zone places: its actor's name less _ACTORDEF, plus _DEFAULT
+  (EQGraphicsDX9.dll 0x10044550, 0x10044bd0)."""
+  return modelName.rsplit(".", 1)[0].upper() + "_DEFAULT"
+
+
+class PlacedPoses:
+  """The skinned models a zone places, each posed once as the client poses it (eqModels.placedSkinnedPose) by the animation its
+  archives register (animationTracks: a resource name to its tracks, or None), with how many placements each has."""
+  def __init__(self, clientRoot, animationTracks, label):
+    self.clientRoot, self.animationTracks, self.label = clientRoot, animationTracks, label
+    self.poses, self.placements, self.rootOffsets = {}, {}, None
+
+  def posed(self, modelName, model):
+    if modelName not in self.poses:
+      if self.rootOffsets is None:
+        self.rootOffsets = eqRaces.avatarOffsets(self.clientRoot)
+      resource = defaultAnimation(modelName)
+      tracks = self.animationTracks(resource)
+      self.poses[modelName] = (eqModels.placedSkinnedPose(model, tracks, resource, self.rootOffsets, f"{self.label}:{modelName}"), None if tracks is None else resource)
+    self.placements[modelName] = self.placements.get(modelName, 0) + 1
+    return self.poses[modelName][0]
+
+  def report(self):
+    """Per skinned model: its placements and the animation whose first key poses them (None: the bind pose)."""
+    return {name: {"placements": count, "animation": self.poses[name][1]} for name, count in sorted(self.placements.items())}
+
+
 class TerrainObjects:
-  """The static EQG models a terrain zone places, each parsed once from the archive the zone's links resolve it to."""
+  """The EQG models a terrain zone places, each parsed once from the archive the zone's links resolve it to."""
   def __init__(self, clientRoot, cacheRoot, zoneName):
     self.clientRoot, self.cacheRoot, self.zoneName = clientRoot, cacheRoot, zoneName
     self.models, self.missing, self.archives = {}, set(), []
@@ -254,13 +286,22 @@ class TerrainObjects:
       if definition["kind"] != "eqgModel":
         raise ValueError(f"Zone '{self.zoneName}' places {modelName}, a {definition['kind']} model from {definition['archive']}; only EQG models are placed in terrain zones yet")
       holder = eqArchive.EQArchive(self.clientRoot / definition["archive"])
-      model = eqgFiles.parseModel(holder.read(definition["entry"]), f"{definition['archive']}:{definition['entry']}")
-      if model["bones"] is not None:
-        raise ValueError(f"Zone '{self.zoneName}' places {modelName}, a skinned model; only static models are placed yet")
-      self.models[modelName] = model
+      self.models[modelName] = eqgFiles.parseModel(holder.read(definition["entry"]), f"{definition['archive']}:{definition['entry']}")
       if definition["archive"] not in self.archives:
         self.archives.append(definition["archive"])
     return self.models[modelName]
+
+  def animationTracks(self, resource):
+    """An animation the zone's links register, by resource name: its tracks from the first archive the client loads that defines it,
+    or None."""
+    index = eqModels.loadIndex(self.clientRoot, self.cacheRoot)
+    holder = eqModels.animationHolder(index, eqModels.loadOrder(self.clientRoot, self.zoneName)[0], resource)
+    if holder is None:
+      return None
+    registered = index[holder]["animations"][resource]
+    if "entry" not in registered:
+      raise ValueError(f"Zone '{self.zoneName}': {holder} registers {resource} from a WLD, not an .ani; how the client plays it on an EQG model is not known")
+    return eqgFiles.parseAnimation(eqArchive.EQArchive(self.clientRoot / holder).read(registered["entry"]), f"{holder}:{registered['entry']}")
 
 
 
@@ -367,6 +408,7 @@ def buildTerrainZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
   parts = [part | {"takesAllLights": False} for part in terrainTileParts(terrain, {combo: index for index, combo in enumerate(combos)})]
   tileCount = len(parts)
   objects = TerrainObjects(clientRoot, cacheRoot, zoneName)
+  poses = PlacedPoses(clientRoot, objects.animationTracks, f"Zone '{zoneName}'")
   tilesByOrigin = {(tile["x"], tile["y"]): tile for tile in terrain["tiles"]}
   placedCounts = {}
   for placement in terrain["placements"]:
@@ -375,7 +417,8 @@ def buildTerrainZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
       continue
     transform = eqgTerrain.placementMatrix(placement["rotationDegrees"], placement["scale"])
     colors = numpy.tile(numpy.array(unlitColor, dtype=numpy.uint8), (len(model["vertices"]), 1))
-    parts.append(placedEQGPart(model, transform, eqgTerrain.placedPosition(terrain, tilesByOrigin, placement), colors) | {"takesAllLights": True})
+    posed = None if model["bones"] is None else poses.posed(placement["model"], model)
+    parts.append(placedEQGPart(model, transform, eqgTerrain.placedPosition(terrain, tilesByOrigin, placement), colors, posed) | {"takesAllLights": True})
     placedCounts[placement["model"]] = placedCounts.get(placement["model"], 0) + 1
   missingGroups, litMismatches = set(), set()
   for group in terrain["groups"]:
@@ -389,13 +432,20 @@ def buildTerrainZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
       model = objects.model(member["model"])
       if model is None:
         continue
+      transform = groupTransform @ eqgTerrain.placementMatrix(member["rotationDegrees"], member["scale"])
+      position = groupPosition + groupTransform @ numpy.array(member["position"])
+      unlit = numpy.tile(numpy.array(unlitColor, dtype=numpy.uint8), (len(model["vertices"]), 1))
+      # A skinned member becomes a CHierarchicalActor, which the group loader makes without reading its .lit (0x100a5810).
+      if model["bones"] is not None:
+        parts.append(placedEQGPart(model, transform, position, unlit, poses.posed(member["model"], model)) | {"takesAllLights": True})
+        placedCounts[member["model"]] = placedCounts.get(member["model"], 0) + 1
+        continue
       colors = litColors(readEntry(archive, member["lit"]), len(model["vertices"]), member["lit"])
       baked = colors is not None
       if colors is None:
         litMismatches.add(member["lit"])
-        colors = numpy.tile(numpy.array(unlitColor, dtype=numpy.uint8), (len(model["vertices"]), 1))
-      transform = groupTransform @ eqgTerrain.placementMatrix(member["rotationDegrees"], member["scale"])
-      parts.append(placedEQGPart(model, transform, groupPosition + groupTransform @ numpy.array(member["position"]), colors) | {"takesAllLights": not baked})
+        colors = unlit
+      parts.append(placedEQGPart(model, transform, position, colors) | {"takesAllLights": not baked})
       placedCounts[member["model"]] = placedCounts.get(member["model"], 0) + 1
   textureHolders = [archive] + [eqArchive.EQArchive(clientRoot / name) for name in objects.archives if name != source["archive"].name.lower()]
   written = eqModels.writePartsCache(zoneFolder, parts, textureHolders, f"Zone '{zoneName}'")
@@ -403,52 +453,68 @@ def buildTerrainZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
   return {
     "tiles": tileCount, "ecosystems": sorted(ecosystems), "terrainCombos": [list(combo) for combo in combos], "placements": len(terrain["placements"]),
     "objectGroups": len(terrain["groups"]), "missingObjectGroups": sorted(missingGroups), "litFilesNotMatchingModels": sorted(litMismatches),
-    "placedObjects": sum(placedCounts.values()),
+    "placedObjects": sum(placedCounts.values()), "animatedModels": poses.report(),
     "objectArchives": objects.archives, "missingModels": sorted(objects.missing), "particleCloudsNotDrawn": 0,
   } | written
 
 
 def eqgLitColors(litBytes, sourceName):
-  """An EQG placement's .lit file (EQGP): a D3DCOLOR per vertex."""
+  """An EQG placement's .lit file (EQGP) as the version 1 loader reads it (EQGraphicsDX9.dll 0x10064da0): the color count its header
+  gives and the D3DCOLORs, one per vertex, of that count the file holds. The loader reads the count, then that many colors through
+  the archive, whose read stops at the file's end (0x100db120), so a file shorter than its count leaves the rest of the client's buffer
+  as its memory pool held it."""
   if litBytes[:4] != b"EQGP":
     raise ValueError(f"{sourceName}: not an EQGP baked light file")
   count = struct.unpack_from("<I", litBytes, 4)[0]
-  if len(litBytes) != 8 + 4 * count:
-    raise ValueError(f"{sourceName}: {count} colors in {len(litBytes)} bytes")
-  return numpy.frombuffer(litBytes, dtype="<u4", count=count, offset=8)
+  return count, numpy.frombuffer(litBytes, dtype="<u4", count=min(count, (len(litBytes) - 8) // 4), offset=8)
 
 
-def eqgZoneParts(library, zone, zoneArchive, label):
+def countedByModel(counts, modelName):
+  counts[modelName] = counts.get(modelName, 0) + 1
+
+
+def eqgZoneParts(clientRoot, library, zone, zoneArchive, label):
   """An EQG zone's placements as mesh parts. Baked light comes from the .zon (version 2) or each placement's <name>.lit (version 1)
-  and is drawn only where its count equals the model's vertices, as the client takes it (EQGraphicsDX9.dll 0x100548d0). The client
-  computes its own light for a placement whose count differs; that is not drawn yet, so those placements are listed and drawn with
-  none. A model no linked archive holds is left out, as the client draws nothing for it."""
-  parts, missing, notFitting, placedCounts = [], set(), [], {}
+  and is drawn only where its count equals the model's vertices, as the client takes it (EQGraphicsDX9.dll 0x100548d0); a placement
+  whose count differs keeps none, and those are counted by model. A .lit shorter than its count gives the colors it holds; past them
+  the client's colors are whatever its memory pool held, which the preview draws as no baked light, and those placements are counted
+  by model too. A skinned model is posed as the client poses it (PlacedPoses) and takes no baked light: the loaders make it a
+  CHierarchicalActor without the colors (0x10064da0, 0x10065430). A model no linked archive holds is left out, as the client draws
+  nothing for it."""
+  parts, missing, notFitting, pastFileEnd, placedCounts = [], set(), {}, {}, {}
+  poses = PlacedPoses(clientRoot, library.animationTracks, label)
   for placement in zone["placements"]:
     model = library.model(placement["model"])
     if model is None:
       missing.add(placement["model"])
       continue
-    if model["bones"] is not None:
-      raise ValueError(f"{label} places {placement['model']}, a skinned model; only static models are placed yet")
     vertexCount = len(model["vertices"])
+    unlit = numpy.tile(numpy.array(unlitColor, dtype=numpy.uint8), (vertexCount, 1))
+    placedCounts[placement["model"]] = placedCounts.get(placement["model"], 0) + 1
+    if model["bones"] is not None:
+      parts.append(placedEQGPart(model, *eqgFiles.drawnTransform(placement), unlit, poses.posed(placement["model"], model)) | {"takesAllLights": True})
+      continue
     colors = placement["colors"]
+    count = None if colors is None else len(colors)
     if colors is None:
       litName = placement["name"].lower() + ".lit"
-      colors = eqgLitColors(zoneArchive.read(litName), f"{label}:{litName}") if litName in zoneArchive.entries else None
-    if colors is not None and len(colors) and len(colors) != vertexCount:
-      notFitting.append(placement["name"])
-      colors = None
-    baked = colors is not None and len(colors) > 0
-    rgba = bytesRGBA(colors) if baked else numpy.tile(numpy.array(unlitColor, dtype=numpy.uint8), (vertexCount, 1))
+      count, colors = eqgLitColors(zoneArchive.read(litName), f"{label}:{litName}") if litName in zoneArchive.entries else (None, None)
+    baked = bool(count) and count == vertexCount
+    if count and not baked:
+      countedByModel(notFitting, placement["model"])
+    rgba = unlit
+    if baked:
+      rgba = numpy.concatenate([bytesRGBA(colors), unlit[len(colors):]])
+      if len(colors) < count:
+        countedByModel(pastFileEnd, placement["model"])
     # The terrain is drawn as the zone's regions, which take only the lights marked for baked geometry (0x1000db20).
     parts.append(placedEQGPart(model, *eqgFiles.drawnTransform(placement), rgba) | {"takesAllLights": not baked and not placement["model"].endswith(".ter")})
-    placedCounts[placement["model"]] = placedCounts.get(placement["model"], 0) + 1
   if not parts:
     raise ValueError(f"{label}: none of its {len(zone['placements'])} placements has a model in {[archive.archivePath.name for archive in library.archives]}")
   return parts, {
     "zoneVersion": zone["version"], "placements": len(zone["placements"]), "placedObjects": sum(placedCounts.values()),
-    "missingModels": sorted(missing), "bakedLightNotFitting": notFitting, "particleCloudsNotDrawn": 0,
+    "missingModels": sorted(missing), "bakedLightNotFitting": dict(sorted(notFitting.items())), "bakedLightPastFileEnd": dict(sorted(pastFileEnd.items())),
+    "animatedModels": poses.report(), "particleCloudsNotDrawn": 0,
   }
 
 
@@ -457,7 +523,7 @@ def buildClientEQGZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
   archivePaths, missingArchives = zoneSources.assetArchivePaths(clientRoot, source)
   library = zoneSources.ModelLibrary(archivePaths, zoneName)
   label = f"Zone '{zoneName}'"
-  parts, details = eqgZoneParts(library, clientEQGZone(source, zoneName), library.archives[0], label)
+  parts, details = eqgZoneParts(clientRoot, library, clientEQGZone(source, zoneName), library.archives[0], label)
   written = eqModels.writePartsCache(zoneFolder, parts, library.archives, label)
   return details | {"looseZoneFile": "zonPath" in source, "missingAssetArchives": missingArchives} | written
 
@@ -488,9 +554,9 @@ def zoneFileBoundaries(archivePath):
   }
 
 
-def buildZoneFile(cacheRoot, archivePath):
+def buildZoneFile(clientRoot, cacheRoot, archivePath):
   """An EQG zone archive outside the client, such as one zonewright exported: its one .zon and the models and textures it holds,
-  cached by the archive's SHA-256."""
+  cached by the archive's SHA-256; the client's moddat.ini poses any skinned model it places."""
   data = archivePath.read_bytes()
   digest = hashlib.sha256(data).hexdigest()
   zoneName = archivePath.stem.lower()
@@ -507,7 +573,7 @@ def buildZoneFile(cacheRoot, archivePath):
   if len(zoneFiles) != 1:
     raise ValueError(f"{archivePath.name} holds {len(zoneFiles)} .zon files; a zone archive holds one")
   label = f"Zone file '{archivePath.name}'"
-  parts, details = eqgZoneParts(library, eqgFiles.parseZone(archive.read(zoneFiles[0]), zoneFiles[0]), archive, label)
+  parts, details = eqgZoneParts(clientRoot, library, eqgFiles.parseZone(archive.read(zoneFiles[0]), zoneFiles[0]), archive, label)
   zoneFolder.mkdir(parents=True, exist_ok=True)
   written = eqModels.writePartsCache(zoneFolder, parts, [archive], label)
   details = stamp | {"zone": zoneName, "file": str(archivePath)} | details | written

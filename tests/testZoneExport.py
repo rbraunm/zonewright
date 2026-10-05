@@ -88,8 +88,10 @@ def testExportedZoneComesBackAsItWasBuilt(stageBlenderServer, tmp_path):
   assert abs(turned["rotation"][0] - numpy.radians(30)) < 1e-6 and turned["rotation"][1:] == (0.0, 0.0)
 
   source = imported["source"]
-  assert {key: source[key] for key in ("zoneVersion", "placements", "placedObjects", "missingModels", "bakedLightNotFitting", "missingTextures", "droppedTriangles")} == {
-    "zoneVersion": 1, "placements": 4, "placedObjects": 4, "missingModels": [], "bakedLightNotFitting": [], "missingTextures": [], "droppedTriangles": 0,
+  keys = ("zoneVersion", "placements", "placedObjects", "missingModels", "bakedLightNotFitting", "bakedLightPastFileEnd", "animatedModels", "missingTextures", "droppedTriangles")
+  assert {key: source[key] for key in keys} == {
+    "zoneVersion": 1, "placements": 4, "placedObjects": 4, "missingModels": [], "bakedLightNotFitting": {}, "bakedLightPastFileEnd": {}, "animatedModels": {},
+    "missingTextures": [], "droppedTriangles": 0,
   }
   assert detail["triangles"] == sum(sceneTriangles.values())
   # The archive draws as the scene it came from: the same pixels within a level, outside a few antialiased edge pixels.
