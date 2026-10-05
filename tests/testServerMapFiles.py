@@ -281,3 +281,13 @@ def testDrawCollisionShowsTheTopSurfaceAndTheBoxes():
   assert at((25, 25)) == (45, 73, 104) and at((-25, -35)) == (212, 211, 204)
   assert at((-52, -52)) == serverMapDrawing.backgroundColor
   assert at((0, -10)) == serverMapDrawing.regionColors[1]
+  # Raised plateau triangles differ, in red on the third plan; the floor matches and stays faded.
+  raised = collision.copy()
+  raised[2:, :, 2] += 5
+  sheet = serverMapDrawing.drawCollisionComparison(collision, raised, regions, ("before", "after"), 200)
+  assert sheet.size == (3 * 200 + 2 * serverMapDrawing.panelGap, 200 + serverMapDrawing.titleHeight)
+
+  def onDifference(point):
+    x, y = frame.pixel(point)
+    return sheet.getpixel((int(x) + 2 * (200 + serverMapDrawing.panelGap), int(y) + serverMapDrawing.titleHeight))
+  assert onDifference((-25, -35)) == serverMapDrawing.differenceColor and onDifference((25, 25)) not in (serverMapDrawing.differenceColor, (45, 73, 104))
