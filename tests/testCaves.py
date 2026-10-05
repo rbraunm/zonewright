@@ -99,6 +99,7 @@ gallery = {"objectName": "ground", "start": [-120, -45], "end": [120, 10], "floo
 measureShares = r"""
 import numpy, mathutils, mathutils.bvhtree
 import bridgeMeshAccess
+from playerScale import stepHeight
 ground = bpy.data.objects['ground']
 shown, _ = bridgeMeshAccess.readVertexArrays(ground)
 tree = mathutils.bvhtree.BVHTree.FromPolygons(shown.tolist(), bridgeMeshAccess.meshTriangles(ground).tolist())
@@ -107,7 +108,7 @@ def inside(point):
   location, normal, _, _ = tree.ray_cast(mathutils.Vector(point), mathutils.Vector((0, 0, 1)))
   return location is not None and normal.z > 0
 
-result = [float(numpy.mean([inside(numpy.array(point) + [0, 0, 2] + share * width * numpy.array(toSide)) for share in numpy.linspace(-0.5, 0.5, 201)])) for point in path]
+result = [float(numpy.mean([inside(numpy.array(point) + [0, 0, stepHeight] + share * width * numpy.array(toSide)) for share in numpy.linspace(-0.5, 0.5, 201)])) for point in path]
 """
 # The cut floor's height 6 out from and 12 into the rock from each inner point of the path, across its bend's middle.
 measureFloorAcross = r"""
