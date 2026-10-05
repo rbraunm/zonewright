@@ -1699,13 +1699,17 @@ async def cutCave(
   negative to the left looking along it): level {from, to, across, material?} holds the floor exactly at the run's floor (a walking way
   through rough ground, a plot's pad, a threshold), its ends rows of the tube and its sides floor points in every row, so its edges are
   straight lines; pad {from, to, across, top or rise (the other null), edge, material?} sets a level pad at a height (top) or over the
-  run's floor at its middle (rise; negative sinks it), its sides running out to the floor over `edge` (0.5 a riser, more a slope), its
-  edges cut as a level way's (a dais, a plot's raised pad, a terrace step across the whole width); rough {outline [[x, y], ...], rise,
-  edge, breakup {featureSize, amplitude, seed}} raises rubble inside an outline in plan, lumps of the author's noise up to `rise` over
-  the floor, easing to the floor over `edge` past the outline, banked up the wall foot to twice its rise where it meets a wall, the wall's
-  straight part lifted evenly above the bank so it never folds. A level way wins over everything and a pad over rubble; a floor with no
-  strokes stays level wall to wall, a deliberate choice for a hall. `material` gives a level way or a pad's top its own material, its
-  border on the stroke's exact edges. Rubble wants a finer floor: its featureSize at least twice edgeLength (a cave with rubble at 8).
+  run's floor at its middle (rise; negative sinks it), its sides running out over `edge` (0.5 a riser, more a slope) to what stands
+  round it (the floor, or rubble), its edges cut as a level way's (a dais, a plot's raised pad, a terrace step across the whole width);
+  rough {outline [[x, y], ...], rise, edge, breakup {featureSize, amplitude, seed}, bank?, material?} raises rubble over an outline in
+  plan, ridged by the author's noise into crests up to `rise` over the floor falling to `rise` less twice `amplitude` between them,
+  easing to the floor past the outline at a foot that wanders by the same noise from a quarter of `edge` to `edge` out, so its edge runs
+  as broken ground; beside a level way it eases from nothing at the way's side over `edge`, so no blade stands there; with `bank` it
+  heaps up a wall it meets to `bank` (talus, broken by its noise), the wall's straight part lifted evenly above so it never folds. A
+  level way wins over everything and a pad over rubble; a floor with no strokes stays level wall to wall, a deliberate choice for a
+  hall. `material` gives a level way or a pad's top its own material, its border on the stroke's exact edges, and rubble its own where
+  it stands at least half in its ground (rock or scree, so it reads as rock beside a paved way). Rubble wants a finer floor: its
+  featureSize at least twice edgeLength (a cave with rubble at 8).
   `branches` [{name, from, path, widths, heights, grades?, landings?, daylight?, overlook?}] are runs of their own leaving the main run
   ("main") or a branch named before: a side passage, a side room, a fork, a second mouth. A branch's first point stands inside its parent
   (its whole first section within the parent's walls), on its parent's floor (its height may be left out to take the parent's floor
@@ -1744,7 +1748,8 @@ async def cutCave(
   Refused, changing nothing: a stretch of floor steeper than `maximumFloorDegrees` (naming it and the run it needs; a graded segment's
   own grade included), a point whose height is set two ways (given, and by a graded segment into it), a graded segment whose start has
   no height, a landing at an end or at a point where the path does not bend; a floor stroke reaching past its run's walls or ends
-  (naming how far), on an unknown run, named twice, or malformed; rubble finer than twice edgeLength (naming the edgeLength it needs);
+  (naming how far), on an unknown run, named twice, or malformed (naming the field); rubble lying wholly off its run; rubble finer
+  than twice edgeLength (naming the edgeLength it needs);
   relief raising a wall's foot to within a step of the lowest trim band or of the top of the walls' straight part (naming the wall and
   where); a pad sunk where no rock lies under it; a branch whose first section reaches out of its parent (naming how far and where),
   whose floor where it starts lies under its parent's (a hole) or more than a step over it without overlook, that never leaves its

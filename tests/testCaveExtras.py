@@ -149,38 +149,102 @@ def testAPadIsLevelAtItsTopWithStraightEdges(stageBlenderServer, tmp_path):
   assert numpy.abs(heights[beyond] - 2).max() <= 1e-4
 
 
-def testRoughGroundStaysInsideItsOutlineAndBanksWithoutFolding(stageBlenderServer, tmp_path):
+def testRoughGroundStaysInsideItsOutlineAndBanksWhereAskedWithoutFolding(stageBlenderServer, tmp_path):
+  banked = rubble | {"bank": 12, "material": "caveRock"}
+  # On the room's straight line, finer than any cut: where the rubble's foot comes down past its outline's south side (y 120), on a line
+  # every unit across it, how far out its ground reaches there; and its relief beside the way, every quarter unit out from the way's
+  # side (14 across) at three places along it.
+  besideTheWay = r"""
+import numpy
+import bridgeCaveRuns
+strokes = bridgeCaveRuns.strokeDefinitions([way, rubble], ['main'], 8.0)
+line = bridgeCaveRuns.CaveLine([[0, -60], [0, 250]], [120, 120], [70, 70]).setFloors([2, 2])
+relief = bridgeCaveRuns.FloorRelief(strokes, line)
+reaches = []
+for x in numpy.arange(12.0, 69.0):
+  ys = numpy.arange(120.0, 112.0, -0.05)
+  weights = relief.roughWeights(relief.rough[0], numpy.column_stack([numpy.full(len(ys), x), ys]))
+  reaches.append(float(120 - ys[numpy.flatnonzero(weights > 0)].min()))
+alongs = numpy.array([200.0, 220.0, 240.0])
+offsets = numpy.repeat(numpy.arange(14.0, 20.01, 0.25)[None, :], 3, axis=0)
+plan = numpy.stack([offsets, numpy.repeat(alongs[:, None] - 60, offsets.shape[1], axis=1)], axis=2)
+result = {'reaches': reaches, 'offsets': offsets[0].tolist(), 'relief': relief.relief(alongs, offsets, plan, numpy.full(3, 120.0)).tolist()}
+"""
+
   async def steps(session):
     await caveCanyon(session, tmp_path)
     await pathMaterial(session, tmp_path)
-    cut = await session.expectSuccess("cutCave", room | {"breakup": None, "floor": [way, rubble]})
+    cut = await session.expectSuccess("cutCave", room | {"breakup": None, "floor": [way, banked]})
     vertices = (await session.expectSuccess("runPython", {"code": lining("room")}))["result"]
     faces = (await session.expectSuccess("runPython", {"code": "name = 'room'\n" + readLiningFaces}))["result"]
-    return cut, vertices, faces
+    await session.expectSuccess("removeCave", {"objectName": "ground", "name": "room"})
+    await session.expectSuccess("cutCave", room | {"breakup": None, "floor": [way, rubble]})
+    unbanked = (await session.expectSuccess("runPython", {"code": lining("room")}))["result"]
+    fine = (await session.expectSuccess("runPython", {"code": f"way = {way!r}\nrubble = {rubble!r}\n" + besideTheWay}))["result"]
+    return cut, vertices, faces, unbanked, fine
 
-  cut, vertices, faces = stageBlenderServer.session(steps)
+  cut, vertices, faces, unbanked, fine = stageBlenderServer.session(steps)
   vertices = numpy.array(vertices)
   along, across, heights = vertices[:, 1] + 60, vertices[:, 0], vertices[:, 2]
-  floor = heights < 2 + 2 * 6 + 1e-3
+  floor = heights < 2 + 12 + 1e-3
   points = vertices[:, :2]
-  # The outline's own distance: inside it relief is at most its rise but where it banks up the wall foot (60 across), at most twice it
-  # there; beyond its edge none at all; inside the way none at all.
+  # Inside its outline relief is at most its rise but where it banks up the wall foot (60 across); beyond its edge none at all; inside
+  # the way none at all.
   insideOutline = (points[:, 0] >= 10) & (points[:, 0] <= 70) & (points[:, 1] >= 120) & (points[:, 1] <= 220)
   dx = numpy.maximum(numpy.maximum(10 - points[:, 0], points[:, 0] - 70), 0)
   dy = numpy.maximum(numpy.maximum(120 - points[:, 1], points[:, 1] - 220), 0)
   beyond = floor & (numpy.hypot(dx, dy) > 6 + 1e-3) & (along > 150) & (along < 310) & (numpy.abs(across) < 59.5)
   assert beyond.sum() > 50 and numpy.abs(heights[beyond] - 2).max() <= 1e-4
-  awayFromWall = floor & insideOutline & (across < 60 - 2 * 6)
+  awayFromWall = floor & insideOutline & (across > 20) & (across < 60 - 12)
   assert (heights[awayFromWall] - 2).max() <= 6 + 1e-4 and (heights[awayFromWall] - 2).max() > 3
+  # Its bank heaps up the wall to 12 at most, by its noise: 12 less twice its amplitude at least, and not one straight line along it.
   atWall = floor & insideOutline & (numpy.abs(across - 60) <= 1e-3)
-  assert numpy.abs(heights[atWall] - 2 - 12).max() <= 1e-3
+  bank = heights[atWall] - 2
+  assert atWall.sum() >= 5 and bank.max() <= 12 + 1e-4 and bank.min() >= 12 - 2 * 3 - 1e-4 and bank.max() - bank.min() > 1
+  # Without a bank, the rubble at the wall stands no higher than its rise.
+  unbanked = numpy.array(unbanked)
+  unbankedAtWall = (unbanked[:, 2] < 2 + 12) & (numpy.abs(unbanked[:, 0] - 60) <= 1e-3) & (unbanked[:, 1] >= 120) & (unbanked[:, 1] <= 220)
+  assert unbankedAtWall.sum() >= 5 and (unbanked[unbankedAtWall, 2] - 2).max() <= 6 + 1e-4
   inWay = floor & (along >= 160) & (along <= 300) & (across >= -10) & (across <= 14)
   assert numpy.abs(heights[inWay] - 2).max() <= 1e-4
+  # Beside the way, it eases from nothing at the way's side over its edge: at most its rise times the ease that far out, so no blade
+  # stands at the way's side.
+  share = (numpy.array(fine["offsets"]) - 14) / 6
+  besideWay = numpy.array(fine["relief"])
+  assert numpy.abs(besideWay[:, 0]).max() == 0 and (besideWay - 6 * share * share * (3 - 2 * share)).max() <= 1e-9 and besideWay[:, -1].max() > 1
+  # Its foot runs out past its outline as broken ground: from a quarter of its edge to its edge out, not one distance along the side.
+  reaches = fine["reaches"]
+  assert min(reaches) >= 6 / 4 - 0.05 and max(reaches) <= 6 + 1e-9 and max(reaches) - min(reaches) > 1
+  # Its faces deep inside its outline carry its material; the floor beyond its edge keeps the cave's; the way keeps its own.
+  centers, normals, materials = numpy.array(faces["centers"]), numpy.array(faces["normals"]), numpy.array(faces["materials"])
+  floorFaces = (normals[:, 2] > 0.7) & (centers[:, 2] < 2 + 12)
+  deepInside = floorFaces & (centers[:, 0] > 20) & (centers[:, 0] < 58) & (centers[:, 1] > 128) & (centers[:, 1] < 212)
+  pastIt = floorFaces & (centers[:, 0] < -20) & (centers[:, 1] > 100) & (centers[:, 1] < 240)
+  assert deepInside.sum() > 0 and set(materials[deepInside]) == {"caveRock"} and set(materials[pastIt]) == {"caveFloor"}
+  assert [(stroke["name"], stroke.get("bank"), stroke.get("material")) for stroke in cut["floorStrokes"]] == [("way", None, None), ("rubble", 12.0, "caveRock")]
   # The wall rising from the bank never folds: no lining face of the room (short of its blind end's dome, which closes over its floor)
   # below where its walls stop rising straight faces down, and the cave's own checks find nothing wrong.
-  centers, normals = numpy.array(faces["centers"]), numpy.array(faces["normals"])
   low = (centers[:, 2] < 2 + 0.35 * 70) & (centers[:, 1] > 90) & (centers[:, 1] < 250)
   assert normals[low, 2].min() >= -1e-3 and faces["problems"] == []
+
+
+def testAPadOverRubbleEasesIntoItWithoutAMoat(stageBlenderServer, tmp_path):
+  rubbleEverywhere = {"kind": "rough", "name": "rubble", "run": "main", "outline": [[-60, 110], [60, 110], [60, 250], [-60, 250]], "rise": 6, "edge": 6, "breakup": {"featureSize": 32, "amplitude": 2, "seed": 3}}
+  plotPad = {"kind": "pad", "name": "plotPad", "run": "main", "from": 200, "to": 260, "across": [-20, 20], "rise": 2, "edge": 20}
+  across = list(range(-56, 57, 2))
+
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    await session.expectSuccess("cutCave", room | {"breakup": None, "floor": [rubbleEverywhere, plotPad]})
+    return (await session.expectSuccess("runPython", {"code": floorHeights([[x, 170, 30] for x in across])}))["result"]
+
+  heights = numpy.array(stageBlenderServer.session(steps))
+  offsets = numpy.abs(numpy.array(across))
+  # Its top is level at 4; its side, 20 wide, runs from its top to the rubble round it (4 to 8), never dipping under both.
+  assert numpy.abs(heights[offsets <= 20] - 4).max() <= 1e-3
+  side = (offsets > 20) & (offsets < 40)
+  assert side.sum() >= 16 and heights[side].min() >= 4 - 1e-3
+  assert heights[offsets >= 40].min() >= 4 - 1e-3 and heights[offsets >= 40].max() <= 8 + 1e-3
 
 
 def testFloorStrokesComeBackOnEveryCut(stageBlenderServer, tmp_path):
@@ -216,14 +280,18 @@ def testFloorStrokeRefusals(stageBlenderServer, tmp_path):
     fine = await session.expectError("cutCave", room | {"floor": [rubble | {"breakup": {"featureSize": 20, "amplitude": 3, "seed": 3}}]})
     banded = await session.expectError("cutCave", room | {"trimBands": [trim], "floor": [rubble]})
     twice = await session.expectError("cutCave", room | {"floor": [way, pad | {"name": "way"}]})
+    offRun = await session.expectError("cutCave", room | {"floor": [rubble | {"outline": [[150, 300], [200, 300], [200, 350], [150, 350]]}]})
+    malformed = await session.expectError("cutCave", room | {"floor": [pad | {"edge": "wide"}]})
     detail = await session.expectSuccess("getObjectDetail", {"name": "ground"})
-    return outside, fine, banded, twice, detail
+    return outside, fine, banded, twice, offRun, malformed, detail
 
-  outside, fine, banded, twice, detail = stageBlenderServer.session(steps)
+  outside, fine, banded, twice, offRun, malformed, detail = stageBlenderServer.session(steps)
   assert "Floor stroke 'way' reaches 10.0 past its run's left wall at 40.0 along it, where the floor is 40.0 wide" in outside
   assert "featureSize 20 is under twice the cave's edgeLength (16)" in fine and "edgeLength of 10 or less" in fine
   assert "The cave's floor strokes raise its right wall's foot" in banded and "within a step of the lowest trim band (4.0 over the floor)" in banded
   assert "Two floor strokes are named 'way'" in twice
+  assert "Floor stroke 'rubble' (rough) lies wholly off its run 'main'" in offRun
+  assert "Floor stroke 'dais''s edge is a number, got 'wide'" in malformed
   assert detail["caves"] == []
 
 

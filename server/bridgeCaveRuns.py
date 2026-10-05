@@ -15,12 +15,15 @@ strokeKinds = ("level", "pad", "rough")
 strokeKeys = {
   "level": ({"kind", "name", "run", "from", "to", "across"}, {"material"}),
   "pad": ({"kind", "name", "run", "from", "to", "across", "edge"}, {"material", "top", "rise"}),
-  "rough": ({"kind", "name", "run", "outline", "rise", "edge", "breakup"}, set()),
+  "rough": ({"kind", "name", "run", "outline", "rise", "edge", "breakup"}, {"material", "bank"}),
 }
 runKeys = ({"path", "widths", "heights"}, {"grades", "landings", "daylight"})
 branchKeys = ({"name", "from", "path", "widths", "heights"}, {"grades", "landings", "daylight", "overlook"})
 roughOctaves = 3
 roughRoughness = 0.5
+# Where a rough stroke's edge wanders is read from its noise this far off (in noise units) from where its lumps are, so the two are
+# independent.
+wanderOffset = numpy.array([733.1, -419.7, 0.0])
 # Two floor breaks (a stroke's edge across the floor) closer than this are one, and one this close to a wall is the wall's corner.
 breakTolerance = 1e-3
 # A break kept off a wall it would otherwise meet in a narrower row by at least this, so no floor face closes to nothing.
@@ -217,8 +220,18 @@ class CaveLine:
     }
 
 
+def isNumber(value):
+  return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def requireNumber(value, what):
+  if not isNumber(value):
+    raise ValueError(f"{what} is a number, got {value!r}")
+  return float(value)
+
+
 def requireNumbers(values, count, what, low=None, high=None):
-  if not isinstance(values, list) or len(values) != count or any(not isinstance(value, (int, float)) or isinstance(value, bool) for value in values):
+  if not isinstance(values, list) or len(values) != count or not all(isNumber(value) for value in values):
     raise ValueError(f"{what} are {count} numbers, got {values!r}")
   if low is not None and min(values) < low or high is not None and max(values) > high:
     raise ValueError(f"{what} lie from {low:g} to {high:g}, got {values!r}")
@@ -230,15 +243,15 @@ def runDefinition(run, label, isBranch):
   (signed degrees, or null), landing point indices, an optional daylight share per point, and for a branch whether it is an overlook."""
   required, optional = branchKeys if isBranch else runKeys
   path = run["path"]
-  if not isinstance(path, list) or len(path) < 2 or any(not isinstance(point, list) or len(point) not in (2, 3) for point in path):
-    raise ValueError(f"{label}'s path is at least two points, each [x, y] or [x, y, z] (a floor height, or none to take it from the grades or the even grade between given ones), got {path!r}")
+  if not isinstance(path, list) or len(path) < 2 or any(not isinstance(point, list) or len(point) not in (2, 3) or not all(isNumber(value) for value in point) for point in path):
+    raise ValueError(f"{label}'s path is at least two points, each [x, y] or [x, y, z] in numbers (a floor height, or none to take it from the grades or the even grade between given ones), got {path!r}")
   count = len(path)
   widths, heights = run["widths"], run["heights"]
-  if not isinstance(widths, list) or not isinstance(heights, list) or len(widths) != count or len(heights) != count or min(widths) <= 0 or min(heights) <= 0:
+  if not isinstance(widths, list) or not isinstance(heights, list) or len(widths) != count or len(heights) != count or not all(isNumber(value) and value > 0 for value in widths + heights):
     raise ValueError(f"{label}'s widths and heights are one positive value per path point ({count}), got {widths!r} and {heights!r}")
   grades = run.get("grades")
   if grades is not None:
-    if not isinstance(grades, list) or len(grades) != count - 1 or any(grade is not None and (not isinstance(grade, (int, float)) or isinstance(grade, bool)) for grade in grades):
+    if not isinstance(grades, list) or len(grades) != count - 1 or any(grade is not None and not isNumber(grade) for grade in grades):
       raise ValueError(f"{label}'s grades are one per segment ({count - 1}), each signed degrees or null where the points' heights decide, got {grades!r}")
     grades = [None if grade is None else float(grade) for grade in grades]
   landings = run.get("landings") or []
@@ -346,39 +359,47 @@ def strokeDefinitions(floor, runNames, edgeLength):
       raise ValueError(f"Floor stroke '{name}' is on run {stroke['run']!r}; the cave's runs are {runNames}")
     what = f"Floor stroke '{name}'"
     defined = {"kind": kind, "name": name, "run": stroke["run"]}
+    material = stroke.get("material")
+    if material is not None and not isinstance(material, str):
+      raise ValueError(f"{what}'s material is a material's name, got {material!r}")
+    defined["material"] = material
     if kind in ("level", "pad"):
       across = stroke["across"]
-      if not isinstance(across, list) or len(across) != 2 or not all(isinstance(value, (int, float)) for value in across) or across[0] >= across[1]:
+      if not isinstance(across, list) or len(across) != 2 or not all(isNumber(value) for value in across) or across[0] >= across[1]:
         raise ValueError(f"{what}'s across is [left, right], units from the run's middle (negative to the left looking along it), left under right, got {across!r}")
       defined |= {"from": requirePosition(stroke["from"], f"{what}'s from"), "to": requirePosition(stroke["to"], f"{what}'s to"), "across": [float(value) for value in across]}
-      material = stroke.get("material")
-      if material is not None and not isinstance(material, str):
-        raise ValueError(f"{what}'s material is a material's name, got {material!r}")
-      defined["material"] = material
     if kind == "pad":
       top, rise = stroke.get("top"), stroke.get("rise")
       if (top is None) == (rise is None):
         raise ValueError(f"{what} is set at top (a height) or rise (over the run's floor at its middle), one of them (the other null), got top {top!r} and rise {rise!r}")
-      if not stroke["edge"] >= 0.5:
-        raise ValueError(f"{what}'s edge is how far its side runs out to the floor, at least 0.5 (a riser; more is a slope), got {stroke['edge']!r}")
-      defined |= {"top": None if top is None else float(top), "rise": None if rise is None else float(rise), "edge": float(stroke["edge"])}
+      edge = requireNumber(stroke["edge"], f"{what}'s edge")
+      if not edge >= 0.5:
+        raise ValueError(f"{what}'s edge is how far its side runs out to the floor around it, at least 0.5 (a riser; more is a slope), got {stroke['edge']!r}")
+      defined |= {"top": None if top is None else requireNumber(top, f"{what}'s top"), "rise": None if rise is None else requireNumber(rise, f"{what}'s rise"), "edge": edge}
     if kind == "rough":
       outline = stroke["outline"]
-      if not isinstance(outline, list) or len(outline) < 3 or any(not isinstance(point, list) or len(point) != 2 for point in outline):
+      if not isinstance(outline, list) or len(outline) < 3 or any(not isinstance(point, list) or len(point) != 2 or not all(isNumber(value) for value in point) for point in outline):
         raise ValueError(f"{what}'s outline is at least three [x, y] points in plan, got {outline!r}")
       breakup = stroke["breakup"]
-      if not isinstance(breakup, dict) or set(breakup) != {"featureSize", "amplitude", "seed"} or breakup["featureSize"] <= 0 or breakup["amplitude"] <= 0:
-        raise ValueError(f"{what}'s breakup is {{featureSize, amplitude, seed}} with a positive featureSize and amplitude, got {breakup!r}")
-      if not stroke["rise"] > 0 or not stroke["edge"] > 0:
-        raise ValueError(f"{what}'s rise (how high its rubble stands over the floor) and edge (how far past its outline it eases to the floor) are positive, got {stroke['rise']!r} and {stroke['edge']!r}")
+      if (
+        not isinstance(breakup, dict) or set(breakup) != {"featureSize", "amplitude", "seed"} or not isNumber(breakup["featureSize"]) or not isNumber(breakup["amplitude"])
+        or breakup["featureSize"] <= 0 or breakup["amplitude"] <= 0 or not isinstance(breakup["seed"], int) or isinstance(breakup["seed"], bool)
+      ):
+        raise ValueError(f"{what}'s breakup is {{featureSize, amplitude, seed}} with a positive featureSize and amplitude and a whole seed, got {breakup!r}")
+      rise, edge = requireNumber(stroke["rise"], f"{what}'s rise"), requireNumber(stroke["edge"], f"{what}'s edge")
+      if not rise > 0 or not edge > 0:
+        raise ValueError(f"{what}'s rise (how high its rubble stands over the floor) and edge (how wide the band is where it eases to the floor) are positive, got {stroke['rise']!r} and {stroke['edge']!r}")
+      bank = stroke.get("bank")
+      if bank is not None and not (isNumber(bank) and bank > 0):
+        raise ValueError(f"{what}'s bank is how high its rubble heaps up a wall it meets (talus), a positive height, or none, got {bank!r}")
       if breakup["featureSize"] < 2 * edgeLength - 1e-9:
         raise ValueError(
           f"{what}'s featureSize {breakup['featureSize']:g} is under twice the cave's edgeLength ({edgeLength:g}), too fine for its floor to hold:"
           f" cut the cave at an edgeLength of {breakup['featureSize'] / 2:g} or less, or give a featureSize of {2 * edgeLength:g} or more"
         )
       defined |= {
-        "outline": [[float(value) for value in point] for point in outline], "rise": float(stroke["rise"]), "edge": float(stroke["edge"]),
-        "breakup": {"featureSize": float(breakup["featureSize"]), "amplitude": float(breakup["amplitude"]), "seed": int(breakup["seed"])},
+        "outline": [[float(value) for value in point] for point in outline], "rise": rise, "edge": edge, "bank": None if bank is None else float(bank),
+        "breakup": {"featureSize": float(breakup["featureSize"]), "amplitude": float(breakup["amplitude"]), "seed": breakup["seed"]},
       }
     strokes.append(defined)
   return strokes
@@ -395,9 +416,9 @@ def positionAlong(line, value, what):
 
 class FloorRelief:
   """The floor strokes of one run, placed on its line: where they need rows (along) and floor points (across), and the relief they give
-  the floor: level holds it at the run's floor and wins over everything; a pad sets it level at its top, its sides running out to the
-  floor over its edge, and wins over rough ground; rough ground rises inside its outline by the author's noise, eases to the floor over
-  its edge outside it, and banks up the wall foot to twice its rise."""
+  the floor: level holds it at the run's floor and wins over everything; a pad sets it level at its top, its sides running out over its
+  edge to what stands round it, and wins over rough ground; rough ground rises in lumps of the author's noise about its outline, its edge
+  broken by the same noise, heaped up a wall it meets where the author gives it a bank."""
 
   def __init__(self, strokes, line):
     self.line = line
@@ -464,42 +485,84 @@ class FloorRelief:
 
   def relief(self, alongs, offsets, plan, widths):
     """The floor's relief over the run's floor at floor points: alongs (rows), offsets (rows x points, across), plan (rows x points x 2)
-    and widths (rows). Returns relief (rows x points) and which stroke's material each point stands under (or None)."""
+    and widths (rows). Rough ground stands in its own ground (roughWeights), lumps of its noise (lumpHeights) easing to nothing at a
+    level stroke's side over its edge; a pad blends from its top at its sides to what stands round it at its feet; a level stroke holds
+    the floor. Refuses a rough stroke none of whose ground lies on the run's floor."""
     rows, count = offsets.shape
-    relief = numpy.zeros((rows, count))
     alongGrid = numpy.repeat(alongs[:, None], count, axis=1)
-    if self.rough:
-      rough = numpy.zeros((rows, count))
-      wallDistance = widths[:, None] / 2 - numpy.abs(offsets)
-      for stroke in self.rough:
-        weights = outlineWeights(plan.reshape(-1, 2), stroke["outlineArray"], stroke["edge"]).reshape(rows, count)
-        if not weights.any():
-          continue
-        breakup = stroke["breakup"]
-        samples = numpy.column_stack([plan.reshape(-1, 2), numpy.zeros(rows * count)])
-        noise = bridgeNoise.fractalNoise(bridgeNoise.noiseSamplePoints(samples, breakup["featureSize"], breakup["seed"]), roughOctaves, roughRoughness).reshape(rows, count)
-        lumps = numpy.clip(stroke["rise"] - breakup["amplitude"] + breakup["amplitude"] * noise, 0.0, stroke["rise"])
-        bank = 2 * stroke["rise"] * numpy.clip(1 - wallDistance / (2 * stroke["rise"]), 0.0, 1.0)
-        rough = numpy.maximum(rough, weights * numpy.maximum(lumps, bank))
-      relief = rough
+    flatPlan = plan.reshape(-1, 2)
+    relief = numpy.zeros((rows, count))
+    wallDistance = widths[:, None] / 2 - numpy.abs(offsets)
+    for stroke in self.rough:
+      weights = self.roughWeights(stroke, flatPlan).reshape(rows, count)
+      if not weights.any():
+        raise ValueError(
+          f"Floor stroke '{stroke['name']}' (rough) lies wholly off its run '{stroke['run']}': no floor of the run lies within its outline or"
+          f" {stroke['edge']:g} of it. Draw its outline over the run's floor, or name the run it lies on"
+        )
+      lumps = lumpHeights(stroke, flatPlan, wallDistance.ravel()).reshape(rows, count)
+      for level in self.level:
+        lumps *= smoothstep(numpy.clip(strokeDistances(alongGrid, offsets, level) / stroke["edge"], 0.0, 1.0))
+      relief = numpy.maximum(relief, weights * lumps)
+    floors = self.line.floorAt(alongs)[:, None]
     padWeight = numpy.zeros((rows, count))
     for pad in self.pads:
       weight = numpy.minimum(sideWeights(alongGrid, pad["start"], pad["end"], pad["edge"]), sideWeights(offsets, pad["across"][0], pad["across"][1], pad["edge"]))
-      floors = self.line.floorAt(alongs)[:, None]
-      over = weight > padWeight
-      relief = numpy.where(over & (weight > 0), weight * (pad["topHeight"] - floors), relief)
+      over = (weight > padWeight) & (weight > 0)
+      relief = numpy.where(over, weight * (pad["topHeight"] - floors) + (1 - weight) * relief, relief)
       padWeight = numpy.maximum(padWeight, weight)
     level = numpy.zeros((rows, count), dtype=bool)
     for stroke in self.level:
       level |= insideStroke(alongGrid, offsets, stroke)
     return numpy.where(level, 0.0, relief)
 
-  def materialOf(self, along, offset):
-    """The material of the level stroke (first) or pad top a point of the floor stands in, or None."""
-    for stroke in self.level + self.pads:
-      if stroke["material"] is not None and insideStroke(numpy.array([along]), numpy.array([offset]), stroke)[0]:
-        return stroke["material"]
-    return None
+  def roughWeights(self, stroke, points):
+    """How far each plan point stands in a rough stroke's ground, 0 to 1: full inside its outline, easing to nothing past it at its foot,
+    which wanders by the stroke's noise from a quarter of `edge` to `edge` out, so the rubble's foot runs as broken ground rather than
+    along the outline's straight sides."""
+    breakup = stroke["breakup"]
+    inside = pointsInPolygon(points, stroke["outlineArray"])
+    samples = bridgeNoise.noiseSamplePoints(numpy.column_stack([points, numpy.zeros(len(points))]), breakup["featureSize"], breakup["seed"]) + wanderOffset
+    foot = stroke["edge"] * (0.625 + 0.375 * numpy.tanh(bridgeNoise.fractalNoise(samples, roughOctaves, roughRoughness)))
+    return numpy.where(inside, 1.0, smoothstep(numpy.clip(1 - polygonDistances(points, stroke["outlineArray"]) / foot, 0.0, 1.0)))
+
+  def materials(self, alongs, offsets, points):
+    """The stroke material each floor point (alongs, offsets, plan points; flat) stands under, or None for the floor's own: the level
+    stroke's it stands in, else the pad top's, else the rough ground's it stands at least half in (the most, of two)."""
+    found = numpy.full(len(alongs), None, dtype=object)
+    strongest = numpy.full(len(alongs), 0.5)
+    for stroke in self.rough:
+      if stroke["material"] is None:
+        continue
+      weights = self.roughWeights(stroke, points)
+      wins = weights >= strongest
+      found[wins], strongest[wins] = stroke["material"], weights[wins]
+    for stroke in self.pads + self.level:
+      found[insideStroke(alongs, offsets, stroke)] = stroke["material"]
+    return found
+
+
+def lumpHeights(stroke, points, wallDistances):
+  """A rough stroke's height at plan points over its ground: ridged by its noise, crests standing at `rise` where the noise crosses its
+  middle and falling to `rise` less twice `amplitude` away from them (never under the floor), so the rubble breaks into sharp crests
+  rather than standing flat; and with a bank, heaped up a wall it meets the same way up to `bank`, reaching as far out from the wall as
+  it stands high there."""
+  breakup = stroke["breakup"]
+  samples = bridgeNoise.noiseSamplePoints(numpy.column_stack([points, numpy.zeros(len(points))]), breakup["featureSize"], breakup["seed"])
+  shape = 1 - 2 * numpy.abs(numpy.tanh(bridgeNoise.fractalNoise(samples, roughOctaves, roughRoughness)))
+  lumps = numpy.maximum(stroke["rise"] - breakup["amplitude"] + breakup["amplitude"] * shape, 0.0)
+  if stroke["bank"] is None:
+    return lumps
+  talus = numpy.maximum(stroke["bank"] - breakup["amplitude"] + breakup["amplitude"] * shape, 0.0)
+  banked = talus * smoothstep(numpy.clip(1 - wallDistances / numpy.maximum(talus, 1e-9), 0.0, 1.0))
+  return numpy.maximum(lumps, banked)
+
+
+def strokeDistances(alongs, offsets, stroke):
+  """How far floor points stand from a level stroke or pad top, along and across the run: 0 inside it."""
+  alongGap = numpy.maximum(numpy.maximum(stroke["start"] - alongs, alongs - stroke["end"]), 0.0)
+  acrossGap = numpy.maximum(numpy.maximum(stroke["across"][0] - offsets, offsets - stroke["across"][1]), 0.0)
+  return numpy.hypot(alongGap, acrossGap)
 
 
 def insideStroke(alongs, offsets, stroke):
@@ -509,13 +572,6 @@ def insideStroke(alongs, offsets, stroke):
 def sideWeights(values, low, high, edge):
   """1 between low and high, falling evenly to 0 over edge beyond each."""
   return numpy.clip(1 - numpy.maximum(low - values, values - high) / edge, 0.0, 1.0)
-
-
-def outlineWeights(points, outline, edge):
-  """1 inside a closed outline in plan, easing (smoothstep) to 0 at edge outside it, 0 beyond."""
-  inside = pointsInPolygon(points, outline)
-  distances = polygonDistances(points, outline)
-  return numpy.where(inside, 1.0, smoothstep(numpy.clip(1 - distances / edge, 0.0, 1.0)))
 
 
 def pointsInPolygon(points, polygon):

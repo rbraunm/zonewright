@@ -182,30 +182,35 @@ def testACaveIsCutSealedWalkableAndSurfacedAndItsLiningStrokesComeBack(stageBlen
   assert recut["cut"]["liningFaces"] > 0 and repainted == {"floor": ["rock"], "walls": ["caveRock"]}
 
 
-def testFineCutsCloseWhereTheFloorMeetsTheGroundAndOnlyFlapsGo(stageBlenderServer, tmp_path):
-  # A closed tetrahedron, and the same with a flap: its first face again, turned over, back to back with it.
-  flaps = r"""
+def testFineCutsCloseWhereTheTubesEndStandsOnTheGround(stageBlenderServer, tmp_path):
+  # Two faces meeting along a line from x 0 to 10, each with a corner of its own on it (the upper at 7, the lower at 4), and between them
+  # the slit the exact boolean leaves where a tube's flat end stands on the ground: its outline back along the line by the upper face's
+  # corners and out again by the lower's.
+  slit = r"""
+import numpy
 import bridgeCaves
-closed = [[0, 1, 2], [0, 3, 1], [1, 3, 2], [2, 3, 0]]
-result = {'flap': bridgeCaves.flapEdgesClosed(closed + [[0, 2, 1]], [4]), 'closing': bridgeCaves.flapEdgesClosed(closed, [0]),
-  'pairBothNamed': bridgeCaves.flapEdgesClosed(closed + [[0, 2, 1]], [0, 4])}
+positions = numpy.array([[0, 0, 0], [10, 0, 0], [10, 5, 0], [0, 5, 0], [4, 0, 0], [10, -5, 0], [0, -5, 0], [7, 0, 0]], dtype=float)
+faces = [[0, 7, 1, 2, 3], [6, 5, 1, 4, 0], [1, 7, 0, 4]]
+kept, sources, _ = bridgeCaves.withoutSlivers(positions, faces, [0, 1, -2], [[0, 0, 1]] * 3)
+result = {'faces': kept, 'sources': sources}
 """
   fine = hall | {"path": [[0, -60, 2], [0, 10, 2], [0, 60, 2], [0, 90, 2], [0, 250, 2]], "breakup": None}
 
   async def steps(session):
     await caveCanyon(session, tmp_path)
-    dropped = (await session.expectSuccess("runPython", {"code": flaps}))["result"]
+    zipped = (await session.expectSuccess("runPython", {"code": slit}))["result"]
     checks = []
-    for edgeLength, breakup in ((8, None), (8, {"featureSize": 40, "amplitude": 3, "seed": 11}), (12, None)):
+    for edgeLength, breakup in ((8, None), (8, {"featureSize": 40, "amplitude": 3, "seed": 11}), (12, None), (16, None), (16, None)):
       await session.expectSuccess("cutCave", fine | {"edgeLength": edgeLength, "breakup": breakup})
       checks.append((await session.expectSuccess("runPython", {"code": checkCave}))["result"])
       await session.expectSuccess("removeCave", {"objectName": "ground", "name": "hall"})
-    return dropped, checks
+    return zipped, checks
 
-  dropped, checks = stageBlenderServer.session(steps)
-  # A flap goes, a face that closes the surface stays, and of a back-to-back pair both named, one goes.
-  assert dropped == {"flap": [4], "closing": [], "pairBothNamed": [4]}
-  # At every edgeLength the floor running out level onto the ground in front of the mouth leaves the cut sealed.
+  zipped, checks = stageBlenderServer.session(steps)
+  # The slit goes, and each face takes the other's corner on the line, so the two meet edge to edge.
+  assert zipped == {"faces": [[0, 4, 7, 1, 2, 3], [6, 5, 1, 7, 4, 0]], "sources": [0, 1]}
+  # At every edgeLength, and cut again after being taken back, the cut is sealed where the tube's end stands on the ground in front of
+  # the mouth.
   for checked in checks:
     assert checked["edgesOnThreeOrMoreFaces"] == 0 and checked["openEdges"] == borderEdges
 

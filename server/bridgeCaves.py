@@ -680,13 +680,16 @@ def relieved(definition, worked, rows, sections, vertices, surface):
   sunk = values < -1e-6
   if sunk.any():
     requireFloorOnRock(surface, vertices[:, :floorCount + 1][sunk], worked["owner"])
-  for row in own[:-1]:
-    if row + 1 not in own:
-      continue
-    middleAlong = (rows["alongs"][row] + rows["alongs"][row + 1]) / 2
-    for index in range(floorCount):
-      middleOffset = (offsets[row, index] + offsets[row, index + 1] + offsets[row + 1, index] + offsets[row + 1, index + 1]) / 4
-      materials[row][index] = relief.materialOf(middleAlong, middleOffset)
+  faceRows = numpy.array([row for row in own[:-1] if row + 1 in own], dtype=numpy.int64)
+  if not len(faceRows):
+    return materials
+  middleAlongs = numpy.repeat((rows["alongs"][faceRows] + rows["alongs"][faceRows + 1]) / 2, floorCount)
+  middleOffsets = ((offsets[faceRows, :floorCount] + offsets[faceRows, 1:floorCount + 1] + offsets[faceRows + 1, :floorCount] + offsets[faceRows + 1, 1:floorCount + 1]) / 4).ravel()
+  plan = sections[:, :floorCount + 1, :2]
+  middlePoints = ((plan[faceRows, :floorCount] + plan[faceRows, 1:] + plan[faceRows + 1, :floorCount] + plan[faceRows + 1, 1:]) / 4).reshape(-1, 2)
+  found = relief.materials(middleAlongs, middleOffsets, middlePoints).reshape(len(faceRows), floorCount)
+  for position, row in enumerate(faceRows.tolist()):
+    materials[row] = found[position].tolist()
   return materials
 
 
@@ -1137,86 +1140,97 @@ def simpleLoops(corners):
 def groundedFloor(positions, faces, sources, normals, patchPositions, patchFaces):
   """The faces' sources with each face of the tube's floor that lies in the ground's own plane (where the tube runs out in the open in
   front of its mouth, its floor level with the ground, the exact boolean may keep the tube's floor there rather than the ground's) taken
-  as a piece of the ground face it lies on, so the open ground in front of a mouth stays ground; and one facing down there dropped as
-  the solid's sides are (-1) where it is a flap, the tube's floor met from below where it only touches the ground: one whose every edge
-  the faces left still close (flapEdgesClosed). One that closes the surface stays."""
+  as a piece of the ground face it lies on, so the open ground in front of a mouth stays ground."""
   tree = mathutils.bvhtree.BVHTree.FromPolygons(patchPositions.tolist(), patchFaces)
   sources = list(sources)
-  facingDown = []
   for index, (face, source, normal) in enumerate(zip(faces, sources, normals)):
-    if source > -2 or abs(normal[2]) <= floorNormalZ:
+    if source > -2 or normal[2] <= floorNormalZ:
       continue
     middle = mathutils.Vector(positions[face].mean(axis=0).tolist())
     location, _, patchFace, _ = tree.ray_cast(middle + up * groundPlaneTolerance, down, 2 * groundPlaneTolerance)
     if location is not None:
-      if normal[2] > 0:
-        sources[index] = patchFace
-      else:
-        facingDown.append(index)
-  for index in flapEdgesClosed(faces, facingDown):
-    sources[index] = -1
+      sources[index] = patchFace
   return sources
 
 
-def flapEdgesClosed(faces, candidates):
-  """The candidate faces that can go without opening the surface: taken out together, every edge of theirs is left on an even number
-  of faces. While one of their edges would be left on an odd number, the first candidate on it stays, as it closes the surface."""
-  def edgesOf(face):
-    return [tuple(sorted((face[position], face[(position + 1) % len(face)]))) for position in range(len(face))]
-
-  left = {}
-  for face in faces:
-    for edge in edgesOf(face):
-      left[edge] = left.get(edge, 0) + 1
-  dropped = list(candidates)
-  for index in dropped:
-    for edge in edgesOf(faces[index]):
-      left[edge] -= 1
-  while True:
-    needed = next((index for index in dropped if any(left[edge] % 2 for edge in edgesOf(faces[index]))), None)
-    if needed is None:
-      return sorted(dropped)
-    dropped.remove(needed)
-    for edge in edgesOf(faces[needed]):
-      left[edge] += 1
-
-
 def isFlat(points):
-  """Whether a triangle's corners lie in a line, within matchDistance of it."""
-  lengths = [numpy.linalg.norm(points[(position + 1) % 3] - points[position]) for position in range(3)]
-  return bool(numpy.linalg.norm(numpy.cross(points[1] - points[0], points[2] - points[0])) <= matchDistance * max(max(lengths), matchDistance))
+  """Whether a face's corners lie on a line, within matchDistance of the line through its two farthest apart."""
+  points = numpy.asarray(points, dtype=numpy.float64)
+  spans = numpy.linalg.norm(points[:, None, :] - points[None, :, :], axis=2)
+  first, second = numpy.unravel_index(int(spans.argmax()), spans.shape)
+  length = float(spans[first, second])
+  if length <= matchDistance:
+    return True
+  direction = (points[second] - points[first]) / length
+  offsets = points - points[first]
+  return bool(numpy.linalg.norm(offsets - (offsets @ direction)[:, None] * direction, axis=1).max() <= matchDistance)
 
 
 def withoutSlivers(positions, faces, sources, normals):
-  """The faces with each triangle of the tube whose corners lie in a line (within matchDistance of it) taken out, its middle corner set
-  into the face across its long edge (unless that is the solid's side), so the surface stays closed: the tube running along the
-  ground's own edges leaves such triangles."""
+  """The faces with each face of the tube whose corners lie on a line (isFlat) taken out, so the surface stays closed where the tube runs
+  along the ground's own edges: a triangle with no area has its middle corner set into the face across its long edge (unless that is the
+  solid's side); a slit, whose outline runs out along a line and back (where a tube's flat end stands on the ground), has each of its
+  corners set into the face across the edge of it the corner lies on, so the faces either side of the line meet edge to edge (unless an
+  edge of it is on no other face, the solid's side takes a corner, or two of its corners stand at one place)."""
   owners = {}
   for index, face in enumerate(faces):
     for position, corner in enumerate(face):
       owners[corner, face[(position + 1) % len(face)]] = index
   dropped = set()
   for index, face in enumerate(faces):
-    if len(face) != 3 or sources[index] > -2:
+    if sources[index] > -2 or not isFlat(positions[face]):
       continue
-    points = positions[face]
-    lengths = [numpy.linalg.norm(points[(position + 1) % 3] - points[position]) for position in range(3)]
-    longest = int(numpy.argmax(lengths))
-    if numpy.linalg.norm(numpy.cross(points[1] - points[0], points[2] - points[0])) / lengths[longest] > matchDistance:
+    plans = sliverTriangle(positions, faces, sources, owners, dropped, index) if len(face) == 3 else slitPolygon(positions, faces, sources, owners, dropped, index)
+    if plans is None:
       continue
-    start, end, middle = face[longest], face[(longest + 1) % 3], face[(longest + 2) % 3]
-    across = owners.get((end, start))
-    if across is None or across in dropped or sources[across] == -1 or middle in faces[across]:
-      continue
-    neighbour = faces[across]
-    position = next(position for position, corner in enumerate(neighbour) if corner == end and neighbour[(position + 1) % len(neighbour)] == start)
-    neighbour.insert(position + 1, middle)
-    for first, second in ((end, middle), (middle, start)):
-      owners[first, second] = across
-    del owners[end, start]
+    for across, start, end, between in plans:
+      neighbour = faces[across]
+      position = next(position for position, corner in enumerate(neighbour) if corner == end and neighbour[(position + 1) % len(neighbour)] == start)
+      neighbour[position + 1:position + 1] = between
+      del owners[end, start]
+      chain = [end] + between + [start]
+      for corner, following in zip(chain, chain[1:]):
+        owners[corner, following] = across
     dropped.add(index)
   keep = [index for index in range(len(faces)) if index not in dropped]
   return [faces[index] for index in keep], [sources[index] for index in keep], [normals[index] for index in keep]
+
+
+def sliverTriangle(positions, faces, sources, owners, dropped, index):
+  """For a flat triangle: its middle corner into the face across its long edge, as [(across, start, end, [middle])]; None to keep it."""
+  face = faces[index]
+  points = positions[face]
+  lengths = [numpy.linalg.norm(points[(position + 1) % 3] - points[position]) for position in range(3)]
+  longest = int(numpy.argmax(lengths))
+  start, end, middle = face[longest], face[(longest + 1) % 3], face[(longest + 2) % 3]
+  across = owners.get((end, start))
+  if across is None or across in dropped or sources[across] == -1 or middle in faces[across]:
+    return None
+  return [(across, start, end, [middle])]
+
+
+def slitPolygon(positions, faces, sources, owners, dropped, index):
+  """For a flat face of four or more corners: for each of its edges, the corners lying between the edge's ends to set into the face
+  across it, ordered from the edge's end, as [(across, start, end, corners)]; None to keep it."""
+  face = faces[index]
+  points = positions[face]
+  spans = numpy.linalg.norm(points[:, None, :] - points[None, :, :], axis=2)
+  if (spans + numpy.eye(len(face)) * matchDistance * 2 <= matchDistance).any():
+    return None
+  first, second = numpy.unravel_index(int(spans.argmax()), spans.shape)
+  alongs = (points - points[first]) @ ((points[second] - points[first]) / spans[first, second])
+  plans = []
+  for position, (start, end) in enumerate(zip(face, face[1:] + face[:1])):
+    across = owners.get((end, start))
+    if across is None or across == index or across in dropped:
+      return None
+    low, high = sorted((alongs[position], alongs[(position + 1) % len(face)]))
+    between = sorted((corner for corner, along in zip(face, alongs) if low < along < high and corner not in faces[across]), key=lambda corner: abs(alongs[face.index(corner)] - alongs[(position + 1) % len(face)]))
+    if between and sources[across] == -1:
+      return None
+    if between:
+      plans.append((across, start, end, between))
+  return plans
 
 
 def unitedTubes(tubes, temporary):
@@ -1520,7 +1534,7 @@ def strokeReport(definition, worked, tubes):
       placed = next(pad for pad in relief.pads if pad["name"] == stroke["name"])
       entry |= {"from": round(placed["start"], 1), "to": round(placed["end"], 1), "across": placed["across"], "top": round(placed["topHeight"], 2)}
     else:
-      entry |= {"rise": stroke["rise"], "outline": stroke["outline"]}
+      entry |= {"rise": stroke["rise"], "bank": stroke["bank"], "outline": stroke["outline"], "material": stroke["material"]}
     report.append(entry)
   return report
 
@@ -2009,7 +2023,7 @@ def caveGuides(sceneObject=None, caveName=None):
         relief = bridgeCaveRuns.FloorRelief([stroke for stroke in definition["floor"] if stroke["run"] == runName], line)
         strokes = [{"name": stroke["name"], "kind": "level", "from": stroke["start"], "to": stroke["end"], "across": stroke["across"]} for stroke in relief.level]
         strokes += [{"name": pad["name"], "kind": "pad", "from": pad["start"], "to": pad["end"], "across": pad["across"], "top": pad["topHeight"], "edge": pad["edge"]} for pad in relief.pads]
-        strokes += [{"name": stroke["name"], "kind": "rough", "outline": stroke["outline"], "rise": stroke["rise"], "edge": stroke["edge"]} for stroke in relief.rough]
+        strokes += [{"name": stroke["name"], "kind": "rough", "outline": stroke["outline"], "rise": stroke["rise"], "edge": stroke["edge"], "bank": stroke["bank"]} for stroke in relief.rough]
         runs.append({
           "run": runName, "from": parent, "samples": numpy.column_stack([floors, widths, heights, alongs]).round(3).tolist(),
           "polyline": polyline.round(3).tolist(), "polylineAlongs": polylineAlongs.round(3).tolist(),
