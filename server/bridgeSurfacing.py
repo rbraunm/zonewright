@@ -195,6 +195,7 @@ def mixColors(tree, first, second, factor, blendType="MIX"):
 
 # The client's water flattens its ripples from the camera out to this distance.
 waterFlatDistance = 300.0
+lookupNudge = (1e-5, 1e-5, 0.0)
 
 
 def clientWater(material, values, texturePaths):
@@ -261,7 +262,9 @@ def clientWater(material, values, texturePaths):
     lookup = tree.nodes.new("ShaderNodeTexEnvironment")
     lookup.image = loadImage(texturePaths["environment"], "Non-Color")
     lookup.interpolation = "Linear"
-    links.new(vector("REFLECT", scaled(geometry.outputs["Incoming"], -1.0), normal), lookup.inputs["Vector"])
+    # The node reads a direction whose x or y is exactly 0 (calm water seen straight down in a map) as its image's first texel; a
+    # hundred-thousandth of a unit turns it off that singularity.
+    links.new(vector("ADD", vector("REFLECT", scaled(geometry.outputs["Incoming"], -1.0), normal), lookupNudge), lookup.inputs["Vector"])
     mirrored = vector("MULTIPLY", lookup.outputs["Color"], tuple(component * values["reflectionAmount"] for component in values["reflectionColor"]))
     added = scaled(mirrored, fresnel)
   return baseColor, normal, added

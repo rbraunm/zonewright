@@ -9,6 +9,7 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
 import eqArchive
+import eqCubeMaps
 import eqgFiles
 import eqgWriter
 from conftest import writeCubeDDS, writePNG
@@ -760,6 +761,36 @@ def testWaterMirrorsTheCubeFaceItsReflectedViewFinds(stageBlenderServer, tmp_pat
   assert "flat_e.png is not a DDS cube map" in notCube
   drawn = {face: patchColor(image, 270, 480) for face, image in images.items()}
   assert all(numpy.abs(drawn[face] - cubeFaceColors[face][:3]).max() <= 1 for face in drawn), drawn
+
+
+calmWater = """
+import bpy, bridgeSurfacing
+bpy.ops.mesh.primitive_plane_add(size=200, location=(0, 0, 0))
+plane = bpy.context.active_object
+material = bpy.data.materials.new("calm")
+material.use_nodes = True
+values = {"fresnelBias": 1.0, "fresnelPower": 8.0, "reflectionAmount": 1.0, "reflectionColor": [1, 1, 1], "waterColor1": [0, 0, 0], "waterColor2": [0, 0, 0]}
+bridgeSurfacing.liquidNodes(material, "water", values, diffusePath, {"environment": lookupPath}, False, "object")
+plane.data.materials.append(material)
+result = plane.name
+"""
+
+
+def testCalmWaterSeenStraightDownMirrorsTheFaceAbove(stageBlenderServer, tmp_path):
+  # A client water without a normal map is flat, so in a map every pixel's reflected view is exactly up.
+  cube = writeCubeDDS(tmp_path / "six_e.dds", 8, cubeFaceColors)
+  lookup = tmp_path / "six_e.lookup.png"
+  lookup.write_bytes(eqCubeMaps.environmentLookupPNG(cube.read_bytes(), cube.name))
+  diffuse = writePNG(tmp_path / "water_c.png", 4, 4, (40, 90, 110, 255))
+
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("runPython", {"code": f"diffusePath = {str(diffuse)!r}\nlookupPath = {str(lookup)!r}\n" + calmWater})
+    await session.expectSuccess("setZoneProperties", environment | {"fogOn": False})
+    return (await session.expectImage("renderView", {"view": {"map": {"center": [0, 0], "width": 100}}, "guides": False}))[0]
+
+  view = stageBlenderServer.session(steps)
+  assert numpy.abs(patchColor(view, 270, 480) - cubeFaceColors[2][:3]).max() <= 1
 
 
 def testOwnLavaGlowsUnlitWhereItsAlphaIsClearAndExportsItsMask(stageBlenderServer, tmp_path):
