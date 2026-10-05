@@ -291,6 +291,21 @@ def testCaveRefusals(stageBlenderServer, tmp_path):
   assert "rises 58.0" in edited and after == before and detail["caves"][0]["from"] == hall["path"][0]
 
 
+def testACaveFloorClimbsAsSteeplyAsPlayersWalk(stageBlenderServer, tmp_path):
+  shaft = hall | {"name": "shaft", "path": [[0, -60, 2], [0, 30, 6], [0, 60, 62]], "widths": [40] * 3, "heights": [45] * 3, "breakup": None, "maximumFloorDegrees": 65}
+
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    cut = await session.expectSuccess("cutCave", shaft)
+    floor = await session.expectSuccess("measure", {"points": [[0, 40, 45], [0, 55, 75]], "snapToSurface": True})
+    return cut, floor
+
+  cut, floor = stageBlenderServer.session(steps)
+  # A floor climbing past 60 degrees, under the steepest face players walk (playerScale), is cut at its grade.
+  grade = numpy.degrees(numpy.arctan2(62 - 6, 30))
+  assert grade > 60 and cut["liningFaces"] > 0 and abs(floor["segments"][0]["slopeDegrees"] - grade) <= 0.1
+
+
 def testATracedGalleryIsEvenlyGradedInsideTheRockByItsShareLevelAcrossAndWalkedUnderCover(stageBlenderServer, tmp_path):
   async def steps(session):
     await caveCanyon(session, tmp_path)

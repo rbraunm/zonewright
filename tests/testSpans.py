@@ -127,6 +127,20 @@ def testBridgeRefusals(stageBlenderServer, tmp_path):
   assert summary["collections"] == ["terrain"] and summary["libraries"] == []
 
 
+def testADeckRisesAsSteeplyAsPlayersWalk(stageBlenderServer, tmp_path):
+  arch = 38
+
+  async def steps(session):
+    kitPath = await kitAndPlot(session, tmp_path)
+    return await session.expectSuccess("buildBridge", bridgeArguments(kitPath, profile={"arch": arch}, maximumDeckDegrees=65))
+
+  built = stageBlenderServer.session(steps)
+  # An arch whose ends rise past 60 degrees, under the steepest face players walk (playerScale), is built and walked.
+  steepest = math.degrees(math.atan(4 * arch / bridgeSpan))
+  assert steepest > 60 and abs(built["steepest"]["degrees"] - steepest) <= 0.1
+  assert built["walk"]["walkable"] and built["walk"]["problems"] == [] and built["walk"]["steepest"]["slopeDegrees"] > 60
+
+
 def testATrestleStandsItsBentsOnTheGround(stageBlenderServer, tmp_path):
   stations = [30.0, 55.0]
 

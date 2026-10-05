@@ -117,6 +117,22 @@ def testRefusalsNameTheRunTheClashAndTheLedgeSpan(stageBlenderServer, tmp_path):
   assert passes == ["base", "cliff", "hill", "breakup", "hollow"]
 
 
+def testARouteIsGradedAsSteeplyAsPlayersWalk(stageBlenderServer, tmp_path):
+  rise, run = 18.5, 10
+
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    # Its fill batter is steeper than its grade: past its top end the bench runs on at its grade, so a gentler batter would never meet
+    # the ground there.
+    return await session.expectSuccess("gradeRoute", {"objectName": "ground", "name": "ramp", "width": 20, "points": [[-200, -260, 0], [-200 + run, -260, rise]], "maximumGradeDegrees": 65, "fillBatterDegrees": 80})
+
+  graded = stageBlenderServer.session(steps)
+  # A ramp past 60 degrees, under the steepest face players walk (playerScale), is graded and walked.
+  grade = math.degrees(math.atan2(rise, run))
+  assert grade > 60 and abs(graded["segments"][0]["gradeDegrees"] - grade) <= 0.05
+  assert graded["walk"]["walkable"] and graded["walk"]["problems"] == [] and abs(graded["walk"]["steepest"]["slopeDegrees"] - grade) <= 0.1
+
+
 def testARegradePutsTheBenchBackAfterOtherShapingAndRemovingThePassTakesItBack(stageBlenderServer, tmp_path):
   roughen = {"objectName": "ground", "featureSize": 30, "amplitude": 3, "octaves": 2, "seed": 9, "direction": "up"}
 
