@@ -173,7 +173,7 @@ def testPlacedObjectsWithoutColorsTakeTheLightTheClientGivesThemAtLoad():
   for zoneName, placed in rocks.items():
     archive = eqArchive.EQArchive(everquestClient / f"{zoneName}.s3d")
     floors = loadTimeLight.ShareFloors(eqWorldFile.WorldFile(archive.read(f"{zoneName}.wld"), f"{zoneName}.wld").meshes(), eqZones.colorlessRegionColor[3])
-    lights = eqZones.zoneLights(everquestClient, zoneName)
+    lights = loadTimeLight.ZoneLights(eqZones.zoneLights(everquestClient, zoneName))
     placements = eqZones.objectPlacements(eqWorldFile.WorldFile(archive.read("objects.wld"), "objects.wld"))
     for actor, (x, y), first, hashed in placed:
       placement = next(placement for placement in placements if placement["actor"] == actor and abs(placement["position"][0] - x) < 0.01 and abs(placement["position"][1] - y) < 0.01)

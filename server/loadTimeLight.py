@@ -138,14 +138,23 @@ class ShareFloors:
     return numpy.float32(leastShare)
 
 
+class ZoneLights:
+  """A zone's point lights (lights.wld) as arrays, in the client's list order: positions, radii, and first-frame colors."""
+
+  def __init__(self, lights):
+    self.positions = numpy.array([light["position"] for light in lights], dtype=numpy.float64).reshape(-1, 3)
+    self.radii = numpy.array([light["radius"] for light in lights], dtype=numpy.float64)
+    self.colors = numpy.array([light["color"] for light in lights], dtype=numpy.float64).reshape(-1, 3)
+
+
 def placedColors(part, placement, rotation, lights, floors):
   """The RGBA per vertex the client gives a static actor at load (0x100530f0). Alpha is the share of scene light a drop from the
   model's bounding sphere, set at the placement and neither turned nor scaled, finds (ShareFloors.share), times 255, truncated. RGB
-  sums, over the zone lights whose sphere reaches the actor's (the light's radius plus the bounding radius times the placement's
-  scale, from its position), each light's color times 0.05 radius^2 / distance^2 times the facing of the vertex's normal toward it,
-  for a light within its radius in front of the vertex; times 255, truncated and capped at 255. The vertices and normals are turned
-  and moved by the actor's matrix, which holds no scale (CSimpleActor + 0xe4 in the dumps), the normals read through the client's
-  table (normalSteps) and normalized."""
+  sums, over the zone lights (ZoneLights) whose sphere reaches the actor's (the light's radius plus the bounding radius times the
+  placement's scale, from its position), each light's color times 0.05 radius^2 / distance^2 times the facing of the vertex's normal
+  toward it, for a light within its radius in front of the vertex; times 255, truncated and capped at 255. The vertices and normals
+  are turned and moved by the actor's matrix, which holds no scale (CSimpleActor + 0xe4 in the dumps), the normals read through the
+  client's table (normalSteps) and normalized."""
   sphere = part["boundingSphere"]
   position = numpy.asarray(placement["position"], dtype=numpy.float64)
   share = floors.share(position + sphere["center"], sphere["radius"])
@@ -154,18 +163,16 @@ def placedColors(part, placement, rotation, lights, floors):
   normals = normalSteps[(numpy.rint(part["lighting"]["normals"] * 127).astype(numpy.int64) >> 3) & 31] @ rotation.T
   lengths = numpy.linalg.norm(normals, axis=1, keepdims=True)
   normals = numpy.where(lengths >= shortestNormal, normals / numpy.maximum(lengths, shortestNormal), 0)
-  reach = sphere["radius"] * placement["scale"]
+  reaching = numpy.flatnonzero(((lights.positions - position) ** 2).sum(1) < (lights.radii + sphere["radius"] * placement["scale"]) ** 2)
   light = numpy.zeros((len(world), 3), dtype=numpy.float32)
-  for source in lights:
-    lightPosition = numpy.asarray(source["position"], dtype=numpy.float64)
-    if ((lightPosition - position) ** 2).sum() >= (source["radius"] + reach) ** 2:
-      continue
-    toLight = lightPosition - world
+  for index in reaching:
+    radius = lights.radii[index]
+    toLight = lights.positions[index] - world
     distanceSquared = (toLight ** 2).sum(1)
     with numpy.errstate(divide="ignore", invalid="ignore"):
       facing = (toLight * normals).sum(1) / numpy.sqrt(distanceSquared)
-    lit = (distanceSquared < source["radius"] ** 2) & (facing > 0)
-    strength = numpy.where(lit, source["radius"] ** 2 * lightScale / numpy.where(lit, distanceSquared, 1) * facing, 0)
-    light = (light + (strength[:, None] * numpy.asarray(source["color"])[None, :]).astype(numpy.float32)).astype(numpy.float32)
+    lit = (distanceSquared < radius ** 2) & (facing > 0)
+    strength = numpy.where(lit, radius ** 2 * lightScale / numpy.where(lit, distanceSquared, 1) * facing, 0)
+    light = (light + (strength[:, None] * lights.colors[index][None, :]).astype(numpy.float32)).astype(numpy.float32)
   channels = numpy.minimum(numpy.trunc(light.astype(numpy.float64) * 255), 255).astype(numpy.uint8)
   return numpy.concatenate([channels, numpy.full((len(world), 1), alpha, dtype=numpy.uint8)], axis=1)

@@ -191,7 +191,7 @@ def buildClassicZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
   regionMeshCount = len(parts)
   placements = objectPlacements(eqWorldFile.WorldFile(archive.read("objects.wld"), f"{source['archive'].name}:objects.wld")) if "objects.wld" in archive.entries else []
   floors = loadTimeLight.ShareFloors(regionMeshes, colorlessRegionColor[3])
-  lights = zoneLights(clientRoot, zoneName)
+  lights = loadTimeLight.ZoneLights(zoneLights(clientRoot, zoneName))
   objectParts, missingModels, objectArchives, placedCounts, particleClouds, colorsIgnored, colorsShort, litAtLoad = {}, set(), [], {}, 0, 0, {}, 0
   parkedCounts = collections.Counter()
   for placement in placements:
