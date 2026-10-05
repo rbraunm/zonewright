@@ -91,18 +91,23 @@ def requireLiquidValues(liquid, values):
 
 
 def imageNode(material, name, path):
+  """A liquid's texture node, its color and alpha read as stored: lava's glow shows where its alpha is 0."""
   node = material.node_tree.nodes.new("ShaderNodeTexImage")
   node.name = name
   node.image = loadImage(path, "Non-Color")
+  node.image.alpha_mode = "CHANNEL_PACKED"
   node.interpolation = "Linear"
   return node
 
 
-def createLiquidMaterial(name, liquid, diffuseTexture, normalTexture, environmentTexture, secondDiffuseTexture, values):
+def createLiquidMaterial(name, liquid, diffuseTexture, normalTexture, environmentTexture, environmentLookup, secondDiffuseTexture, values):
   """A liquid material: textures and shader values as the client's own water, waterfall, or lava materials carry them, drawn as
-  liquidNodes describes."""
+  liquidNodes describes for a placed object, as water bodies export. A water's environment is a DDS cube map, which the preview looks
+  up in its equirectangular image (environmentLookup)."""
   if bpy.data.materials.get(name) is not None:
     raise ValueError(f"A material named '{name}' already exists")
+  if (environmentTexture is None) != (environmentLookup is None):
+    raise ValueError("An environment cube map comes with its lookup image")
   values = requireLiquidValues(liquid, values)
   textures = {"normal": normalTexture, "environment": environmentTexture, "secondDiffuse": secondDiffuseTexture}
   missing = sorted(key for key in liquidTextures[liquid] if textures[key] is None)
@@ -113,30 +118,66 @@ def createLiquidMaterial(name, liquid, diffuseTexture, normalTexture, environmen
   material.use_fake_user = True
   material.use_nodes = True
   material[bridgeMeshAccess.liquidProperty] = json.dumps({"liquid": liquid, "values": values})
-  liquidNodes(material, liquid, values, diffuseTexture, {key: path for key, path in textures.items() if path is not None}, False)
+  drawn = {key: path for key, path in (textures | {"environment": environmentLookup}).items() if path is not None}
+  liquidNodes(material, liquid, values, diffuseTexture, drawn, False, "object")
+  # Zone export reads every texture it ships from these nodes, also those the preview does not draw: a water's cube map (drawn from its
+  # lookup image) and lava's normal map (which lights only point light 0, left out).
+  for key, nodeName in (("normal", normalNodeName), ("environment", environmentNodeName), ("secondDiffuse", secondDiffuseNodeName)):
+    if textures[key] is not None and material.node_tree.nodes.get(nodeName) is None:
+      imageNode(material, nodeName, textures[key])
   return {"material": name, "liquid": liquid, "values": values}
 
 
-def liquidNodes(material, liquid, values, diffusePath, texturePaths, lit):
-  """A liquid's look in the preview, as the client's DX9 liquid effects draw it, still (at time 0), also used for the client's own liquid
-  materials when a zone is imported (then lit by their baked light). Water (RegionWater.fxo / SModelWater.fxo, ps_2_0): no diffuse; its
-  color runs from waterColor1 seen from straight above to waterColor2 at grazing angles, lit like any surface, under a normal map
-  sampled at the texture coordinates and at twice them, flattening with distance until flat 300 units off; plus its environment
-  mirrored by fresnel (bias + (1 - bias) times the grazing term to fresnelPower) times reflectionAmount and reflectionColor, added
-  unlit before fog. The environment is a cube map the preview cannot look up, so its average color stands for it. A waterfall
-  (RegionWaterFall.fxo): its diffuse lit, as see-through as the diffuse's alpha. Lava: its two diffuses averaged (its effect is not
-  read yet). Water a material leaves without its values or textures is drawn without what they give."""
-  tree = material.node_tree
+# Lava's glow on the zone's terrain (RegionLava.fxo ps_1_4 0x3360: lrp with Diffuse1_x2) and on a placed object (SModelLava.fxo ps_1_4
+# 0x47a4: Diffuse1 times 1 plus point light 0 by the normal, which the preview leaves out).
+lavaGlow = {"terrain": 2.0, "object": 1.0}
+
+
+def liquidNodes(material, liquid, values, diffusePath, texturePaths, lit, mesh):
+  """A liquid's look in the preview, as the client's liquid effects draw it on the given mesh ("terrain" or "object"), still (at time
+  0), also used for the client's own liquid materials when a zone is imported (then lit by their baked light). Water (RegionWater.fxo /
+  SModelWater.fxo, ps_2_0): no diffuse; its color runs from waterColor1 seen from straight above to waterColor2 at grazing angles, lit
+  like any surface, under a normal map sampled at the texture coordinates and at twice them, flattening with distance until flat 300
+  units off; plus its environment cube map, looked up along the view mirrored about that normal (texturePaths' environment is its
+  equirectangular lookup image), times fresnel (bias + (1 - bias) times the grazing term to fresnelPower), reflectionAmount, and
+  reflectionColor, added unlit before fog. A waterfall (RegionWaterFall.fxo): its diffuse lit, as see-through as the diffuse's alpha.
+  Lava (RegionLava.fxo, SModelLava.fxo, ps_1_4): the diffuse's alpha is how much crust shows, lit; the rest glows unlit with the second
+  diffuse, at twice its color on terrain and once on an object. A liquid a material leaves without its values or textures is drawn
+  without what they give."""
+  if mesh not in lavaGlow:
+    raise ValueError(f"mesh must be one of {list(lavaGlow)}, got {mesh!r}")
   diffuse = imageNode(material, diffuseNodeName, diffusePath)
   if liquid == "water" and all(key in values for key in ("waterColor1", "waterColor2", "fresnelBias", "fresnelPower")):
     baseColor, normal, added = clientWater(material, values, texturePaths)
     bridgeClientLight.surfaceOutput(material, baseColor, None, "opaque", lit, 0.5, normal, added)
-    return
-  baseColor = diffuse.outputs["Color"]
-  if liquid == "lava" and "secondDiffuse" in texturePaths:
-    second = imageNode(material, secondDiffuseNodeName, texturePaths["secondDiffuse"])
-    baseColor = mixColors(tree, diffuse.outputs["Color"], second.outputs["Color"], 0.5)
-  bridgeClientLight.surfaceOutput(material, baseColor, diffuse.outputs["Alpha"], "blended" if liquid == "waterfall" else "opaque", lit, 0.5)
+  elif liquid == "lava":
+    baseColor, added = clientLava(material, diffuse, texturePaths, lavaGlow[mesh])
+    bridgeClientLight.surfaceOutput(material, baseColor, None, "opaque", lit, 0.5, None, added)
+  else:
+    bridgeClientLight.surfaceOutput(material, diffuse.outputs["Color"], diffuse.outputs["Alpha"], "blended" if liquid == "waterfall" else "opaque", lit, 0.5)
+
+
+def clientLava(material, diffuse, texturePaths, glow):
+  """The client's lava as preview nodes: its crust to light (the diffuse times its alpha) and its glow to add (the second diffuse times
+  glow and the rest of the alpha), or no glow without a second diffuse."""
+  tree = material.node_tree
+  crust = tree.nodes.new("ShaderNodeVectorMath")
+  crust.operation = "SCALE"
+  tree.links.new(diffuse.outputs["Color"], crust.inputs["Vector"])
+  tree.links.new(diffuse.outputs["Alpha"], crust.inputs["Scale"])
+  if "secondDiffuse" not in texturePaths:
+    return crust.outputs["Vector"], None
+  second = imageNode(material, secondDiffuseNodeName, texturePaths["secondDiffuse"])
+  share = tree.nodes.new("ShaderNodeMath")
+  share.operation = "MULTIPLY_ADD"
+  tree.links.new(diffuse.outputs["Alpha"], share.inputs[0])
+  share.inputs[1].default_value = -glow
+  share.inputs[2].default_value = glow
+  added = tree.nodes.new("ShaderNodeVectorMath")
+  added.operation = "SCALE"
+  tree.links.new(second.outputs["Color"], added.inputs["Vector"])
+  tree.links.new(share.outputs["Value"], added.inputs["Scale"])
+  return crust.outputs["Vector"], added.outputs["Vector"]
 
 
 def mixColors(tree, first, second, factor, blendType="MIX"):
@@ -154,11 +195,6 @@ def mixColors(tree, first, second, factor, blendType="MIX"):
 
 # The client's water flattens its ripples from the camera out to this distance.
 waterFlatDistance = 300.0
-
-
-def imageAverage(path):
-  pixels = numpy.array(loadImage(path, "Non-Color").pixels[:], dtype=numpy.float64).reshape(-1, 4)
-  return pixels[:, :3].mean(axis=0)
 
 
 def clientWater(material, values, texturePaths):
@@ -219,14 +255,15 @@ def clientWater(material, values, texturePaths):
   grazing = math("SUBTRACT", 1.0, facing)
   baseColor = mixColors(tree, (*values["waterColor1"], 1.0), (*values["waterColor2"], 1.0), grazing)
   added = None
-  if "environment" in texturePaths:
-    # The preview cannot look the cube map up, but zone export reads the texture from this node.
-    imageNode(material, environmentNodeName, texturePaths["environment"])
   if "environment" in texturePaths and "reflectionAmount" in values and "reflectionColor" in values:
     bias = values["fresnelBias"]
     fresnel = math("ADD", bias, math("MULTIPLY", 1 - bias, math("POWER", grazing, values["fresnelPower"])))
-    mirrored = numpy.array(values["reflectionColor"]) * imageAverage(texturePaths["environment"]) * values["reflectionAmount"]
-    added = scaled(tuple(float(component) for component in mirrored), fresnel)
+    lookup = tree.nodes.new("ShaderNodeTexEnvironment")
+    lookup.image = loadImage(texturePaths["environment"], "Non-Color")
+    lookup.interpolation = "Linear"
+    links.new(vector("REFLECT", scaled(geometry.outputs["Incoming"], -1.0), normal), lookup.inputs["Vector"])
+    mirrored = vector("MULTIPLY", lookup.outputs["Color"], tuple(component * values["reflectionAmount"] for component in values["reflectionColor"]))
+    added = scaled(mirrored, fresnel)
   return baseColor, normal, added
 
 

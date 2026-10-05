@@ -1,6 +1,7 @@
 import atexit
 import datetime
 import functools
+import hashlib
 import inspect
 import io
 import json
@@ -25,12 +26,14 @@ import checkpoints
 import conceptComparison
 import emitterAssets
 import eqCalibration
+import eqCubeMaps
 import eqEmitters
 import eqgExport
 import eqModels
 import eqRaces
 import eqRecording
 import eqSky
+import eqTextures
 import eqZones
 import extensionCatalog
 import machineProfile
@@ -971,7 +974,8 @@ async def importZone(context: Context, zone: str, collection: str | None = None)
   "<zone> zone lines", as placeZoneLine makes them, named as the zone file names them (the number the client reads from the name) and
   turned about Z as it turns them, with no target (the zone file never says where one leads; the server's zone points do); getZoneLines
   lists them and plans and views draw them. Those with a tilt field set, whose reading is untraced, are listed in zoneLinesTilted, not
-  placed. A classic or EQ terrain zone's zone lines are not read (zoneLines None)."""
+  placed. A classic or EQ terrain zone's zone lines are not read (zoneLines None). Water whose environment map is not a DDS cube map,
+  which the client cannot load and so draws without a reflection, is drawn so and its maps listed in source.environmentMapsNotCube."""
   placed = await placeZone(context, zone, collection)
   clientRoot = zoneSources.resolveClientRoot()
   try:
@@ -2571,6 +2575,22 @@ liquidDefaults = {
 }
 
 
+def environmentLookupPath(environmentTexture):
+  """The equirectangular image the preview looks a water's environment cube map up in (eqCubeMaps), written once under the tooling root."""
+  path = Path(environmentTexture)
+  if not path.is_absolute() or not path.is_file():
+    raise ToolError(f"environmentTexture '{environmentTexture}' is not an existing absolute path")
+  data = path.read_bytes()
+  if not eqTextures.isCubeMap(data):
+    raise ToolError(f"environmentTexture {path.name} is not a DDS cube map: the client loads a water's environment only as a cube map and reflects nothing from any other texture")
+  lookup = toolingRoot / "environmentLookups" / f"{path.stem}@{hashlib.sha256(data).hexdigest()[:12]}.png"
+  if not lookup.is_file():
+    image = callReportingFailures(eqCubeMaps.environmentLookupPNG, data, path.name)
+    lookup.parent.mkdir(parents=True, exist_ok=True)
+    lookup.write_bytes(image)
+  return str(lookup)
+
+
 @guardedTool()
 async def createLiquidMaterial(
   context: Context, name: str, liquid: str, diffuseTexture: str, normalTexture: str | None = None, environmentTexture: str | None = None,
@@ -2582,12 +2602,15 @@ async def createLiquidMaterial(
   waterColor2), "waterfall" (Opaque_MaxWaterFall.fx: a diffuse), or "lava" (Opaque_MaxLava.fx: a diffuse, secondDiffuseTexture, and
   normalTexture); each takes `slides` [first x, first y, second x, second y], how fast its two texture layers scroll. Values left out
   take the client's own (water: its WaterSwap.ini new water; slides: what most of its materials use). Colors are three numbers from 0
-  to 1. A texture is an absolute path or a catalog texture id (texture/<name>@<hash>). The preview draws it still, as the client's DX9
-  effects draw it: water takes no color from its diffuse (the client's older effects do) but runs from waterColor1 seen from above to
-  waterColor2 at grazing angles, lit like any surface, rippled by its normal map at the texture coordinates and twice them (so the
-  normal map repeats as often as the surface's texture coordinates do), and mirrors its environment by fresnel (the preview takes the
-  environment cube map's average color); a waterfall is its diffuse, lit, as see-through as its alpha; lava is its two diffuses
-  averaged. Pools, rivers, and falls (floodWater, runWater, pourWaterfall) take these materials."""
+  to 1. A texture is an absolute path or a catalog texture id (texture/<name>@<hash>); a water's environmentTexture is a DDS cube map,
+  as the client loads only those (a 2D texture there would reflect nothing in game). The preview draws it still, as the client's
+  effects draw it on a placed object (which a water body exports as): water takes no color from its diffuse (the client's older
+  effects do) but runs from waterColor1 seen from above to waterColor2 at grazing angles, lit like any surface, rippled by its normal map
+  at the texture coordinates and twice them (so the normal map repeats as often as the surface's texture coordinates do), and mirrors
+  its environment cube map by fresnel, looked up along the view reflected about the ripples; a waterfall is its diffuse, lit, as
+  see-through as its alpha; lava's diffuse alpha is how much crust shows (1 crust, 0 glow): the crust is the diffuse lit, and the rest
+  glows with secondDiffuseTexture's color, unlit, so it glows in the dark and at night (paint the alpha to place the glow). Pools,
+  rivers, and falls (floodWater, runWater, pourWaterfall) take these materials."""
   if liquid not in liquidDefaults:
     raise ToolError(f"liquid is one of {list(liquidDefaults)}, got '{liquid}'")
   given = {
@@ -2598,9 +2621,11 @@ async def createLiquidMaterial(
   if stray:
     raise ToolError(f"A {liquid} material does not take {stray}; it takes {list(liquidDefaults[liquid])}")
   values = liquidDefaults[liquid] | {key: value for key, value in given.items() if value is not None}
+  environmentPath = catalogTexturePath(environmentTexture)
   return await callBridge(context, "createLiquidMaterial", {
     "name": name, "liquid": liquid, "diffuseTexture": catalogTexturePath(diffuseTexture), "normalTexture": catalogTexturePath(normalTexture),
-    "environmentTexture": catalogTexturePath(environmentTexture), "secondDiffuseTexture": catalogTexturePath(secondDiffuseTexture), "values": values,
+    "environmentTexture": environmentPath, "environmentLookup": environmentLookupPath(environmentPath) if environmentPath is not None else None,
+    "secondDiffuseTexture": catalogTexturePath(secondDiffuseTexture), "values": values,
   })
 
 

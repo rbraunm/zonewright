@@ -145,7 +145,8 @@ def testImportZoneBringsTheClientsZone(stageBlenderServer):
   imported = stageBlenderServer.session(steps)
   assert imported["source"] | {"particleCloudsNotDrawn": None} == {
     "archive": "poknowledge.s3d", "format": "wld", "regionMeshes": 1802, "placements": 1249, "placedObjects": 1249,
-    "objectArchives": ["poknowledge_obj.s3d"], "missingModels": [], "missingTextures": [], "droppedTriangles": 0, "particleCloudsNotDrawn": None,
+    "objectArchives": ["poknowledge_obj.s3d"], "missingModels": [], "missingTextures": [], "environmentMapsNotCube": [], "droppedTriangles": 0,
+    "particleCloudsNotDrawn": None,
   }
   assert imported["dimensions"] == [1968.0, 1968.0, 1011.931]
   # A classic zone's zone lines are BSP regions, whose places are not read.

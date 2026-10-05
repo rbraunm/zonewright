@@ -30,7 +30,7 @@ sharedLocalAppDataPath = Path(os.environ["LOCALAPPDATA"]) / "zonewrightTests" / 
 sharedInstallLockSeconds = 900
 zoneSurveySkill = Path(".claude") / "skills" / "zone-survey"
 readerFiles = {f"server/{name}.py" for name in (
-  "eqAnimations", "eqArchive", "eqEmitterDefinitions", "eqEmitters", "eqLinks", "eqLooks", "eqModels", "eqRaces", "eqSkeletons",
+  "eqAnimations", "eqArchive", "eqCubeMaps", "eqEmitterDefinitions", "eqEmitters", "eqLinks", "eqLooks", "eqModels", "eqRaces", "eqSkeletons",
   "eqTerrainTextures", "eqTextures", "eqWorldFile", "eqZones", "eqgFiles", "eqgSkeletons", "eqgTerrain", "zoneGeometry", "zoneSources",
   "bridgeModels", "emitterAssets", "emitterParticles", "bridgeEmitterDrawing",
 )}
@@ -304,6 +304,16 @@ def writePNG(path, width, height, rgba):
     return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
   header = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
   path.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(row * height)) + chunk(b"IEND", b""))
+  return path
+
+
+def writeCubeDDS(path, side, faceColors):
+  """An uncompressed (A8R8G8B8) DDS cube map of one level, each face one RGBA color, in DDS face order (+X, -X, +Y, -Y, +Z, -Z), as
+  the client's env_noswap_day.dds is stored."""
+  pixelFormat = struct.pack("<8I", 32, 0x41, 0, 32, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000)
+  header = b"DDS " + struct.pack("<7I", 124, 0x1 | 0x2 | 0x4 | 0x8 | 0x1000, side, side, side * 4, 0, 0) + bytes(44) + pixelFormat
+  header += struct.pack("<4I", 0x1000 | 0x8, 0xFE00, 0, 0) + bytes(4)
+  path.write_bytes(header + b"".join(bytes((blue, green, red, alpha)) * side * side for red, green, blue, alpha in faceColors))
   return path
 
 

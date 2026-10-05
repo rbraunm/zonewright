@@ -10,6 +10,7 @@ import numpy
 
 import eqAnimations
 import eqArchive
+import eqCubeMaps
 import eqgFiles
 import eqgSkeletons
 import eqLinks
@@ -22,7 +23,7 @@ import machineProfile
 import zoneSources
 
 indexFormat = 10
-modelCacheFormat = 18
+modelCacheFormat = 19
 actorTrailingBytes = 4
 staticKinds = ("wldStatic",)
 defaultAppearance = {
@@ -352,6 +353,7 @@ def eqgMaterialTextures(materials, triangleMaterials, diffuseSwaps):
 
 
 liquidShaders = {"opaque_maxwater.fx": "water", "opaque_maxwaterfall.fx": "waterfall", "opaque_maxlava.fx": "lava"}
+liquidMeshes = ("terrain", "object")
 slideProperties = ("e_fSlide1X", "e_fSlide1Y", "e_fSlide2X", "e_fSlide2Y")
 
 
@@ -359,10 +361,13 @@ def liquidColor(value):
   return [((value >> shift) & 0xFF) / 255 for shift in (16, 8, 0)]
 
 
-def eqgLiquid(material):
-  """A material drawn with one of the client's liquid shaders as the preview draws liquids: its liquid, its shader values, and its
-  textures beyond the diffuse; None for any other material. The client's own materials leave some of these out (about one water material
-  in thirty has no environment map); what a material leaves out is left out here, and the preview draws without it."""
+def eqgLiquid(material, mesh):
+  """A material drawn with one of the client's liquid shaders as the preview draws liquids: its liquid, its shader values, its textures
+  beyond the diffuse, and the mesh it is on ("terrain", drawn with the region effects, or "object", with the SModel ones); None for any
+  other material. The client's own materials leave some of these out (about one water material in thirty has no environment map); what
+  a material leaves out is left out here, and the preview draws without it."""
+  if mesh not in liquidMeshes:
+    raise ValueError(f"mesh must be one of {list(liquidMeshes)}, got {mesh!r}")
   liquid = liquidShaders.get(material["shader"].lower())
   if liquid is None:
     return None
@@ -372,11 +377,11 @@ def eqgLiquid(material):
   if liquid == "water":
     values |= {key: properties[name] for key, name in (("fresnelBias", "e_fFresnelBias"), ("fresnelPower", "e_fFresnelPower"), ("reflectionAmount", "e_fReflectionAmount")) if name in properties}
     values |= {key: liquidColor(properties[name]) for key, name in (("reflectionColor", "e_fReflectionColor"), ("waterColor1", "e_fWaterColor1"), ("waterColor2", "e_fWaterColor2")) if name in properties}
-  return {"liquid": liquid, "values": values, "textures": {key: properties[name].lower() for key, name in textureKeys.items() if properties.get(name)}}
+  return {"liquid": liquid, "values": values, "textures": {key: properties[name].lower() for key, name in textureKeys.items() if properties.get(name)}, "mesh": mesh}
 
 
-def eqgLiquids(materials, triangleMaterials):
-  return [eqgLiquid(materials[index]) if index >= 0 else None for index in triangleMaterials]
+def eqgLiquids(materials, triangleMaterials, mesh):
+  return [eqgLiquid(materials[index], mesh) if index >= 0 else None for index in triangleMaterials]
 
 
 def staticEQGUVs(uvs):
@@ -901,8 +906,9 @@ def writePartsCache(modelFolder, parts, textureHolders, label):
   textureSources = {}
   # A texture absent from every linked archive is absent for the client too; its faces are drawn as missing and reported.
   missingTextures = []
-  liquidTextureNames = {name for liquid in liquids if liquid is not None for name in liquid["textures"].values()}
-  for textureName in sorted(set(textures) | liquidTextureNames):
+  environmentNames = {liquid["textures"]["environment"] for liquid in liquids if liquid is not None and "environment" in liquid["textures"]}
+  drawnNames = set(textures) | {name for liquid in liquids if liquid is not None for key, name in liquid["textures"].items() if key != "environment"}
+  for textureName in sorted(drawnNames | environmentNames):
     if textureName.startswith("terrain:"):
       continue
     holder = next((candidate for candidate in textureHolders if textureName in candidate.entries), None)
@@ -911,18 +917,26 @@ def writePartsCache(modelFolder, parts, textureHolders, label):
     else:
       textureSources[textureName] = holder.archivePath.name.lower()
   modelFolder.mkdir(parents=True, exist_ok=True)
-  fileNames = {}
+  fileNames, lookupNames, notCube = {}, {}, []
   for textureName, holderName in textureSources.items():
     holder = next(candidate for candidate in textureHolders if candidate.archivePath.name.lower() == holderName)
-    fileNames[textureName], readable = eqTextures.readableTexture(textureName, holder.read(textureName))
-    (modelFolder / fileNames[textureName]).write_bytes(readable)
-  # Triangles index a palette of materials (texture file, alpha mode, tint, liquid). A liquid names its textures by their cached files;
-  # one whose texture is missing keeps the rest.
+    data = holder.read(textureName)
+    if textureName in drawnNames:
+      fileNames[textureName], readable = eqTextures.readableTexture(textureName, data)
+      (modelFolder / fileNames[textureName]).write_bytes(readable)
+    # The client loads a water's environment only as a cube map and draws no reflection from any other (EQGraphicsDX9.dll 0x10061610).
+    if textureName in environmentNames and eqTextures.isCubeMap(data):
+      lookupNames[textureName] = textureName + ".lookup.png"
+      (modelFolder / lookupNames[textureName]).write_bytes(eqCubeMaps.environmentLookupPNG(data, f"{holderName}:{textureName}"))
+    elif textureName in environmentNames:
+      notCube.append(textureName)
+  # Triangles index a palette of materials (texture file, alpha mode, tint, liquid). A liquid names its textures by their cached files
+  # (its environment by its cube map's lookup image); one whose texture is missing or cannot be drawn keeps the rest.
   def liquidKey(liquid):
     if liquid is None:
       return ""
-    found = {key: fileNames[name] for key, name in liquid["textures"].items() if name in fileNames}
-    return json.dumps(liquid | {"textures": found}, sort_keys=True)
+    found = {key: (lookupNames if key == "environment" else fileNames).get(name) for key, name in liquid["textures"].items()}
+    return json.dumps(liquid | {"textures": {key: name for key, name in found.items() if name is not None}}, sort_keys=True)
 
   passable = numpy.concatenate(passableChunks)
   palette, triangleMaterials = {}, numpy.empty(len(textures), dtype=numpy.int32)
@@ -938,6 +952,7 @@ def writePartsCache(modelFolder, parts, textureHolders, label):
     **({"trianglePassable": passable} if passable.any() else {}),
   )
   return {
-    "textureSources": textureSources, "missingTextures": missingTextures, "droppedTriangles": sum(part["dropped"] for part in parts), "lit": bool(litParts),
+    "textureSources": textureSources, "missingTextures": missingTextures, "environmentMapsNotCube": notCube,
+    "droppedTriangles": sum(part["dropped"] for part in parts), "lit": bool(litParts),
     "minimum": [float(value) for value in vertices.min(0)], "maximum": [float(value) for value in vertices.max(0)],
   }

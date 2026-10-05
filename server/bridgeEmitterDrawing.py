@@ -53,7 +53,8 @@ def particleMaterial(preview, texturePath, additive):
   nodes.clear()
   texture = nodes.new("ShaderNodeTexImage")
   texture.image = bpy.data.images.load(texturePath, check_existing=True)
-  preview.loadedImages.append(texture.image)
+  if texture.image not in preview.loadedImages:
+    preview.loadedImages.append(texture.image)
   texture.image.colorspace_settings.name = "Non-Color"
   texture.image.alpha_mode = "STRAIGHT"
   texture.interpolation = "Linear"

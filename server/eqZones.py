@@ -226,14 +226,15 @@ def litColors(litBytes, vertexCount, sourceName):
   return bytesRGBA(numpy.frombuffer(litBytes, dtype="<u4", count=count, offset=4))
 
 
-def placedEQGPart(model, transform, position, colors):
+def placedEQGPart(model, transform, position, colors, mesh):
   """A static EQG model placed by a transform (rotation and scale) and a position, its normals turned with it, lit by colors (RGBA per
-  vertex), with the triangles its file lets players through."""
+  vertex), with the triangles its file lets players through; mesh says whether the client draws it as the zone's terrain or as an
+  object (eqModels.eqgLiquid)."""
   textures, alphaModes = eqModels.eqgMaterialTextures(model["materials"], model["triangleMaterials"], {})
   normals = model["normals"] @ numpy.linalg.inv(transform)
   normals /= numpy.maximum(numpy.linalg.norm(normals, axis=1, keepdims=True), 1e-12)
   return eqModels.meshPart(model["vertices"] @ transform.T + position, model["triangles"], eqModels.staticEQGUVs(model["uvs"]), textures, alphaModes,
-    {"normals": normals, "colors": colors}, eqModels.eqgLiquids(model["materials"], model["triangleMaterials"]), model["triangleFlags"] & eqgFiles.passableFlag)
+    {"normals": normals, "colors": colors}, eqModels.eqgLiquids(model["materials"], model["triangleMaterials"], mesh), model["triangleFlags"] & eqgFiles.passableFlag)
 
 
 class TerrainObjects:
@@ -375,7 +376,7 @@ def buildTerrainZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
       continue
     transform = eqgTerrain.placementMatrix(placement["rotationDegrees"], placement["scale"])
     colors = numpy.tile(numpy.array(unlitColor, dtype=numpy.uint8), (len(model["vertices"]), 1))
-    parts.append(placedEQGPart(model, transform, eqgTerrain.placedPosition(terrain, tilesByOrigin, placement), colors) | {"takesAllLights": True})
+    parts.append(placedEQGPart(model, transform, eqgTerrain.placedPosition(terrain, tilesByOrigin, placement), colors, "object") | {"takesAllLights": True})
     placedCounts[placement["model"]] = placedCounts.get(placement["model"], 0) + 1
   missingGroups, litMismatches = set(), set()
   for group in terrain["groups"]:
@@ -395,7 +396,7 @@ def buildTerrainZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
         litMismatches.add(member["lit"])
         colors = numpy.tile(numpy.array(unlitColor, dtype=numpy.uint8), (len(model["vertices"]), 1))
       transform = groupTransform @ eqgTerrain.placementMatrix(member["rotationDegrees"], member["scale"])
-      parts.append(placedEQGPart(model, transform, groupPosition + groupTransform @ numpy.array(member["position"]), colors) | {"takesAllLights": not baked})
+      parts.append(placedEQGPart(model, transform, groupPosition + groupTransform @ numpy.array(member["position"]), colors, "object") | {"takesAllLights": not baked})
       placedCounts[member["model"]] = placedCounts.get(member["model"], 0) + 1
   textureHolders = [archive] + [eqArchive.EQArchive(clientRoot / name) for name in objects.archives if name != source["archive"].name.lower()]
   written = eqModels.writePartsCache(zoneFolder, parts, textureHolders, f"Zone '{zoneName}'")
@@ -442,7 +443,8 @@ def eqgZoneParts(library, zone, zoneArchive, label):
     baked = colors is not None and len(colors) > 0
     rgba = bytesRGBA(colors) if baked else numpy.tile(numpy.array(unlitColor, dtype=numpy.uint8), (vertexCount, 1))
     # The terrain is drawn as the zone's regions, which take only the lights marked for baked geometry (0x1000db20).
-    parts.append(placedEQGPart(model, *eqgFiles.drawnTransform(placement), rgba) | {"takesAllLights": not baked and not placement["model"].endswith(".ter")})
+    terrain = placement["model"].endswith(".ter")
+    parts.append(placedEQGPart(model, *eqgFiles.drawnTransform(placement), rgba, "terrain" if terrain else "object") | {"takesAllLights": not baked and not terrain})
     placedCounts[placement["model"]] = placedCounts.get(placement["model"], 0) + 1
   if not parts:
     raise ValueError(f"{label}: none of its {len(zone['placements'])} placements has a model in {[archive.archivePath.name for archive in library.archives]}")
