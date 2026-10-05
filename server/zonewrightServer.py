@@ -191,6 +191,7 @@ def modelSummary(details):
     "model": details["model"], "kind": definition["kind"], "archive": definition["archive"], "linkedBy": definition["via"], "tier": definition["tier"],
     "pose": details["pose"], "pieces": details["pieces"], "unattached": details["unattached"], "swappedMaterials": details["swappedMaterials"],
     "missingTextures": details["missingTextures"], "droppedTriangles": details["droppedTriangles"], "particleCloudsNotDrawn": details["particleCloudsNotDrawn"],
+    "drawnOtherwise": details["drawnOtherwise"],
   }
 
 
@@ -834,7 +835,7 @@ placementHelp = (
   " eqgame.exe turns a spawn toward a point. zone names the zone whose archives the client"
   " loads (none searches only the global lists); the model is found through the client's own links (see findModel), never by name in an"
   " unrelated archive. source (\"archive\" or \"archive:entry\") takes a definition other than the first the client loads."
-  " The result's source lists the archive and link used and anything the client data lacks (missingTextures draw magenta)."
+  " The result's source lists the archive and link used and anything the client data lacks (missingTextures draw black, as the client's effect reads a sampler with no texture)."
 )
 
 
@@ -1009,7 +1010,11 @@ async def importZone(context: Context, zone: str, collection: str | None = None)
   baked light files the archive lacks or that do not fit). A skinned (boned) model an EQG or EQ terrain zone places is posed at the
   first key of its <model>_DEFAULT animation, which the client loops from a random point (the bind pose without one). The result's
   source counts what the build left out or drew in another way by model (bakedLightNotFitting, bakedLightPastFileEnd, animatedModels),
-  never by placement. It keeps the zone file's coordinates, which the scene shares (Blender
+  never by placement; the triangles drawn by a stand-in, by stand-in (drawnOtherwise: an MPL material by its diffuse alone, an AddAlpha
+  one opaque, water opaque with its environment's average color, lava as its two diffuses averaged); and what an EQ terrain zone holds
+  that the client draws and the preview does not (waterNotDrawn, radialFloraNotDrawn, lightsNotDrawn, each None where it holds none).
+  A classic zone's placed static objects without colors of their own draw with the colors the client computes for them at load
+  (placementsLitAtLoad). It keeps the zone file's coordinates, which the scene shares (Blender
   x, y are the server's y, x). The zone's lights (classic and EQG zones) come in as point lights in "<zone> lights" and its emitters as
   empties in "<zone> emitters", as placeLights and placeEmitters make them, every line of its emitter list among them; emittersNotMade
   groups the lines the client makes no emitter for (a negative or too high definition index, a lifespan of 0 or less), which previews

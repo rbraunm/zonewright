@@ -2,6 +2,7 @@
 client lights them by: a classic (WLD) zone's region meshes and the objects its objects.wld places, an EQ terrain zone's tiles,
 textured as the client textures them, and the objects and object groups they place, or an EQG (EQGZ) zone's terrain and objects,
 including a zone file zonewright exported."""
+import collections
 import hashlib
 import json
 import math
@@ -22,7 +23,7 @@ import eqWorldFile
 import loadTimeLight
 import zoneSources
 
-zoneCacheFormat = 11
+zoneCacheFormat = 12
 # A model's vertex light where its file gives none: no baked light and the full share of scene light, an assumption until the client's
 # lighting of EQG objects is traced.
 unlitColor = (0, 0, 0, 255)
@@ -303,7 +304,8 @@ def placedEQGPart(model, transform, position, colors, posed=None):
   normals /= numpy.maximum(numpy.linalg.norm(normals, axis=1, keepdims=True), 1e-12)
   uvs = eqModels.staticEQGUVs(model["uvs"]) if posed is None else model["uvs"]
   return eqModels.meshPart(vertices @ transform.T + position, model["triangles"], uvs, textures, alphaModes,
-    {"normals": normals, "colors": colors}, eqModels.eqgLiquids(model["materials"], model["triangleMaterials"]), model["triangleFlags"] & eqgFiles.passableFlag)
+    {"normals": normals, "colors": colors}, eqModels.eqgLiquids(model["materials"], model["triangleMaterials"]), model["triangleFlags"] & eqgFiles.passableFlag,
+    eqModels.eqgTriangleStandIns(model["materials"], model["triangleMaterials"]))
 
 
 def defaultAnimation(modelName):
@@ -488,6 +490,25 @@ def writeTerrainTextures(zoneFolder, terrain, textures, combos, ecosystems, arch
   (zoneFolder / "terrain.json").write_text(json.dumps(description, indent=1), encoding="utf-8")
 
 
+def terrainNotDrawn(terrain, ecosystems, archive):
+  """What an EQ terrain zone holds that the client draws and the preview does not, or None for each it lacks: its water (tiles with a
+  level, by level, tiles with a version 21 water sheet rectangle, and water.dat's placed sheets); the *FLORA entries of the ecosystems
+  on its tiles, from which the client draws radial flora around the camera; and its tiles' point lights, by light definition."""
+  levels = collections.Counter(round(float(tile["level"]), 2) for tile in terrain["tiles"] if tile["level"] != eqgTerrain.noWaterLevel)
+  sheetTiles = sum(tile["waterSheet"] for tile in terrain["tiles"])
+  waterSheets = len(re.findall(r"\*WATERSHEET\s", archive.read("water.dat").decode("latin1"))) if "water.dat" in archive.entries else 0
+  flora = sum(len(re.findall(r"\*FLORA\b", readEntry(archive, name + ".eco").decode("latin1"))) for name in ecosystems)
+  lightDefinitions = collections.Counter(light["definition"] for light in terrain["lights"])
+  return {
+    "waterNotDrawn": {
+      "tilesWithLevel": sum(levels.values()), "levels": {str(level): count for level, count in levels.most_common(4)}, "tilesWithSheetRectangle": sheetTiles,
+      "waterDatSheets": waterSheets,
+    } if levels or sheetTiles or waterSheets else None,
+    "radialFloraNotDrawn": {"floraEntries": flora} if flora else None,
+    "lightsNotDrawn": {"lights": len(terrain["lights"]), "byDefinition": dict(sorted(lightDefinitions.items()))} if terrain["lights"] else None,
+  }
+
+
 def buildTerrainZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
   """An EQ terrain zone's tiles, the objects they place on the ground, and the object groups they place. Hole quads, maps the archive
   lacks, and baked light the client does not take are drawn as the client draws them and listed."""
@@ -548,7 +569,7 @@ def buildTerrainZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
   textureHolders = [archive] + [eqArchive.EQArchive(clientRoot / name) for name in objects.archives if name != source["archive"].name.lower()]
   written = eqModels.writePartsCache(zoneFolder, parts, textureHolders, f"Zone '{zoneName}'")
   writeTerrainTextures(zoneFolder, terrain, textures, combos, ecosystems, archive)
-  return {
+  return terrainNotDrawn(terrain, ecosystems, archive) | {
     "tiles": tileCount, "holeQuads": eqgTerrain.holeQuadCount(terrain), "ecosystems": sorted(ecosystems), "terrainCombos": [list(combo) for combo in combos],
     "terrainMapsMissing": {kind: names for kind, names in missingMaps.items() if names}, "placements": len(terrain["placements"]),
     "objectGroups": len(terrain["groups"]), "missingObjectGroups": sorted(missingGroups), "litFilesMissing": sorted(litProblems["missing"]),

@@ -1,4 +1,5 @@
 """EverQuest models found through the client's own links (eqLinks) and built into per-model caches: EQG models (.mod, static or skinned), EQG skinned piece models (.mds), and WLD static and skeletal actors."""
+import collections
 import concurrent.futures
 import hashlib
 import json
@@ -22,7 +23,7 @@ import machineProfile
 import zoneSources
 
 indexFormat = 11
-modelCacheFormat = 19
+modelCacheFormat = 20
 actorTrailingBytes = 4
 staticKinds = ("wldStatic",)
 defaultAppearance = {
@@ -381,6 +382,24 @@ def eqgLiquids(materials, triangleMaterials):
   return [eqgLiquid(materials[index]) if index >= 0 else None for index in triangleMaterials]
 
 
+def eqgStandIns(material):
+  """What the preview draws in place of what the client draws for an EQG material, by name (docs/clientRendering.md, EQG zones):
+  mplByDiffuseAlone, an MPL material by its diffuse alone, without its coverage map, the vertex buffer's second color, or point light 0
+  through its normal map; additiveDrawnOpaque, an AddAlpha material opaque; waterOpaque, water opaque where the client's alpha follows
+  its fresnel, without point light 0, its environment cube map by its average color; lavaDiffusesAveraged, lava as its two diffuses
+  averaged, its effects unread."""
+  shader = material["shader"].lower()
+  liquid = liquidShaders.get(shader)
+  return tuple(label for label, applies in (
+    ("mplByDiffuseAlone", "_mpl" in shader), ("additiveDrawnOpaque", "addalpha" in shader), ("waterOpaque", liquid == "water"),
+    ("lavaDiffusesAveraged", liquid == "lava"),
+  ) if applies)
+
+
+def eqgTriangleStandIns(materials, triangleMaterials):
+  return [eqgStandIns(materials[index]) if index >= 0 else () for index in triangleMaterials]
+
+
 def staticEQGUVs(uvs):
   """A static (boneless) EQG model's texture coordinates as Blender counts them, v up from a texture's bottom: measured against
   screenshots, the Neighborhood's map board and guild gate show upright only with v flipped, while skinned models (a Drakkin's face)
@@ -388,10 +407,11 @@ def staticEQGUVs(uvs):
   return uvs * (1, -1) + (0, 1)
 
 
-def meshPart(vertices, triangles, uvs, textures, alphaModes, lighting=None, liquids=None, passable=None):
+def meshPart(vertices, triangles, uvs, textures, alphaModes, lighting=None, liquids=None, passable=None, standIns=None):
   """Drawn triangles only; triangles with non-finite vertices are dropped and counted. lighting is the file's per-vertex normals and
   RGBA colors as the client lights them ({normals, colors}), or None for a mesh lit without them; liquids, each triangle's liquid
-  (eqgLiquid) or None; passable, whether the file lets players through each triangle, or None for a model that does not say."""
+  (eqgLiquid) or None; passable, whether the file lets players through each triangle, or None for a model that does not say;
+  standIns, each triangle's stand-ins (eqgStandIns), or None for a mesh drawn as the client draws it."""
   finite = triangleKeep(vertices, triangles)
   keep = numpy.array([texture is not None for texture in textures], dtype=bool) & finite
   keptTextures = [texture for texture, kept in zip(textures, keep) if kept]
@@ -400,6 +420,7 @@ def meshPart(vertices, triangles, uvs, textures, alphaModes, lighting=None, liqu
     "tints": [eqLooks.untinted] * len(keptTextures), "dropped": int((~finite).sum()), "lighting": lighting,
     "liquids": [None] * len(keptTextures) if liquids is None else [liquid for liquid, kept in zip(liquids, keep) if kept],
     "passable": None if passable is None else numpy.asarray(passable, dtype=bool)[keep],
+    "standIns": [()] * len(keptTextures) if standIns is None else [labels for labels, kept in zip(standIns, keep) if kept],
   }
 
 
@@ -545,7 +566,10 @@ def eqgModelParts(archive, definition, appearance, context):
       raise ValueError(f"Model '{definition['model']}' is static; it has no animations")
     if changedAppearance(appearance):
       raise ValueError(f"Model '{definition['model']}' is static; appearance does not apply, got {changedAppearance(appearance)}")
-    return {"parts": [meshPart(model["vertices"], model["triangles"], staticEQGUVs(model["uvs"]), *eqgMaterialTextures(model["materials"], model["triangleMaterials"], {}))], "pose": {"static": True}}
+    return {"parts": [meshPart(
+      model["vertices"], model["triangles"], staticEQGUVs(model["uvs"]), *eqgMaterialTextures(model["materials"], model["triangleMaterials"], {}),
+      standIns=eqgTriangleStandIns(model["materials"], model["triangleMaterials"]),
+    )], "pose": {"static": True}}
   code = definition["model"].upper()
   if eqLooks.isEQGPlayerModel(code):
     unread = {key: value for key, value in changedAppearance(appearance).items() if key in ("variation", "headType", "textureSet")}
@@ -962,6 +986,7 @@ def writePartsCache(modelFolder, parts, textureHolders, label):
     return json.dumps(liquid | {"textures": found}, sort_keys=True)
 
   passable = numpy.concatenate(passableChunks)
+  drawnOtherwise = collections.Counter(label for part in parts for labels in part.get("standIns") or () for label in labels)
   palette, triangleMaterials = {}, numpy.empty(len(textures), dtype=numpy.int32)
   for index, key in enumerate(zip(textures, alphaModes, tints, (liquidKey(liquid) for liquid in liquids))):
     triangleMaterials[index] = palette.setdefault(key, len(palette))
@@ -976,5 +1001,6 @@ def writePartsCache(modelFolder, parts, textureHolders, label):
   )
   return {
     "textureSources": textureSources, "missingTextures": missingTextures, "droppedTriangles": sum(part["dropped"] for part in parts), "lit": bool(litParts),
+    "drawnOtherwise": dict(sorted(drawnOtherwise.items())),
     "minimum": [float(value) for value in vertices.min(0)], "maximum": [float(value) for value in vertices.max(0)],
   }

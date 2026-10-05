@@ -7,6 +7,7 @@ import struct
 import numpy
 
 tileCoordinateOrigin = 100000
+noWaterLevel = -1000.0
 supportedTerrainVersions = ("4", None)
 supportedDataVersions = (20, 21)
 # Quad flag bit choosing the diagonal: clear splits the quad from its (0, 0) corner to (1, 1), set from (1, 0) to (0, 1)
@@ -93,7 +94,9 @@ def parseTerrain(zonText, datBytes, sourceName):
   """EQTZP terrain: each tile's height grid, vertex colors (tint and baked light), quad flags, and ecosystem layers (the first
   covering the tile, each later one with its coverage mask), the objects and object groups the tiles place, in world units. A group's
   z is a height in the world, not above the ground (its members are placed from it unchanged, 0x101038c0), and its tenth value lifts
-  its members."""
+  its members. Also each tile's level (noWaterLevel on most tiles, by its spread a water height on the rest) and, from data version 21,
+  whether it stores a water sheet rectangle, and the tiles' point lights by name and light definition (.def); none of these is
+  drawn yet."""
   header = parseTerrainHeader(zonText, sourceName)
   quads = header["quadsPerTile"]
   vertexSide = quads + 1
@@ -104,17 +107,19 @@ def parseTerrain(zonText, datBytes, sourceName):
     raise ValueError(f"{sourceName}: terrain data version {version} is not supported (only {supportedDataVersions})")
   baseTexture = reader.string().lower()
   tileCount = reader.read("I")
-  tiles, placements, groups, regionNames = [], [], [], []
+  tiles, placements, groups, regionNames, lights = [], [], [], [], []
   for _ in range(tileCount):
     longitude, latitude, _ = reader.read("iii")
     heights = reader.array("<f4", vertexSide * vertexSide).reshape(vertexSide, vertexSide)
     tints = reader.array("<u4", vertexSide * vertexSide).reshape(vertexSide, vertexSide)
     baked = reader.array("<u4", vertexSide * vertexSide).reshape(vertexSide, vertexSide)
     quadFlags = reader.array("u1", quads * quads).reshape(quads, quads)
-    reader.read("f")
+    level = reader.read("f")
+    waterSheet = False
     if version > 20:
       reader.read("i")
-      if reader.read("B"):
+      waterSheet = bool(reader.read("B"))
+      if waterSheet:
         reader.read("4f")
     reader.read("f")
     layers = []
@@ -128,7 +133,7 @@ def parseTerrain(zonText, datBytes, sourceName):
     tileX, tileY = tileOrigin(longitude, latitude, tileSize)
     tiles.append({
       "longitude": longitude, "latitude": latitude, "x": tileX, "y": tileY, "heights": heights, "tints": tints, "baked": baked, "quadFlags": quadFlags,
-      "layers": layers, "baseLayer": layers[0]["ecosystem"] if layers else None,
+      "layers": layers, "baseLayer": layers[0]["ecosystem"] if layers else None, "level": level, "waterSheet": waterSheet,
     })
     for _ in range(reader.read("I")):
       placements.append(readPlacement(reader, version, tileSize, (tileX, tileY)))
@@ -139,11 +144,12 @@ def parseTerrain(zonText, datBytes, sourceName):
       reader.read("II")
       reader.read("12f")
     for _ in range(reader.read("I")):
-      reader.string()
-      reader.string()
+      name = reader.string()
+      definition = reader.string().lower()
       reader.read("b")
       reader.read("II")
       reader.read("10f")
+      lights.append({"name": name, "definition": definition})
     for _ in range(reader.read("I")):
       name = reader.string().lower()
       groupLongitude, groupLatitude = reader.read("ii")
@@ -157,7 +163,7 @@ def parseTerrain(zonText, datBytes, sourceName):
     raise ValueError(f"{sourceName}: terrain data ends at {reader.position} of {len(datBytes)} bytes")
   return {
     "header": header, "dataVersion": version, "baseTexture": baseTexture, "tileSize": tileSize, "tiles": tiles, "placements": placements,
-    "groups": groups, "regionNames": regionNames,
+    "groups": groups, "regionNames": regionNames, "lights": lights,
   }
 
 

@@ -48,4 +48,4 @@ A model may also come from an archive the client loads at startup, which loads b
 
 - **Closed only.** Doors are drawn closed; opening rotations are not applied.
 - **Animated doors.** These are posed at frame 0 of their skeleton; their particle effects are not drawn (`particleCloudsNotDrawn` counts them).
-- **Missing textures.** A texture missing from every linked archive draws magenta and is listed in `missingTextures`.
+- **Missing textures.** A texture missing from every linked archive draws black (the client's effect samples no texture there) and is listed in `missingTextures`.

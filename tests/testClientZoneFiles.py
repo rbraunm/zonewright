@@ -77,6 +77,38 @@ def testClientWaterMaterialsReadAsLiquids():
   assert all(liquid is None for name, liquid in liquids.items() if name not in ("water", "waterfalls"))
 
 
+def testTrianglesDrawnByAStandInAreCountedByStandIn(tmp_path):
+  # Highpass Hold's terrain draws 73,069 triangles with Opaque_MPLBump2UV materials, which the preview draws by their diffuse alone,
+  # and its 2,996 water triangles opaque; its 204 waterfall triangles draw as the client draws them, and 496 name no material.
+  archive = eqArchive.EQArchive(everquestClient / "highpasshold.eqg")
+  model = eqgFiles.parseModel(archive.read("ter_highpass05.ter"), "ter_highpass05.ter")
+  colors = numpy.tile(numpy.array(eqZones.unlitColor, dtype=numpy.uint8), (len(model["vertices"]), 1))
+  part = eqZones.placedEQGPart(model, numpy.identity(3), numpy.zeros(3), colors)
+  written = eqModels.writePartsCache(tmp_path, [part], [archive], "Highpass Hold's terrain")
+  assert len(model["triangles"]) == 76765 and len(part["triangles"]) == 76765 - 496
+  assert written["drawnOtherwise"] == {"mplByDiffuseAlone": 73069, "waterOpaque": 2996}
+
+
+@pytest.mark.clientData("clientFiles")
+def testWhatATerrainZoneHoldsAndThePreviewDoesNotDrawIsNamed():
+  # Every one of Ocean of Tears' 8,840 tiles stores the level -300 (its sea), 8,664 a water sheet rectangle; its tiles place 34
+  # campfire lights and a haunted light, and the ecosystems on them name 36 flora entries. Commonlands' Druid Ring lake: 42 tiles at -40
+  # and one water.dat sheet. A zone without them names none.
+  found = {}
+  for zoneName in ("oceanoftears", "commonlands", "steamfontmts"):
+    source = zoneSources.loadedVariant(everquestClient, zoneName)[1]
+    terrain = eqgTerrain.parseTerrain(*zoneSources.terrainFiles(source), zoneName)
+    ecosystems = {layer["ecosystem"] for tile in terrain["tiles"] for layer in tile["layers"]}
+    found[zoneName] = eqZones.terrainNotDrawn(terrain, ecosystems, eqArchive.EQArchive(source["archive"]))
+  assert found["oceanoftears"] == {
+    "waterNotDrawn": {"tilesWithLevel": 8840, "levels": {"-300.0": 8840}, "tilesWithSheetRectangle": 8664, "waterDatSheets": 0},
+    "radialFloraNotDrawn": {"floraEntries": 36}, "lightsNotDrawn": {"lights": 35, "byDefinition": {"campfire": 34, "haunted_light": 1}},
+  }
+  assert found["commonlands"]["waterNotDrawn"] == {"tilesWithLevel": 42, "levels": {"-40.0": 42}, "tilesWithSheetRectangle": 0, "waterDatSheets": 1}
+  assert found["commonlands"]["lightsNotDrawn"] is None and found["commonlands"]["radialFloraNotDrawn"] == {"floraEntries": 15}
+  assert found["steamfontmts"]["waterNotDrawn"] is None and found["steamfontmts"]["radialFloraNotDrawn"] == {"floraEntries": 4}
+
+
 def testClientArtPlayersPassThroughAndCollisionShellsWithoutMaterialsRead():
   # Highpass Hold's lamp posts are solid art the client flags passable (0x1) on every triangle; the survey reads them as passable.
   archive = eqArchive.EQArchive(everquestClient / "highpasshold.eqg")

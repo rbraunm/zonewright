@@ -13,24 +13,22 @@ import bridgeObjects
 import bridgeSurfacing
 
 alphaThreshold = 0.5
-missingTextureColor = (1.0, 0.0, 1.0, 1.0)
+# Direct3D 9 reads a sampler with no texture bound as 0, 0, 0, 1.
+emptySamplerColor = (0.0, 0.0, 0.0, 1.0)
 untinted = 0xFFFFFF
 
 
-def missingTextureMaterial(textureName):
-  """Faces whose texture no linked archive holds: flat magenta, unlit and unfogged, so the gap is visible in every render."""
-  materialName = f"eq_missing_{textureName}"
+def missingTextureMaterial(textureName, lit):
+  """Faces whose texture no linked archive holds: the client's effect samples no texture there, which reads black and opaque, so they
+  draw black, lit and fogged as any surface (docs/clientRendering.md, EQG zones)."""
+  materialName = f"eq_missing_{textureName}{'_lit' if lit else ''}"
   material = bpy.data.materials.get(materialName)
   if material is None:
     material = bpy.data.materials.new(materialName)
     material.use_nodes = True
-    nodes = material.node_tree.nodes
-    for unused in [node for node in nodes if node.type == "BSDF_PRINCIPLED"]:
-      nodes.remove(unused)
-    emission = nodes.new("ShaderNodeEmission")
-    emission.inputs["Color"].default_value = missingTextureColor
-    output = next(node for node in nodes if node.type == "OUTPUT_MATERIAL")
-    material.node_tree.links.new(emission.outputs["Emission"], output.inputs["Surface"])
+    empty = material.node_tree.nodes.new("ShaderNodeRGB")
+    empty.outputs["Color"].default_value = emptySamplerColor
+    bridgeClientLight.surfaceOutput(material, empty.outputs["Color"], None, "opaque", lit, alphaThreshold)
   return material
 
 
@@ -180,7 +178,7 @@ def buildModelMesh(folder, meshName):
     if key[0].startswith("terrain:"):
       mesh.materials.append(terrainMaterial(folder, int(key[0].split(":")[1])))
     elif key[0] in missing:
-      mesh.materials.append(missingTextureMaterial(key[0]))
+      mesh.materials.append(missingTextureMaterial(key[0], lit))
     elif str(liquid):
       mesh.materials.append(liquidModelMaterial(folder, key[0], json.loads(str(liquid)), lit))
     else:
