@@ -542,6 +542,7 @@ def testABranchLeavesThroughItsParentsStrokesOnlyAsTheAuthorDrewIt(stageBlenderS
   async def steps(session):
     await caveCanyon(session, tmp_path)
     trench = await session.expectError("cutCave", branched | {"breakup": None, "floor": [rubbleEast]})
+    throughPad = await session.expectError("cutCave", branched | {"breakup": None, "floor": [pad]})
     throughThreshold = await session.expectSuccess("cutCave", branched | {"breakup": None, "floor": [rubbleEast, threshold]})
     walked = await session.expectSuccess("walkRoute", {"cave": {"objectName": "ground", "name": "branched", "run": "side"}})
     await session.expectSuccess("removeCave", {"objectName": "ground", "name": "branched"})
@@ -549,11 +550,13 @@ def testABranchLeavesThroughItsParentsStrokesOnlyAsTheAuthorDrewIt(stageBlenderS
     await session.expectSuccess("removeCave", {"objectName": "ground", "name": "branched"})
     sloped = await session.expectError("cutCave", ramp | {"branches": [sideOfRamp]})
     level = await session.expectSuccess("cutCave", landed | {"branches": [sideOfRamp]})
-    return trench, throughThreshold, walked, onDais, sloped, level
+    return trench, throughPad, throughThreshold, walked, onDais, sloped, level
 
-  trench, throughThreshold, walked, onDais, sloped, level = stageBlenderServer.session(steps)
+  trench, throughPad, throughThreshold, walked, onDais, sloped, level = stageBlenderServer.session(steps)
   # Through rubble no one cleared, the branch would cut a trench; refused, naming the rubble and how to clear it.
   assert "Branch 'side' leaves its parent 'main' through its floor stroke(s) ['rubbleEast']" in trench and "Run a level way to where it leaves" in trench
+  # Through a pad 3 high, less than a step but a trench deeper than buildTolerances.trenchTolerance, it is refused too.
+  assert "Branch 'side' leaves its parent 'main' through its floor stroke(s) ['dais'], standing 3.0 over the branch's floor" in throughPad
   # Over a threshold the author drew, it leaves cleanly and is walked from the mouth.
   assert [junction["rise"] for junction in throughThreshold["junctions"]] == [0.0] and walked["walkable"] is True and walked["problems"] == []
   # Started without a height on a dais, it takes the dais's top and stands on it, no step over its parent's floor there.

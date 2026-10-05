@@ -26,7 +26,7 @@ import bridgeNoise
 import bridgePasses
 import bridgeSurfacing
 import playerScale
-from buildTolerances import floorHangTolerance, probeOverFloor, strokeStandTolerance, wallFootClearance
+from buildTolerances import floorHangTolerance, probeOverFloor, strokeStandTolerance, trenchTolerance, wallFootClearance
 
 # A pass holds single precision: a ring vertex reads back this close to its plug triangle, and ground counts as moved past this.
 ringTolerance = 1e-4
@@ -1016,8 +1016,8 @@ def relievedFloorsAt(run, points):
 
 
 def requireNoTrench(branch, parent, exitAlong):
-  """Refuse a branch whose floor, from its start to where it leaves its parent's walls, runs more than a step under the parent's floor
-  strokes standing there (rubble, a pad): the union would cut a trench through them that nobody drew."""
+  """Refuse a branch whose floor, from its start to where it leaves its parent's walls, runs more than trenchTolerance under the
+  parent's floor strokes standing there (rubble, a pad): the union would cut a trench through them that nobody drew."""
   line = branch["line"]
   alongs = numpy.linspace(0.0, exitAlong, max(2, math.ceil(exitAlong / 2.0) + 1))
   floors, directions, widths, _ = line.at(alongs)
@@ -1028,7 +1028,7 @@ def requireNoTrench(branch, parent, exitAlong):
   parentFloors, offsets, parentWidths, standing = relievedFloorsAt(parent, points)
   stroked = numpy.array([bool(names) for names in standing])
   over = numpy.where((numpy.abs(offsets) <= parentWidths / 2) & stroked, parentFloors - heights, -math.inf)
-  if over.max() <= playerScale.stepHeight + 1e-9:
+  if over.max() <= trenchTolerance + 1e-9:
     return
   worst = int(over.argmax())
   raise ValueError(

@@ -13,6 +13,8 @@ wallFootClearance = 2.0
 # A point within this of a cave floor stroke's height (a level way's floor, a pad's top) stands on the stroke; farther, it floats over
 # it or is sunk in it.
 strokeStandTolerance = 2.0
+# A cave branch leaving through its parent's rubble or pad may run this far under it; deeper, the union cuts a trench nobody drew.
+trenchTolerance = 2.0
 # A prefab's floor without a plinth reads as standing on the ground within this of it: ground higher comes up through it, and ground
 # lower shows a gap under its walls.
 floorTolerance = 2.0
