@@ -8,7 +8,6 @@ import os
 
 import bpy
 import mathutils
-import numpy
 
 import bridgeBoundaries
 import bridgeExport
@@ -411,14 +410,6 @@ def groundHeight(x, y):
   top = bridgeMeshAccess.sceneTopHeight() + overheadLift
   footing = bridgeMeshAccess.PlayerSurfaces().footingBelow(mathutils.Vector((x, y, top)), top + bridgeMeshAccess.waterReach)
   return None if footing is None else footing.z
-
-
-def headingOf(direction):
-  return round(math.degrees(math.atan2(direction[0], direction[1])) % 360.0, 3)
-
-
-def standView(at, direction, pitch=-5.0):
-  return {"standAt": roundVector(at), "headingDegrees": headingOf(direction), "pitchDegrees": pitch}
 
 
 def orbitView(collection):

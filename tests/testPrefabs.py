@@ -1,5 +1,3 @@
-import math
-
 import structurePlots
 
 prefab = "testKitHouse"

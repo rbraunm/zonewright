@@ -9,7 +9,6 @@ import numpy
 structureProperty = "zonewrightStructure"
 probesProperty = "zonewrightStructureProbes"
 partProperty = "zonewrightStructurePart"
-shearProperty = "zonewrightShearOf"
 probeKinds = {"footing": 0, "below": 1, "beside": 2, "overhead": 3}
 probeKindNames = {code: name for name, code in probeKinds.items()}
 probeWidth = 9
@@ -60,12 +59,6 @@ def writeProbes(collection, rows):
 
 def partsOf(collection):
   return sorted((member for member in collection.objects if member.get(partProperty) == collection.name), key=lambda member: member.name)
-
-
-def namedObjects(name):
-  """The objects a name stands for in a view: a structure's parts, or the object of that name."""
-  collection = findStructure(name)
-  return [part.name for part in partsOf(collection)] if collection is not None else [name]
 
 
 def structureOf(sceneObject):
