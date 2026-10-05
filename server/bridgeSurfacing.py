@@ -134,7 +134,7 @@ def liquidNodes(material, liquid, values, diffusePath, texturePaths, lit):
   distance until flat 300 units off; plus its environment mirrored by fresnel (bias + (1 - bias) times the grazing term to
   fresnelPower) times reflectionAmount and reflectionColor, added unlit before fog. The environment is a cube map the preview cannot
   look up, so its average color stands for it. A waterfall (RegionWaterFall.fxo): its diffuse's color lit, as see-through as its alpha,
-  each sampled at its own slide. Lava: its two diffuses averaged (its effect is not read yet). Each layer scrolls as scrolledCoordinates
+  each sampled at its own slide. Lava: its two diffuses averaged (its color formula is not read yet). Each layer scrolls as scrolledCoordinates
   says. Water a material leaves without its values or textures is drawn without what they give."""
   tree = material.node_tree
   slides = values.get("slides", [0.0, 0.0, 0.0, 0.0])
@@ -160,9 +160,10 @@ def liquidNodes(material, liquid, values, diffusePath, texturePaths, lit):
 def scrolledCoordinates(tree, scale, clientOffset):
   """The texture coordinates times scale, moved by clientOffset (texture repeats per unit of effect time, [u, v] with v counted down
   from the texture's top as the client counts it) times the effect time the preview sets (liquidTimeProperty, the time modulo 100 as
-  each effect's preshader takes it). Water moves its first layer by minus its first slide and its second, at twice the coordinates, by
-  plus its second slide (RegionWater.fxo: mad oT0, r0, 1/256, -c7 and mad oT1, r0, 1/128, +c9); a waterfall moves its color and its
-  alpha (RegionWaterFall.fxo) and lava its two diffuses (RegionLava.fxo) each by plus its slide."""
+  each effect's preshader takes it). Water moves its first sample's coordinates by minus its first slide and its second's, at twice the
+  coordinates, by plus its second slide (RegionWater.fxo: mad oT0, r0, 1/256, -c7 and mad oT1, r0, 1/128, +c9); a waterfall moves its
+  color's and its alpha's coordinates (RegionWaterFall.fxo) and lava its two diffuses' (RegionLava.fxo) each by plus its slide. A
+  pattern moves against its coordinates."""
   coordinates = tree.nodes.new("ShaderNodeTexCoord").outputs["UV"]
   time = tree.nodes.new("ShaderNodeAttribute")
   time.attribute_type = "VIEW_LAYER"
