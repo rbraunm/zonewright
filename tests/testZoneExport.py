@@ -445,9 +445,10 @@ def testExportLeavesOutWhatIsNotTheZonesOwnAndSaysWhy(stageBlenderServer, tmp_pa
 
   async def steps(session):
     await buildPlot(session, texture, texture, tmp_path / "plot.blend")
-    await session.expectSuccess("createRegion", {"name": "yard", "outline": [[-30, -30], [30, -30], [30, 30], [-30, 30]], "bottom": -10, "top": 30, "intent": "the yard"})
+    await session.expectSuccess("createRegion", {"name": "yard", "outline": [[-30, -30], [30, -30], [30, 30], [-30, 30]], "bottom": -10, "top": 30, "intent": "the yard", "access": "play"})
     await session.expectSuccess("placeSpawn", {"zone": None, "model": "DAF", "name": "visitor", "height": 5, "location": [0, 0, 20], "headingDegrees": 0})
     await session.expectSuccess("placeObject", {"zone": None, "model": "IT10800_ACTORDEF", "name": "kiln", "location": [10, 10, 0], "headingDegrees": 0})
+    await session.expectImage("placeEntry", {"name": "gate", "at": [-50, -50], "headingDegrees": 45, "kind": "landing"})
     await session.expectSuccess("runPython", {"code": "bpy.data.objects['pillar'].hide_render = True"})
     await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "mound"})
     await session.expectSuccess("setShapingPass", {"objectName": "ground", "name": "mound", "muted": True})
@@ -461,6 +462,7 @@ def testExportLeavesOutWhatIsNotTheZonesOwnAndSaysWhy(stageBlenderServer, tmp_pa
     {"reason": "a client object: client models do not export yet", "count": 1, "objects": ["kiln"]},
     {"reason": "a client spawn: the server's data, not zone geometry", "count": 1, "objects": ["visitor"]},
     {"reason": "a region: the plan", "count": 1, "objects": ["yard"]},
+    {"reason": "an entry: where players arrive (server rows)", "count": 1, "objects": ["gate"]},
     {"reason": "hidden from renders", "count": 1, "objects": ["pillar"]},
   ]
   assert exported["toConfirm"] == [{"object": "ground", "passesOff": ["mound"], "layersMuted": ["path"], "staleCaves": [], "staleDefinedPasses": []}]

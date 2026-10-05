@@ -21,7 +21,7 @@ import bridgeStructureData
 import bridgeSurfacing
 import bridgeSwim
 import skyDrawing
-from playerScale import swimEyeAboveSurface
+from playerScale import eyeHeight, swimEyeAboveSurface
 
 requiredZoneKeys = (
   "ambientColor", "specialAmbientColor", "bounceColor", "sunColor", "sunAzimuthDegrees", "sunElevationDegrees", "fogColor", "fogStart", "fogEnd",
@@ -38,7 +38,6 @@ verticalFieldOfViewDegrees = 46.5
 minimumFieldOfViewDegrees = 10.0
 maximumFieldOfViewDegrees = 120.0
 maximumFrameSide = 1920
-eyeHeight = 5.5
 cameraClipStart = 0.5
 # A point given with its height finds the ground from this far above it, so a height read off a floor or a little under it still
 # stands on that floor, down to groundSearchDistance below it.

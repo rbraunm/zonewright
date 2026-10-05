@@ -135,7 +135,7 @@ def testLabelsNameOnlyWhatTheViewShowsAndTheObjectsShadingColorsEachObject(stage
     await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [200, 200], "spacing": 8, "location": [0, 0, 0], "collection": "terrain"})
     for name, kind, size, location in labelScene:
       await session.expectSuccess("createPrimitive", {"kind": kind, "name": name, "size": size, "location": location} | ({"segments": 12} if kind == "cylinder" else {}))
-    await session.expectSuccess("createRegion", {"name": "yard", "outline": [[-50, -50], [50, -50], [50, 50], [-50, 50]], "bottom": -5, "top": 40, "intent": "a yard"})
+    await session.expectSuccess("createRegion", {"name": "yard", "outline": [[-50, -50], [50, -50], [50, 50], [-50, 50]], "bottom": -5, "top": 40, "intent": "a yard", "access": "play"})
     await session.expectSuccess("setZoneProperties", environment)
     labelled = await session.expectImage("renderView", {"view": southLow, "labels": ["crate", "pillar", "hidden", "wall"]})
     plain = await session.expectImage("renderView", {"view": southLow})

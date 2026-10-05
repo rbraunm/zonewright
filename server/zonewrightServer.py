@@ -25,6 +25,7 @@ import blenderBridge
 import checkpoints
 import conceptComparison
 import emitterAssets
+import eqAxes
 import eqCalibration
 import eqCubeMaps
 import eqEmitterDefinitions
@@ -39,6 +40,7 @@ import eqZones
 import extensionCatalog
 import machineProfile
 import planDrawing
+import playerScale
 import skyDrawing
 import toolingLog
 import viewSheets
@@ -136,10 +138,6 @@ async def callBridge(context, command, arguments):
 # The live dumps record dark elf females at height 5, the race default.
 figureModelCode = "DAF"
 figureHeight = 5.0
-# The server and the live dumps give positions as (x, y, z); the zone files, and so Blender, hold them as (y, x, z): measured, every
-# kind of placement lands on the zone geometry only that way. Headings run 512 to a turn; eqgame.exe's heading toward a point
-# (0x4ef250) is 0 toward +y and 128 toward +x, which through the axis swap is a turn of +heading about Z for a model whose front is +X.
-eqHeadingUnits = 512
 standPose = {"animation": None, "variant": None, "frame": 0}
 
 
@@ -180,10 +178,12 @@ def placementFrame(location, headingDegrees, x, y, z, heading):
   if blenderGiven:
     if location is None or headingDegrees is None or len(location) != 3:
       raise ToolError("location [x, y, z] and headingDegrees go together")
-    return list(location), 90 - headingDegrees
+    return list(location), eqAxes.turnFromHeading(headingDegrees)
   if None in (x, y, z, heading):
     raise ToolError("x, y, z, and heading go together")
-  return [y, x, z], heading * 360 / eqHeadingUnits
+  # The server and the live dumps give positions in the server's axes: measured, every kind of placement lands on the zone geometry
+  # only through eqAxes' swap.
+  return eqAxes.zoneFromServer([x, y, z]), eqAxes.turnFromEQHeading(heading)
 
 
 def modelSummary(details):
@@ -766,6 +766,7 @@ async def setZoneProperties(
   sky: dict | str | None = None,
   safePoint: list[float] | None = None,
   underworld: float | None = None,
+  shortName: str | None = None,
 ):
   """Set the zone's EQ properties stored in the .blend, in the client's lighting terms (docs/clientRendering.md): ambient, special
   ambient, bounce, and sun colors (0-1, raw as the client uses them); the direction toward the sun (azimuth 0 = +Y, clockwise;
@@ -782,13 +783,14 @@ async def setZoneProperties(
   drops any set before; sky "none" states that the zone draws no sky (its zone row's sky 0, as about a third of the client's EQG
   zones have), so previews show the fog color where nothing is drawn and the light and fog color are set by hand. safePoint [x, y, z, headingDegrees] is where players arrive in the zone (the zone
   row's safe point; heading 0 = +Y, clockwise) and underworld the height below it under which the client puts a falling player back;
-  a game export needs both, with ground under the safe point above the underworld. The result gives how the client resolves the sky
-  and the light it supplies."""
+  a game export needs both, with ground the zone ships under the safe point above the underworld. shortName is the zone's short name
+  (1 to 31 lowercase letters and digits): a zone line whose target is it leads back into this zone, a teleport whose landing
+  getEntries lists. The result gives how the client resolves the sky and the light it supplies."""
   updates = {
     "ambientColor": ambientColor, "specialAmbientColor": specialAmbientColor, "bounceColor": bounceColor, "sunColor": sunColor,
     "sunAzimuthDegrees": sunAzimuthDegrees, "sunElevationDegrees": sunElevationDegrees, "fogColor": fogColor, "fogStart": fogStart,
     "fogEnd": fogEnd, "fogDensity": fogDensity, "fogOn": fogOn, "minClip": minClip, "maxClip": maxClip, "newEngineZone": newEngineZone, "sky": sky,
-    "safePoint": safePoint, "underworld": underworld,
+    "safePoint": safePoint, "underworld": underworld, "shortName": shortName,
   }
   given = {key: value for key, value in updates.items() if value is not None}
   if not given:
@@ -1520,27 +1522,33 @@ async def measure(context: Context, points: list[list[float]], snapToSurface: bo
   return await callBridge(context, "measure", {"points": points, "snapToSurface": snapToSurface})
 
 
-@guardedTool()
+steepestWalkableDegrees = math.degrees(math.acos(playerScale.walkableNormalZ))
+
+
+@guardedTool(description=(
+  "Walk a route as a player would, over what the client collides with (rendered meshes and collection instances, and the"
+  " boundaries, never drawn; not water, which is waded or swum, nor faces players pass through: liquid and cutout materials, objects"
+  " marked passable, faces an imported zone file flags passable; nor guides, regions, spawns, or doors, taken as open; ground inside a"
+  " solid is no footing, ground under one-sided cover such as a roof plane is): from its first point, following the footing underfoot"
+  " past each point of `path` [[x, y, z], ...], of the saved review route named `route` (saveReviewRoute), or of the walk line of the"
+  " bridge, flight, or walkway named `route` (its centerline at deck height, run on 5 past each end that stands on footing), whose"
+  " heights only need to be within a step of the footing (so a route can run over an arch or under it). Judged for the player of"
+  f" playerScale, {playerScale.playerHeight:g} units tall, who walks faces up to {steepestWalkableDegrees:.1f} degrees and steps up"
+  f" {playerScale.stepHeight:g} (both measured in the RoF2 client), in half-unit strides whatever `sampleSpacing`, which sets only the"
+  " profile's rows (give `path` or `route`, not both; renderRouteStrip shows the walk in pictures). Returns the length walked, the"
+  " steepest face stood on, the steepest grade climbed or descended between two profile rows (steepestGrade: a stair's level treads"
+  " stand at 0 but climb at its pitch), the narrowest footing (how far it runs to each side before a drop of more than a player's"
+  " height, a wall, a step too high, or a face too steep; null beyond 60), the lowest headroom, the deepest water over the footing;"
+  " `problems`, everything that stops a player, each once over the stretch it covers: blocked (a boundary across the way at half a"
+  f" player's height, where it stands), rise (a wall or step over {playerScale.stepHeight:g} in the way, its height, how far up its face"
+  f" stays steeper than {steepestWalkableDegrees:.1f}, a plane's as much as a block's; null past 60), drop (no footing within 60 below), steep (a"
+  f" face over {steepestWalkableDegrees:.1f} climbed, its steepest), headroom (under {playerScale.playerHeight:g}, its lowest); after a boundary, a"
+  " rise, or a drop the walk takes up again where the route's own heights find footing (resumesAt, null if never); `oneWay`, ways down a"
+  f" player cannot climb back: ledge (a drop over a step, its height) and steep (a face over {steepestWalkableDegrees:.1f} descended); walkable when"
+  " there are no problems; and a profile along the way (each row with the water depth over its footing, or null). Use it on decks,"
+  " ramps, ledges, and the ways into an area."
+))
 async def walkRoute(context: Context, path: list[list[float]] | None = None, route: str | None = None, sampleSpacing: float = 4.0):
-  """Walk a route as a player would, over what the client collides with (rendered meshes and collection instances, and the
-  boundaries, never drawn; not water, which is waded or swum, nor faces players pass through: liquid and cutout materials, objects
-  marked passable, faces an imported zone file flags passable; nor guides, regions, spawns, or doors, taken as open; ground inside a
-  solid is no footing, ground under one-sided cover such as a roof plane is): from its first point, following the footing underfoot
-  past each point of `path` [[x, y, z], ...], of the saved review route named `route` (saveReviewRoute), or of the walk line of the
-  bridge, flight, or walkway named `route` (its centerline at deck height, run on 5 past each end that stands on footing), whose heights only need to
-  be within a step of the footing (so a route can run over an arch or under it). Judged for a player 6 units tall who walks slopes up
-  to 60 degrees and steps up 2, in half-unit strides whatever `sampleSpacing`, which sets only the profile's rows (give `path` or
-  `route`, not both; renderRouteStrip shows the walk in pictures). Returns the length walked, the steepest face stood on, the steepest
-  grade climbed or descended between two profile rows (steepestGrade: a stair's level treads stand at 0 but climb at its pitch), the narrowest footing
-  (how far it runs to each side before a drop of more than a player's height, a wall, a step too high, or a face too steep; null
-  beyond 60), the lowest headroom, the deepest water over the footing; `problems`, everything that stops a player, each once over the
-  stretch it covers: blocked (a boundary across the way at half a player's height, where it stands), rise (a wall or step over 2 in
-  the way, its height, how far up its face stays steeper than 60, a plane's as much as a block's; null past 60), drop (no footing
-  within 60 below), steep (a face over 60 climbed, its steepest), headroom (under 6, its lowest); after a boundary, a rise, or a drop
-  the walk takes up again where the route's own heights find footing (resumesAt, null if never); `oneWay`, ways down a player cannot
-  climb back: ledge (a drop over a step, its height) and steep (a face over 60 descended); walkable when there are no problems; and a
-  profile along the way (each row with the water depth over its footing, or null). Use it on decks, ramps, ledges, and the ways into
-  an area."""
   return await callBridge(context, "walkRoute", {"path": path, "route": route, "sampleSpacing": sampleSpacing})
 
 
@@ -1936,18 +1944,23 @@ async def placeEmitters(context: Context, emitters: list[dict], collection: str 
 
 
 @guardedTool()
-async def createRegion(context: Context, name: str, outline: list[list[float]], bottom: float, top: float, intent: str):
+async def createRegion(context: Context, name: str, outline: list[list[float]], bottom: float, top: float, intent: str, access: str):
   """Mark an area of the zone for what it is to become: a vertical prism over `outline` ([[x, y], ...], in order) from `bottom` to
   `top`, kept in the regions collection (seen in Blender, never rendered or exported) with its `intent` ("north guild terrace: packed
-  earth, dwellings carved into the back wall"). A zone is planned as regions first and each is shaped, surfaced, and dressed for its
-  own intent; the {"region": name} selector confines any tool to one."""
-  return await callBridge(context, "createRegion", {"name": name, "outline": outline, "bottom": bottom, "top": top, "intent": intent})
+  earth, dwellings carved into the back wall") and its `access`, whether players reach it: "play" (they walk or swim there; walking
+  against swimming is the swim volumes' decision), "view" (seen but never entered: a backdrop slope, a far shore), or "none" (never
+  reached: behind the rim, rock interiors, under the world). A zone is planned as regions first and each is shaped, surfaced, and
+  dressed for its own intent; the {"region": name} selector confines any tool to one."""
+  return await callBridge(context, "createRegion", {"name": name, "outline": outline, "bottom": bottom, "top": top, "intent": intent, "access": access})
 
 
 @guardedTool()
-async def editRegion(context: Context, name: str, outline: list[list[float]] | None = None, bottom: float | None = None, top: float | None = None, intent: str | None = None):
-  """Change a region's outline, bottom, top, or intent as the plan changes."""
-  return await callBridge(context, "editRegion", {"name": name, "outline": outline, "bottom": bottom, "top": top, "intent": intent})
+async def editRegion(
+  context: Context, name: str, outline: list[list[float]] | None = None, bottom: float | None = None, top: float | None = None, intent: str | None = None,
+  access: str | None = None,
+):
+  """Change a region's outline, bottom, top, intent, or access (play, view, or none) as the plan changes."""
+  return await callBridge(context, "editRegion", {"name": name, "outline": outline, "bottom": bottom, "top": top, "intent": intent, "access": access})
 
 
 sketchShapeHelp = (
@@ -1987,8 +2000,8 @@ async def getSketch(context: Context, sheet: str | None = None):
 
 @guardedTool()
 async def renderSketch(
-  context: Context, center: list[float], width: float, sheets: list[str] | None = None, layers: list[str] = ["regions", "plots", "water", "boundaries", "zoneLines"],
-  bandHeight: float = 25.0, spotHeights: bool = True,
+  context: Context, center: list[float], width: float, sheets: list[str] | None = None,
+  layers: list[str] = ["regions", "plots", "water", "boundaries", "zoneLines", "entries"], bandHeight: float = 25.0, spotHeights: bool = True,
 ):
   """Draw a plan: the zone from straight above in quiet grey relief (lighter higher, a step every bandHeight units, slopes shaded
   from the game's northwest), `width` units across (along y) about `center`, the game's north (+X) up and east (-Y) right as the
@@ -1996,7 +2009,10 @@ async def renderSketch(
   crossing unless spotHeights is false, giving way wherever a label must stand on it), a scale bar, the sketch sheets (all, or
   those named) in their own colors (areas dashed and faintly filled, footprints filled with their facing arrows and heights, paths at
   their widths, points, notes; every shape shows, inside an area or under another sheet's), and the plan's own layers: regions
-  (dashed, named), plots (outlined, by address, with a mark pointing out of the entrance side), water (as players see it, not where a
+  (dashed, named, filled by access: view hatched amber, none hatched red, undecided hatched grey, play outlined alone), entries (where
+  players arrive, getEntries: dark arrows from the point toward the heading, hollow when isolated, a ring where a teleport keeps the
+  player's heading, labelled S for the safe point, zoneIn with the zone it comes from, landing with its name, T<number> for a teleport's
+  landing, and entrance with its plot), plots (outlined, by address, with a mark pointing out of the entrance side), water (as players see it, not where a
   surface runs on tucked under its banks: blue, lava orange), swim (the swim volumes, dashed, cyan water and magenta lava, each
   named inside itself where its name fits clear of the other labels, else by its number; `unnamedSwimVolumes` lists those in the
   drawing left unnamed, to see closer), boundaries (red, named: walls as lines along their foot, lids and floors faintly filled), and
@@ -2390,8 +2406,48 @@ async def getZoneLines(context: Context):
 
 
 @guardedTool()
+async def placeEntry(
+  context: Context, name: str, at: list[float], headingDegrees: float, kind: str, fromZone: str | None = None, fromNumber: int | None = None,
+  isolated: bool = False,
+):
+  """Place an entry, where players arrive, as an arrow at its footing facing headingDegrees (0 = +Y, clockwise): kind "zoneIn", where a
+  neighbour's zone line lands players (fromZone, the neighbour's short name; fromNumber, that line's zone_points number, when known),
+  or "landing", where a port inside the world lands them (a teleport door, an NPC port). isolated marks an area reached only by its own
+  port. at [x, y] takes the highest footing there, [x, y, z] the footing from 3 above z down to 50 below it, as standAt finds it, on
+  what the zone ships and the client collides with: reference zones, placed client objects, guides, and what players pass through are
+  no ground. Refused, changing nothing: no footing, footing steeper than players walk or with less headroom than a player's height
+  (playerScale), footing inside a zone line or a swim volume (players would arrive swimming), or under the surface of a pool or river
+  whose swimming is undecided (a floating pool over the point, with its basin between, is not over it). Placing an entry's name again
+  replaces it; transformObjects moves it and deleteObjects removes it, and getEntries says when one no longer stands on its footing,
+  which a game export refuses. Entries are never exported as geometry. Returns the entry and its arrival view: standing there facing
+  its heading, in client shading, with the scale figure ahead."""
+  placed = await callBridge(context, "placeEntry", {
+    "name": name, "at": at, "headingDegrees": headingDegrees, "kind": kind, "fromZone": fromZone, "fromNumber": fromNumber, "isolated": isolated,
+  })
+  view = {"standAt": placed["at"], "headingDegrees": placed["headingDegrees"], "pitchDegrees": 0.0}
+  outputPath = newRenderPath()
+  zone = await callBridge(context, "getZoneProperties", {})
+  arrival = await callBridge(context, "renderView", {
+    "view": view, "outputPath": str(outputPath), "figureModel": await scaleFigureModel(zone, view), "shading": "client", "bandHeight": 50.0,
+    "guides": True, "sky": await zoneSky(zone), "swimVolumes": False, "labels": None, "emitters": await previewEmitterAssets(),
+  })
+  return [Image(data=outputPath.read_bytes(), format="png"), placed | {"arrivalView": {"outputPath": str(outputPath), "view": view, "eye": arrival["eye"], "figure": arrival["figure"]}}]
+
+
+@guardedTool()
+async def getEntries(context: Context):
+  """Every place players arrive, stored and derived, each with its point, heading, source, and state (onFooting, or offFooting with
+  the footing found there and how far off): the entries placeEntry placed (zoneIn with fromZone and fromNumber, landing, isolated);
+  the safe point; the landing of each zone line whose target is this zone's shortName at a whole point (a teleport, named T<number>);
+  and each plot's entrance, facing into the plot. Footing is read on what the zone ships, as placeEntry reads it. notFollowed lists
+  the zone lines whose landing cannot be placed, with why (a kept coordinate, or no shortName to tell which lead back here)."""
+  return await callBridge(context, "getEntries", {})
+
+
+@guardedTool()
 async def getRegions(context: Context):
-  """Every region with its intent, outline, height span, and area: the zone's plan."""
+  """Every region with its intent, access, outline, height span, and area: the zone's plan; and under `undecided` the regions made
+  before access was decided, which a game export refuses until editRegion gives each its access."""
   return await callBridge(context, "getRegions", {})
 
 

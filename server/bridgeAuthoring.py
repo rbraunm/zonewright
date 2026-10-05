@@ -20,6 +20,7 @@ import bridgeShaping
 import bridgeSurfacing
 
 regionCollectionName = "regions"
+regionAccess = ("play", "view", "none")
 layerOrderProperty = bridgeMeshAccess.surfaceLayersProperty
 baseAttributeName = "zonewrightSurfaceBase"
 layerAttributePrefix = "zonewrightSurface:"
@@ -79,26 +80,36 @@ def describeRegion(regionObject):
   outline, bottom, top = bridgeMeshAccess.regionShape(regionObject)
   x, y = outline[:, 0], outline[:, 1]
   area = abs(float(numpy.dot(x, numpy.roll(y, -1)) - numpy.dot(y, numpy.roll(x, -1)))) / 2
-  return {"name": regionObject.name, "intent": regionObject[bridgeMeshAccess.regionIntentProperty], "outline": [[round(float(a), 2), round(float(b), 2)] for a, b in outline],
-    "bottom": round(bottom, 2), "top": round(top, 2), "area": round(area)}
+  return {"name": regionObject.name, "intent": regionObject[bridgeMeshAccess.regionIntentProperty], "access": regionObject.get(bridgeMeshAccess.regionAccessProperty),
+    "outline": [[round(float(a), 2), round(float(b), 2)] for a, b in outline], "bottom": round(bottom, 2), "top": round(top, 2), "area": round(area)}
 
 
-def createRegion(name, outline, bottom, top, intent):
+def requireAccess(access):
+  if access not in regionAccess:
+    raise ValueError(f"A region's access is one of {list(regionAccess)} (players walk or swim there; seen but never entered; never reached), got {access!r}")
+
+
+def createRegion(name, outline, bottom, top, intent, access):
   bridgeObjects.requireNewName(name)
   if not intent.strip():
     raise ValueError("A region needs its intent: what the area is to become")
+  requireAccess(access)
   regionObject = bpy.data.objects.new(name, regionMesh(name, outline, bottom, top))
   regionObject[bridgeMeshAccess.regionIntentProperty] = intent.strip()
+  regionObject[bridgeMeshAccess.regionAccessProperty] = access
   regionObject.display_type = "WIRE"
   regionObject.hide_render = True
   bridgeObjects.targetCollection(regionCollectionName).objects.link(regionObject)
   return describeRegion(regionObject)
 
 
-def editRegion(name, outline, bottom, top, intent):
+def editRegion(name, outline, bottom, top, intent, access):
   regionObject = bridgeMeshAccess.requireRegion(name)
-  if outline is None and bottom is None and top is None and intent is None:
-    raise ValueError("editRegion needs an outline, bottom, top, or intent")
+  if outline is None and bottom is None and top is None and intent is None and access is None:
+    raise ValueError("editRegion needs an outline, bottom, top, intent, or access")
+  if access is not None:
+    requireAccess(access)
+    regionObject[bridgeMeshAccess.regionAccessProperty] = access
   currentOutline, currentBottom, currentTop = bridgeMeshAccess.regionShape(regionObject)
   if outline is not None or bottom is not None or top is not None:
     oldMesh = regionObject.data
@@ -114,7 +125,8 @@ def editRegion(name, outline, bottom, top, intent):
 
 def getRegions():
   bpy.context.view_layer.update()
-  return {"regions": [describeRegion(sceneObject) for sceneObject in bpy.context.scene.objects if sceneObject.type == "MESH" and bridgeMeshAccess.regionIntentProperty in sceneObject]}
+  regions = [describeRegion(sceneObject) for sceneObject in bpy.context.scene.objects if sceneObject.type == "MESH" and bridgeMeshAccess.regionIntentProperty in sceneObject]
+  return {"regions": regions, "undecided": [region["name"] for region in regions if region["access"] is None]}
 
 
 # Surfacing layers

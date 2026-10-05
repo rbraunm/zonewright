@@ -28,7 +28,7 @@ async def makeMaterials(session, folder, names):
 def testRegionsConfineToolsAndKeepTheirIntent(stageBlenderServer):
   async def steps(session):
     await newGround(session, 64, 8)
-    created = await session.expectSuccess("createRegion", {"name": "plaza", "outline": [[-20, -20], [20, -20], [20, 20], [-20, 20]], "bottom": -10, "top": 10, "intent": "packed earth plaza"})
+    created = await session.expectSuccess("createRegion", {"name": "plaza", "outline": [[-20, -20], [20, -20], [20, 20], [-20, 20]], "bottom": -10, "top": 10, "intent": "packed earth plaza", "access": "play"})
     moved = await session.expectSuccess("moveVertices", {"objectName": "ground", "selector": {"region": "plaza"}, "offset": [0, 0, 5]})
     await session.expectSuccess("editRegion", {"name": "plaza", "top": 3})
     above = await session.expectError("moveVertices", {"objectName": "ground", "selector": {"region": "plaza"}, "offset": [0, 0, 1]})
@@ -38,10 +38,10 @@ def testRegionsConfineToolsAndKeepTheirIntent(stageBlenderServer):
     return created, moved, above, notRegion, regions, summary
 
   created, moved, above, notRegion, regions, summary = stageBlenderServer.session(steps)
-  assert created == {"name": "plaza", "intent": "packed earth plaza", "outline": [[-20, -20], [20, -20], [20, 20], [-20, 20]], "bottom": -10, "top": 10, "area": 1600}
+  assert created == {"name": "plaza", "intent": "packed earth plaza", "access": "play", "outline": [[-20, -20], [20, -20], [20, 20], [-20, 20]], "bottom": -10, "top": 10, "area": 1600}
   # The 5 by 5 grid vertices from -16 to 16 lie inside; raised to 5, they are above the edited top of 3.
   assert moved["movedVertices"] == 25 and "matches no vertices" in above and "is not a region" in notRegion
-  assert regions["regions"] == [created | {"top": 3}]
+  assert regions == {"regions": [created | {"top": 3}], "undecided": []}
   assert next(entry for entry in summary["objects"] if entry["name"] == "plaza")["hiddenInRender"] is True
 
 
@@ -121,7 +121,7 @@ mesh.update()
 
   async def steps(session):
     await newGround(session, 128, 8)
-    await session.expectSuccess("createRegion", {"name": "patch", "outline": [[-30, -30], [30, -30], [30, 30], [-30, 30]], "bottom": -500, "top": 500, "intent": "test patch"})
+    await session.expectSuccess("createRegion", {"name": "patch", "outline": [[-30, -30], [30, -30], [30, 30], [-30, 30]], "bottom": -500, "top": 500, "intent": "test patch", "access": "play"})
     await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "hill"})
     await session.expectSuccess("sculptAtPoint", {"objectName": "ground", "mode": "raise", "center": [0, 0, 0], "radius": 56, "strength": 20, "direction": [0, 0, 1]})
     hill = (await session.expectSuccess("runPython", {"code": readHeights}))["result"]

@@ -1,5 +1,9 @@
 import math
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
+from playerScale import eyeHeight
 
 groundSceneCode = """
 import bpy
@@ -18,7 +22,6 @@ zoneProperties = {
   "newEngineZone": False,
 }
 eyeLevelView = {"standAt": [0, 0, 0], "headingDegrees": 0, "pitchDegrees": 0}
-eyeHeight = 5.5
 renderHeight = 540
 verticalFieldOfViewDegrees = 46.5
 

@@ -19,6 +19,7 @@ import bridgeObjects
 import bridgePasses
 import bridgeShaping
 import bridgeWater
+import eqAxes
 import playerScale
 
 housingProperty = "zonewrightHousing"
@@ -39,7 +40,6 @@ borderModels = {"player": "OBP_LOTSQUARE", "guild": "OBP_GUILDSQUARE"}
 borderArchive = "stonesquare.eqg"
 # The open type of a plot border door (EQSWITCH_REALESTATE_PLOT).
 borderOpenType = 160
-eqHeadingUnits = 512
 # Pricing at Live's plot limits: the middle tier's 105 items and 5 pets at 84pp, and per item and per pet so that Live's other tiers
 # come out at its prices (90 items and 4 pets 42pp, 120 and 6 126pp); a guild plot 210 items and 12 pets at 21pp; upkeep a tenth of the
 # price a day. Features scale the price.
@@ -71,6 +71,7 @@ keptGradePrefix = "kept grade "
 # Assessment: how far around a plot it looks, and what counts as a drop, a wall, water at its edge, seclusion, prominence. A view is
 # judged by looking out from the plot, never measured.
 sideProbes = (10.0, 30.0, 60.0)
+entranceReach = 10.0
 # Grading names the other plots whose ground it changed within this far of their edges, as far as assessPlot looks past each side.
 touchedReach = sideProbes[-1]
 sideRise = 15.0
@@ -824,6 +825,20 @@ def toWorld(plot, local):
   return numpy.array(plot.matrix_world.translation[:2]) + local[:, :1] * right + local[:, 1:] * front
 
 
+def entrancePoint(plot):
+  """Where players come to a plot: entranceReach out from the middle of its entrance side, at the plot's height."""
+  center = numpy.array(plot.matrix_world.translation)
+  return numpy.append(center[:2] + frontDirection(facingOf(plot)) * (readPlot(plot)["size"][1] / 2 + entranceReach), center[2])
+
+
+def plotEntrances():
+  """Each plot's entrance (entrancePoint), facing into the plot: [{plot, at, headingDegrees}]."""
+  return [
+    {"plot": plot.name, "at": [round(float(value), 3) for value in entrancePoint(plot)], "headingDegrees": round((facingOf(plot) + 180) % 360, 3)}
+    for plot in plotObjects()
+  ]
+
+
 def assessPlot(address):
   """Measure a plot where it lies: the ground under it, what rises and falls around each side, water beside it, how high it stands
   over its surroundings, how enclosed it is, its neighbours, and how much of the zone's main routes see it; and the features those
@@ -867,7 +882,7 @@ def assessPlot(address):
       "drop": bool(len(finite) and finite.min() < -sideRise), "wall": bool(len(finite) and finite.max() > sideRise),
       "offGround": int(numpy.isnan(relative).sum()),
     }
-  entrance = center[:2] + front * (along / 2 + 10)
+  entrance = entrancePoint(plot)[:2]
   entranceGround = surfaces.groundAtLevel(*entrance, center[2])
   water = None
   bodies = [body for body in bpy.context.scene.objects if bridgeMeshAccess.waterProperty in body and not body.hide_render]
@@ -986,13 +1001,8 @@ def layOutPlots(street, path, side, kind, size, firstNumber, gap, setback, items
 
 # Export
 
-def serverOrder(point):
-  """Blender (zone file) x, y, z as the server's x, y, z: the server swaps the first two."""
-  return [round(float(point[1]), 3), round(float(point[0]), 3), round(float(point[2]), 3)]
-
-
-def eqHeading(counterclockwiseDegrees):
-  return round((counterclockwiseDegrees * eqHeadingUnits / 360) % eqHeadingUnits, 3) % eqHeadingUnits
+def serverPoint(point):
+  return [round(float(value), 3) for value in eqAxes.serverFromZone(point)]
 
 
 def collectHousing():
@@ -1020,14 +1030,14 @@ def collectHousing():
     if border is None:
       raise ValueError(f"Plot '{plot.name}' has no border")
     price = plotPrice(spec, housing)
-    heading = eqHeading(math.degrees(border.matrix_world.to_euler("XYZ").z))
+    heading = round(eqAxes.eqHeadingFromTurn(math.degrees(border.matrix_world.to_euler("XYZ").z)), 3) % eqAxes.eqHeadingUnits
     doors.append({
-      "door": doorNumber, "name": borderModels[spec["kind"]], "position": serverOrder(border.matrix_world.translation), "heading": heading,
+      "door": doorNumber, "name": borderModels[spec["kind"]], "position": serverPoint(border.matrix_world.translation), "heading": heading,
       "openType": borderOpenType, "size": round(border.matrix_world.to_scale()[0] * 100),
     })
     records.append({
       "kind": "plot" if spec["kind"] == "player" else "guild plot", "address": plot.name, "door": doorNumber,
-      "center": serverOrder(plot.matrix_world.translation), "heading": heading, "sizeAcross": spec["size"][0], "sizeAlong": spec["size"][1],
+      "center": serverPoint(plot.matrix_world.translation), "heading": heading, "sizeAcross": spec["size"][0], "sizeAlong": spec["size"][1],
       "pricePlatinum": price["pricePlatinum"], "upkeepPlatinumPerDay": price["upkeepPlatinumPerDay"], "capacity": spec["items"], "pets": spec["pets"],
       "features": spec["tags"],
     })

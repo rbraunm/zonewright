@@ -26,8 +26,12 @@ selectorFields = {
   "facing": ("direction", "withinDegrees"), "slope": ("minimumDegrees", "maximumDegrees"), "height": ("minimum", "maximum"),
   "nearPath": ("path", "radius"), "noise": ("featureSize", "share", "seed"), "nearWater": ("water", "distance"),
 }
-# A region is a vertical prism over an outline: an area of the zone chosen for what it is to become, its intent kept in this property.
+# A region is a vertical prism over an outline: an area of the zone chosen for what it is to become, its intent kept in this property,
+# and whether players reach it (play, view, or none) in the next; a region made before access was decided has none.
 regionIntentProperty = "zonewrightRegionIntent"
+regionAccessProperty = "zonewrightRegionAccess"
+# An entry (bridgeEntries) is an arrow empty where players arrive, its kind and where they come from kept in this property.
+entryProperty = "zonewrightEntry"
 # A mesh surfaced by layers keeps their order in this property; its face materials are composed from them.
 surfaceLayersProperty = "zonewrightSurfaceLayers"
 # A water body (bridgeWater) keeps what it was made from in this property, so every edit rebuilds it from that against the ground.

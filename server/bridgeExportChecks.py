@@ -16,6 +16,7 @@ import bridgeBoundaries
 import bridgeCaveData
 import bridgeCaves
 import bridgeCommands
+import bridgeEntries
 import bridgeExport
 import bridgeHousing
 import bridgeKitData
@@ -684,7 +685,7 @@ def checkZoneExport(purpose):
     failures.append({"failure": "housing", "message": str(error)})
   gapKey = "failure" if purpose == "game" else "finding"
   gaps = blockouts.listed(gapKey) + [{gapKey: f"swim {swimState}", "body": body.name, "at": bodyCenter(body)} for swimState, bodies in decisions.items() for body in bodies]
-  gaps += [{gapKey: gap["gap"]} | {key: value for key, value in gap.items() if key != "gap"} for gap in zoneRowGaps() + bridgeBoundaries.zoneLineGaps()]
+  gaps += [{gapKey: gap["gap"]} | {key: value for key, value in gap.items() if key != "gap"} for gap in zoneRowGaps() + bridgeBoundaries.zoneLineGaps() + playerSpaceGaps()]
   objectDecisions = bridgeExport.decisionsToConfirm(shipped)
   toConfirm = objectDecisions + [{"structure": entry["structure"], "why": entry["why"]} for entry in stale]
   if purpose == "game":
@@ -721,8 +722,30 @@ def zoneRowGaps():
   if "safePoint" in zone:
     x, y, z = zone["safePoint"][:3]
     floor = zone["underworld"] if "underworld" in zone else bridgeBoundaries.sceneHeightSpan()[0]
-    if bridgeBoundaries.collisionSurfaces(boundaries=False).footingBelow(mathutils.Vector((x, y, z + 1)), z + 1 - floor) is None:
-      gaps.append({"gap": "safe point over no ground", "at": [x, y, z], "message": f"No ground players stand on lies under the safe point {[x, y, z]} above {floor}; players arriving there would fall"})
+    surfaces = bridgeExport.collisionSurfaces(bridgeExport.collisionTriangles())
+    if surfaces is None or surfaces.footingBelow(mathutils.Vector((x, y, z + 1)), z + 1 - floor) is None:
+      gaps.append({"gap": "safe point over no ground", "at": [x, y, z], "message": f"No ground the zone ships lies under the safe point {[x, y, z]} above {floor}; players arriving there would fall"})
+  return gaps
+
+
+def playerSpaceGaps():
+  """What a game export needs decided of the zone's player space: regions at all, each region's access, and every stored entry on its
+  footing."""
+  gaps = []
+  regions = bridgeAuthoring.getRegions()
+  if not regions["regions"]:
+    gaps.append({"gap": "no regions", "message": "The zone has no regions; createRegion plans every area players reach or see, with its access"})
+  gaps += [
+    {"gap": "region access undecided", "region": name, "message": f"Region '{name}' has no access; editRegion gives it play, view, or none"}
+    for name in regions["undecided"]
+  ]
+  for entry in bridgeEntries.getEntries()["entries"]:
+    if entry["source"] == "placeEntry" and entry["state"] == "offFooting":
+      found = "no footing there" if entry["footing"] is None else f"its footing is {entry['distance']:g} off, at {entry['footing']}"
+      gaps.append({
+        "gap": "entry off its footing", "entry": entry["name"], "at": entry["at"], "footing": entry["footing"], "distance": entry["distance"],
+        "message": f"Entry '{entry['name']}' at {entry['at']} no longer stands on the ground the zone ships ({found}); place it again (placeEntry)",
+      })
   return gaps
 
 

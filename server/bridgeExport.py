@@ -3,16 +3,19 @@ coordinates with the boundaries (bridgeBoundaries) as triangles without a materi
 at its object's transform (copies sharing a mesh and without modifiers share one model), and every collection instance a model of its
 collection's meshes and, to any depth, of the collections its members instance (a placed building's part holding placed pieces). Each
 triangle carries whether players pass through it (a liquid or cutout material, an object marked passable, or a face flagged passable,
-as a span's ropes and rails are). Materials are told apart by their full names, so a kit's material and the zone's own of one name
-both export, the kit's under its name and its kit file's stem. What is not the zone's own geometry (guides, plot borders, regions,
-placed client content, anything hidden from renders) is left out and listed with why. Collecting assumes the scene passed
-bridgeExportChecks; it writes the meshes to modelArrays.npz and returns the models, materials, placements, swim volumes and zone lines
-as regions, and the zone's housing. Runs under Blender's Python."""
+as a span's ropes and rails are: passableTriangles). Materials are told apart by their full names, so a kit's material and the zone's
+own of one name both export, the kit's under its name and its kit file's stem. What is not the zone's own geometry (guides, plot
+borders, regions, entries, placed client content, anything hidden from renders) is left out and listed with why. Collecting assumes
+the scene passed bridgeExportChecks; it writes the meshes to modelArrays.npz and returns the models, materials, placements, swim
+volumes and zone lines as regions, and the zone's housing. collisionTriangles collects what the client collides with in that same
+zone, by the same rule, for the checks that need its ground. Runs under Blender's Python."""
 import collections
 import os
 import re
 
 import bpy
+import mathutils
+import mathutils.bvhtree
 import numpy
 
 import bridgeBoundaries
@@ -53,6 +56,8 @@ def exclusionReason(sceneObject):
     return "a swim volume: written as a .zon region"
   if bridgeMeshAccess.zoneLineProperty in sceneObject:
     return "a zone line: written as a .zon region"
+  if bridgeMeshAccess.entryProperty in sceneObject:
+    return "an entry: where players arrive (server rows)"
   if bridgeMeshAccess.boundaryProperty in sceneObject:
     return None
   if sceneObject.hide_render:
@@ -145,10 +150,28 @@ def materialRecord(material):
   }}
 
 
+def passableTriangles(mesh, slotMaterials, marked):
+  """Which of an evaluated mesh's loop triangles players pass through: every one when its object is marked passable, else those of a
+  liquid or cutout material and those on a face flagged passable. The archive's flags and the collision collector both read it."""
+  count = len(mesh.loop_triangles)
+  if marked:
+    return numpy.ones(count, dtype=bool)
+  slots = numpy.empty(count, dtype=numpy.int64)
+  mesh.loop_triangles.foreach_get("material_index", slots)
+  polygons = numpy.empty(count, dtype=numpy.int64)
+  mesh.loop_triangles.foreach_get("polygon_index", polygons)
+  flagged = numpy.zeros(len(mesh.polygons), dtype=bool)
+  attribute = mesh.attributes.get(bridgeMeshAccess.passableAttribute)
+  if attribute is not None and attribute.domain == "FACE":
+    attribute.data.foreach_get("value", flagged)
+  passableSlots = numpy.array([bridgeMeshAccess.isPassableMaterial(material) for material in slotMaterials] + [False], dtype=bool)
+  return passableSlots[numpy.minimum(slots, len(slotMaterials))] | flagged[polygons]
+
+
 def meshArrays(sceneObject, depsgraph, matrix, materialNames, marked):
   """An object's evaluated mesh as the file keeps it: one vertex per distinct position, corner normal, and texture coordinate (v up
   from the texture's top, as static EQG models store it), transformed by matrix, and each triangle's material name and whether players
-  pass through it (its material's, its face's passable flag, or every triangle when marked)."""
+  pass through it (passableTriangles)."""
   evaluated = sceneObject.evaluated_get(depsgraph)
   mesh = evaluated.to_mesh()
   try:
@@ -166,13 +189,8 @@ def meshArrays(sceneObject, depsgraph, matrix, materialNames, marked):
     mesh.loop_triangles.foreach_get("loops", triangleLoops)
     triangleSlots = numpy.empty(len(mesh.loop_triangles), dtype=numpy.int64)
     mesh.loop_triangles.foreach_get("material_index", triangleSlots)
-    trianglePolygons = numpy.empty(len(mesh.loop_triangles), dtype=numpy.int64)
-    mesh.loop_triangles.foreach_get("polygon_index", trianglePolygons)
-    flaggedFaces = numpy.zeros(len(mesh.polygons), dtype=bool)
-    attribute = mesh.attributes.get(bridgeMeshAccess.passableAttribute)
-    if attribute is not None and attribute.domain == "FACE":
-      attribute.data.foreach_get("value", flaggedFaces)
     slotMaterials = [slot.material for slot in evaluated.material_slots]
+    passable = passableTriangles(mesh, slotMaterials, marked)
   finally:
     evaluated.to_mesh_clear()
   positions = positions.reshape(-1, 3) @ matrix[:3, :3].T + matrix[:3, 3]
@@ -186,9 +204,69 @@ def meshArrays(sceneObject, depsgraph, matrix, materialNames, marked):
   return {
     "positions": positions[loopVertices[firstLoop]], "normals": normals[firstLoop], "uvs": uvs[firstLoop],
     "triangles": loopToVertex[triangleLoops].reshape(-1, 3),
-    "materials": [materialNames(slotMaterials[slot]) for slot in triangleSlots],
-    "passable": marked | flaggedFaces[trianglePolygons] | numpy.array([bridgeMeshAccess.isPassableMaterial(slotMaterials[slot]) for slot in triangleSlots], dtype=bool),
+    "materials": [materialNames(slotMaterials[slot]) for slot in triangleSlots], "passable": passable,
   }
+
+
+def solidTriangles(sceneObject, depsgraph, matrix, marked):
+  """A mesh's evaluated triangles players do not pass through (passableTriangles): world positions by matrix, and the triangles."""
+  evaluated = sceneObject.evaluated_get(depsgraph)
+  mesh = evaluated.to_mesh()
+  try:
+    mesh.calc_loop_triangles()
+    positions = numpy.empty(len(mesh.vertices) * 3, dtype=numpy.float64)
+    mesh.vertices.foreach_get("co", positions)
+    triangles = numpy.empty(len(mesh.loop_triangles) * 3, dtype=numpy.int64)
+    mesh.loop_triangles.foreach_get("vertices", triangles)
+    passable = passableTriangles(mesh, [slot.material for slot in evaluated.material_slots], marked)
+  finally:
+    evaluated.to_mesh_clear()
+  return positions.reshape(-1, 3) @ matrix[:3, :3].T + matrix[:3, 3], triangles.reshape(-1, 3)[~passable]
+
+
+def collisionTriangles():
+  """What the client collides with in the zone as exported: the world triangles of every shipped terrain, boundary (a wall's facing
+  both ways, as the archive holds it), mesh, and collection instance's parts (nested instances included), without those players pass
+  through; {positions, triangles, owners (each triangle's index into ownerNames), ownerNames}. Reference content, guides, regions,
+  sketches, and entries do not ship, so none of them is here."""
+  bpy.context.view_layer.update()
+  depsgraph = bpy.context.evaluated_depsgraph_get()
+  shipped, _, _ = classifyObjects()
+  positions, triangles, owners, ownerNames, offset = [], [], [], [], 0
+  for sceneObject, role in shipped:
+    marked = bridgeMeshAccess.passableProperty in sceneObject
+    if role == "boundary":
+      arrays = bridgeBoundaries.boundaryArrays(sceneObject, depsgraph)
+      parts = [(arrays["positions"], arrays["triangles"])]
+    elif role in ("terrain", "mesh"):
+      parts = [solidTriangles(sceneObject, depsgraph, numpy.array(sceneObject.matrix_world), marked)]
+    elif role == "instance":
+      parts = [
+        solidTriangles(member, depsgraph, numpy.array(sceneObject.matrix_world @ matrix), marked or bridgeMeshAccess.passableProperty in member)
+        for member, matrix in bridgeMeshAccess.collectionParts(sceneObject.instance_collection)
+      ]
+    else:
+      continue
+    for partPositions, partTriangles in parts:
+      positions.append(partPositions)
+      triangles.append(partTriangles + offset)
+      owners.append(numpy.full(len(partTriangles), len(ownerNames), dtype=numpy.int64))
+      offset += len(partPositions)
+    ownerNames.append(sceneObject.name)
+  if not positions:
+    return {"positions": numpy.zeros((0, 3)), "triangles": numpy.zeros((0, 3), dtype=numpy.int64), "owners": numpy.zeros(0, dtype=numpy.int64), "ownerNames": ownerNames}
+  return {"positions": numpy.concatenate(positions), "triangles": numpy.concatenate(triangles), "owners": numpy.concatenate(owners), "ownerNames": ownerNames}
+
+
+def collisionSurfaces(collision):
+  """Ray casts (bridgeMeshAccess.PlayerSurfaces) against collisionTriangles' collision, a tree per shipped object named by it; None when
+  the zone ships nothing players collide with."""
+  trees = []
+  for index, name in enumerate(collision["ownerNames"]):
+    used, corners = numpy.unique(collision["triangles"][collision["owners"] == index], return_inverse=True)
+    if len(used):
+      trees.append((name, mathutils.Matrix.Identity(4), mathutils.bvhtree.BVHTree.FromPolygons(collision["positions"][used].tolist(), corners.reshape(-1, 3).tolist())))
+  return bridgeMeshAccess.PlayerSurfaces(trees=trees) if trees else None
 
 
 def mergeArrays(parts):

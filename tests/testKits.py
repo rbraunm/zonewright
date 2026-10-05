@@ -1,7 +1,12 @@
 import math
+import sys
+from pathlib import Path
 
 from conftest import writePNG
 import structurePlots
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
+from playerScale import stepHeight
 
 wallPiece = "testKitWall25"
 doorFrame = {"width": 1.5, "depth": 0.5, "material": "testKitFrame", "worldUnitsPerRepeat": 2.5}
@@ -479,7 +484,9 @@ def testAKitEditReachesEveryZoneThatLinksIt(stageBlenderServer, tmp_path):
 
 
 def testARailPieceIsPassableToWalks(stageBlenderServer, tmp_path):
-  bar = {"size": [25, 0.8, 4], "materials": {"side": "testKitTimber", "end": "testKitTrim"}, "worldUnitsPerRepeat": {"side": 12.5, "end": 12.5}}
+  # Taller than a step, so only its passable flag lets a walk through it.
+  barHeight = stepHeight + 2
+  bar = {"size": [25, 0.8, barHeight], "materials": {"side": "testKitTimber", "end": "testKitTrim"}, "worldUnitsPerRepeat": {"side": 12.5, "end": 12.5}}
 
   async def steps(session):
     kitPath = await structurePlots.testKit(session, tmp_path)
@@ -496,7 +503,7 @@ def testARailPieceIsPassableToWalks(stageBlenderServer, tmp_path):
   walks = stageBlenderServer.session(steps)
   railWalk, rail = walks["testKitTallRail"]
   assert rail["passable"] is True and railWalk["walkable"] is True
-  for piece, height in (("testKitTallBeam", 4.0), (wallPiece, 30.0)):
+  for piece, height in (("testKitTallBeam", barHeight), (wallPiece, 30.0)):
     walk, detail = walks[piece]
     assert detail["passable"] is False
     assert [problem["kind"] for problem in walk["problems"]] == ["rise"] and walk["problems"][0]["height"] == height, (piece, walk["problems"])
