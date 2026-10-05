@@ -40,6 +40,8 @@ matchDistance = 1e-4
 groundPlaneTolerance = 1e-3
 mouthEdgeShare = 1.0 / 3.0
 weldRounds = 8
+# A ring vertex welds only into a vertex this close to the plane of each plug triangle it lies on.
+weldPlaneTolerance = 1e-3
 # Candidate rows lie this share of edgeLength apart; rows are kept so no point of the section moves more than edgeLength between two.
 rowSampleShare = 0.25
 breakupOctaves = 3
@@ -1564,9 +1566,11 @@ def caveLayers(editor, name):
   }
 
 
-def weldMouth(editor, faces, rankOf, pointOf, shortest):
+def weldMouth(editor, faces, rankOf, pointOf, shortest, plugOf):
   """Weld the cut's short edges at the mouth: a ring or lining vertex closer than `shortest` to a neighbour on a cave face merges into
-  it, the terrain's own vertices surviving first and ring vertices next, so every survivor keeps its place in every pass."""
+  it, the terrain's own vertices surviving first and ring vertices next, so every survivor keeps its place in every pass. A ring vertex
+  merges only into a vertex lying in the plane of every plug triangle it lies on (plugOf: those planes, each a point and a unit normal),
+  so the pieces of ground it bounds stay in their triangles' planes rather than tilting out of the cliff as blades."""
   welded = 0
   # Only edges at a ring vertex or a vertex of the ground can weld; the lining's own edges never do.
   seamVertices = {vertex for face in faces for vertex in face.verts if rankOf[vertex] > 0}
@@ -1588,6 +1592,8 @@ def weldMouth(editor, faces, rankOf, pointOf, shortest):
       if first in claimed or second in claimed:
         continue
       survivor, victim = (first, second) if rankOf[first] >= rankOf[second] else (second, first)
+      if rankOf[victim] == 1 and any(abs((numpy.array(pointOf[survivor]) - point) @ normal) > weldPlaneTolerance for point, normal in plugOf[victim]):
+        continue
       targets[victim] = survivor
       claimed.update((first, second))
     if not targets:
@@ -1820,6 +1826,11 @@ def spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, pa
         onTerrain.setdefault(vertex, int(source))
       elif source <= -2:
         onLining[vertex] = True
+  plugsUsing = {}
+  for face, source in zip(cutFaces, cutSources):
+    if source >= 0:
+      for vertex in face:
+        plugsUsing.setdefault(vertex, set()).add(int(source))
   unchanged = {
     int(source) for face, source in zip(cutFaces, cutSources)
     if source >= 0 and len(face) == 3 and (original[list(face)] >= 0).all() and {int(original[vertex]) for vertex in face} == {vertex.index for vertex in patch[source].verts}
@@ -1855,7 +1866,7 @@ def spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, pa
   for position in changed:
     corners = [patchVertex[vertex] for vertex in cornersOf[position]]
     cornerKeys[position] = {"": numpy.array([list(vertex.co) for vertex in corners])} | {keyName: numpy.array([list(vertex[layer]) for vertex in corners]) for keyName, layer in shapeLayers.items()}
-  made, rankOf, pointOf = {}, {}, {}
+  made, rankOf, pointOf, plugOf = {}, {}, {}, {}
   ringCount = liningCount = 0
   for index, point in enumerate(cutPositions):
     if original[index] >= 0:
@@ -1867,6 +1878,12 @@ def spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, pa
       for keyName, layer in shapeLayers.items():
         vertex[layer] = mathutils.Vector(weights @ cornerKeys[source][keyName])
       vertex[layers["tag"]], vertex[layers["source"]], vertex[layers["weights"]] = bridgeCaveData.ringTag, sources[source], mathutils.Vector(weights)
+      planes = []
+      for plug in plugsUsing[index]:
+        corners = shown[cornersOf[plug]]
+        normal = numpy.cross(corners[1] - corners[0], corners[2] - corners[0])
+        planes.append((corners[0], normal / numpy.linalg.norm(normal)))
+      plugOf[vertex] = planes
       rankOf[vertex] = 1
       ringCount += 1
     elif onLining[index]:
@@ -1928,7 +1945,7 @@ def spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, pa
   shortest = 0.0 if definition["wallShare"] == 1 else definition["edgeLength"] * mouthEdgeShare
   if definition["trimBands"]:
     shortest = min(shortest, tube["shortestStretch"] / 2)
-  welded = weldMouth(editor, newFaces, rankOf, pointOf, shortest)
+  welded = weldMouth(editor, newFaces, rankOf, pointOf, shortest, plugOf)
   caveFaces = {face for face in newFaces if face.is_valid}
   polygons = [face for face in caveFaces if len(face.verts) > 3]
   if polygons:

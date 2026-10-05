@@ -215,6 +215,41 @@ result = {'faces': kept, 'sources': sources}
     assert checked["edgesOnThreeOrMoreFaces"] == 0 and checked["openEdges"] == borderEdges
 
 
+def testPiecesOfGroundAtTheMouthStayInTheirTrianglesPlanes(stageBlenderServer, tmp_path):
+  # Each piece of ground the cut left at the mouth against the plane of the ground triangle it is a piece of: the angle between them.
+  readTilts = r"""
+import numpy
+import bridgeCaveData, bridgeMeshAccess
+ground = bpy.data.objects['ground']
+mesh = ground.data
+shown, _ = bridgeMeshAccess.readVertexArrays(ground)
+tags = bridgeCaveData.faceTags(ground, 'hall')
+vertexTags = bridgeCaveData.attributeValues(mesh, 'zonewrightCaveVertex:hall')
+record = bridgeCaveData.caves(ground)['hall']
+byIdentifier = {int(tag): index for index, tag in enumerate(vertexTags.tolist()) if tag > 0}
+tilts = []
+for polygon in mesh.polygons:
+  tag = int(tags[polygon.index])
+  if tag <= 0:
+    continue
+  corners = shown[list(polygon.vertices)]
+  normal = numpy.cross(corners[1] - corners[0], corners[2] - corners[0])
+  plug = shown[[byIdentifier[identifier] for identifier in record['plug'][tag - 1]['vertices']]]
+  plugNormal = numpy.cross(plug[1] - plug[0], plug[2] - plug[0])
+  tilts.append(float(numpy.degrees(numpy.arccos(numpy.clip(abs(normal @ plugNormal) / (numpy.linalg.norm(normal) * numpy.linalg.norm(plugNormal)), 0, 1)))))
+result = {'pieces': len(tilts), 'worstTilt': max(tilts)}
+"""
+
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    await session.expectSuccess("cutCave", hall)
+    return (await session.expectSuccess("runPython", {"code": readTilts}))["result"]
+
+  tilts = stageBlenderServer.session(steps)
+  # The welds at the seam move no piece out of its triangle's plane, so none stands out of the cliff as a blade.
+  assert tilts["pieces"] > 20 and tilts["worstTilt"] <= 0.5
+
+
 def testLiningWallsAreMappedRoundTheirBendsWithoutSeams(stageBlenderServer, tmp_path):
   # A tunnel into the cliff turning 90 degrees east at y 100 on an arc of radius 40; its walls and vault in the bend, away from its ends.
   bent = hall | {"path": [[0, -60, 2], [0, 10, 2], [0, 140, 2], [120, 140, 2]], "widths": [40] * 4, "heights": [45] * 4, "breakup": None}
