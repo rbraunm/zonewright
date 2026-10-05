@@ -1014,7 +1014,8 @@ async def importZone(context: Context, zone: str, collection: str | None = None)
   one opaque, water opaque with its environment's average color, lava as its two diffuses averaged); and what an EQ terrain zone holds
   that the client draws and the preview does not (waterNotDrawn, radialFloraNotDrawn, lightsNotDrawn, each None where it holds none).
   A classic zone's placed static objects without colors of their own draw with the colors the client computes for them at load
-  (placementsLitAtLoad). It keeps the zone file's coordinates, which the scene shares (Blender
+  (placementsLitAtLoad); those it parks near -32768, far below itself, stand there as in the client and are named by actor
+  (placementsParkedBelowTheWorld), and layout and relief shadings band heights without them. It keeps the zone file's coordinates, which the scene shares (Blender
   x, y are the server's y, x). The zone's lights (classic and EQG zones) come in as point lights in "<zone> lights" and its emitters as
   empties in "<zone> emitters", as placeLights and placeEmitters make them, every line of its emitter list among them; emittersNotMade
   groups the lines the client makes no emitter for (a negative or too high definition index, a lifespan of 0 or less), which previews

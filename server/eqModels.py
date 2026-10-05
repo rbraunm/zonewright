@@ -987,6 +987,9 @@ def writePartsCache(modelFolder, parts, textureHolders, label):
 
   passable = numpy.concatenate(passableChunks)
   drawnOtherwise = collections.Counter(label for part in parts for labels in part.get("standIns") or () for label in labels)
+  # Views band heights over the zone without the objects it parks far below itself.
+  parked = numpy.concatenate([numpy.full(len(part["vertices"]), part.get("parked", False)) for part in parts])[used]
+  heightsWithoutParked = {"heightsWithoutParked": numpy.array([vertices[~parked, 2].min(), vertices[~parked, 2].max()], dtype=numpy.float32)} if parked.any() else {}
   palette, triangleMaterials = {}, numpy.empty(len(textures), dtype=numpy.int32)
   for index, key in enumerate(zip(textures, alphaModes, tints, (liquidKey(liquid) for liquid in liquids))):
     triangleMaterials[index] = palette.setdefault(key, len(palette))
@@ -998,6 +1001,7 @@ def writePartsCache(modelFolder, parts, textureHolders, label):
     **{key: value.astype(numpy.float32) if value.dtype == numpy.float64 else value for key, value in (lighting | terrainAttributes).items()},
     **lightChoice,
     **({"trianglePassable": passable} if passable.any() else {}),
+    **heightsWithoutParked,
   )
   return {
     "textureSources": textureSources, "missingTextures": missingTextures, "droppedTriangles": sum(part["dropped"] for part in parts), "lit": bool(litParts),

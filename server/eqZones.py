@@ -36,6 +36,9 @@ instanceColorsFlag = 0x100
 instanceColorsOffset = 52
 # The vertex light the client's region builder gives a zone mesh that stores no colors (EQGraphicsDX9.dll 0x1001f7d2: 0xFF1F1F1F).
 colorlessRegionColor = (0x1F, 0x1F, 0x1F, 0xFF)
+# 5,786 placements in 47 classic archives stand near -32768, the floor of a 16-bit height (all between -32769 and -32555.7); the RoF2
+# client keeps them there (all 681 of Eastern Wastes' sentinel ice trees in its dump), far below the zone.
+parkedBelow = -32000.0
 
 
 def objectPlacements(objectsFile):
@@ -190,8 +193,10 @@ def buildClassicZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
   floors = loadTimeLight.ShareFloors(regionMeshes, colorlessRegionColor[3])
   lights = zoneLights(clientRoot, zoneName)
   objectParts, missingModels, objectArchives, placedCounts, particleClouds, colorsIgnored, colorsShort, litAtLoad = {}, set(), [], {}, 0, 0, {}, 0
+  parkedCounts = collections.Counter()
   for placement in placements:
     actor = placement["actor"]
+    partsBefore = len(parts)
     if actor not in objectParts:
       found = eqModels.findModel(clientRoot, cacheRoot, actor, zoneName)
       if not found["linked"] and not found["onDemand"]:
@@ -231,12 +236,16 @@ def buildClassicZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
         entry["colorCounts"] = sorted(set(entry["colorCounts"]) | {len(placement["colors"])})
         entry["placements"] += 1
     placedCounts[actor] = placedCounts.get(actor, 0) + 1
+    if float(placement["position"][2]) < parkedBelow:
+      parkedCounts[actor] += 1
+      parts[partsBefore:] = [part | {"parked": True} for part in parts[partsBefore:]]
   textureHolders = [archive] + [eqArchive.EQArchive(clientRoot / name) for name in objectArchives]
   written = eqModels.writePartsCache(zoneFolder, parts, textureHolders, label)
   return {
     "regionMeshes": regionMeshCount, "placements": len(placements), "placedObjects": sum(placedCounts.values()), "objectArchives": objectArchives,
     "missingModels": sorted(missingModels), "particleCloudsNotDrawn": particleClouds, "placementColorsIgnoredBySkeletalActors": colorsIgnored,
     "placementColorsShort": [colorsShort[actor] for actor in sorted(colorsShort)], "placementsLitAtLoad": litAtLoad,
+    "placementsParkedBelowTheWorld": dict(sorted(parkedCounts.items())),
   } | written
 
 

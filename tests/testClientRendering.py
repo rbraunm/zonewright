@@ -167,6 +167,23 @@ def testImportZoneLeavesOutALightOfRadiusZero(stageBlenderServer):
   assert imported["lights"] == 382 and imported["lightsOfRadiusZero"] == ["L277_LDEF"]
 
 
+@pytest.mark.clientData("clientFiles")
+def testObjectsAZoneParksBelowTheWorldStandThereWithoutStretchingLayoutBands(stageBlenderServer):
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    imported = await session.expectSuccess("importZone", {"zone": "cauldron"})
+    await session.expectSuccess("setZoneProperties", environment)
+    _, layout = await session.expectImage("renderView", {"view": {"map": {"center": [0, 0], "width": 6000}}, "shading": "layout", "bandHeight": 50})
+    return imported, layout
+
+  imported, layout = stageBlenderServer.session(steps)
+  # The Cauldron parks eight rocks at -32767.998, as the RoF2 client draws them: the zone object reaches down to them, while its
+  # layout bands run over the zone itself, from its lowest point at -468.469.
+  assert imported["source"]["placementsParkedBelowTheWorld"] == {"CAULROCK1_ACTORDEF": 3, "CAULROCK3_ACTORDEF": 5}
+  assert imported["dimensions"][2] > 33000
+  assert layout["heightRange"] == [-468.469, 727.938]
+
+
 def pixelAt(image, x, y):
   return Image.open(io.BytesIO(image)).convert("RGB").getpixel((x, y))
 

@@ -167,6 +167,8 @@ def buildModelMesh(folder, meshName):
   if "trianglePassable" in data:
     passable = mesh.attributes.new(bridgeMeshAccess.passableAttribute, "BOOLEAN", "FACE")
     passable.data.foreach_set("value", data["trianglePassable"].astype(bool))
+  if "heightsWithoutParked" in data:
+    mesh[bridgeMeshAccess.heightsWithoutParkedProperty] = [float(value) for value in data["heightsWithoutParked"]]
   if "detailUVs" in data:
     detailLayer = mesh.uv_layers.new(name=bridgeClientLight.detailUVMap)
     detailLayer.data.foreach_set("uv", data["detailUVs"][triangles.ravel()].astype(numpy.float32).ravel())

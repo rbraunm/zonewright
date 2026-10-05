@@ -422,7 +422,19 @@ def sceneCorners(preview):
 
 
 def sceneHeightRange(preview):
-  heights = [corner.z for corner in sceneCorners(preview)]
+  """The lowest and highest the scene's meshes reach, an imported zone's without the objects it parks far below itself."""
+  depsgraph = preview.depsgraph()
+  heights = []
+  for sceneObject in preview.scene.objects:
+    if sceneObject.type != "MESH":
+      continue
+    corners = [mathutils.Vector(corner) for corner in sceneObject.evaluated_get(depsgraph).bound_box]
+    withoutParked = sceneObject.data.get(bridgeMeshAccess.heightsWithoutParkedProperty)
+    if withoutParked is not None:
+      corners = [mathutils.Vector((corner.x, corner.y, height)) for corner in corners for height in withoutParked]
+    heights += [(sceneObject.matrix_world @ corner).z for corner in corners]
+  if not heights:
+    raise ValueError("The scene has no meshes")
   return min(heights), max(heights)
 
 

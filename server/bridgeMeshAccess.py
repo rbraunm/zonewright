@@ -43,6 +43,8 @@ clientContentProperty = "zonewrightClientContent"
 clientContentKinds = ("spawn", "door", "object", "zone", "zoneFile")
 boundaryProperty = "zonewrightBoundary"
 zoneLineProperty = "zonewrightZoneLine"
+# An imported zone that parks objects far below itself (eqZones.parkedBelow) keeps its mesh's height range without them here.
+heightsWithoutParkedProperty = "zonewrightHeightsWithoutParked"
 # What players pass through: an object marked passable (markPassable), a face an imported client file flags passable (this face
 # attribute), and a face of a cutout or liquid material (createMaterial, createLiquidMaterial; export flags them). A liquid material
 # keeps its liquid and shader values, which export writes as the client's shader properties; a client liquid material keeps only its
