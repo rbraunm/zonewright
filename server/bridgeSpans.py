@@ -338,8 +338,8 @@ def bridgeViewSet(definition, groundHeight):
   profile = Profile(start, end, bulge)
   middle = profile.pointAt(0.5)
   views = {
-    "fromStart": bridgeStructures.standView(start - profile.direction * viewBack, profile.direction),
-    "fromEnd": bridgeStructures.standView(end + profile.direction * viewBack, -profile.direction),
+    "fromStart": bridgeStructures.standView(start - profile.direction * viewBack, start, profile.direction, groundHeight),
+    "fromEnd": bridgeStructures.standView(end + profile.direction * viewBack, end, -profile.direction, groundHeight),
     "across": bridgeStructures.lookView(middle + profile.left * 0.9 * profile.span + up * 0.25 * profile.span, middle),
   }
   below = middle + profile.left * 0.4 * profile.span
@@ -401,8 +401,9 @@ class Station:
   """Where a post or bracket stands along an edge: its point on the edge, the walking surface's height there, the underside's, the
   way along, and the side's outward direction."""
 
-  def __init__(self, point, height, underside, direction, outward, stretch, label):
+  def __init__(self, point, height, underside, direction, outward, stretch, label, bracketed=False):
     self.point, self.height, self.underside, self.direction, self.outward, self.stretch, self.label = point, height, underside, direction, outward, stretch, label
+    self.bracketed = bracketed
 
 
 def layGroundedPosts(laying, bake, postData, stations, rail, side, sink, onlyRaised):
@@ -497,8 +498,8 @@ def layStairs(laying):
     gaps[label] = round(float(point[2] - found), 3)
   bake = bridgeKitGeometry.Bake()
   report = flight.lay(bake, width, treadData, stringerData)
+  least = flightClearance(laying, flight, width, size(treadData, 2), "The flight")
   underside = size(treadData, 2) + (0.0 if stringerData is None else size(stringerData, 2))
-  least = flightClearance(laying, flight, width, underside, "The flight")
   legReport, railLength = [], 0.0
   for side in sides:
     stations = [
@@ -530,8 +531,8 @@ def stairsViewSet(definition, groundHeight):
   middle = (bottom + top) / 2
   side = max(run, rise) * 1.2 + 10
   return {
-    "fromFoot": bridgeStructures.standView(bottom - direction * viewBack, direction, round(math.degrees(math.atan2(rise, run + viewBack)), 2)),
-    "fromHead": bridgeStructures.standView(top + direction * viewBack, -direction, round(-math.degrees(math.atan2(rise, run + viewBack)), 2)),
+    "fromFoot": bridgeStructures.standView(bottom - direction * viewBack, bottom, direction, groundHeight, round(math.degrees(math.atan2(rise, run + viewBack)), 2)),
+    "fromHead": bridgeStructures.standView(top + direction * viewBack, top, -direction, groundHeight, round(-math.degrees(math.atan2(rise, run + viewBack)), 2)),
     "side": bridgeStructures.lookView(middle + leftOf(direction) * side, middle),
   }
 
@@ -616,19 +617,25 @@ class WalkwayPlan:
     return self.landings[pointIndex - 1]
 
   def edge(self, side):
-    """The walkway's edge on one side as stretches, each [(plan point, height), ...] along travel: legs and the landings between."""
+    """The walkway's edge on one side as stretches along travel, legs and the landings between, each a list of segments (start, its
+    height, end, its height, the legs whose edge it carries on: a landing's outer corner turns from the incoming leg's to the
+    outgoing leg's)."""
     stretches = []
     half = self.width / 2
     for leg in self.legs:
       if leg["index"] > 0:
         landing = self.landingAt(leg["index"])
-        path = [landing["corners"][("in", side)]]
+        corners, height = landing["corners"], landing["height"]
         if landing["outer"] == side:
-          path.append(landing["corners"]["miter"])
-        path.append(landing["corners"][("out", side)])
-        stretches.append({"kind": "landing", "index": landing["index"], "path": [(point, landing["height"]) for point in path]})
+          segments = [
+            (corners[("in", side)], height, corners["miter"], height, {leg["index"] - 1}),
+            (corners["miter"], height, corners[("out", side)], height, {leg["index"]}),
+          ]
+        else:
+          segments = [(corners[("in", side)], height, corners[("out", side)], height, {leg["index"] - 1, leg["index"]})]
+        stretches.append({"kind": "landing", "index": landing["index"], "segments": segments})
       offset = leg["left"] * side * half
-      stretches.append({"kind": "leg", "index": leg["index"], "path": [(plan(leg["start"]) + offset, float(leg["start"][2])), (plan(leg["end"]) + offset, float(leg["end"][2]))]})
+      stretches.append({"kind": "leg", "index": leg["index"], "segments": [(plan(leg["start"]) + offset, float(leg["start"][2]), plan(leg["end"]) + offset, float(leg["end"][2]), {leg["index"]})]})
     return stretches
 
 
@@ -750,10 +757,12 @@ def layWalkway(laying):
   treadThickness = 0.0 if treadData is None else size(treadData, 2)
   stringerHeight = 0.0 if stringerData is None else size(stringerData, 2)
 
-  def undersideBelow(stretch):
+  def undersideBelow(stretch, stringersToo=True):
+    """How far under the walking surface a stretch's underside lies: its deck's or treads' (clearance), with the stringers under it
+    (what posts and brackets hold up)."""
     if stretch["kind"] == "leg" and stretch["index"] in flights:
-      return treadThickness + stringerHeight
-    return deckThickness + (stringerHeight if stretch["kind"] == "leg" else 0.0)
+      return treadThickness + (stringerHeight if stringersToo else 0.0)
+    return deckThickness + (stringerHeight if stretch["kind"] == "leg" and stringersToo else 0.0)
 
   gaps = {}
   for label, point in (("start", points[0]), ("end", points[-1])):
@@ -778,13 +787,19 @@ def layWalkway(laying):
     entry |= {"from": roundVector(points[leg["index"]]), "to": roundVector(points[leg["index"] + 1]), "planLength": round(leg["length"], 3), "laidLength": round(leg["laid"], 3)}
   for landing in walkway.landings:
     landingDeck(bake, deck, landing, walkway.legs[landing["index"] - 1], deckThickness)
-  first, last = plan(walkway.points[0]), plan(walkway.points[-1])
+  endLines = [(plan(walkway.points[0]), walkway.legs[0]["left"]), (plan(walkway.points[-1]), walkway.legs[-1]["left"])]
 
   def nearEnd(point):
-    return min(numpy.linalg.norm(plan(point) - first), numpy.linalg.norm(plan(point) - last)) <= stepHeight
+    """Within a step of either end's edge across the deck: the ends' first step, where a deck may rest in the ground it starts from."""
+    for center, left in endLines:
+      offset = plan(point) - center
+      across = numpy.clip(offset @ left, -width / 2, width / 2)
+      if numpy.linalg.norm(offset - left * across) <= stepHeight:
+        return True
+    return False
 
   for leg in walkway.legs:
-    below = undersideBelow({"kind": "leg", "index": leg["index"]})
+    below = undersideBelow({"kind": "leg", "index": leg["index"]}, False)
     if leg["index"] in flights:
       flightClearance(laying, flights[leg["index"]], width, below, f"Stair leg {leg['index']}")
       continue
@@ -808,10 +823,9 @@ def layWalkway(laying):
     stations, breaks = [], set()
     for stretch in walkway.edge(side):
       isFlight = stretch["kind"] == "leg" and stretch["index"] in flights
-      bracketed = stretch["kind"] == "leg" and stretch["index"] in bracketLegs and side == bracketSide
       below = undersideBelow(stretch)
-      path = stretch["path"]
-      for (first, firstHeight), (second, secondHeight) in zip(path[:-1], path[1:]):
+      for first, firstHeight, second, secondHeight, carried in stretch["segments"]:
+        bracketed = side == bracketSide and bool(carried & bracketLegs)
         length = float(numpy.linalg.norm(second - first))
         if length < 1e-6:
           continue
@@ -825,12 +839,12 @@ def layWalkway(laying):
             if isFlight or (stations[-1].stretch == "flight") != isFlight:
               breaks.add(len(stations) - 1)
             continue
-          stations.append(Station(point, height, height - below, direction, outward, "flight" if isFlight else ("bracket" if bracketed else stretch["kind"]), label))
+          stations.append(Station(point, height, height - below, direction, outward, "flight" if isFlight else stretch["kind"], label, bracketed))
       if isFlight and stations:
         breaks.add(len(stations) - 1)
     heldByPosts = posts is not None and side in postSides
     for station in stations:
-      if station.stretch == "bracket" or heldByPosts:
+      if station.bracketed or heldByPosts:
         continue
       ground = laying.lookups.below((station.point[0], station.point[1], station.underside))
       if ground is not None and station.underside - ground > stepHeight and not nearEnd(station.point):
@@ -839,7 +853,7 @@ def layWalkway(laying):
       continue
     tops = []
     for index, station in enumerate(stations):
-      if station.stretch == "bracket":
+      if station.bracketed:
         tops.append(None)
         edgeGround = laying.lookups.below((station.point[0], station.point[1], station.underside))
         if edgeGround is not None and station.underside - edgeGround <= size(bracketData, 2):
@@ -886,8 +900,8 @@ def walkwayViewSet(definition, groundHeight):
   width = definition["width"]
   first, last = unit(plan(points[1] - points[0])), unit(plan(points[-1] - points[-2]))
   views = {
-    "fromStart": bridgeStructures.standView(points[0] - first * viewBack, first),
-    "fromEnd": bridgeStructures.standView(points[-1] + last * viewBack, -last),
+    "fromStart": bridgeStructures.standView(points[0] - first * viewBack, points[0], first, groundHeight),
+    "fromEnd": bridgeStructures.standView(points[-1] + last * viewBack, points[-1], -last, groundHeight),
   }
   brackets = definition["brackets"]
   for index in range(1, len(points) - 1):

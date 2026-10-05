@@ -32,7 +32,7 @@ groundReach = 300.0
 # Decks are probed for clearance this often along their edges and centerline, and walked in samples this far apart.
 clearanceSpacing = 4.0
 walkSpacing = 4.0
-# A walk line runs on this far past each end that stands on footing.
+# A walk line runs on this far past each end that stands on footing with footing that far on.
 walkExtension = 5.0
 overheadLift = 10.0
 castNudge = bridgeMeshAccess.castNudge
@@ -468,18 +468,22 @@ def staleStructures():
 
 
 def walkLine(collection):
-  """A span's walk line: its centerline at deck height, run on walkExtension past each end that stands within a step of footing."""
+  """A span's walk line: its centerline at deck height, run on walkExtension past each end where both the end and the ground that far
+  on stand within a step of footing (a dock's open end, or a flight's foot against a rising wall, ends the line)."""
   record = bridgeStructureData.readStructure(collection)
   spec = kinds[record["kind"]]
   if spec.walkLine is None:
     raise ValueError(f"'{collection.name}' is a {record['kind']}; only bridges, flights, and walkways have a walk line")
   points = [mathutils.Vector(point) for point in spec.walkLine(record["definition"])]
   surfaces = StructureGround().without(skippedNames(record["order"]))
+  def onFooting(point):
+    footing = surfaces.footingOn(point + up * (stepHeight + castNudge), 2 * stepHeight + castNudge)
+    return footing is not None and abs(point.z - footing.point.z) <= stepHeight
+
   extensions = []
   for end, inner in ((points[0], points[1]), (points[-1], points[-2])):
-    footing = surfaces.footingOn(end + up * (stepHeight + castNudge), 2 * stepHeight + castNudge)
-    outward = mathutils.Vector((end.x - inner.x, end.y - inner.y, 0.0)).normalized()
-    extensions.append([] if footing is None or abs(end.z - footing.point.z) > stepHeight else [list(end + outward * walkExtension)])
+    beyond = end + mathutils.Vector((end.x - inner.x, end.y - inner.y, 0.0)).normalized() * walkExtension
+    extensions.append([list(beyond)] if onFooting(end) and onFooting(beyond) else [])
   return extensions[0] + [list(point) for point in points] + extensions[1]
 
 
@@ -499,8 +503,12 @@ def headingOf(direction):
   return round(math.degrees(math.atan2(direction[0], direction[1])) % 360.0, 3)
 
 
-def standView(at, direction, pitch=-5.0):
-  return {"standAt": roundVector(at), "headingDegrees": headingOf(direction), "pitchDegrees": pitch}
+def standView(at, end, direction, groundHeight, pitch=-5.0):
+  """Standing on the approach to an end, heading along a direction: where the ground there lies within two steps of the end's height;
+  else on the end itself (a flight's foot against a wall, a lookout's open end over the ground far below)."""
+  ground = groundHeight(at[0], at[1])
+  near = ground is not None and abs(ground - at[2]) <= 2 * stepHeight
+  return {"standAt": roundVector(at if near else end), "headingDegrees": headingOf(direction), "pitchDegrees": pitch}
 
 
 def lookView(eye, target):
