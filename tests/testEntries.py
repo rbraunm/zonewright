@@ -31,7 +31,8 @@ async def groundGrid(session, folder, name="ground", size=200, location=(0, 0, 0
 
 async def entryPlot(session, folder):
   """Flat ground at 0, 200 across, with a dais 10 high at (60, 60), a ramp steeper than players walk at (-60, 0), a slab whose
-  underside leaves less than a player's height over the ground at (-60, 60), a pond of undecided swimming at (-60, -60), a swim volume
+  underside leaves less than a player's height over the ground at (-60, 60), a pond of undecided swimming at (-60, -60), a terrace
+  floating over the ground at (0, 70), its rim 20 up and a pool of undecided swimming 16 up in its basin, whose floor is 12 up, a swim volume
   on the ground at (30, -70), one floating 20 over it at (70, -70), and a zone line at (-95, 0)."""
   await freshScene(session)
   await groundGrid(session, folder)
@@ -39,8 +40,11 @@ async def entryPlot(session, folder):
   await session.expectSuccess("createPrimitive", {"kind": "plane", "name": "ramp", "size": [20, 20, 0], "location": [-60, 0, 12], "rotationDegrees": [steepDegrees, 0, 0]})
   await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "slab", "size": [20, 20, 1], "location": [-60, 60, playerHeight - 1]})
   await session.expectSuccess("sculptAlongPath", {"objectName": "ground", "mode": "carve", "path": [[-60, -60, -10]], "radius": 30, "strength": 1, "profile": [[0, 0], [1, 10]], "conformRim": False})
+  await groundGrid(session, folder, name="terrace", size=40, location=(0, 70, 20))
+  await session.expectSuccess("sculptAlongPath", {"objectName": "terrace", "mode": "carve", "path": [[0, 70, 12]], "radius": 16, "strength": 1, "profile": [[0, 0], [0.5, 0], [1, 8]], "conformRim": False})
   await liquidMaterials(session, folder)
   await session.expectSuccess("floodWater", {"name": "pond", "seed": [-60, -60], "level": -2, "material": "water"})
+  await session.expectSuccess("floodWater", {"name": "terracePool", "seed": [0, 70], "level": 16, "material": "water", "within": [[-12, 58], [12, 58], [12, 82], [-12, 82]]})
   await session.expectSuccess("placeSwimVolume", {"name": "wading", "liquid": "water", "minimum": [20, -80, -5], "maximum": [40, -60, 10]})
   await session.expectSuccess("placeSwimVolume", {"name": "skyPool", "liquid": "water", "minimum": [60, -80, 20], "maximum": [80, -60, 30]})
   await session.expectSuccess("placeZoneLine", {"number": 1, "label": "west", "minimum": [-100, -10, -5], "maximum": [-90, 10, 40], "target": otherZone})
@@ -57,12 +61,14 @@ def testPlaceEntryStandsOnShippedFooting(stageBlenderServer, tmp_path):
     view, placed = await session.expectImage("placeEntry", entryArguments("fromQeynos", [0, 0], "zoneIn", fromZone="qeynos2", fromNumber=3))
     _, dais = await session.expectImage("placeEntry", entryArguments("daisTop", [60, 60]))
     _, underPool = await session.expectImage("placeEntry", entryArguments("underSkyPool", [70, -70]))
+    _, underTerrace = await session.expectImage("placeEntry", entryArguments("underTerrace", [0, 70, 0]))
     _, again = await session.expectImage("placeEntry", entryArguments("fromQeynos", [10, 0], "zoneIn", fromZone="qeynos2"))
     refusals = {
       "noFooting": await session.expectError("placeEntry", entryArguments("lost", [500, 500])),
       "steep": await session.expectError("placeEntry", entryArguments("onTheRamp", [-60, 0])),
       "headroom": await session.expectError("placeEntry", entryArguments("underTheSlab", [-60, 60, 0])),
       "undecided": await session.expectError("placeEntry", entryArguments("inThePond", [-60, -60])),
+      "terracePool": await session.expectError("placeEntry", entryArguments("inTheTerracePool", [0, 70])),
       "swimBox": await session.expectError("placeEntry", entryArguments("inTheShallows", [30, -70])),
       "zoneLine": await session.expectError("placeEntry", entryArguments("inTheGate", [-95, 0])),
       "clash": await session.expectError("placeEntry", entryArguments("dais", [0, 30])),
@@ -73,9 +79,9 @@ def testPlaceEntryStandsOnShippedFooting(stageBlenderServer, tmp_path):
       "landingFrom": await session.expectError("placeEntry", entryArguments("landed", [0, 30], fromZone="qeynos2")),
     }
     listed = await session.expectSuccess("getEntries", {})
-    return view, placed, dais, underPool, again, refusals, listed
+    return view, placed, dais, underPool, underTerrace, again, refusals, listed
 
-  view, placed, dais, underPool, again, refusals, listed = stageBlenderServer.session(steps)
+  view, placed, dais, underPool, underTerrace, again, refusals, listed = stageBlenderServer.session(steps)
   assert {key: placed[key] for key in ("name", "kind", "at", "headingDegrees", "fromZone", "fromNumber", "isolated", "state", "replaced")} == {
     "name": "fromQeynos", "kind": "zoneIn", "at": [0.0, 0.0, 0.0], "headingDegrees": 90.0, "fromZone": "qeynos2", "fromNumber": 3, "isolated": False,
     "state": "onFooting", "replaced": False,
@@ -86,10 +92,13 @@ def testPlaceEntryStandsOnShippedFooting(stageBlenderServer, tmp_path):
   assert Image.open(io.BytesIO(view)).size == (960, 540) and Path(placed["arrivalView"]["outputPath"]).is_file()
   # [x, y] takes the highest footing: the dais's top.
   assert dais["at"] == [60.0, 60.0, 10.0] and dais["state"] == "onFooting"
-  # Under a floating pool, with air between, players arrive on the ground: the box, not the water over it, decides swimming.
+  # Under a floating swim volume, with air between, players arrive on the ground: the box, not the water over it, decides swimming.
   assert underPool["at"] == [70.0, -70.0, 0.0]
+  # Under the floating terrace's pool, its basin between, players arrive on the ground; in the basin they would arrive in its water.
+  assert underTerrace["at"] == [0.0, 70.0, 0.0] and underTerrace["state"] == "onFooting"
+  assert "The footing at [0.0, 70.0, 12.0] lies under the surface of 'terracePool', whose swimming is undecided" in refusals["terracePool"]
   assert again["replaced"] is True and again["at"] == [10.0, 0.0, 0.0] and again["fromNumber"] is None
-  assert [entry["name"] for entry in listed["entries"]] == ["daisTop", "fromQeynos", "underSkyPool"]
+  assert [entry["name"] for entry in listed["entries"]] == ["daisTop", "fromQeynos", "underSkyPool", "underTerrace"]
   assert "No ground the zone ships lies at [500.0, 500.0]" in refusals["noFooting"]
   assert f"slopes {steepDegrees:.1f} degrees, steeper than players walk ({math.degrees(math.acos(walkableNormalZ)):.1f}" in refusals["steep"]
   assert f"has {playerHeight - 1:.2f} of headroom, under a player's height ({playerHeight:g}" in refusals["headroom"]
@@ -211,6 +220,11 @@ placed.location = (-60, -100, 0)
 placed.rotation_euler = (0, 0, 0.7)
 placed.scale = (1.5, 1.5, 1.5)
 bpy.context.scene.collection.objects.link(placed)
+passed = bpy.data.objects.new('passablePlaced', None)
+passed.instance_type = 'COLLECTION'
+passed.instance_collection = outer
+passed.location = (60, -100, 0)
+bpy.context.scene.collection.objects.link(passed)
 """
 collectCode = """
 import bridgeExport
@@ -225,6 +239,7 @@ def testCollisionTrianglesEqualTheArchivesSolidTriangles(stageBlenderServer, tmp
   async def steps(session):
     await boundedPlot(session, tmp_path)
     await session.expectSuccess("runPython", {"code": nestedInstance})
+    await session.expectSuccess("markPassable", {"objects": ["passablePlaced"]})
     await session.expectSuccess("saveFile", {"path": str(tmp_path / "collisionplot.blend")})
     exported = await session.expectSuccess("exportZone", {"path": str(archivePath), "purpose": "test"})
     collected = (await session.expectSuccess("runPython", {"code": collectCode}))["result"]
@@ -234,10 +249,13 @@ def testCollisionTrianglesEqualTheArchivesSolidTriangles(stageBlenderServer, tmp
   assert exported["failures"] == []
   archiveSolid, archivePassable = triangleCorners(archivePath, "collisionplot")
   corners = numpy.array(collected["corners"])
-  # The pool, the fall, the cutout card, and the crate marked passable are passed through whole, so none of them owns a triangle; the
-  # archive flags theirs, and its other triangles, placed as the client places them, are the collector's, one for one.
+  # The pool, the fall, the cutout card, the crate marked passable, and the instance marked passable (its two crates, one nested) are
+  # passed through whole, so none of them owns a triangle; the archive flags theirs, and its other triangles, placed as the client
+  # places them, are the collector's, one for one.
   assert collected["owners"] == ["crate", "eastNorth", "eastSouth", "ground", "outerPlaced", "westLid"]
-  assert len(archivePassable) > 0 and len(corners) == len(archiveSolid)
+  passableInstance = numpy.all(numpy.abs(archivePassable.mean(axis=1)[:, :2] - [60, -100]) < 20, axis=1)
+  assert passableInstance.sum() == 2 * 12 and len(archivePassable) > passableInstance.sum()
+  assert len(corners) == len(archiveSolid)
   assert unmatchedTriangle(corners, archiveSolid, 1e-4) is None
   assert unmatchedTriangle(archiveSolid, corners, 1e-4) is None
 
@@ -325,7 +343,11 @@ sketchRegions = {
 }
 # Inside each region, clear of its label at its middle, of its outline, and of the grid's lines.
 sketchSamples = {"backdrop": [110, -135], "rimRock": [110, 135], "square": [-110, 135], "old": [-110, -135]}
-sketchEntries = {"safe point": ([0, 0], False), "zoneIn": ([-75, 60], False), "landing": ([75, -60], True), "T2": ([-75, -60], False), "entrance": ([0, 140], False)}
+# Each entry's point, heading, and whether it is isolated.
+sketchEntries = {
+  "safe point": ([0, 0], 90, False), "zoneIn": ([-75, 60], 0, False), "landing": ([75, -60], 90, True), "T2": ([-75, -60], 0, False),
+  "entrance": ([0, 140], 0, False),
+}
 sketchView = {"center": [0, 0], "width": 480, "spotHeights": False}
 
 
@@ -368,14 +390,21 @@ def testRenderSketchDrawsEntriesAndAccess(stageBlenderServer, tmp_path):
   red, green, blue = shifts["old"]
   assert min(abs(red), abs(green), abs(blue)) > 3 and max(abs(red - green), abs(green - blue)) < 3, shifts["old"]
   assert numpy.abs(shifts["square"]).max() < 1, shifts["square"]
-  # Each entry is a triangle about its point: dark, or hollow (white inside) when isolated.
-  for name, (point, isolated) in sketchEntries.items():
-    x, y = frame.pixel(point)
-    inside = planPixels[round(y), round(x)]
+  def planPixel(point, headingDegrees=0, pixels=0):
+    """The drawing's pixel `pixels` along a heading from a world point, stepping in the world (0 = +Y, clockwise)."""
+    heading, units = math.radians(headingDegrees), pixels / frame.length(1)
+    x, y = frame.pixel([point[0] + math.sin(heading) * units, point[1] + math.cos(heading) * units])
+    return planPixels[round(y), round(x)]
+
+  # Each entry is a triangle about its point, its tip 18 pixels ahead along its heading and its back 9 behind: dark, or hollow (white
+  # inside, inside a dark edge that fills its narrow end) when isolated. 11 pixels ahead lies inside it, 11 behind outside it on the
+  # grey relief.
+  for name, (point, heading, isolated) in sketchEntries.items():
+    inside, ahead, behind = planPixel(point), planPixel(point, heading, 11), planPixel(point, heading, -11)
     assert (inside.min() >= 200) if isolated else (inside.max() <= 60), (name, inside)
-  # The plot faces -Y, the plan's right: its own entrance mark points out of the middle of that side, rightward, where its entrance's
-  # arrow stands 10 beyond.
-  x, y = frame.pixel([0, 150])
-  red, green, blue = planPixels[round(y), round(x) + 6]
+    assert ahead.max() <= 60 and behind.min() >= 80, (name, ahead, behind)
+  # The plot faces -Y, the plan's right: its own entrance mark points out of the middle of that side, 11 pixels long, rightward, where
+  # its entrance's arrow stands 10 beyond. 8 pixels out it is the plot's brown, beyond a mark lying along the side, 14 across.
+  red, green, blue = planPixel([0, 150], 180, 8)
   assert red - blue > 80 and red > green > blue, (red, green, blue)
   assert drawn["width"] == sketchView["width"]
