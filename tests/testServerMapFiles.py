@@ -8,7 +8,6 @@ import numpy
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
-import eqArchive
 import eqgFiles
 import eqgWriter
 import serverMapDrawing
@@ -73,9 +72,9 @@ def testMapWriterReproducesPeridotsHighpassHold():
 
 
 @pytest.mark.clientData("serverMaps")
-@pytest.mark.parametrize("zoneName", ["thulehouse2", "freeporteast", "freeportwest"])
-def testMapWriterReproducesPeridotsOtherEQGZones(zoneName):
-  assert assertMapReproduces(zoneName) > 0
+@pytest.mark.parametrize(("zoneName", "changedTurns"), [("thulehouse2", 2365), ("freeporteast", 2320), ("freeportwest", 1946)])
+def testMapWriterReproducesPeridotsOtherEQGZones(zoneName, changedTurns):
+  assert assertMapReproduces(zoneName) == changedTurns
 
 
 @pytest.mark.clientData("serverMaps")
