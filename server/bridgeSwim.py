@@ -67,11 +67,13 @@ def requireSwimBody(name):
 
 
 def liquidOfBody(body):
+  """What players swim in under a body: lava under lava, water under water or a river of the waterfall liquid laid over its bed (as
+  Crescent Reach's rivers are, swum through their AWT_ boxes)."""
   material = body.material_slots[0].material if body.material_slots else None
   liquid = bridgeSurfacing.liquidOf(material)
-  if liquid is None or liquid["liquid"] not in volumePrefixes:
-    raise ValueError(f"Water body '{body.name}' needs a water or lava material for swim volumes")
-  return liquid["liquid"]
+  if liquid is None:
+    raise ValueError(f"Water body '{body.name}' needs a liquid material for swim volumes")
+  return "lava" if liquid["liquid"] == "lava" else "water"
 
 
 def bodyCells(body, ground, area=None):

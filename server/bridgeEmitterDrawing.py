@@ -53,7 +53,9 @@ def particleMaterial(preview, texturePath, additive):
   nodes.clear()
   texture = nodes.new("ShaderNodeTexImage")
   texture.image = bpy.data.images.load(texturePath, check_existing=True)
-  preview.loadedImages.append(texture.image)
+  # A texture drawn both blended and added is one image in two materials; the preview removes each image once.
+  if texture.image not in preview.loadedImages:
+    preview.loadedImages.append(texture.image)
   texture.image.colorspace_settings.name = "Non-Color"
   texture.image.alpha_mode = "STRAIGHT"
   texture.interpolation = "Linear"

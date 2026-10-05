@@ -381,16 +381,27 @@ def joinObjects(names, into):
   return describeTransform(target) | bridgeMeshAccess.meshCounts(target) | {"materials": [slot.material.name if slot.material else None for slot in target.material_slots]}
 
 
+def bodySprays(names):
+  """The spray emitters of the named water bodies."""
+  return [
+    sceneObject for sceneObject in bpy.data.objects
+    if bridgeMeshAccess.sprayProperty in sceneObject and json.loads(sceneObject[bridgeMeshAccess.sprayProperty])["body"] in names
+  ]
+
+
 def deleteObjects(names):
+  """Delete objects, and with a water body the emitters its sprays placed."""
   sceneObjects = [bridgeMeshAccess.requireObject(name) for name in names]
+  sprays = [spray for spray in bodySprays({sceneObject.name for sceneObject in sceneObjects if bridgeMeshAccess.waterProperty in sceneObject}) if spray.name not in names]
+  removedSprays = sorted(spray.name for spray in sprays)
   removedData = []
-  for sceneObject in sceneObjects:
+  for sceneObject in sceneObjects + sprays:
     data = sceneObject.data
     bpy.data.objects.remove(sceneObject)
     if isinstance(data, bpy.types.Mesh) and data.users == 0:
       removedData.append(data.name)
       bpy.data.meshes.remove(data)
-  return {"deleted": names, "removedMeshes": removedData}
+  return {"deleted": names, "removedMeshes": removedData, "removedSprays": removedSprays}
 
 
 def organize(renames, parents, collections):
@@ -399,6 +410,8 @@ def organize(renames, parents, collections):
   for oldName, newName in (renames or {}).items():
     sceneObject = bridgeMeshAccess.requireObject(oldName)
     requireNewName(newName)
+    for spray in bodySprays({oldName}) if bridgeMeshAccess.waterProperty in sceneObject else []:
+      spray[bridgeMeshAccess.sprayProperty] = json.dumps(json.loads(spray[bridgeMeshAccess.sprayProperty]) | {"body": newName})
     sceneObject.name = newName
     nameOwnMesh(sceneObject)
   bpy.context.view_layer.update()

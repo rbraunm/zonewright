@@ -33,6 +33,8 @@ surfaceLayersProperty = "zonewrightSurfaceLayers"
 waterProperty = "zonewrightWater"
 # A swim volume (bridgeSwim) keeps its liquid, its body, and what it was built from in this property.
 swimProperty = "zonewrightSwimVolume"
+# An emitter a water body's spray placed keeps its body, its spray, and what it stands on in this property; it goes with its body.
+sprayProperty = "zonewrightWaterSpray"
 # A guide is drawn to design with (a plot's outline) and never exported; a plot's border is a server-placed door, exported in the
 # zone's housing file rather than its geometry.
 guideProperty = "zonewrightGuide"

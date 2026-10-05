@@ -24,6 +24,9 @@ blockoutPropertyName = "zonewrightBlockout"
 transitionPropertyName = "zonewrightTransition"
 environmentNodeName = "zonewrightEnvironment"
 secondDiffuseNodeName = "zonewrightDiffuse1"
+diffuseAlphaNodeName = "zonewrightDiffuseAlpha"
+# The client's effect time modulo 100, which a preview sets on its scene to draw liquids scrolled as at that moment; unset, it is 0.
+liquidTimeProperty = "zonewrightLiquidTime"
 # Each liquid's textures (beyond its diffuse) and shader values, as the client's water (Opaque_MaxWater.fx), waterfall
 # (Opaque_MaxWaterFall.fx), and lava (Opaque_MaxLava.fx) materials carry them.
 liquidTextures = {"water": ("normal", "environment"), "waterfall": (), "lava": ("normal", "secondDiffuse")}
@@ -87,6 +90,12 @@ def requireLiquidValues(liquid, values):
       raise ValueError(f"{key} is three numbers from 0 to 1, got {values[key]!r}")
   if len(values["slides"]) != 4:
     raise ValueError(f"slides is [first x, first y, second x, second y] in texture repeats a second, got {values['slides']!r}")
+  jumping = [slide for slide in values["slides"] if abs(100 * slide - round(100 * slide)) > 1e-9]
+  if jumping:
+    raise ValueError(
+      f"slides {jumping} jump every 100 seconds: the client's effects take time modulo 100, so a layer scrolls seamlessly only when 100"
+      f" times its slide is a whole number of repeats (0.07 or 0.08, not 0.075)"
+    )
   return {key: values[key] for key in liquidValues[liquid]}
 
 
@@ -118,25 +127,62 @@ def createLiquidMaterial(name, liquid, diffuseTexture, normalTexture, environmen
 
 
 def liquidNodes(material, liquid, values, diffusePath, texturePaths, lit):
-  """A liquid's look in the preview, as the client's DX9 liquid effects draw it, still (at time 0), also used for the client's own liquid
-  materials when a zone is imported (then lit by their baked light). Water (RegionWater.fxo / SModelWater.fxo, ps_2_0): no diffuse; its
-  color runs from waterColor1 seen from straight above to waterColor2 at grazing angles, lit like any surface, under a normal map
-  sampled at the texture coordinates and at twice them, flattening with distance until flat 300 units off; plus its environment
-  mirrored by fresnel (bias + (1 - bias) times the grazing term to fresnelPower) times reflectionAmount and reflectionColor, added
-  unlit before fog. The environment is a cube map the preview cannot look up, so its average color stands for it. A waterfall
-  (RegionWaterFall.fxo): its diffuse lit, as see-through as the diffuse's alpha. Lava: its two diffuses averaged (its effect is not
-  read yet). Water a material leaves without its values or textures is drawn without what they give."""
+  """A liquid's look in the preview, as the client's DX9 liquid effects draw it at the effect time the preview sets (0 unless a view
+  asks for another), also used for the client's own liquid materials when a zone is imported (then lit by their baked light). Water
+  (RegionWater.fxo / SModelWater.fxo, ps_2_0): no diffuse; its color runs from waterColor1 seen from straight above to waterColor2 at
+  grazing angles, lit like any surface, under a normal map sampled at the texture coordinates and at twice them, flattening with
+  distance until flat 300 units off; plus its environment mirrored by fresnel (bias + (1 - bias) times the grazing term to
+  fresnelPower) times reflectionAmount and reflectionColor, added unlit before fog. The environment is a cube map the preview cannot
+  look up, so its average color stands for it. A waterfall (RegionWaterFall.fxo): its diffuse's color lit, as see-through as its alpha,
+  each sampled at its own slide. Lava: its two diffuses averaged (its effect is not read yet). Each layer scrolls as scrolledCoordinates
+  says. Water a material leaves without its values or textures is drawn without what they give."""
   tree = material.node_tree
+  slides = values.get("slides", [0.0, 0.0, 0.0, 0.0])
   diffuse = imageNode(material, diffuseNodeName, diffusePath)
   if liquid == "water" and all(key in values for key in ("waterColor1", "waterColor2", "fresnelBias", "fresnelPower")):
-    baseColor, normal, added = clientWater(material, values, texturePaths)
+    baseColor, normal, added = clientWater(material, values, texturePaths, slides)
     bridgeClientLight.surfaceOutput(material, baseColor, None, "opaque", lit, 0.5, normal, added)
     return
+  tree.links.new(scrolledCoordinates(tree, 1.0, slides[:2]), diffuse.inputs["Vector"])
   baseColor = diffuse.outputs["Color"]
+  alpha = diffuse.outputs["Alpha"]
+  if liquid == "waterfall":
+    alphaNode = imageNode(material, diffuseAlphaNodeName, diffusePath)
+    tree.links.new(scrolledCoordinates(tree, 1.0, slides[2:]), alphaNode.inputs["Vector"])
+    alpha = alphaNode.outputs["Alpha"]
   if liquid == "lava" and "secondDiffuse" in texturePaths:
     second = imageNode(material, secondDiffuseNodeName, texturePaths["secondDiffuse"])
+    tree.links.new(scrolledCoordinates(tree, 1.0, slides[2:]), second.inputs["Vector"])
     baseColor = mixColors(tree, diffuse.outputs["Color"], second.outputs["Color"], 0.5)
-  bridgeClientLight.surfaceOutput(material, baseColor, diffuse.outputs["Alpha"], "blended" if liquid == "waterfall" else "opaque", lit, 0.5)
+  bridgeClientLight.surfaceOutput(material, baseColor, alpha, "blended" if liquid == "waterfall" else "opaque", lit, 0.5)
+
+
+def scrolledCoordinates(tree, scale, clientOffset):
+  """The texture coordinates times scale, moved by clientOffset (texture repeats per unit of effect time, [u, v] with v counted down
+  from the texture's top as the client counts it) times the effect time the preview sets (liquidTimeProperty, the time modulo 100 as
+  each effect's preshader takes it). Water moves its first layer by minus its first slide and its second, at twice the coordinates, by
+  plus its second slide (RegionWater.fxo: mad oT0, r0, 1/256, -c7 and mad oT1, r0, 1/128, +c9); a waterfall moves its color and its
+  alpha (RegionWaterFall.fxo) and lava its two diffuses (RegionLava.fxo) each by plus its slide."""
+  coordinates = tree.nodes.new("ShaderNodeTexCoord").outputs["UV"]
+  time = tree.nodes.new("ShaderNodeAttribute")
+  time.attribute_type = "VIEW_LAYER"
+  time.attribute_name = liquidTimeProperty
+  scaled = tree.nodes.new("ShaderNodeVectorMath")
+  scaled.operation = "SCALE"
+  tree.links.new(coordinates, scaled.inputs["Vector"])
+  scaled.inputs["Scale"].default_value = scale
+  moved = tree.nodes.new("ShaderNodeVectorMath")
+  moved.operation = "MULTIPLY_ADD"
+  # Blender counts v up from the texture's bottom.
+  moved.inputs[0].default_value = (clientOffset[0], -clientOffset[1], 0.0)
+  tree.links.new(time.outputs["Fac"], moved.inputs[1])
+  tree.links.new(scaled.outputs["Vector"], moved.inputs[2])
+  return moved.outputs["Vector"]
+
+
+def scrollsInPreview(material):
+  """Whether a liquid material's nodes take the effect time a preview sets: those made before previews scrolled liquids do not."""
+  return any(node.type == "ATTRIBUTE" and node.attribute_name == liquidTimeProperty for node in material.node_tree.nodes)
 
 
 def mixColors(tree, first, second, factor, blendType="MIX"):
@@ -161,7 +207,7 @@ def imageAverage(path):
   return pixels[:, :3].mean(axis=0)
 
 
-def clientWater(material, values, texturePaths):
+def clientWater(material, values, texturePaths, slides):
   """The client's DX9 water as preview nodes: its base color to light, its rippled normal, and its mirrored environment to add."""
   tree = material.node_tree
   links = tree.links
@@ -197,11 +243,10 @@ def clientWater(material, values, texturePaths):
   geometry = tree.nodes.new("ShaderNodeNewGeometry")
   normal = geometry.outputs["Normal"]
   if "normal" in texturePaths:
-    coordinates = tree.nodes.new("ShaderNodeTexCoord").outputs["UV"]
     first = imageNode(material, normalNodeName, texturePaths["normal"])
-    links.new(coordinates, first.inputs["Vector"])
+    links.new(scrolledCoordinates(tree, 1.0, [-slides[0], -slides[1]]), first.inputs["Vector"])
     second = imageNode(material, normalNodeName + "Twice", texturePaths["normal"])
-    links.new(scaled(coordinates, 2.0), second.inputs["Vector"])
+    links.new(scrolledCoordinates(tree, 2.0, slides[2:]), second.inputs["Vector"])
     summed = vector("SUBTRACT", vector("ADD", first.outputs["Color"], second.outputs["Color"]), (1.0, 1.0, 1.0))
     distance = tree.nodes.new("ShaderNodeCameraData").outputs["View Distance"]
     near = math("MINIMUM", math("MAXIMUM", math("DIVIDE", math("SUBTRACT", waterFlatDistance, distance), waterFlatDistance), 0.0), 1.0)
