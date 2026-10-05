@@ -215,6 +215,52 @@ result = {'faces': kept, 'sources': sources}
     assert checked["edgesOnThreeOrMoreFaces"] == 0 and checked["openEdges"] == borderEdges
 
 
+def testLiningWallsAreMappedRoundTheirBendsWithoutSeams(stageBlenderServer, tmp_path):
+  # A tunnel into the cliff turning 90 degrees east at y 100 on an arc of radius 40; its walls and vault in the bend, away from its ends.
+  bent = hall | {"path": [[0, -60, 2], [0, 10, 2], [0, 140, 2], [120, 140, 2]], "widths": [40] * 4, "heights": [45] * 4, "breakup": None}
+  readMapping = r"""
+import numpy
+import bridgeCaveData, bridgeMeshAccess, bridgeSurfacing
+ground = bpy.data.objects['ground']
+mesh = ground.data
+shown, _ = bridgeMeshAccess.readVertexArrays(ground)
+tags = bridgeCaveData.faceTags(ground, 'hall')
+uvs = numpy.empty(len(mesh.loops) * 2)
+mesh.uv_layers[bridgeSurfacing.uvLayerName].data.foreach_get('uv', uvs)
+uvs = uvs.reshape(-1, 2)
+byVertex, stretch = {}, []
+for polygon in mesh.polygons:
+  corners = shown[list(polygon.vertices)]
+  middle = corners.mean(axis=0)
+  e1, e2 = corners[1] - corners[0], corners[2] - corners[0]
+  normal = numpy.cross(e1, e2)
+  if tags[polygon.index] != -1 or normal[2] > 0.7 * numpy.linalg.norm(normal) or not (60 < middle[1] < 180 and middle[0] < 80) or middle[2] < 3:
+    continue
+  texture = uvs[list(polygon.loop_indices)]
+  axisU = e1 / numpy.linalg.norm(e1)
+  axisV = numpy.cross(normal / numpy.linalg.norm(normal), axisU)
+  world = numpy.array([[e1 @ axisU, e2 @ axisU], [e1 @ axisV, e2 @ axisV]])
+  singular = numpy.linalg.svd(numpy.column_stack([texture[1] - texture[0], texture[2] - texture[0]]) @ numpy.linalg.inv(world), compute_uv=False)
+  stretch.append([float(singular.max() / singular.min()), bool(middle[1] > 100 - 16 and middle[0] < 40 + 16)])
+  for vertex, uv in zip(polygon.vertices, texture.tolist()):
+    byVertex.setdefault(vertex, []).append(uv)
+spreads = [float(numpy.ptp(numpy.array(values), axis=0).max()) for values in byVertex.values() if len(values) > 1]
+result = {'faces': len(stretch), 'worstInTheBend': max(value for value, inBend in stretch if inBend), 'worstOnTheStraights': max(value for value, inBend in stretch if not inBend), 'worstSeam': max(spreads)}
+"""
+
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    await session.expectSuccess("cutCave", bent)
+    return (await session.expectSuccess("runPython", {"code": readMapping}))["result"]
+
+  mapping = stageBlenderServer.session(steps)
+  # Round the bend the walls and vault carry one mapping, every corner the same place in it from each face that meets there. On the
+  # straights either side (a row clear of it) a texel is square; in the bend the inner wall, on half the radius of the run's middle,
+  # takes the texture at most twice as close along it as up it, inside the export's limit.
+  assert mapping["faces"] > 50 and mapping["worstSeam"] <= 1e-4
+  assert mapping["worstOnTheStraights"] <= 1.05 and mapping["worstInTheBend"] <= 2.01
+
+
 def testTakingACaveBackLeavesTheGroundAsAnUncutCopyGivenTheSameChange(stageBlenderServer, tmp_path):
   async def steps(session):
     await caveCanyon(session, tmp_path)

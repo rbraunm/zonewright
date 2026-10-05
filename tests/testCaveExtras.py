@@ -568,6 +568,27 @@ def testAPlanDrawsACavesRunsWhereTheyRun(stageBlenderServer, tmp_path):
   assert not changed[row - 6:row + 7, column - 6:column + 7].any()
 
 
+def testAPlanDrawsAPassageOverAnotherOverItsOwnFloor(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    await session.expectSuccess("setZoneProperties", zone)
+    await session.expectSuccess("cutCave", room | {"name": "spiral", "breakup": None, "branches": [over]})
+    return await session.expectImage("renderSketch", {"center": [0, 40], "width": 300, "layers": ["caves"], "spotHeights": False})
+
+  drawn, plan = stageBlenderServer.session(steps)
+  image = numpy.asarray(Image.open(io.BytesIO(drawn)).convert("L"), dtype=numpy.int64)
+  height, width = image.shape
+  units = plan["unitsPerPixel"]
+
+  def darkest(x, y):
+    column, row = int(round(width / 2 + (40 - y) / units)), int(round(height / 2 - x / units))
+    return int(image[row - 3:row + 4, column - 3:column + 4].min())
+
+  # The tunnel's east wall (x 20) is drawn dark where nothing passes over it, and faded under the passage over it (y 15 to 45), which is
+  # drawn after it, over a floor of its own, as the higher level.
+  assert darkest(20, -10) < 120 and darkest(20, 22) > darkest(20, -10) + 50
+
+
 def testDaylightReachesExportAsBakedLight(stageBlenderServer, tmp_path):
   archivePath = tmp_path / "daylit.eqg"
   # Each imported vertex's baked share of scene light (the alpha of its baked color) by position.

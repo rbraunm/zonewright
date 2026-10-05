@@ -314,6 +314,43 @@ result = [pixel(510), pixel(30)]
     assert abs(measured - shade * highest) <= 2 / 255
 
 
+def testLayoutBandsAlternateSoTheyReadAtAnyHeightRange(stageBlenderServer):
+  # A ramp rising 1 in 2 north from 0 to 50, east of the mesa that holds the scene's range at 0 to 100: bands 5 tall are 10 apart
+  # on it, each a tenth of the range, so neighboring bands barely differ in color.
+  rampCode = """
+mesh = bpy.data.meshes.new('ramp')
+mesh.from_pydata([(0, -150, 0), (100, -150, 50), (100, -100, 50), (0, -100, 0)], [], [(0, 1, 2, 3)])
+bpy.context.scene.collection.objects.link(bpy.data.objects.new('ramp', mesh))
+mesh = bpy.data.meshes.new('mesa')
+mesh.from_pydata([(50, -50, 100), (150, -50, 100), (150, 50, 100), (50, 50, 100)], [], [(0, 1, 2, 3)])
+bpy.context.scene.collection.objects.link(bpy.data.objects.new('mesa', mesh))
+"""
+
+  async def steps(session):
+    await buildGroundScene(session)
+    await session.expectSuccess("runPython", {"code": rampCode})
+    _, description = await session.expectImage("renderView", {"view": {"map": {"center": [0, 0], "width": 400}}, "shading": "layout", "bandHeight": 5})
+    pixels = await session.expectSuccess("runPython", {"code": f"""
+image = bpy.data.images.load(r'{description['outputPath']}')
+width, height = image.size
+unitsPerPixel = {description['unitsPerPixel']}
+column = int(round(width / 2 + 125 / unitsPerPixel))
+def brightness(x):
+  row = int(round(height / 2 - x / unitsPerPixel))
+  index = ((height - 1 - row) * width + column) * 4
+  return sum(image.pixels[index:index + 3])
+result = [brightness(10 * band) for band in range(1, 10)]
+"""})
+    return description, pixels["result"]
+
+  description, brightness = stageBlenderServer.session(steps)
+  assert description["heightRange"] == [0.0, 100.0]
+  # Every other band is a shade darker: odd bands (5, 15, ... high) darker than the even ones either side of them.
+  for band, (lower, upper) in enumerate(zip(brightness, brightness[1:]), start=1):
+    assert (lower < upper) == (band % 2 == 1), (band, brightness)
+    assert abs(upper - lower) / max(upper, lower) > 0.03, (band, brightness)
+
+
 def testSyncStopsAnIdleBridgeButRefusesUnsavedChanges(freshBlenderServer):
   async def steps(session):
     await session.expectSuccess("runPython", {"code": "bpy.data.objects.new('marker', None)"})

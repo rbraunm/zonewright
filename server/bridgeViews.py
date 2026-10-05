@@ -64,6 +64,8 @@ skyImageHeight = 1024
 # whatever the zone's sun.
 layoutLightDirection = (0.5, 0.5, 0.7071)
 layoutAmbient = 0.3
+# Layout shading darkens every other height band by this share, so band edges read as contours at any height range.
+layoutStripeShade = 0.15
 # Swim volumes tint a view: cyan for water and magenta for lava, which shows over lava's oranges.
 swimColors = {"water": (0.1, 0.85, 1.0), "lava": (1.0, 0.15, 0.85)}
 swimAlpha = 0.3
@@ -429,10 +431,11 @@ def sceneHeightRange(preview):
   return min(heights), max(heights)
 
 
-def applyLayoutShading(preview, bandHeight, heightColors):
+def applyLayoutShading(preview, bandHeight, heightColors, stripes):
   """Draw every surface unlit in a color for its height across the scene's height range (heightColors: (fraction, RGB) stops),
-  banded every bandHeight units so the band edges read as contours, and darker facing away from the layout light so slopes read;
-  returns that height range."""
+  banded every bandHeight units so the band edges read as contours (with stripes, every other band a shade darker, so they read where
+  the scene's range is so tall a band's color barely differs from the next, as in a cave under a hill), and darker facing away from the
+  layout light so slopes read; returns that height range."""
   if bandHeight <= 0:
     raise ValueError(f"bandHeight must be positive, got {bandHeight}")
   bottom, top = sceneHeightRange(preview)
@@ -477,6 +480,28 @@ def applyLayoutShading(preview, bandHeight, heightColors):
   links.new(lit.outputs["Value"], shade.inputs[0])
   shade.inputs[1].default_value = 1 - layoutAmbient
   shade.inputs[2].default_value = layoutAmbient
+  if stripes:
+    bandIndex = nodes.new("ShaderNodeMath")
+    bandIndex.operation = "DIVIDE"
+    links.new(banded.outputs["Value"], bandIndex.inputs[0])
+    bandIndex.inputs[1].default_value = bandHeight
+    whole = nodes.new("ShaderNodeMath")
+    whole.operation = "ROUND"
+    links.new(bandIndex.outputs["Value"], whole.inputs[0])
+    parity = nodes.new("ShaderNodeMath")
+    parity.operation = "FLOORED_MODULO"
+    links.new(whole.outputs["Value"], parity.inputs[0])
+    parity.inputs[1].default_value = 2.0
+    striped = nodes.new("ShaderNodeMath")
+    striped.operation = "MULTIPLY_ADD"
+    links.new(parity.outputs["Value"], striped.inputs[0])
+    striped.inputs[1].default_value = -layoutStripeShade
+    striped.inputs[2].default_value = 1.0
+    darkened = nodes.new("ShaderNodeMath")
+    darkened.operation = "MULTIPLY"
+    links.new(shade.outputs["Value"], darkened.inputs[0])
+    links.new(striped.outputs["Value"], darkened.inputs[1])
+    shade = darkened
   shaded = nodes.new("ShaderNodeVectorMath")
   shaded.operation = "SCALE"
   links.new(ramp.outputs["Color"], shaded.inputs[0])
@@ -648,7 +673,7 @@ def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, b
     if shading == "coverage":
       description["coverage"] = bridgeExportChecks.drawCoverage(preview)
     elif shading in ("layout", "relief"):
-      description["heightRange"] = list(applyLayoutShading(preview, bandHeight, layoutHeightColors if shading == "layout" else reliefHeightColors))
+      description["heightRange"] = list(applyLayoutShading(preview, bandHeight, layoutHeightColors if shading == "layout" else reliefHeightColors, shading == "layout"))
       description["bandHeight"] = bandHeight
     preview.scene.render.filepath = outputPath
     start = time.perf_counter()

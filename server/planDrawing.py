@@ -296,8 +296,10 @@ def boundaryLabelSpot(frame, boundary):
 
 
 def drawCaves(draw, frame, caves):
-  """Caves' runs in plan: their walls at floor height, their middles dotted, their floor strokes' outlines, and their junctions."""
-  for cave in caves:
+  """Caves' runs in plan, lowest floor first, each over a pale floor of its own, so a run passing over another hides what lies under it
+  as a level over a level: their walls at floor height, their middles dotted, their floor strokes' outlines, and their junctions."""
+  for cave in sorted(caves, key=lambda cave: cave["meanFloor"]):
+    draw.polygon([frame.pixel(point) for point in cave["left"] + cave["right"][::-1]], fill=caveFloorFill)
     for stroke in cave["strokes"]:
       points = [frame.pixel(point) for point in stroke["outline"]]
       if stroke["kind"] == "rough":
@@ -506,6 +508,8 @@ entranceMarkSection = 10
 crossingMark = 5
 bendColor = (70, 70, 160)
 caveColor = (120, 40, 140)
+# A run's floor in plan: pale enough that the relief reads through it, opaque enough that a run under it fades.
+caveFloorFill = (246, 242, 248, 150)
 strokeColors = {"level": (30, 150, 60), "pad": (220, 120, 0), "rough": (130, 90, 60)}
 strokeWidth = 5
 # A cave's profile stacks one panel per run, each at most this tall (and at least the shorter), a few pixels apart.

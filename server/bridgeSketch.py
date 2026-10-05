@@ -536,7 +536,7 @@ def offsetLine(samples, offsets):
 
 def planCaves():
   """The caves' runs in plan (bridgeCaves.caveGuides): each run's walls at floor height, its floor height at each path point, its
-  junctions, the outlines of its floor strokes, and its name."""
+  junctions, the outlines of its floor strokes, its name, and its mean floor height (runs are drawn lowest first)."""
   drawn = []
   for guide in bridgeCaves.caveGuides():
     for run in guide["runs"]:
@@ -559,7 +559,7 @@ def planCaves():
         "cave": guide["cave"], "run": run["run"], "label": guide["cave"] + ("" if run["run"] == bridgeCaveRuns.mainRun else f" {run['run']}"),
         "left": numpy.round(offsetLine(samples, -halves), 2).tolist(), "right": numpy.round(offsetLine(samples, halves), 2).tolist(),
         "middle": numpy.round(samples[:, :2], 2).tolist(), "floors": [{"at": roundPoint(spot[:2]), "floor": rounded(spot[2], 1)} for spot in spots],
-        "junction": roundPoint(samples[0, :2]) if run["from"] is not None else None, "strokes": strokes,
+        "junction": roundPoint(samples[0, :2]) if run["from"] is not None else None, "strokes": strokes, "meanFloor": rounded(float(samples[:, 2].mean()), 2),
       })
   return drawn
 

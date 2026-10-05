@@ -623,6 +623,27 @@ def unbrokenTube(definition, rows):
   return {"vertices": vertices, "faces": orientedOutward(vertices, faces), "spans": spans, "bands": bands, "vertexRows": vertexRows, "sections": sections}
 
 
+def surfaceCoordinates(sections, rows, total):
+  """Where each of a tube's vertices lies on its surface unrolled, for mapping its walls and vault (mapLining): how far along the run its
+  row stands (the centerline's distance along it, so every line of the section shares it and nothing shears after a bend; over a rounded
+  end, each line's own distance on from the run's end, as the end closes), and how far round the section it stands from the floor's
+  left corner, in world units on the unbroken section (rows x points); with the whole way round its row's section, where the face
+  closing the section back to the floor's corner takes it up again; NaN for the vertices a rounded or flat end adds (total vertices in
+  all)."""
+  count, size = sections.shape[:2]
+  lines = numpy.concatenate([numpy.zeros((1, size)), numpy.cumsum(numpy.linalg.norm(numpy.diff(sections, axis=0), axis=2), axis=0)])
+  own = numpy.flatnonzero(rows["scales"] == 1.0)
+  along = numpy.repeat(rows["alongs"][:, None], size, axis=1).astype(numpy.float64)
+  first, last = own[0], own[-1]
+  along[:first] = rows["alongs"][first] - (lines[first] - lines[:first])
+  along[last + 1:] = rows["alongs"][last] + (lines[last + 1:] - lines[last])
+  around = numpy.concatenate([numpy.zeros((count, 1)), numpy.cumsum(numpy.linalg.norm(numpy.diff(sections, axis=1), axis=2), axis=1)], axis=1)
+  whole = around[:, -1] + numpy.linalg.norm(sections[:, 0] - sections[:, -1], axis=1)
+  coordinates = numpy.full((total, 3), numpy.nan)
+  coordinates[:count * size] = numpy.column_stack([along.ravel(), around.ravel(), numpy.repeat(whole, size)])
+  return coordinates
+
+
 def surfaceTree(vertices, faces):
   return mathutils.bvhtree.BVHTree.FromPolygons(numpy.asarray(vertices).tolist(), [list(face) for face in faces])
 
@@ -697,7 +718,10 @@ def brokenTube(definition, worked, rows, unbroken, surface, junctionTrees):
   for row in range(count - 1):
     for index in range(min(floorCount, size)):
       faceMaterials[row * size + index] = strokeMaterials[row][index]
-  return {"vertices": vertices, "faces": orientedOutward(vertices, faces), "spans": spans, "bands": bands, "vertexRows": vertexRows, "materials": faceMaterials}
+  return {
+    "vertices": vertices, "faces": orientedOutward(vertices, faces), "spans": spans, "bands": bands, "vertexRows": vertexRows, "materials": faceMaterials,
+    "coordinates": surfaceCoordinates(sections, rows, len(vertices)),
+  }
 
 
 def relieved(definition, worked, rows, sections, vertices, surface):
@@ -997,12 +1021,13 @@ def requireRockBetweenRuns(definition, worked, tubes, trees, junctions):
 
 
 def combinedTube(tubes):
-  """The runs' tubes as one: vertices, faces, spans (rows numbered across the runs), bands, stroke materials, each vertex's row, and each
-  row's floor height."""
-  vertices, faces, spans, bands, materials, vertexRows, floors = [], [], [], [], [], [], []
+  """The runs' tubes as one: vertices, faces, spans (rows numbered across the runs), bands, stroke materials, each vertex's row, each
+  row's floor height, and each vertex's place on its tube's surface unrolled (surfaceCoordinates)."""
+  vertices, faces, spans, bands, materials, vertexRows, floors, coordinates = [], [], [], [], [], [], [], []
   vertexOffset = rowOffset = 0
   for tube in tubes.values():
     vertices.append(tube["vertices"])
+    coordinates.append(tube["coordinates"])
     faces += [tuple(index + vertexOffset for index in face) for face in tube["faces"]]
     spans.append(tube["spans"] + rowOffset)
     bands.append(tube["bands"])
@@ -1013,7 +1038,7 @@ def combinedTube(tubes):
     rowOffset += len(tube["rows"]["floors"])
   return {
     "vertices": numpy.vstack(vertices), "faces": faces, "spans": numpy.vstack(spans), "bands": numpy.concatenate(bands), "materials": materials,
-    "vertexRows": numpy.concatenate(vertexRows), "floors": numpy.concatenate(floors),
+    "vertexRows": numpy.concatenate(vertexRows), "floors": numpy.concatenate(floors), "coordinates": numpy.vstack(coordinates),
     "shortestStretch": min(tube["rows"]["shape"]["shortestStretch"] for tube in tubes.values()),
   }
 
@@ -1874,9 +1899,12 @@ def requireSealed(caveFaces, pointOf):
 
 def mapLining(editor, faces, pointOf, definition, tube, tubeLayer):
   """Map lining faces from where they stand, as their UVs and, where the layers map transitions, as their base mapping with no
-  transition of their own: box-mapped at worldUnitsPerRepeat, as projectUVs maps a face along its normal's largest axis; a trim band's
-  faces along the band, u along their box axis and v up from the band's bottom edge (over the floor where the face lies), at the band's
-  repeat, so a strip texture runs once up the band. Returns how many faces each band has."""
+  transition of their own, at worldUnitsPerRepeat: the floor from above, as projectUVs maps it; the walls and vault by where they lie on
+  their tube's surface unrolled (tubeCoordinates: u along the tube, v round its section), so the texture runs along the walls round a
+  bend and up over the vault, without the seams and smears box mapping leaves where a curved surface turns from one axis to the next; a
+  face of a rounded or flat end box-mapped along its normal's largest axis; a trim band's faces along the band, u along their box axis
+  and v up from the band's bottom edge (over the floor where the face lies), at the band's repeat, so a strip texture runs once up the
+  band. Returns how many faces each band has."""
   uvLayer = editor.loops.layers.uv[bridgeSurfacing.uvLayerName]
   vectors = editor.loops.layers.float_vector
   base = vectors.get(bridgeSurfacing.baseMappingName)
@@ -1888,7 +1916,11 @@ def mapLining(editor, faces, pointOf, definition, tube, tubeLayer):
     normal = numpy.abs(numpy.cross(points[1] - points[0], points[2] - points[0]))
     tubeFace = face[tubeLayer]
     band = int(tube["bands"][tubeFace])
-    if band < 0:
+    facing = numpy.cross(points[1] - points[0], points[2] - points[0])
+    unrolled = tubeCoordinates(points, tube, tubeFace)
+    if band < 0 and facing[2] <= floorNormalZ * numpy.linalg.norm(facing) and unrolled is not None:
+      uvs = unrolled / definition["worldUnitsPerRepeat"]
+    elif band < 0:
       uvs = points @ boxAxes[int(normal.argmax())].T / definition["worldUnitsPerRepeat"]
     else:
       trim = definition["trimBands"][band]
@@ -1902,6 +1934,27 @@ def mapLining(editor, faces, pointOf, definition, tube, tubeLayer):
       for layer in transitions:
         loop[layer] = (math.nan, math.nan, math.nan)
   return bandFaces
+
+
+def tubeCoordinates(points, tube, tubeFace):
+  """Where points of the lining that came from one face of the tube lie on its surface unrolled (surfaceCoordinates), from where each
+  lies on the face's own triangles; None for a face of an end, which has none."""
+  corners = numpy.array(tube["faces"][tubeFace])
+  values = tube["coordinates"][corners]
+  if numpy.isnan(values).any():
+    return None
+  values = values[:, :2].copy()
+  whole = tube["coordinates"][corners, 2]
+  if values[:, 1].max() - values[:, 1].min() > whole.max() / 2:
+    values[:, 1] = numpy.where(values[:, 1] < whole / 2, values[:, 1] + whole, values[:, 1])
+  positions = tube["vertices"][corners]
+  triangles = [[0, position, position + 1] for position in range(1, len(corners) - 1)]
+  triangles = [triangle for triangle in triangles if not isFlat(positions[triangle])]
+  if not triangles:
+    return None
+  weights = [barycentric(points, positions[triangle]) for triangle in triangles]
+  best = numpy.argmax(numpy.column_stack([weight.min(axis=1) for weight in weights]), axis=1)
+  return numpy.array([weights[choice][index] @ values[triangles[choice]] for index, choice in enumerate(best.tolist())])
 
 
 def liningFloors(points, tube, tubeFace):
