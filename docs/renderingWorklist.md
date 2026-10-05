@@ -24,7 +24,7 @@ Blender-built zones drawn as the client would draw them depend on these.
 
 ## Next: matching client zones in calibration
 
-6. **Load-time light of placed objects.** A classic zone's placed static objects without colors of their own get colors the client computes once the zone has loaded, from the zone's lights and the share of scene light of the floor beneath them ([clientRendering.md](clientRendering.md#placements-and-their-vertex-light)); EQG objects whose baked light doesn't fit seem to get the same. The preview draws them with the mesh's own vertex light (or none) and the import counts them (`placementsLitAtLoadNotDrawn`). A reading of the traced rules matches the RoF2 dump of the Plane of Knowledge in every alpha but drops lights the client drops for a reason not yet found; the dump's color hashes check a fix.
+6. **Load-time light of placed objects.** A classic zone's placed static objects without colors of their own draw with the colors the client computes once the zone has loaded ([clientRendering.md](clientRendering.md#placements-and-their-vertex-light)), matching ten zones' RoF2 dumps in 99% of first colors; for 70 of 6548 the drop finds a different floor than the client's, for a reason not found. EQG objects whose baked light doesn't fit seem to get the same light (the Guild Lobby's, alpha `0x19`) and still draw with none.
 7. **Character lighting.** Spawns are lit like zone meshes; the client lights them with the `SkinMesh*` effects, not yet read.
 8. **Equipment.** NPCs and players draw without equipment (Luclin bodies show bare skin); Drakkin armor pieces and layers are not drawn either. The recordings carry each spawn's equipment and armor colors.
 9. **Levels of detail.** The client switches `.lod` models by distance (for example `OBJ_pinetree` 100, 200, 500, 5000 units); every object draws at full detail.
@@ -34,7 +34,7 @@ Blender-built zones drawn as the client would draw them depend on these.
 13. **Scene light sources.** The special ambient's fade (the value the player's actor gives, vtable `0xf0`) and the second special ambient source (scene graph vtable `0xd0`); previews draw a character without infravision or ultravision, whose ambient floors differ (clientRendering.md, Where the lighting values come from); the calibration fit folds special ambient into ambient.
 14. **Cover map mips.** D3DX recompresses each generated mip level of a terrain cover map to DXT5; the preview box filters without recompressing.
 15. **Spawn looks not read.** Appearance values some EQG models carry (an ALA's face style and heritage) are refused rather than guessed.
-16. **WLD normals.** The client reads each WLD normal byte through a table in steps of 1/15 ([clientRendering.md](clientRendering.md#zone-files-as-the-renderer-reads-them)); the preview divides by 127.
+16. **WLD normals.** The client reads each WLD normal byte through a table in steps of 1/15 ([clientRendering.md](clientRendering.md#zone-files-as-the-renderer-reads-them)); the preview draws them divided by 127 (the load-time light reads them through the table).
 
 ## Validation
 

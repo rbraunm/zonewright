@@ -19,9 +19,10 @@ import eqRaces
 import eqTerrainTextures
 import eqTextures
 import eqWorldFile
+import loadTimeLight
 import zoneSources
 
-zoneCacheFormat = 10
+zoneCacheFormat = 11
 # A model's vertex light where its file gives none: no baked light and the full share of scene light, an assumption until the client's
 # lighting of EQG objects is traced.
 unlitColor = (0, 0, 0, 255)
@@ -56,9 +57,10 @@ def objectPlacements(objectsFile):
 
 def placementRotation(placement):
   """The rotation a placement gives its object: the tilt about the object's Y axis, then the heading about Z, counter-clockwise from
-  above as a spawn's heading turns it."""
+  above as a spawn's heading turns it. The tilt turns from +Z toward -X, the turn the RoF2 client's actor matrix (CSimpleActor + 0xe4)
+  holds for every tilted placement MQPeridotEmu's dumps record."""
   heading = math.radians(placement["heading"] * 360 / anglesPerTurn)
-  tilt = math.radians(placement["tilt"] * 360 / anglesPerTurn)
+  tilt = -math.radians(placement["tilt"] * 360 / anglesPerTurn)
   aboutZ = numpy.array([[math.cos(heading), -math.sin(heading), 0], [math.sin(heading), math.cos(heading), 0], [0, 0, 1]])
   aboutY = numpy.array([[math.cos(tilt), 0, math.sin(tilt)], [0, 1, 0], [-math.sin(tilt), 0, math.cos(tilt)]])
   return aboutZ @ aboutY
@@ -71,18 +73,15 @@ def placedPart(part, placement, colors=None):
   return part | {"vertices": (part["vertices"] * placement["scale"]) @ rotation.T + placement["position"], "lighting": lighting}
 
 
-def staticPlacementParts(parts, placement, label):
-  """A static actor's parts as its placement draws them, and whether its own colors run short of its vertices. A placement with its own
-  colors gives them to the actor's one mesh by vertex index (EQGraphicsDX9.dll 0x10054630, 0x1008f6d0); one without them gets colors
-  the client computes at load (0x100530f0), which are not drawn yet: it keeps the mesh's own vertex light here. Either way the model
-  then holds baked light, so it takes only the lights marked for baked geometry, which lights.wld never marks (0x1000e45e asks the model,
-  0x10056470). Where its own colors run short, the client reads on past their copy into whatever its memory pool holds next; the
-  vertices past them keep the mesh's own vertex light here."""
-  colors = placement["colors"]
-  if colors is None:
-    return [placedPart(part, placement) | {"takesAllLights": False} for part in parts], False
+def staticPlacementParts(parts, placement, colors, label):
+  """A static actor's parts as its placement draws them with the colors its model holds, and whether those run short of its vertices.
+  The colors are the placement's own, which the model takes by vertex index (EQGraphicsDX9.dll 0x10054630, 0x1008f6d0), or, for a
+  placement without them, those the client computes at load (loadTimeLight). Either way the model holds baked light, so it takes only
+  the lights marked for baked geometry, which lights.wld never marks (0x1000e45e asks the model, 0x10056470). Where a placement's own
+  colors run short, the client reads on past their copy into whatever its memory pool holds next; the vertices past them keep the
+  mesh's own vertex light here."""
   if len(parts) != 1:
-    raise ValueError(f"{label} gives {placement['actor']} its own vertex colors across {len(parts)} meshes; the client's static actor draws one")
+    raise ValueError(f"{label} gives {placement['actor']} vertex colors across {len(parts)} meshes; the client's static actor draws one")
   ownColors = parts[0]["lighting"]["colors"]
   short = len(colors) < len(ownColors)
   drawnColors = numpy.concatenate([colors, ownColors[len(colors):]]) if short else colors[:len(ownColors)]
@@ -182,10 +181,13 @@ def buildClassicZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
   archive = eqArchive.EQArchive(source["archive"])
   worldFile = eqWorldFile.WorldFile(archive.read(f"{zoneName}.wld"), f"{source['archive'].name}:{zoneName}.wld")
   label = f"Zone '{zoneName}'"
+  regionMeshes = worldFile.meshes()
   # A zone's regions take only the lights marked for baked geometry, which lights.wld never marks (EQGraphicsDX9.dll 0x1000db20).
-  parts = [eqModels.wldMeshPart(mesh, {}, colorlessRegionColor) | {"takesAllLights": False} for mesh in worldFile.meshes()]
+  parts = [eqModels.wldMeshPart(mesh, {}, colorlessRegionColor) | {"takesAllLights": False} for mesh in regionMeshes]
   regionMeshCount = len(parts)
   placements = objectPlacements(eqWorldFile.WorldFile(archive.read("objects.wld"), f"{source['archive'].name}:objects.wld")) if "objects.wld" in archive.entries else []
+  floors = loadTimeLight.ShareFloors(regionMeshes, colorlessRegionColor[3])
+  lights = zoneLights(clientRoot, zoneName)
   objectParts, missingModels, objectArchives, placedCounts, particleClouds, colorsIgnored, colorsShort, litAtLoad = {}, set(), [], {}, 0, 0, {}, 0
   for placement in placements:
     actor = placement["actor"]
@@ -215,9 +217,14 @@ def buildClassicZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
       colorsIgnored += placement["colors"] is not None
       parts += [placedPart(part, placement) | {"takesAllLights": True} for part in objectParts[actor]["parts"]]
     else:
-      placedParts, short = staticPlacementParts(objectParts[actor]["parts"], placement, label)
+      colors = placement["colors"]
+      if colors is None:
+        if len(objectParts[actor]["parts"]) != 1:
+          raise ValueError(f"{label} places {actor} without colors across {len(objectParts[actor]['parts'])} meshes; the client lights one at load")
+        colors = loadTimeLight.placedColors(objectParts[actor]["parts"][0], placement, placementRotation(placement), lights, floors)
+        litAtLoad += 1
+      placedParts, short = staticPlacementParts(objectParts[actor]["parts"], placement, colors, label)
       parts += placedParts
-      litAtLoad += placement["colors"] is None
       if short:
         entry = colorsShort.setdefault(actor, {"actor": actor, "vertices": len(placedParts[0]["vertices"]), "colorCounts": [], "placements": 0})
         entry["colorCounts"] = sorted(set(entry["colorCounts"]) | {len(placement["colors"])})
@@ -228,7 +235,7 @@ def buildClassicZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
   return {
     "regionMeshes": regionMeshCount, "placements": len(placements), "placedObjects": sum(placedCounts.values()), "objectArchives": objectArchives,
     "missingModels": sorted(missingModels), "particleCloudsNotDrawn": particleClouds, "placementColorsIgnoredBySkeletalActors": colorsIgnored,
-    "placementColorsShort": [colorsShort[actor] for actor in sorted(colorsShort)], "placementsLitAtLoadNotDrawn": litAtLoad,
+    "placementColorsShort": [colorsShort[actor] for actor in sorted(colorsShort)], "placementsLitAtLoad": litAtLoad,
   } | written
 
 

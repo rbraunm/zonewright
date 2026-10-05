@@ -15,6 +15,7 @@ import eqModels
 import eqRaces
 import eqWorldFile
 import eqZones
+import loadTimeLight
 import zoneGeometry
 import zoneSources
 
@@ -105,12 +106,60 @@ def testPlacementsLightTheirMeshWithTheirOwnVertexColors():
   assert [placement["colors"][0].tolist() for placement in carts] == [[82, 82, 19, 190], [0, 0, 0, 201], [51, 51, 11, 181]]
   parts = eqModels.wldStaticParts(eqArchive.EQArchive(everquestClient / "qeynos_obj.s3d"), classicActor("qeynos_obj.s3d", "CART_ACTORDEF"), {}, None)["parts"]
   assert [len(part["vertices"]) for part in parts] == [168] and all(len(placement["colors"]) == 168 for placement in carts)
-  placed, short = eqZones.staticPlacementParts(parts, carts[1], "Zone 'qeynos'")
+  placed, short = eqZones.staticPlacementParts(parts, carts[1], carts[1]["colors"], "Zone 'qeynos'")
   assert not short and placed[0]["takesAllLights"] is False and numpy.array_equal(placed[0]["lighting"]["colors"], carts[1]["colors"])
-  # Without colors of its own a placement gets colors the client computes at load, not drawn yet: it keeps the mesh's vertex light,
-  # and holding baked light either way it takes no light lights.wld places.
-  bare, _ = eqZones.staticPlacementParts(parts, carts[1] | {"colors": None}, "Zone 'qeynos'")
-  assert bare[0]["takesAllLights"] is False and numpy.array_equal(bare[0]["lighting"]["colors"], parts[0]["lighting"]["colors"])
+
+
+def d3dColors(rgba):
+  rgba = rgba.astype(numpy.uint32)
+  return (rgba[:, 3] << 24) | (rgba[:, 0] << 16) | (rgba[:, 1] << 8) | rgba[:, 2]
+
+
+def fnv1a(values):
+  hashed = 0x811C9DC5
+  for byte in numpy.asarray(values, dtype="<u4").tobytes():
+    hashed = ((hashed ^ byte) * 0x01000193) & 0xFFFFFFFF
+  return hashed
+
+
+@pytest.mark.clientData("clientFiles")
+def testPlacedObjectsWithoutColorsTakeTheLightTheClientGivesThemAtLoad():
+  # Each placement's first color and the FNV-1a hash of all its colors as MQPeridotEmu read them from the RoF2 client: Grimling Forest's
+  # cave rocks take the share of scene light of the cave floor a drop beneath them finds (alpha 0x43 to 0x5b), or the least share, 0.1,
+  # where it finds no visible floor (0x19), and a little light from the zone's lights; the Plane of Knowledge's rock at scale 0.25 is lit
+  # on its unscaled vertices; Crystal Caverns' rock tilted 326/512 of a turn is lit turned the client's way.
+  rocks = {
+    "grimling": [
+      ("LROCK311A_ACTORDEF", (873.13, 1858.009), 0x52000000, 0xA0547C91), ("LROCK311A_ACTORDEF", (867.318, 1856.254), 0x5B0A0A02, 0xC5A9A4A6),
+      ("LROCK311A_ACTORDEF", (862.585, 1880.739), 0x430D0D03, 0x13AF68D4), ("LROCK311A_ACTORDEF", (846.449, 1855.322), 0x5B090902, 0xB4AB71BF),
+      ("LROCK311A_ACTORDEF", (891.251, 1832.583), 0x190D0D03, 0x2DDCF082), ("LROCK311A_ACTORDEF", (929.805, 1863.853), 0x19000000, 0xBAFEFEF8),
+    ],
+    "poknowledge": [("POTRANQROCK505_ACTORDEF", (12.368, 554.238), 0xFE040300, 0xB05EE7F1)],
+    "crystal": [("CCROCK204_ACTORDEF", (-225.812, 839.006), 0x19010203, 0x522B6DA2)],
+  }
+  for zoneName, placed in rocks.items():
+    archive = eqArchive.EQArchive(everquestClient / f"{zoneName}.s3d")
+    floors = loadTimeLight.ShareFloors(eqWorldFile.WorldFile(archive.read(f"{zoneName}.wld"), f"{zoneName}.wld").meshes(), eqZones.colorlessRegionColor[3])
+    lights = eqZones.zoneLights(everquestClient, zoneName)
+    placements = eqZones.objectPlacements(eqWorldFile.WorldFile(archive.read("objects.wld"), "objects.wld"))
+    for actor, (x, y), first, hashed in placed:
+      placement = next(placement for placement in placements if placement["actor"] == actor and abs(placement["position"][0] - x) < 0.01 and abs(placement["position"][1] - y) < 0.01)
+      assert placement["colors"] is None
+      part = eqModels.wldStaticParts(eqArchive.EQArchive(everquestClient / f"{zoneName}_obj.s3d"), classicActor(f"{zoneName}_obj.s3d", actor), {}, None)["parts"][0]
+      colors = d3dColors(loadTimeLight.placedColors(part, placement, eqZones.placementRotation(placement), lights, floors))
+      assert (int(colors[0]), fnv1a(colors)) == (first, hashed), (zoneName, actor, x, y)
+
+
+@pytest.mark.clientData("clientFiles")
+def testATiltedPlacementTurnsAsTheClientsActorMatrixDoes():
+  # Crystal Caverns places CCROCK204 with heading 384 and tilt 326 (512ths of a turn); the RoF2 client's actor holds this matrix (rows
+  # are where +X, +Y, and +Z go; CSimpleActor + 0xe4, read by MQPeridotEmu), which turns the rock's +Z down toward -Y.
+  archive = eqArchive.EQArchive(everquestClient / "crystal.s3d")
+  placements = eqZones.objectPlacements(eqWorldFile.WorldFile(archive.read("objects.wld"), "objects.wld"))
+  rock = next(placement for placement in placements if placement["actor"] == "CCROCK204_ACTORDEF" and abs(placement["position"][0] + 225.812) < 0.01)
+  assert (rock["heading"], rock["tilt"]) == (384, 326)
+  clientRows = numpy.array([[0.0, 0.653173, -0.757209], [1.0, 0.0, 0.0], [0.0, -0.757209, -0.653173]])
+  assert numpy.abs(eqZones.placementRotation(rock).T - clientRows).max() < 1e-5
 
 
 def testPlacementColorsRunningShortLeaveTheRestOfTheMeshItsOwnLight():
@@ -120,7 +169,7 @@ def testPlacementColorsRunningShortLeaveTheRestOfTheMeshItsOwnLight():
   placements = eqZones.objectPlacements(eqWorldFile.WorldFile(archive.read("objects.wld"), "objects.wld"))
   barrel = next(placement for placement in placements if placement["actor"] == "BARRELONSIDE_ACTORDEF")
   parts = eqModels.wldStaticParts(eqArchive.EQArchive(everquestClient / "freportn_obj.s3d"), classicActor("freportn_obj.s3d", "BARRELONSIDE_ACTORDEF"), {}, None)["parts"]
-  placed, short = eqZones.staticPlacementParts(parts, barrel, "Zone 'freportn'")
+  placed, short = eqZones.staticPlacementParts(parts, barrel, barrel["colors"], "Zone 'freportn'")
   colors = placed[0]["lighting"]["colors"]
   assert short and len(barrel["colors"]) == 78 and len(colors) == 81
   assert numpy.array_equal(colors[:78], barrel["colors"]) and numpy.array_equal(colors[78:], parts[0]["lighting"]["colors"][78:])

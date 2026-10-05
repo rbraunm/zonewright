@@ -649,9 +649,10 @@ def wldActor(archive, definition):
 
 
 def wldStaticParts(archive, definition, appearance, context):
+  """A static WLD actor's meshes, each with its bounding sphere (eqWorldFile mesh)."""
   worldFile, actor = wldActor(archive, definition)
-  meshes = [worldFile.fragment(struct.unpack_from("<i", reference.body, 4)[0], 0x36) for reference in actorReferences(worldFile, actor)]
-  return {"parts": [wldMeshPart(worldFile.mesh(meshFragment), {}, colorlessMeshColor) for meshFragment in meshes], "pose": {"static": True}}
+  meshes = [worldFile.mesh(worldFile.fragment(struct.unpack_from("<i", reference.body, 4)[0], 0x36)) for reference in actorReferences(worldFile, actor)]
+  return {"parts": [wldMeshPart(mesh, {}, colorlessMeshColor) | {"boundingSphere": mesh["boundingSphere"]} for mesh in meshes], "pose": {"static": True}}
 
 
 def wldTextureSetSwaps(worldFile, code, textureSet):

@@ -122,9 +122,12 @@ class WorldFile:
 
   def mesh(self, meshFragment):
     """A mesh (0x36). The client takes one UV, normal, and color per vertex from the start of each stored array, leaving any more
-    unread (EQGraphicsDX9.dll 0x1001f630 regions, 0x10057060 objects, 0x1004ad50 skins); an array the file leaves empty is None."""
+    unread (EQGraphicsDX9.dll 0x1001f630 regions, 0x10057060 objects, 0x1004ad50 skins); an array the file leaves empty is None. Its
+    bounding sphere holds the box the file stores about the mesh's center: the box's center and half its diagonal, the radius
+    MQPeridotEmu's dumps show a placed actor holding (+0x144)."""
     body = meshFragment.body
     (_, materialListReference, _, _, _, centerX, centerY, centerZ) = struct.unpack_from("<IiiIIfff", body, 4)
+    boxLow, boxHigh = numpy.array(struct.unpack_from("<3f", body, 52)), numpy.array(struct.unpack_from("<3f", body, 64))
     counts = struct.unpack_from("<10H", body, 76)
     vertexCount, uvCount, normalCount, colorCount, polygonCount, vertexPieceCount, polygonTextureCount, vertexTextureCount, meshOperationCount, scaleShift = counts
     position = 96
@@ -169,6 +172,7 @@ class WorldFile:
       "isPassable": (polygons["flags"] & passablePolygonFlag) != 0,
       "triangleMaterials": polygonMaterials.astype(numpy.int64),
       "materials": self.materialList(materialListReference) if materialListReference > 0 else [],
+      "boundingSphere": {"center": numpy.array((centerX, centerY, centerZ)) + (boxLow + boxHigh) / 2, "radius": float(numpy.linalg.norm(boxHigh - boxLow) / 2)},
     }
 
   def meshes(self):
