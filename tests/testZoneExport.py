@@ -198,6 +198,7 @@ def testExportRefusesEveryHardErrorAtOnceAndKeepsTheLastArchive(stageBlenderServ
     await session.expectSuccess("exportZone", {"path": str(archivePath), "purpose": "test"})
     previous = archivePath.read_bytes()
     uppercase = await session.expectError("exportZone", {"path": str(tmp_path / "TestPlot.eqg"), "purpose": "test"})
+    tooLong = await session.expectError("checkExport", {"path": str(tmp_path / f"{'a' * 32}.eqg"), "purpose": "test"})
     unknownPurpose = await session.expectError("checkExport", {"path": str(archivePath), "purpose": "final"})
     await session.expectSuccess("transformObjects", {"names": ["pillar"], "scale": [1, 2, 1]})
     for name, texture in (("odd", odd), ("stoneOne", stones[0]), ("stoneTwo", stones[1]), ("lost", lost), ("painted", fall)):
@@ -219,10 +220,11 @@ def testExportRefusesEveryHardErrorAtOnceAndKeepsTheLastArchive(stageBlenderServ
     lost.unlink()
     checked = await session.expectSuccess("checkExport", {"path": str(archivePath), "purpose": "test"})
     refused = await session.expectError("exportZone", {"path": str(archivePath), "purpose": "test"})
-    return previous, uppercase, unknownPurpose, unsaved, checked, refused
+    return previous, uppercase, tooLong, unknownPurpose, unsaved, checked, refused
 
-  previous, uppercase, unknownPurpose, unsaved, checked, refused = stageBlenderServer.session(steps)
-  assert "lowercase letters and digits" in uppercase and "purpose is one of ['test', 'game'], got 'final'" in unknownPurpose
+  previous, uppercase, tooLong, unknownPurpose, unsaved, checked, refused = stageBlenderServer.session(steps)
+  assert all("is not a zone short name: 1 to 31 lowercase letters and digits" in refusal for refusal in (uppercase, tooLong))
+  assert "purpose is one of ['test', 'game'], got 'final'" in unknownPurpose
   assert unsaved["failures"][0] == {"failure": "unsaved changes", "message": "Save the file (saveFile): an export writes the zone as saved"}
   # An image made in memory cannot be saved, so only an unsaved file can hold one; its check names it by its image name.
   assert [(failure["failure"], failure["material"], failure["image"], failure["faces"]) for failure in unsaved["failures"] if failure.get("object") == "paintedBox"] == [

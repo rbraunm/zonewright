@@ -18,6 +18,7 @@ import bridgeMeshAccess
 import bridgeObjects
 import bridgeSwim
 import bridgeViews
+import eqgFiles
 from playerScale import playerHeight, walkableNormalZ
 
 entryCollectionName = "entries"
@@ -144,8 +145,8 @@ def requireEntryValues(name, at, headingDegrees, kind, fromZone, fromNumber, iso
   if kind == "zoneIn":
     if fromZone is None:
       raise ValueError("A zoneIn needs fromZone: the short name of the neighbour whose zone line lands players here")
-    if not isinstance(fromZone, str) or not bridgeCommands.shortNamePattern.match(fromZone):
-      raise ValueError(f"fromZone is a zone's short name, 1 to 31 lowercase letters and digits, got {fromZone!r}")
+    if not isinstance(fromZone, str) or not eqgFiles.zoneNamePattern.match(fromZone):
+      raise ValueError(f"fromZone is a zone's short name, {eqgFiles.zoneNameRule}, got {fromZone!r}")
   elif fromZone is not None or fromNumber is not None:
     raise ValueError("fromZone and fromNumber are a zoneIn's: a landing is reached by a port inside the world")
   if fromNumber is not None and (isinstance(fromNumber, bool) or not isinstance(fromNumber, int) or fromNumber < 1):

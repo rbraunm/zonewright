@@ -160,10 +160,11 @@ def testGetEntriesListsDerivedEntriesAndOffFooting(stageBlenderServer, tmp_path)
     await session.expectImage("placeEntry", entryArguments("dock", [100, -100], headingDegrees=0, isolated=True))
     await session.expectSuccess("transformObjects", {"names": ["dock"], "translate": [0, 0, 3]})
     listed = await session.expectSuccess("getEntries", {})
-    badName = await session.expectError("setZoneProperties", {"shortName": "entry_plot"})
-    return unnamed, listed, badName
+    badNames = [await session.expectError("setZoneProperties", {"shortName": name}) for name in ("entry_plot", "a" * 32)]
+    longTarget = await session.expectError("placeZoneLine", {"number": 6, "label": "far", "minimum": [0, 300, -5], "maximum": [20, 320, 40], "target": otherZone | {"zone": "a" * 32}})
+    return unnamed, listed, badNames, longTarget
 
-  unnamed, listed, badName = stageBlenderServer.session(steps)
+  unnamed, listed, badNames, longTarget = stageBlenderServer.session(steps)
   # Without the zone's short name no zone line can be told to lead back into it.
   assert [entry["kind"] for entry in unnamed["entries"]] == ["safePoint", "plotEntrance"]
   assert [line["zoneLine"] for line in unnamed["notFollowed"]] == ["ATP_2_loop", "ATP_3_kept", "ATP_4_away"]
@@ -179,7 +180,9 @@ def testGetEntriesListsDerivedEntriesAndOffFooting(stageBlenderServer, tmp_path)
     {"name": "101 Test Street", "kind": "plotEntrance", "at": [0.0, 50.0, 0.0], "headingDegrees": 180.0, "source": "plot 101 Test Street", "state": "onFooting"},
   ]
   assert listed["notFollowed"] == [{"zoneLine": "ATP_3_kept", "why": "its target keeps the player's own x, so where it lands is not one point"}]
-  assert "shortName is 1 to 31 lowercase letters and digits" in badName
+  # One rule names a zone, for the zone's own short name, a zone line's target, and an export's archive (testZoneExport).
+  assert all("shortName is 1 to 31 lowercase letters and digits" in badName for badName in badNames)
+  assert "target zone is a zone short name, 1 to 31 lowercase letters and digits" in longTarget
 
 
 def triangleCorners(archivePath, zoneName):

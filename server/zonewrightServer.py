@@ -31,6 +31,7 @@ import eqCubeMaps
 import eqEmitterDefinitions
 import eqEmitters
 import eqgExport
+import eqgFiles
 import eqModels
 import eqRaces
 import eqRecording
@@ -1156,8 +1157,8 @@ def exportTarget(path):
   if not archivePath.is_absolute() or archivePath.suffix != ".eqg" or not archivePath.parent.is_dir():
     raise ToolError(f"'{path}' is not an absolute .eqg path in an existing folder")
   zone = archivePath.stem
-  if not eqgExport.zoneNamePattern.match(zone):
-    raise ToolError(f"Zone name '{zone}' must be lowercase letters and digits, as the client's zone short names are")
+  if not eqgFiles.zoneNamePattern.match(zone):
+    raise ToolError(f"Zone name '{zone}' is not a zone short name: {eqgFiles.zoneNameRule}")
   return archivePath, zone
 
 
@@ -2447,8 +2448,8 @@ async def placeZoneLine(context: Context, number: int, label: str, minimum: list
   clockwise; each coordinate and the heading may be "keep" (the player's own). Zone lines sit in gaps of the boundary walls, tint
   views with guides green in every shading, draw green in plans and sections, and export as ATP_ regions; the server's rows are not written yet. A line placed
   with a number already in use replaces that line; adjust a box with transformObjects, remove it with deleteObjects."""
-  if not isinstance(target, dict) or not isinstance(target.get("zone"), str) or not eqgExport.zoneNamePattern.match(target["zone"]):
-    raise ToolError(f"target zone is a zone short name, lowercase letters and digits, got {target.get('zone') if isinstance(target, dict) else target!r}")
+  if not isinstance(target, dict) or not isinstance(target.get("zone"), str) or not eqgFiles.zoneNamePattern.match(target["zone"]):
+    raise ToolError(f"target zone is a zone short name, {eqgFiles.zoneNameRule}, got {target.get('zone') if isinstance(target, dict) else target!r}")
   return await callBridge(context, "placeZoneLine", {"number": number, "label": label, "minimum": minimum, "maximum": maximum, "target": target})
 
 

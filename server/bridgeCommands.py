@@ -4,7 +4,6 @@ import io
 import json
 import math
 import os
-import re
 
 import bpy
 
@@ -34,6 +33,7 @@ import bridgeSurfacing
 import bridgeViews
 import bridgeWalls  # registers its kind with bridgeStructures
 import bridgeWater
+import eqgFiles
 import skyDrawing
 from bridgeState import requireNoUnsavedChanges, state
 
@@ -42,8 +42,6 @@ zonePropertyKeys = (
   "ambientColor", "specialAmbientColor", "bounceColor", "sunColor", "sunAzimuthDegrees", "sunElevationDegrees", "fogColor", "fogStart", "fogEnd",
   "fogDensity", "fogOn", "minClip", "maxClip", "newEngineZone", "sky", "safePoint", "underworld", "shortName",
 )
-# The server keeps a short name in char[32], and the client reads text after an underscore as a number.
-shortNamePattern = re.compile(r"^[a-z0-9]{1,31}$")
 # The client raises a lower minimum clip to this (eqgame 0x4c9ee6).
 clientMinimumClip = 50.0
 skyKeys = {"type": str, "weather": str, "hour": int, "minute": int}
@@ -281,8 +279,8 @@ def setZoneProperties(updates):
     raise ValueError(f"maxClip {zone['maxClip']} must be greater than fogStart {zone['fogStart']}: nothing would be drawn far enough to fog")
   if "newEngineZone" in zone and not isinstance(zone["newEngineZone"], bool):
     raise ValueError(f"newEngineZone must be true or false, got {zone['newEngineZone']!r}")
-  if "shortName" in zone and not (isinstance(zone["shortName"], str) and shortNamePattern.match(zone["shortName"])):
-    raise ValueError(f"shortName is 1 to 31 lowercase letters and digits, without an underscore (the client reads what follows one as a number), got {zone['shortName']!r}")
+  if "shortName" in zone and not (isinstance(zone["shortName"], str) and eqgFiles.zoneNamePattern.match(zone["shortName"])):
+    raise ValueError(f"shortName is {eqgFiles.zoneNameRule}, got {zone['shortName']!r}")
   validatePlayerValues(zone)
   bpy.context.scene[zonePropertyName] = zone
   return {"zone": readZoneProperties(bpy.context.scene), "replacedBySky": replaced}
