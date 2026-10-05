@@ -592,11 +592,13 @@ def requireFrame(frame):
   return frame
 
 
-def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes, labels, emitters, frame=None):
+def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes, labels, emitters, frame=None, carriedLight=None):
   """Render a view; in client shading the zone's point lights and emitters are drawn too (emitters: the server's prepared emitter
-  assets, or None without a client)."""
+  assets, or None without a client), and the light the view's character carries (a clientPointLights.carriedLight record, or None)."""
   if shading not in viewShadings:
     raise ValueError(f"shading must be one of {list(viewShadings)}, got '{shading}'")
+  if carriedLight is not None and shading != "client":
+    raise ValueError(f"A carried light draws only in client shading, not '{shading}'")
   if frame is not None and ("map" in view or "camera" in view):
     raise ValueError("A frame is set for an eye, standAt, or frame view; a map keeps the preview's frame and a review camera its own")
   # A map, or a drawing for reading shape, coverage, or values, is neither fogged nor has a sky.
@@ -612,7 +614,7 @@ def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, b
     if labels is not None or shading in valueShadings:
       description |= bridgeShadings.prepareView(preview, shading, labels, os.path.splitext(outputPath)[0] + "_pass.exr")
     if shading == "client":
-      description["pointLights"] = bridgePointLights.applyPointLights(preview, sourceScene)
+      description["pointLights"] = bridgePointLights.applyPointLights(preview, sourceScene, [] if carriedLight is None else [carriedLight])
       description["emitters"] = bridgeEmitterDrawing.drawEmitters(preview, sourceScene, emitters)
     if shading == "coverage":
       description["coverage"] = bridgeExportChecks.drawCoverage(preview)

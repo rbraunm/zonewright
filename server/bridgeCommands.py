@@ -33,7 +33,7 @@ from bridgeState import requireNoUnsavedChanges, state
 zonePropertyName = "zonewrightZone"
 zonePropertyKeys = (
   "ambientColor", "specialAmbientColor", "bounceColor", "sunColor", "sunAzimuthDegrees", "sunElevationDegrees", "fogColor", "fogStart", "fogEnd",
-  "fogDensity", "fogOn", "minClip", "maxClip", "newEngineZone", "sky", "safePoint", "underworld",
+  "fogDensity", "fogOn", "minClip", "maxClip", "newEngineZone", "sky", "safePoint", "underworld", "zoneId",
 )
 # The client raises a lower minimum clip to this (eqgame 0x4c9ee6).
 clientMinimumClip = 50.0
@@ -272,6 +272,8 @@ def setZoneProperties(updates):
     raise ValueError(f"maxClip {zone['maxClip']} must be greater than fogStart {zone['fogStart']}: nothing would be drawn far enough to fog")
   if "newEngineZone" in zone and not isinstance(zone["newEngineZone"], bool):
     raise ValueError(f"newEngineZone must be true or false, got {zone['newEngineZone']!r}")
+  if "zoneId" in zone and (isinstance(zone["zoneId"], bool) or not isinstance(zone["zoneId"], int) or zone["zoneId"] < 0):
+    raise ValueError(f"zoneId is the zone header's ZoneID, a whole number from 0, got {zone['zoneId']!r}")
   validatePlayerValues(zone)
   bpy.context.scene[zonePropertyName] = zone
   return {"zone": readZoneProperties(bpy.context.scene), "replacedBySky": replaced}
@@ -290,8 +292,8 @@ def previewZone(sky):
   return zone | sky["environment"] if sky is not None else zone
 
 
-def renderView(view, outputPath, figureModel, shading, bandHeight, guides, sky, swimVolumes, labels, emitters, frame=None):
-  return bridgeViews.renderView(bpy.context.scene, previewZone(sky), sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes, labels, emitters, frame)
+def renderView(view, outputPath, figureModel, shading, bandHeight, guides, sky, swimVolumes, labels, emitters, frame=None, carriedLight=None):
+  return bridgeViews.renderView(bpy.context.scene, previewZone(sky), sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes, labels, emitters, frame, carriedLight)
 
 
 def pick(view, pixel, sky):

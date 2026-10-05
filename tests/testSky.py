@@ -40,6 +40,22 @@ def testAZoneWithoutItsOwnSkyGetsTheDefaultSkyAndItsLight(tmp_path):
   assert numpy.load(sun["textures"][0]["path"]).shape == (256, 256, 4)
 
 
+def testTheMoonLightsTheSceneBefore555AndAfter1820WithTheAmbientRaisedToTheFloor(tmp_path):
+  assert [eqSky.lightsByMoon(hour, minute) for hour, minute in ((5, 54), (5, 55), (18, 20), (18, 21))] == [True, False, False, True]
+  night = eqSky.skyState(clientRoot, tmp_path, {"type": "default", "hour": 1, "minute": 0})
+  assert night["lightFrom"] == "moon"
+  assert night["environment"]["sunColor"] == [round(int(value) / 255, 4) for value in colorMapPixel("ColorMap-DefaultNight.dds", 1, 31)[:3]]
+  assert night["environment"]["bounceColor"] == [round(int(value) / 255, 4) for value in colorMapPixel("ColorMap-DefaultNight.dds", 29, 31)[:3]]
+  # The night map's ambient is black; eqgame.exe raises it to the 0.08 of a character without infravision or ultravision.
+  assert colorMapPixel("ColorMap-DefaultNight.dds", 3, 31)[:3].tolist() == [0, 0, 0]
+  assert night["environment"]["ambientColor"] == [0.08, 0.08, 0.08]
+  # The moon stands opposite the sun, which at 1:00 is 15 degrees past the nadir toward -Y.
+  assert night["environment"]["sunAzimuthDegrees"] == 0.0 and night["environment"]["sunElevationDegrees"] == 75.0
+  # At 18:10 the sun, below the horizon, still lights the scene.
+  dusk = eqSky.skyState(clientRoot, tmp_path, {"type": "default", "hour": 18, "minute": 10})
+  assert dusk["lightFrom"] == "sun" and dusk["environment"]["sunElevationDegrees"] == -2.5
+
+
 def testAColorSetCrossFadesInEightBitsInsideATransition(tmp_path):
   # DefaultClear's day map starts at 0.279999 of a day and fades in over 0.019989: 6:50 is 310 of its 1309 65536ths in, weight 60.
   state = eqSky.skyState(clientRoot, tmp_path, {"type": "default", "weather": "DefaultClear", "hour": 6, "minute": 50})
