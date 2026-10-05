@@ -431,7 +431,7 @@ async def getZoneNotes(context: Context, zone: str, text: str | None = None):
   if not zoneSurvey.brewallMapPaths(clientRoot, zoneName):
     raise ToolError(f"No Brewall map files for zone '{zone}' in {clientRoot / 'maps' / 'Brewall'}")
   try:
-    variant = eqZones.drawnVariant(clientRoot, zoneName)[0]
+    variant = zoneSources.loadedVariant(clientRoot, zoneName)[0]
   except ValueError as error:
     raise ToolError(f"Zone '{zone}' has Brewall maps, but its labels cannot be placed against the zone: {error}") from error
   surveys, _ = await anyio.to_thread.run_sync(zoneSurvey.surveyMeasured, clientRoot, toolingRoot, [zoneName], ["dimensions"], progressReporter(context))
@@ -971,17 +971,24 @@ async def importZone(context: Context, zone: str, collection: str | None = None)
   "<zone> zone lines", as placeZoneLine makes them, named as the zone file names them (the number the client reads from the name) and
   turned about Z as it turns them, with no target (the zone file never says where one leads; the server's zone points do); getZoneLines
   lists them and plans and views draw them. Those with a tilt field set, whose reading is untraced, are listed in zoneLinesTilted, not
-  placed. A classic or EQ terrain zone's zone lines are not read (zoneLines None)."""
+  placed. A classic or EQ terrain zone's zone lines are not read (zoneLines None). Lights of radius 0, which light nothing in the client,
+  are left out and named in lightsOfRadiusZero; files beside the zone that the client never opens (a Luclin zone's <zone>.dat) are named
+  in filesTheClientNeverOpens."""
   placed = await placeZone(context, zone, collection)
   clientRoot = zoneSources.resolveClientRoot()
   try:
     lights = await anyio.to_thread.run_sync(eqZones.zoneLights, clientRoot, zone)
     emitters = readEmitterList(eqEmitters.emitterListPath(clientRoot, zone))
     zoneLines = await anyio.to_thread.run_sync(eqZones.zoneLines, clientRoot, zone)
+    unreadFiles = eqZones.unreadZoneFiles(clientRoot, zone)
   except ValueError as error:
     raise ToolError(str(error)) from error
-  environment = await placeZoneEnvironment(context, zone, lights, emitters, "zone")
-  return placed | environment | (await placeZoneLineGuides(context, zone, zoneLines, "zone") if zoneLines is not None else {"zoneLines": None, "zoneLinesTilted": None})
+  drawnLights = None if lights is None else [light for light in lights if not eqZones.lightsNothing(light)]
+  radiusZero = [light["name"] for light in lights or [] if eqZones.lightsNothing(light)]
+  environment = await placeZoneEnvironment(context, zone, drawnLights, emitters, "zone")
+  return placed | environment | {"lightsOfRadiusZero": radiusZero, "filesTheClientNeverOpens": unreadFiles} | (
+    await placeZoneLineGuides(context, zone, zoneLines, "zone") if zoneLines is not None else {"zoneLines": None, "zoneLinesTilted": None}
+  )
 
 
 zoneFileSourceKeys = ("zoneCacheFormat", "modelCacheFormat", "sha256", "textureSources", "lit", "minimum", "maximum")

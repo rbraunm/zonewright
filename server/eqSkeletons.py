@@ -128,10 +128,10 @@ def turnedNormals(normals, transform):
   return turned / numpy.maximum(numpy.linalg.norm(turned, axis=1, keepdims=True), 1e-12)
 
 
-def posedSkeleton(worldFile, skeletonFragment, skinned, meshArrays, localTransforms=None):
+def posedSkeleton(worldFile, skeletonFragment, skinned, skinArrays, attachedArrays, localTransforms=None):
   """Skinned meshes (0x36 fragments rigged to this skeleton) and the meshes attached to its bones, posed by its bones at localTransforms
-  (the bind pose when None), their normals turned with them; meshArrays turns one posed mesh into its part. Also returns each bone's
-  posed transform by name."""
+  (the bind pose when None), their normals turned with them; skinArrays and attachedArrays turn one posed skin or attached mesh into its
+  part. Also returns each bone's posed transform by name."""
   dags, _ = readSkeleton(worldFile, skeletonFragment)
   worldTransforms = poseSkeleton(dags, bindTransforms(worldFile, dags) if localTransforms is None else localTransforms)
   parts = []
@@ -150,11 +150,11 @@ def posedSkeleton(worldFile, skeletonFragment, skinned, meshArrays, localTransfo
       start += count
     if start != len(posed):
       raise ValueError(f"{worldFile.sourceName}: bone pieces of '{mesh['name']}' cover {start} of {len(posed)} vertices")
-    parts.append(meshArrays(mesh | {"vertices": posed, "normals": turned}))
+    parts.append(skinArrays(mesh | {"vertices": posed, "normals": turned}))
   attached, particleClouds = boneAttachments(worldFile, dags)
   for bone, meshFragment in attached:
     mesh = worldFile.mesh(worldFile.fragment(meshFragment.index, 0x36))
     transform = worldTransforms[bone]
     normals = None if mesh["normals"] is None else turnedNormals(mesh["normals"], transform)
-    parts.append(meshArrays(mesh | {"vertices": mesh["vertices"] @ transform[:3, :3].T + transform[:3, 3], "normals": normals}))
+    parts.append(attachedArrays(mesh | {"vertices": mesh["vertices"] @ transform[:3, :3].T + transform[:3, 3], "normals": normals}))
   return parts, particleClouds, {dag["name"]: transform for dag, transform in zip(dags, worldTransforms)}

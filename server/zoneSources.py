@@ -8,6 +8,7 @@ import eqArchive
 import eqgFiles
 
 listingExtensions = (".s3d", ".eqg", ".zon")
+eqgModelExtensions = (".mod", ".mds", ".ter", ".zon")
 
 
 def resolveClientRoot():
@@ -88,6 +89,21 @@ def zoneVariants(clientRoot, zoneName):
   if zonPath.is_file():
     variants |= looseVariants(clientRoot, zonPath)
   return variants
+
+
+def loadedVariant(clientRoot, zoneName):
+  """The key and source of the variant the client loads for a zone. It tries <zone>.eqg first and, once that loads, opens no classic
+  zone file (eqgame.exe 0x49b3d0-0x49b4d0, the gates at 0x49b9a2 and 0x49c25c); within it a loose <zone>.zon stands over the archive's
+  own (EQGraphicsDX9.dll 0x10066230). The .eqg loads only when one of its model, terrain, or zone files does (0x10065c00), so one
+  holding none leaves the zone to <zone>.s3d: nektulos.eqg, a copy of nektulos.s3d, does."""
+  variants = zoneVariants(clientRoot, zoneName)
+  if not variants:
+    raise ValueError(f"'{zoneName}' is not a zone in {clientRoot}")
+  key = next(key for key in (f"{zoneName}:eqgz:loose", f"{zoneName}:eqgz", f"{zoneName}:eqtzp", f"{zoneName}:wld") if key in variants)
+  archivePath = clientRoot / f"{zoneName}.eqg"
+  if key.endswith(":wld") and archivePath.is_file() and any(name.endswith(eqgModelExtensions) for name in eqArchive.EQArchive(archivePath).entries):
+    raise ValueError(f"Zone '{zoneName}': {archivePath.name} holds models but no zone, which the client would load over {zoneName}.s3d; not read")
+  return key, variants[key]
 
 
 def assetArchivePaths(clientRoot, source):
