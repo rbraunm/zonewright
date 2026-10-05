@@ -44,7 +44,9 @@ heavyGroups = {
   "calibration": {"server/eqCalibration.py", "server/bridgeClientLight.py"},
   "serverMaps": {f"server/{name}.py" for name in ("serverMapFiles", "serverMapDrawing", "eqgFiles", "eqArchive")}
     | {"tests/serverReference.py", "tests/serverReference.json"},
-  "serverNav": {"server/serverNav.py", "server/recastHelper.py", "server/navDrawing.py", "tests/peridotServerFiles.py"} | {f"recastHelper/{name}" for name in (
+  "serverNav": {f"server/{name}.py" for name in (
+    "serverNav", "recastHelper", "serverMapFiles", "eqgFiles", "eqArchive", "navDrawing", "planDrawing", "machineProfile", "toolingManifest", "toolingSync",
+  )} | {"toolingManifest.json", "tests/serverReference.py", "tests/serverReference.json"} | {f"recastHelper/{name}" for name in (
     "CMakeLists.txt", "main.cpp", "helperIO.h", "helperIO.cpp", "navMode.cpp", "inspectMode.cpp",
   )},
   "install": {f"server/{name}.py" for name in (

@@ -357,37 +357,65 @@ def testWaterReaderRefusesTrailingAndMissingBytesAndOtherFormats():
     serverMapFiles.readWater(b"EQEMUWATRR" + water[10:])
 
 
-def testNavReaderRefusesTrailingBytesAZeroTileReferenceOrSizeAndOtherFormats():
+def framedNav(payload, tail=b""):
+  """An EQNAVMESH file around a payload, framed by hand so the encoder's own check does not refuse it first; tail follows the stream."""
+  compressed = zlib.compress(payload) + tail
+  return struct.pack("<9s3I", b"EQNAVMESH", 2, len(compressed), len(payload)) + compressed
+
+
+def testNavReaderAndEncoderRefuseWhatTheServerWouldMisread():
   nav = oneTileNav()
   payload = serverMapFiles.navPayload(nav)
   data = serverMapFiles.navFile(payload)
+  assert data == framedNav(payload)
   decoded = serverMapFiles.readNav(data)
   assert decoded["tiles"][0]["reference"] == 1 and numpy.array_equal(decoded["tiles"][0]["vertices"], nav["tiles"][0]["vertices"])
-  # One tile: the tile count and parameters (32 bytes), its reference and size (8), then its data to the payload's end.
+  # One tile: the tile count and parameters (32 bytes), its reference and size (8), then its data to the payload's end: the 100-byte
+  # header, 3 vertices, 1 polygon, 3 links, 1 detail mesh and 1 detail triangle.
   tileSize = len(payload) - 40
-  assert struct.unpack_from("<Ii", payload, 32) == (1, tileSize)
+  assert struct.unpack_from("<Ii", payload, 32) == (1, tileSize) and tileSize == 100 + 3 * 12 + 32 + 3 * 12 + 12 + 4
+  tileData = payload[40:]
 
-  def withTileEntry(reference, size, tail=b""):
-    return serverMapFiles.navFile(payload[:32] + struct.pack("<Ii", reference, size) + payload[40:] + tail)
-  with pytest.raises(ValueError, match=rf"^the \.nav: the header's {len(data) - 21}-byte stream from byte 21 ends at byte {len(data)}, the file at byte {len(data) + 1}$"):
-    serverMapFiles.readNav(data + b"\0")
-  with pytest.raises(ValueError, match=rf"^the \.nav \(inflated\): 1 bytes follow the 1 tiles, from byte {len(payload)}$"):
-    serverMapFiles.readNav(serverMapFiles.navFile(payload + b"\0"))
-  with pytest.raises(ValueError, match=rf"^the \.nav, tile 0 \(reference 1\): 1 bytes follow the off-mesh connections, from byte {tileSize}$"):
-    serverMapFiles.readNav(withTileEntry(1, tileSize + 1, b"\0"))
-  # The server drops the whole mesh on a zero tile reference or size (pathfinder_nav_mesh.cpp:473-491).
-  for reference, size in ((0, tileSize), (1, 0)):
-    with pytest.raises(ValueError, match=rf"^the \.nav \(inflated\): tile 0 at byte 32 has reference {reference} and size {size}; the server drops the whole mesh"):
-      serverMapFiles.readNav(withTileEntry(reference, size))
-  with pytest.raises(ValueError, match=r"^the \.nav: magic b'EQNAVMESX' at byte 0 is not b'EQNAVMESH'$"):
-    serverMapFiles.readNav(b"EQNAVMESX" + data[9:])
-  with pytest.raises(ValueError, match=r"^the \.nav: version 3 at byte 9 is not 2$"):
-    serverMapFiles.readNav(data[:9] + struct.pack("<I", 3) + data[13:])
+  def withTileEntry(reference, size, data=tileData):
+    return payload[:32] + struct.pack("<Ii", reference, size) + data
+
+  def refusals(brokenPayload):
+    """What the reader says of a file holding the payload, and what the encoder says when asked to write one."""
+    with pytest.raises(ValueError) as reading:
+      serverMapFiles.readNav(framedNav(brokenPayload))
+    with pytest.raises(ValueError) as writing:
+      serverMapFiles.navFile(brokenPayload)
+    return str(reading.value), str(writing.value)
+  negativeCount = bytearray(tileData)
+  struct.pack_into("<i", negativeCount, 48, -1)
+  for brokenPayload, refusal in (
+    (payload + b"\0", f": 1 bytes follow the 1 tiles, from byte {len(payload)}"),
+    (withTileEntry(1, tileSize + 1, tileData + b"\0"), f", tile 0 (reference 1) (0, 0, layer 0) is {tileSize + 1} bytes, but its header's counts make {tileSize}"),
+    # The size agrees with the bytes that follow, but the header counts more: Detour's addTile would read and write past the tile.
+    (withTileEntry(1, 104, tileData[:104]), f", tile 0 (reference 1) (0, 0, layer 0) is 104 bytes, but its header's counts make {tileSize}"),
+    (withTileEntry(1, tileSize, bytes(negativeCount)), ", tile 0 (reference 1) (0, 0, layer 0): its header's boundingVolumeNodeCount is -1, below zero"),
+    # The server drops the whole mesh on a zero tile reference or size (pathfinder_nav_mesh.cpp:473-491).
+    (withTileEntry(0, tileSize), f": tile 0 at byte 32 has reference 0 and size {tileSize}; the server drops the whole mesh on a zero reference or size"),
+    (withTileEntry(1, 0), ": tile 0 at byte 32 has reference 1 and size 0; the server drops the whole mesh on a zero reference or size"),
+  ):
+    assert refusals(brokenPayload) == (f"the .nav (inflated){refusal}", f"the nav payload{refusal}")
   for magic, version in ((0x44414E56, serverMapFiles.detourVersion), (serverMapFiles.detourMagic, 8)):
     foreign = oneTileNav()
     foreign["tiles"][0]["header"] |= {"magic": magic, "version": version}
-    with pytest.raises(ValueError, match=rf"^the \.nav, tile 0 \(reference 1\): magic {magic:#x} and version {version} at byte 0 are not Detour's 0x444e4156 and 7$"):
-      serverMapFiles.readNav(serverMapFiles.navFile(serverMapFiles.navPayload(foreign)))
+    refusal = f", tile 0 (reference 1): magic {magic:#x} and version {version} at byte 0 are not Detour's 0x444e4156 and 7"
+    assert refusals(serverMapFiles.navPayload(foreign)) == (f"the .nav (inflated){refusal}", f"the nav payload{refusal}")
+
+  for brokenFile, refusal in (
+    (data + b"\0", f"the header's {len(data) - 21}-byte stream from byte 21 ends at byte {len(data)}, the file at byte {len(data) + 1}"),
+    (framedNav(payload, b"garbage"), f"7 bytes follow the zlib stream, from byte {len(data)}"),
+    (data[:13] + struct.pack("<I", len(data) - 31) + data[17:-10], "the zlib stream from byte 21 ends before its last block"),
+    (data[:11], "file header at byte 0 needs 21 bytes; 11 remain"),
+    (b"EQNAVMESX" + data[9:], "magic b'EQNAVMESX' at byte 0 is not b'EQNAVMESH'"),
+    (data[:9] + struct.pack("<I", 3) + data[13:], "version 3 at byte 9 is not 2"),
+  ):
+    with pytest.raises(ValueError) as reading:
+      serverMapFiles.readNav(brokenFile)
+    assert str(reading.value) == f"the .nav: {refusal}"
 
 
 def testDrawCollisionShowsTheTopSurfaceAndEachBoxWhereItIs():

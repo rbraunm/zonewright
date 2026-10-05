@@ -26,7 +26,11 @@ waterRecord = struct.Struct("<I12f")
 # gives type 4 for freeporteast.zon's APK_01. awater writes an unknown prefix as Water, and matches case-sensitively (water_map.cpp:258);
 # how the client reads a prefix in another case is untraced. This table refuses both.
 waterRegionTypes = {"AWT_": 1, "ALV_": 2, "ATP_": 3, "APK_": 4}
-waterRegionTypeNames = {0: "Normal", 1: "Water", 2: "Lava", 3: "ZoneLine", 4: "PvP", 5: "Slime", 6: "Ice", 7: "VWater"}
+waterRegionTypeNames = {
+  0: "Normal", 1: "Water", 2: "Lava", 3: "ZoneLine", 4: "PvP", 5: "Slime", 6: "Ice", 7: "VWater", 8: "GeneralArea", 9: "PreferPathing",
+  10: "DisableNavMesh",
+}
+navAreaNames = {0: "Normal", 1: "Water", 2: "Lava", 3: "ZoneLine", 4: "PvP", 5: "Slime", 6: "Ice", 7: "VWater", 8: "GeneralArea", 9: "Portal", 10: "Prefer", 11: "Disabled"}
 navMagic = b"EQNAVMESH"
 navVersion = 2
 navFileHeader = struct.Struct("<9s3I")
@@ -349,22 +353,29 @@ def readWater(data, source="the .wtr"):
 
 
 def readTile(data, index, reference, source):
+  """One Detour tile, its size checked against its header's counts first: Detour's addTile reads and writes by the counts and never
+  checks them against the size."""
   reader = ByteReader(data, f"{source}, tile {index} (reference {reference})")
   values = reader.values(tileHeader, "header")
   header = dict(zip(tileHeaderFields[:18], values[:18])) | {"boundsLow": values[18:21], "boundsHigh": values[21:24], "quantizeFactor": values[24]}
   if header["magic"] != detourMagic or header["version"] != detourVersion:
     raise ValueError(f"{reader.source}: magic {header['magic']:#x} and version {header['version']} at byte 0 are not Detour's {detourMagic:#x} and {detourVersion}")
+  where = f"{reader.source} ({header['x']}, {header['y']}, layer {header['layer']})"
+  negative = [field for field in tileCountFields if header[field] < 0]
+  if negative:
+    raise ValueError(f"{where}: its header's {negative[0]} is {header[negative[0]]}, below zero")
+  expected = tileHeader.size + sum(header[countField] * dtype.itemsize for _, dtype, countField in tileSections)
+  if len(data) != expected:
+    raise ValueError(f"{where} is {len(data)} bytes, but its header's counts make {expected}")
   tile = {"reference": reference, "header": header}
   for key, dtype, countField in tileSections:
     tile[key] = reader.array(dtype, header[countField], key)
-  reader.finish("off-mesh connections")
   return tile
 
 
 def readNav(data, source="the .nav"):
   """A .nav's parameters (dtNavMeshParams) and tiles (Detour DNAV version 7: reference, header, vertices, polygons, links, detail
-  meshes, detail vertices and triangles, bounding-volume nodes and off-mesh connections), decoded to the last byte. A zero tile
-  reference or size is refused, naming the tile: the server drops the whole mesh on one (pathfinder_nav_mesh.cpp:473-491)."""
+  meshes, detail vertices and triangles, bounding-volume nodes and off-mesh connections), decoded to the last byte (readNavPayload)."""
   reader = ByteReader(data, source)
   magic, version, compressedSize, inflatedSize = reader.values(navFileHeader, "file header")
   if magic != navMagic:
@@ -373,7 +384,13 @@ def readNav(data, source="the .nav"):
     raise ValueError(f"{source}: version {version} at byte {len(navMagic)} is not {navVersion}")
   if navFileHeader.size + compressedSize != len(data):
     raise ValueError(f"{source}: the header's {compressedSize}-byte stream from byte {navFileHeader.size} ends at byte {navFileHeader.size + compressedSize}, the file at byte {len(data)}")
-  payload = ByteReader(inflated(data[navFileHeader.size:], inflatedSize, source, navFileHeader.size), f"{source} (inflated)")
+  return readNavPayload(inflated(data[navFileHeader.size:], inflatedSize, source, navFileHeader.size), f"{source} (inflated)")
+
+
+def readNavPayload(data, source):
+  """A nav payload (a .nav's inflated bytes) decoded to the last byte. A zero tile reference or size is refused, naming the tile: the
+  server drops the whole mesh on one (pathfinder_nav_mesh.cpp:473-491)."""
+  payload = ByteReader(data, source)
   tileCount = payload.values(countLayout, "tile count")[0]
   values = payload.values(navParameters, "parameters")
   parameters = {"origin": values[0:3], "tileWidth": values[3], "tileHeight": values[4], "maximumTiles": values[5], "maximumPolygons": values[6]}
@@ -410,6 +427,8 @@ def navPayload(nav):
 
 
 def navFile(payload):
-  """A .nav container: EQNAVMESH, version 2, the compressed and inflated sizes, then the payload deflated."""
+  """A .nav container: EQNAVMESH, version 2, the compressed and inflated sizes, then the payload deflated. The payload is first read as
+  readNav reads it, so no file is written that the reader would refuse."""
+  readNavPayload(payload, "the nav payload")
   compressed = zlib.compress(payload)
   return navFileHeader.pack(navMagic, navVersion, len(compressed), len(payload)) + compressed

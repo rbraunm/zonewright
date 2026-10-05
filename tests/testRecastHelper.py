@@ -1,7 +1,6 @@
 import shutil
 import struct
 import sys
-import zlib
 from pathlib import Path
 
 import numpy
@@ -15,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
 import navDrawing
 import planDrawing
 import recastHelper
+import serverMapFiles
 import serverNav
 
 tileWorldSize = serverNav.serverNavSettings["tileSize"] * serverNav.serverNavSettings["cellSize"]
@@ -37,18 +37,12 @@ def soup(*floors):
 def tileFrames(payload):
   """Each tile's (reference offset, size offset, data start, size) in a nav payload."""
   frames = []
-  offset = serverNav.payloadHeaderBytes
+  offset = serverMapFiles.countLayout.size + serverMapFiles.navParameters.size
   for _ in range(struct.unpack_from("<I", payload, 0)[0]):
     size = struct.unpack_from("<i", payload, offset + 4)[0]
     frames.append((offset, offset + 4, offset + 8, size))
     offset += 8 + size
   return frames
-
-
-def inflatedFile(payload):
-  """An EQNAVMESH file around a payload, framed by hand so the payload is not checked on the way in."""
-  compressed = zlib.compress(payload)
-  return b"EQNAVMESH" + struct.pack("<3I", 2, len(compressed), len(payload)) + compressed
 
 
 def inspectPayload(payload, toolingRoot):
@@ -164,14 +158,14 @@ def testRecastHelperRefusesWhatMapEditDrops(recastToolingRoot):
 def testNavHelperRefusesTrianglesOutsideItsBoundsAndATileDetourCannotCreate(recastToolingRoot):
   ground = floor(0, 40, 0, 40, 0)
   narrowBounds = ([0.0, 0.0, 0.0], [20.0, 0.0, 20.0])
-  narrow = recastHelper.navInput(serverNav.recastFromServer(ground), narrowBounds, [], serverNav.serverNavSettings, 1)
+  narrow = recastHelper.navInput(serverMapFiles.inRecastAxes(ground), narrowBounds, [], serverNav.serverNavSettings, 1)
   with pytest.raises(ToolError, match=r"^recastHelper nav: collidable triangle 0 has a vertex at zone \(40\.00, 0\.00, 0\.00\), outside the nav bounds"
       r" zone \(0\.00, 0\.00, 0\.00\) to zone \(20\.00, 20\.00, 0\.00\); map_edit would drop the triangle$"):
     recastHelper.runHelper(recastToolingRoot, "nav", narrow, noProgress)
 
   # Detour stores at most 6 vertices a polygon, where Recast builds with 7.
   sevenSided = serverNav.serverNavSettings | {"verticesPerPolygon": 7}
-  tooWide = recastHelper.navInput(serverNav.recastFromServer(ground), serverNav.navBounds(ground), [], sevenSided, 1)
+  tooWide = recastHelper.navInput(serverMapFiles.inRecastAxes(ground), serverNav.navBounds(ground), [], sevenSided, 1)
   with pytest.raises(ToolError, match=r"^recastHelper nav: tile \(0, 0\), zone x 0\.0 to 409\.6, y 0\.0 to 409\.6: dtCreateNavMeshData failed$"):
     recastHelper.runHelper(recastToolingRoot, "nav", tooWide, noProgress)
 
@@ -236,50 +230,16 @@ def testInspectFindsIslandsSnapRiskAndProbes(recastToolingRoot):
   ]
 
 
-def testNavFilesAreReadToTheLastByte(recastToolingRoot):
-  navFile, _ = serverNav.navFromCollision(floor(0, 60, 0, 60, 0), [], recastToolingRoot, noProgress)
-  payload = serverNav.navPayload(navFile)
-  ((referenceAt, sizeAt, dataAt, size),) = tileFrames(payload)
-  assert size == 2120
-
-  zeroReference = payload[:referenceAt] + struct.pack("<I", 0) + payload[referenceAt + 4:]
-  zeroSize = payload[:sizeAt] + struct.pack("<i", 0) + payload[sizeAt + 4:]
-  # The size field agrees with the bytes that follow, but the header still counts the tile's 2,120.
-  shortTile = payload[:sizeAt] + struct.pack("<i", 104) + payload[dataAt:dataAt + 104]
-  notDetour = payload[:dataAt] + b"XXXX" + payload[dataAt + 4:]
-  for broken, refusal in (
-    (zeroReference, r"Nav tile 0 has reference 0 and size 2120; the server drops the whole mesh on a zero"),
-    (zeroSize, r"Nav tile 0 has reference \d+ and size 0; the server drops the whole mesh on a zero"),
-    (notDetour, r"Nav tile 0 has magic 0x58585858 and version 7, not Detour's 0x444e4156 and 7"),
-    (shortTile, r"Nav tile 0 \(0, 0, layer 0\) is 104 bytes, but its header's counts make 2120; Detour's addTile would read and write by the counts"),
-  ):
-    with pytest.raises(ToolError, match=rf"^{refusal}$"):
-      serverNav.navContainer(broken)
-    with pytest.raises(ToolError, match=rf"^{refusal}$"):
-      serverNav.navPayload(inflatedFile(broken))
-
-  compressed = zlib.compress(payload)
-  trailing = b"EQNAVMESH" + struct.pack("<3I", 2, len(compressed) + 7, len(payload)) + compressed + b"garbage"
-  with pytest.raises(ToolError, match=rf"^7 bytes follow the \.nav's zlib stream, from byte {len(trailing) - 7}$"):
-    serverNav.navPayload(trailing)
-  cut = navFile[:-10]
-  cut = cut[:13] + struct.pack("<I", len(cut) - 21) + cut[17:]
-  with pytest.raises(ToolError, match=r"^The \.nav's zlib stream from byte 21 ends before its last block$"):
-    serverNav.navPayload(cut)
-  with pytest.raises(ToolError, match=r"^A \.nav of 11 bytes is shorter than its 21-byte header$"):
-    serverNav.navPayload(b"EQNAVMESH\x02\x00")
-
-
 def testInspectRefusesWhatTheServerWouldDrop(recastToolingRoot):
   navFile, _ = serverNav.navFromCollision(soup(floor(0, 60, 0, 60, 0), floor(500, 560, 0, 60, 0)), [], recastToolingRoot, noProgress)
-  payload = serverNav.navPayload(navFile)
+  payload = serverMapFiles.navPayload(serverMapFiles.readNav(navFile))
   (firstReferenceAt, firstSizeAt, firstDataAt, firstSize), (secondReferenceAt, _, _, _) = tileFrames(payload)
   firstReference = struct.unpack_from("<I", payload, firstReferenceAt)[0]
 
   # The helper refuses what the payload's reader refuses on its own, never reading past a tile.
   single = struct.pack("<I", 1) + payload[4:firstDataAt + firstSize]
   polygonCount, vertexCount, linkCount = struct.unpack_from("<3i", single, firstDataAt + 24)
-  linksAt = firstDataAt + serverNav.tileHeader.size + vertexCount * 12 + polygonCount * 32
+  linksAt = firstDataAt + serverMapFiles.tileHeader.size + vertexCount * 12 + polygonCount * 32
   linkless = (single[:firstSizeAt] + struct.pack("<i", firstSize - linkCount * 12) + single[firstDataAt:firstDataAt + 32] + struct.pack("<i", 0)
     + single[firstDataAt + 36:linksAt] + single[linksAt + linkCount * 12:])
   for broken, refusal in (
@@ -297,11 +257,11 @@ def testInspectRefusesWhatTheServerWouldDrop(recastToolingRoot):
   sharedSlot = payload[:secondReferenceAt] + struct.pack("<I", firstReference) + payload[secondReferenceAt + 4:]
   with pytest.raises(ToolError, match=rf"^recastHelper inspect: payload tile 1 with reference {firstReference} fails dtNavMesh::addTile \(status \d+\);"
       r" the server would lose it without a word$"):
-    serverNav.inspectNav(serverNav.navContainer(sharedSlot), None, [], recastToolingRoot, noProgress)
+    serverNav.inspectNav(serverMapFiles.navFile(sharedSlot), None, [], recastToolingRoot, noProgress)
 
   twice = struct.pack("<I", 3) + payload[4:] + payload[firstReferenceAt:firstDataAt + firstSize]
   with pytest.raises(ToolError, match=r"^recastHelper inspect: payload tile 2 with reference \d+ fails dtNavMesh::addTile \(status \d+\); the server would lose it without a word$"):
-    serverNav.inspectNav(serverNav.navContainer(twice), None, [], recastToolingRoot, noProgress)
+    serverNav.inspectNav(serverMapFiles.navFile(twice), None, [], recastToolingRoot, noProgress)
 
 
 def testNavPlansDrawAreasComponentsAndDifferences(recastToolingRoot, tmp_path):

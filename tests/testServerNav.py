@@ -1,17 +1,17 @@
 import collections
-import struct
 import sys
 from pathlib import Path
 
 import numpy
 import pytest
 
-import peridotServerFiles as peridot
+from serverReference import referenceBytes
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
 import machineProfile
 import navDrawing
 import recastHelper
+import serverMapFiles
 import serverNav
 
 pytestmark = pytest.mark.clientData("serverNav")
@@ -19,56 +19,97 @@ pytestmark = pytest.mark.clientData("serverNav")
 highpassSafePoint = (-148.0, -219.0, -24.0)
 # thulehouse2.navprj, the map_edit project Peridot's thulehouse2.nav was built from, lowers its bounds' top by hand to 255.2.
 thulehouseProjectCeiling = numpy.float32(255.2)
-detailCounts = ("detailVertCount", "detailTriCount")
+detailCounts = ("detailVertexCount", "detailTriangleCount")
 
 
 def noProgress(done, of, message):
   pass
 
 
-def peridotInputs(zone):
-  return peridot.mapCollision(peridot.referenceBytes(f"base/{zone}.map")), peridot.waterRecords(peridot.referenceBytes(f"water/{zone}.wtr"))
+def navOfPeridotsFiles(zone, toolingRoot, reportProgress=noProgress):
+  """Our .nav of Peridot's own .map and .wtr for a zone, and the helper's report."""
+  return serverNav.navBytes(referenceBytes(f"base/{zone}.map"), referenceBytes(f"water/{zone}.wtr"), toolingRoot, reportProgress)
+
+
+def tilesByKey(nav):
+  return {(tile["header"]["x"], tile["header"]["y"], tile["header"]["layer"]): tile for tile in nav["tiles"]}
+
+
+def polygonsWithoutLinks(tile):
+  """A tile's vertices and polygons as bytes, each polygon's firstLink cleared: it indexes the tile's link pool, which fills in the order
+  tiles are added."""
+  polygons = tile["polygons"].copy()
+  polygons["firstLink"] = 0
+  return tile["vertices"].tobytes(), polygons.tobytes()
+
+
+def linkSets(nav):
+  """Each polygon's links as a set of (target tile key, target polygon, edge, side, low, high), by (tile key, polygon): the mesh's
+  connectivity, free of the link pool's order and of tile references, which both follow the order tiles were added."""
+  tileBits = nav["parameters"]["maximumTiles"].bit_length() - 1
+  polygonBits = 22 - tileBits
+  tiles = tilesByKey(nav)
+  keyOfSlot = {(tile["reference"] >> polygonBits) & ((1 << tileBits) - 1): key for key, tile in tiles.items()}
+  result = {}
+  for key, tile in tiles.items():
+    for index, polygon in enumerate(tile["polygons"]):
+      found = set()
+      link = int(polygon["firstLink"])
+      while link != 0xFFFFFFFF:
+        entry = tile["links"][link]
+        reference = int(entry["reference"])
+        target = keyOfSlot[(reference >> polygonBits) & ((1 << tileBits) - 1)]
+        found.add((target, reference & ((1 << polygonBits) - 1), int(entry["edge"]), int(entry["side"]), int(entry["low"]), int(entry["high"])))
+        link = int(entry["next"])
+      result[(key, index)] = found
+  return result
+
+
+def detailOf(tile, index):
+  """A polygon's detail mesh: its own detail vertices and its triangles, as bytes."""
+  mesh = tile["detailMeshes"][index]
+  vertexBase, triangleBase = int(mesh["vertexBase"]), int(mesh["triangleBase"])
+  vertices = tile["detailVertices"][vertexBase:vertexBase + int(mesh["vertexCount"])]
+  triangles = tile["detailTriangles"][triangleBase:triangleBase + int(mesh["triangleCount"])]
+  return vertices.tobytes() + triangles.tobytes()
 
 
 def assertTileForTile(ours, report, peridotFile, tileCount, areas, differingDetails):
   """Peridot's tiles matched by their headers' (x, y, layer), never by reference or file order, which record the order map_edit's
   threads finished in."""
-  theirs, mine = peridot.navTiles(peridotFile), peridot.navTiles(ours)
-  assert mine["params"] == theirs["params"]
-  assert sorted(mine["tiles"]) == sorted(theirs["tiles"])
-  assert len(mine["tiles"]) == tileCount
+  theirs, mine = serverMapFiles.readNav(peridotFile, "Peridot's .nav"), serverMapFiles.readNav(ours, "our .nav")
+  assert mine["parameters"] == theirs["parameters"]
+  ourTiles, theirTiles = tilesByKey(mine), tilesByKey(theirs)
+  assert sorted(ourTiles) == sorted(theirTiles)
+  assert len(ourTiles) == tileCount
   differing = 0
-  for key, theirTile in theirs["tiles"].items():
-    ourTile = mine["tiles"][key]
+  for key, theirTile in theirTiles.items():
+    ourTile = ourTiles[key]
     assert {name: value for name, value in ourTile["header"].items() if name not in detailCounts} == {name: value for name, value in theirTile["header"].items() if name not in detailCounts}
-    assert ourTile["sections"]["verts"] == theirTile["sections"]["verts"]
-    # firstLink indexes the tile's link pool, which fills in the order tiles are added; the links are compared as sets below.
-    ourPolygons, theirPolygons = ourTile["polys"].copy(), theirTile["polys"].copy()
-    ourPolygons["firstLink"] = theirPolygons["firstLink"] = 0
-    assert ourPolygons.tobytes() == theirPolygons.tobytes()
-    differing += sum(peridot.detailOf(ourTile, index) != peridot.detailOf(theirTile, index) for index in range(len(ourTile["polys"])))
-  assert peridot.linkSets(mine) == peridot.linkSets(theirs)
-  assert collections.Counter(int(polygon["areaAndType"] & 0x3F) for tile in mine["tiles"].values() for polygon in tile["polys"]) == areas
+    assert polygonsWithoutLinks(ourTile) == polygonsWithoutLinks(theirTile)
+    differing += sum(detailOf(ourTile, index) != detailOf(theirTile, index) for index in range(len(ourTile["polygons"])))
+  assert linkSets(mine) == linkSets(theirs)
+  assert collections.Counter(int(area) for tile in mine["tiles"] for area in tile["polygons"]["areaAndType"] & 0x3F) == areas
   assert report["mostChunksPerTile"] < 512
   # The pinned Recast (EQEmu 710dabe) carries upstream 13dc549, "Improve triangulateHull", which the 2017 copy that built Peridot's navs
-  # lacked: polygons identical, detail triangulation not.
+  # lacked: polygons identical, detail triangulation not. docs/serverFiles.md records both counts.
   assert differing == differingDetails
-  ordered = sorted(mine["tiles"], key=lambda key: (key[1], key[0]))
-  polygonBits = 22 - (struct.unpack_from("<i", mine["params"], 20)[0].bit_length() - 1)
-  assert mine["order"] == ordered
-  assert [mine["tiles"][key]["reference"] for key in ordered] == [(1 << 22) | (index << polygonBits) for index in range(tileCount)]
+  ordered = sorted(ourTiles, key=lambda key: (key[1], key[0]))
+  polygonBits = 22 - (mine["parameters"]["maximumTiles"].bit_length() - 1)
+  assert list(ourTiles) == ordered
+  assert [ourTiles[key]["reference"] for key in ordered] == [(1 << 22) | (index << polygonBits) for index in range(tileCount)]
 
 
 def testNavReproducesHighpassHoldTileForTile(recastToolingRoot):
-  collision, water = peridotInputs("highpasshold")
-  ours, report = serverNav.navFromCollision(collision, water, recastToolingRoot, noProgress)
-  assertTileForTile(ours, report, peridot.referenceBytes("nav/highpasshold.nav"), 28, {0: 7692, 1: 452, 11: 53}, 4709)
+  ours, report = navOfPeridotsFiles("highpasshold", recastToolingRoot)
+  assertTileForTile(ours, report, referenceBytes("nav/highpasshold.nav"), 28, {0: 7692, 1: 452, 11: 53}, 4709)
   assert (report["tilesWide"], report["tilesHigh"], report["tileBits"], report["polygonBits"]) == (5, 9, 6, 16)
   assert serverNav.inspectNav(ours, None, [], recastToolingRoot, noProgress)["polygons"] == 8197
 
 
 def testNavReproducesThulehouse2TileForTile(recastToolingRoot):
-  collision, water = peridotInputs("thulehouse2")
+  collision = serverMapFiles.mapCollision(referenceBytes("base/thulehouse2.map"))
+  water = serverMapFiles.readWater(referenceBytes("water/thulehouse2.wtr"))
   # Peridot's nav was built with its project's bounds, whose top (255.2) lies below the collision's (270.25), so map_edit dropped the two
   # triangles reaching above it, which also set the collision's x and y extents. Exports always take the collidable extents
   # (navFromCollision); to compare, the helper is given the project's bounds and the triangles map_edit kept.
@@ -77,33 +118,27 @@ def testNavReproducesThulehouse2TileForTile(recastToolingRoot):
   kept = collision[(collision[..., 2] <= thulehouseProjectCeiling).all(axis=1)]
   assert len(collision) - len(kept) == 2
   inputBytes = recastHelper.navInput(
-    serverNav.recastFromServer(kept), (low, high), serverNav.navVolumes(water), serverNav.serverNavSettings, machineProfile.workerCount(),
+    serverMapFiles.inRecastAxes(kept), (low, high), serverNav.navVolumes(water), serverNav.serverNavSettings, machineProfile.workerCount(),
   )
   payload, report = recastHelper.runHelper(recastToolingRoot, "nav", inputBytes, noProgress)
-  ours = serverNav.navContainer(payload)
-  assertTileForTile(ours, report, peridot.referenceBytes("nav/thulehouse2.nav"), 22, {0: 3440, 1: 6, 11: 114}, 1865)
+  ours = serverMapFiles.navFile(payload)
+  assertTileForTile(ours, report, referenceBytes("nav/thulehouse2.nav"), 22, {0: 3440, 1: 6, 11: 114}, 1865)
   assert serverNav.inspectNav(ours, None, [], recastToolingRoot, noProgress)["polygons"] == 3560
 
 
 def testNavIsDeterministic(recastToolingRoot):
-  collision, water = peridotInputs("highpasshold")
   progress = []
-  first, report = serverNav.navFromCollision(collision, water, recastToolingRoot, lambda done, of, message: progress.append((done, of, message)))
-  second, _ = serverNav.navFromCollision(collision, water, recastToolingRoot, noProgress)
+  first, report = navOfPeridotsFiles("highpasshold", recastToolingRoot, lambda done, of, message: progress.append((done, of, message)))
+  second, _ = navOfPeridotsFiles("highpasshold", recastToolingRoot)
   assert first == second
   assert report["threads"] == min(machineProfile.workerCount(), 45) > 1
   assert progress[0] == (0, 1, "partitioning collidable triangles")
   assert progress[-1] == (45, 45, "building nav tiles")
 
 
-# TODO: testNavFromOurHighpassMapMatchesPeridots needs S1's serverMapFiles.mapBytes (our .map from the client's archive and loose .zon):
-# the same params and tile set, identical polygons in every tile that holds no placed-model triangle (named here, at least one), and the
-# count of tiles whose polygons differ recorded with its cause (the rotation floats) in docs/serverFiles.md.
-
-
 def testIslandsAndProbeOnHighpassHold(recastToolingRoot, tmp_path):
-  collision, water = peridotInputs("highpasshold")
-  ours, _ = serverNav.navFromCollision(collision, water, recastToolingRoot, noProgress)
+  ours, _ = navOfPeridotsFiles("highpasshold", recastToolingRoot)
+  water = serverMapFiles.readWater(referenceBytes("water/highpasshold.wtr"))
   targets = [{"name": f"the zone line of .wtr record {index}", "point": record["position"]} for index, record in enumerate(water) if record["type"] == 3]
   assert len(targets) == 5
   inspection = serverNav.inspectNav(ours, highpassSafePoint, targets, recastToolingRoot, noProgress)
@@ -129,7 +164,7 @@ def testIslandsAndProbeOnHighpassHold(recastToolingRoot, tmp_path):
     ("the zone line of .wtr record 6", "noGoalPolygon", 0, False, False),
   ]
   assert len(inspection["findings"]) == 3
-  theirs = serverNav.inspectNav(peridot.referenceBytes("nav/highpasshold.nav"), highpassSafePoint, targets, recastToolingRoot, noProgress)
+  theirs = serverNav.inspectNav(referenceBytes("nav/highpasshold.nav"), highpassSafePoint, targets, recastToolingRoot, noProgress)
   assert {key: theirs[key] for key in ("mainPiece", "islands", "probes", "findings")} == {key: inspection[key] for key in ("mainPiece", "islands", "probes", "findings")}
 
   areas = ["Normal: 7,692 polygons", "Water: 452 polygons", "Disabled: 53 polygons"]

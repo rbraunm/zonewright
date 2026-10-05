@@ -6,7 +6,7 @@ import collections
 from PIL import Image, ImageDraw
 
 import planDrawing
-import serverNav
+import serverMapFiles
 
 background = (250, 250, 247, 255)
 gridColor = (215, 215, 210, 255)
@@ -45,7 +45,7 @@ def areaPanel(title, inspection):
     "title": title,
     "polygons": [{"points": polygon["outline"], "fill": areaColors[polygon["area"]]} for polygon in polygons],
     "labels": [],
-    "legend": [(areaColors[area], f"{serverNav.navAreaNames[area]}: {count:,} polygons") for area, count in sorted(counts.items())],
+    "legend": [(areaColors[area], f"{serverMapFiles.navAreaNames[area]}: {count:,} polygons") for area, count in sorted(counts.items())],
   }
 
 
