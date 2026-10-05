@@ -759,10 +759,16 @@ def testGradeRefusals(stageBlenderServer, tmp_path):
     atEnd = await session.expectError("cutCave", landed | {"landings": [3]})
     straight = await session.expectError("cutCave", graded | {"landings": [2]})
     unset = await session.expectError("cutCave", graded | {"path": [[0, -60, 2], [0, 10, 2], [0, 110], [0, 180], [0, 240, 40], [0, 300]], "grades": [None, None, 10, None, -5]})
+    underTheHill = await session.expectError("cutCave", graded | {"path": [[0, -60, 2], [0, 10, 2], [0, 300]], "grades": None, "widths": [40] * 3, "heights": [40] * 3})
     detail = await session.expectSuccess("getObjectDetail", {"name": "ground"})
-    return twoWays, steep, atEnd, straight, unset, detail
+    mouth = await session.expectSuccess("cutCave", room | {"path": [[0, -60], [0, 10, 2], [0, 60, 2], [0, 90, 2], [0, 250, 2]]})
+    return twoWays, steep, atEnd, straight, unset, underTheHill, detail, mouth
 
-  twoWays, steep, atEnd, straight, unset, detail = stageBlenderServer.session(steps)
+  twoWays, steep, atEnd, straight, unset, underTheHill, detail, mouth = stageBlenderServer.session(steps)
+  # An end left without a height under the hill would take the hilltop, the run climbing out through the plateau; a mouth left without
+  # one on the approach takes the ground there.
+  assert "The cave's end at [0.0, 300.0] has no height, so it took the ground's there" in underTheHill and "a trench" in underTheHill
+  assert mouth["runs"]["main"]["floors"][0] == 2.0
   assert "The cave's point 2 has its height set two ways: given as 10, and by segment 1's grade of 5 degrees" in twoWays
   rise = math.tan(math.radians(35)) * 60
   assert f"rises {rise:.1f} from point 3 to point 4 over a run of 60.0" in steep and f"needs a run of {rise / math.tan(math.radians(30)):.1f}" in steep

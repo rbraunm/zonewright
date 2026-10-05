@@ -389,27 +389,66 @@ def roundedPoint(point):
 
 def workedRuns(definition, surface):
   """Each run worked out on the ground as it stands: its line with every point's floor height (an end without one takes the ground there,
-  a branch's start its parent's floor), its grades checked, and its floor strokes placed."""
+  where it opens onto the ground (requireOpenEnd); a branch's start its parent's floor), its grades checked, and its floor strokes
+  placed."""
   worked = {}
   for name, run, parent in runSpecs(definition):
     owner = bridgeCaveRuns.runOwner(name)
     line = bridgeCaveRuns.runLine(run, name)
+    tookGround = []
 
-    def startHeight(run=run, parent=parent, owner=owner):
+    def startHeight(run=run, parent=parent, owner=owner, tookGround=tookGround):
       if parent is None:
+        tookGround.append("start")
         return surface.groundHeight(run["path"][0], f"{bridgeCaveRuns.capitalized(owner)}'s start")
       return float(relievedFloorsAt(worked[parent], numpy.array([run["path"][0][:2]]))[0][0])
 
-    def endHeight(run=run, owner=owner):
+    def endHeight(run=run, owner=owner, tookGround=tookGround):
+      tookGround.append("end")
       return surface.groundHeight(run["path"][-1], f"{bridgeCaveRuns.capitalized(owner)}'s end")
 
     line.setFloors(bridgeCaveRuns.resolveFloors(line, run["path"], run["grades"], startHeight, endHeight))
     line.requireGrades(definition["maximumFloorDegrees"])
+    for end in tookGround:
+      requireOpenEnd(surface, line, run, end, owner)
     worked[name] = {
       "name": name, "run": run, "parent": parent, "owner": owner, "line": line,
       "relief": bridgeCaveRuns.FloorRelief([stroke for stroke in definition["floor"] if stroke["run"] == name], line),
     }
   return worked
+
+
+def requireOpenEnd(surface, line, run, end, owner):
+  """Refuse an end that took the ground's height where it does not open onto the ground: the run graded to it from the nearest height
+  given comes out of the ground before it, its vault in the open over a floor buried in the rock (a trench) for more than its width;
+  as an end under a hill takes the hilltop and the run climbs out through the plateau."""
+  path = run["path"]
+  if end == "end":
+    index = len(path) - 2
+    while index > 0 and len(path[index]) == 2 and (run["grades"] is None or run["grades"][index - 1] is None):
+      index -= 1
+    low, high = float(line.stations[index]), line.length
+  else:
+    index = 1
+    while index < len(path) - 1 and len(path[index]) == 2:
+      index += 1
+    low, high = 0.0, float(line.stations[index])
+  alongs = numpy.linspace(low, high, max(2, math.ceil((high - low) / 2.0) + 1))
+  floors, _, widths, heights = line.at(alongs)
+  buried = surface.depths(floors + [0.0, 0.0, 0.01]) > playerScale.stepHeight
+  vaultOpen = surface.depths(floors + numpy.column_stack([numpy.zeros((len(floors), 2)), heights])) <= 0
+  trench = buried & vaultOpen
+  spacing = (high - low) / (len(alongs) - 1)
+  if trench.sum() * spacing <= widths[trench].max(initial=0.0):
+    return
+  first, last = numpy.flatnonzero(trench)[[0, -1]]
+  point = path[-1] if end == "end" else path[0]
+  raise ValueError(
+    f"{bridgeCaveRuns.capitalized(owner)}'s {end} at {roundedPoint(point[:2])} has no height, so it took the ground's there"
+    f" ({float(floors[-1 if end == 'end' else 0, 2]):.1f}), and the run graded to it comes out of the ground before it: its vault stands in the open over"
+    f" a floor buried in the rock for {trench.sum() * spacing:.0f} from {roundedPoint(floors[first])} to {roundedPoint(floors[last])}, a trench."
+    " Give the end a height (inside the rock for a blind end), or end it where the run meets the ground"
+  )
 
 
 def parentFloorAt(line, point):

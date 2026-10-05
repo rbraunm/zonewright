@@ -1690,7 +1690,8 @@ async def cutCave(
   before the strokes kept with the lining. Breakup stays the artist's choice (none for a dressed hall). Widths and heights ease from point to point and the floor grades evenly
   between their heights; a room is a wide stretch of the path. A point may be [x, y] without a height: it takes the even grade, by plan
   length along the path, between the nearest points whose heights are set, and an end without one takes the ground there (a mouth on
-  open ground). `grades` (one per segment: signed degrees, or null where the points' heights decide) set a segment's end's height from
+  open ground; refused where the run graded to it comes out of the ground as a trench before it, as an end under a hill would take
+  the hilltop). `grades` (one per segment: signed degrees, or null where the points' heights decide) set a segment's end's height from
   its start's at that grade. `landings` (path point indices, each a bend) turn that bend on a level arc at its point's height, the
   grade taken up on the straights either side, as a builder lands a switchback. Every slope and level is the author's: a climb because
   it leads up to a room, a landing where it turns.
