@@ -248,17 +248,28 @@ spreads = [float(numpy.ptp(numpy.array(values), axis=0).max()) for values in byV
 result = {'faces': len(stretch), 'worstInTheBend': max(value for value, inBend in stretch if inBend), 'worstOnTheStraights': max(value for value, inBend in stretch if not inBend), 'worstSeam': max(spreads)}
 """
 
+  # Every wall and vault face of the hall, whose tunnel flares out into its room between y 90 and 130: how far its mapping draws its
+  # texture out at worst.
+  readFlare = readMapping.replace("not (60 < middle[1] < 180 and middle[0] < 80)", "False").replace("result = {", "result = {'worst': max(value for value, _ in stretch)} or {")
+
   async def steps(session):
     await caveCanyon(session, tmp_path)
     await session.expectSuccess("cutCave", bent)
-    return (await session.expectSuccess("runPython", {"code": readMapping}))["result"]
+    mapping = (await session.expectSuccess("runPython", {"code": readMapping}))["result"]
+    await session.expectSuccess("removeCave", {"objectName": "ground", "name": "hall"})
+    await session.expectSuccess("cutCave", hall)
+    flare = (await session.expectSuccess("runPython", {"code": readFlare}))["result"]
+    return mapping, flare
 
-  mapping = stageBlenderServer.session(steps)
+  mapping, flare = stageBlenderServer.session(steps)
   # Round the bend the walls and vault carry one mapping, every corner the same place in it from each face that meets there. On the
-  # straights either side (a row clear of it) a texel is square; in the bend the inner wall, on half the radius of the run's middle,
-  # takes the texture at most twice as close along it as up it, inside the export's limit.
+  # straights either side (a row clear of it) a texel is square; in the bend, its walls on radii 20 and 60, each takes the texture
+  # sqrt(3) closer or wider along it than up it (mapped as at the radius between them), inside the export's limit of 2.
   assert mapping["faces"] > 50 and mapping["worstSeam"] <= 1e-4
-  assert mapping["worstOnTheStraights"] <= 1.05 and mapping["worstInTheBend"] <= 2.01
+  assert mapping["worstOnTheStraights"] <= 1.05 and 1.6 <= mapping["worstInTheBend"] <= 1.8
+  # Where the tunnel flares into the room its faces look along the run, which the tube's own mapping would draw out; they are mapped
+  # from the side instead, so no face of the lining is drawn out past the export's limit.
+  assert flare["worst"] <= 2.0
 
 
 def testTakingACaveBackLeavesTheGroundAsAnUncutCopyGivenTheSameChange(stageBlenderServer, tmp_path):

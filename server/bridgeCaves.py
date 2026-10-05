@@ -80,6 +80,9 @@ parityStep = 1e-4
 parityCrossings = 64
 # A flap pressed onto a neighbour faces back along it within this.
 flapAntiparallel = 0.99
+# A lining face whose mapping along its tube would draw its texture out more than this (a flare where a run widens into a room faces
+# along the run, so the tube's own coordinates barely change across it) is box-mapped instead; the export flags faces past it too.
+unrolledStretchLimit = 2.0
 
 
 def replayStrokes(sceneObject, name, strokes):
@@ -630,25 +633,39 @@ def unbrokenTube(definition, rows):
   return {"vertices": vertices, "faces": orientedOutward(vertices, faces), "spans": spans, "bands": bands, "vertexRows": vertexRows, "sections": sections}
 
 
-def surfaceCoordinates(sections, rows, total):
+def surfaceCoordinates(sections, rows, line, total):
   """Where each of a tube's vertices lies on its surface unrolled, for mapping its walls and vault (mapLining): how far along the run its
-  row stands (the centerline's distance along it, so every line of the section shares it and nothing shears after a bend; over a rounded
-  end, each line's own distance on from the run's end, as the end closes), and how far round the section it stands from the floor's
-  left corner, in world units on the unbroken section (rows x points); with the whole way round its row's section, where the face
-  closing the section back to the floor's corner takes it up again; NaN for the vertices a rounded or flat end adds (total vertices in
-  all)."""
+  row stands, every line of the section sharing it so nothing shears after a bend, measured along the centerline but round a bend at the
+  radius between its walls' (bendScale), so the inner wall takes the texture no closer and the outer no wider than each other; over a
+  rounded end, each line's own distance on from the run's end, as the end closes; and how far round the section it stands from the
+  floor's left corner, in world units on the unbroken section (rows x points); with the whole way round its row's section, where the
+  face closing the section back to the floor's corner takes it up again; NaN for the vertices a rounded or flat end adds (total vertices
+  in all)."""
   count, size = sections.shape[:2]
   lines = numpy.concatenate([numpy.zeros((1, size)), numpy.cumsum(numpy.linalg.norm(numpy.diff(sections, axis=0), axis=2), axis=0)])
   own = numpy.flatnonzero(rows["scales"] == 1.0)
-  along = numpy.repeat(rows["alongs"][:, None], size, axis=1).astype(numpy.float64)
   first, last = own[0], own[-1]
-  along[:first] = rows["alongs"][first] - (lines[first] - lines[:first])
-  along[last + 1:] = rows["alongs"][last] + (lines[last + 1:] - lines[last])
+  steps = numpy.diff(rows["alongs"][first:last + 1]) * bendScale(line, (rows["alongs"][first:last] + rows["alongs"][first + 1:last + 1]) / 2, (rows["widths"][first:last] + rows["widths"][first + 1:last + 1]) / 2)
+  along = numpy.zeros((count, size))
+  along[first:last + 1] = (rows["alongs"][first] + numpy.concatenate([[0.0], numpy.cumsum(steps)]))[:, None]
+  along[:first] = along[first] - (lines[first] - lines[:first])
+  along[last + 1:] = along[last] + (lines[last + 1:] - lines[last])
   around = numpy.concatenate([numpy.zeros((count, 1)), numpy.cumsum(numpy.linalg.norm(numpy.diff(sections, axis=1), axis=2), axis=1)], axis=1)
   whole = around[:, -1] + numpy.linalg.norm(sections[:, 0] - sections[:, -1], axis=1)
   coordinates = numpy.full((total, 3), numpy.nan)
   coordinates[:count * size] = numpy.column_stack([along.ravel(), around.ravel(), numpy.repeat(whole, size)])
   return coordinates
+
+
+def bendScale(line, alongs, widths):
+  """At distances along a run (with its widths there), how far its mapping moves along it for each unit its centerline does: 1 on a
+  straight; round a bend of radius r, sqrt(1 - (width / 2r)^2), as at the radius halfway in proportion between its inner and outer
+  walls (their geometric mean), so each wall takes the texture as much closer or wider than the other."""
+  scales = numpy.ones(len(alongs))
+  for _, radius, _, sweep, arcAlong in line.arcs:
+    inside = (alongs >= arcAlong) & (alongs <= arcAlong + radius * abs(sweep))
+    scales[inside] = numpy.sqrt(numpy.maximum(1 - (widths[inside] / (2 * radius)) ** 2, 0.0))
+  return scales
 
 
 def surfaceTree(vertices, faces):
@@ -727,7 +744,7 @@ def brokenTube(definition, worked, rows, unbroken, surface, junctionTrees):
       faceMaterials[row * size + index] = strokeMaterials[row][index]
   return {
     "vertices": vertices, "faces": orientedOutward(vertices, faces), "spans": spans, "bands": bands, "vertexRows": vertexRows, "materials": faceMaterials,
-    "coordinates": surfaceCoordinates(sections, rows, len(vertices)),
+    "coordinates": surfaceCoordinates(sections, rows, worked["line"], len(vertices)),
   }
 
 
@@ -1970,9 +1987,9 @@ def mapLining(editor, faces, pointOf, definition, tube, tubeLayer):
   transition of their own, at worldUnitsPerRepeat: the floor from above, as projectUVs maps it; the walls and vault by where they lie on
   their tube's surface unrolled (tubeCoordinates: u along the tube, v round its section), so the texture runs along the walls round a
   bend and up over the vault, without the seams and smears box mapping leaves where a curved surface turns from one axis to the next; a
-  face of a rounded or flat end box-mapped along its normal's largest axis; a trim band's faces along the band, u along their box axis
-  and v up from the band's bottom edge (over the floor where the face lies), at the band's repeat, so a strip texture runs once up the
-  band. Returns how many faces each band has."""
+  face of a rounded or flat end, or one its tube would stretch past unrolledStretchLimit (a flare), box-mapped along its normal's
+  largest axis; a trim band's faces along the band, u along their box axis and v up from the band's bottom edge (over the floor where
+  the face lies), at the band's repeat, so a strip texture runs once up the band. Returns how many faces each band has."""
   uvLayer = editor.loops.layers.uv[bridgeSurfacing.uvLayerName]
   vectors = editor.loops.layers.float_vector
   base = vectors.get(bridgeSurfacing.baseMappingName)
@@ -1986,7 +2003,7 @@ def mapLining(editor, faces, pointOf, definition, tube, tubeLayer):
     band = int(tube["bands"][tubeFace])
     facing = numpy.cross(points[1] - points[0], points[2] - points[0])
     unrolled = tubeCoordinates(points, tube, tubeFace)
-    if band < 0 and facing[2] <= floorNormalZ * numpy.linalg.norm(facing) and unrolled is not None:
+    if band < 0 and facing[2] <= floorNormalZ * numpy.linalg.norm(facing) and unrolled is not None and round(mappingStretch(points, unrolled), 3) <= unrolledStretchLimit:
       uvs = unrolled / definition["worldUnitsPerRepeat"]
     elif band < 0:
       uvs = points @ boxAxes[int(normal.argmax())].T / definition["worldUnitsPerRepeat"]
@@ -2002,6 +2019,23 @@ def mapLining(editor, faces, pointOf, definition, tube, tubeLayer):
       for layer in transitions:
         loop[layer] = (math.nan, math.nan, math.nan)
   return bandFaces
+
+
+def mappingStretch(points, coordinates):
+  """How much a triangle's mapping (coordinates per corner, world units) draws its texture out: the ratio of the longest to the shortest
+  way a unit step on the face moves in the texture, or of either to a unit; infinity for a mapping that folds it flat."""
+  first, second = points[1] - points[0], points[2] - points[0]
+  normal = numpy.cross(first, second)
+  if numpy.linalg.norm(normal) <= 1e-12:
+    return math.inf
+  axisU = first / numpy.linalg.norm(first)
+  axisV = numpy.cross(normal / numpy.linalg.norm(normal), axisU)
+  world = numpy.array([[first @ axisU, second @ axisU], [first @ axisV, second @ axisV]])
+  texture = numpy.column_stack([coordinates[1] - coordinates[0], coordinates[2] - coordinates[0]])
+  singular = numpy.linalg.svd(texture @ numpy.linalg.inv(world), compute_uv=False)
+  if singular.min() <= 1e-9:
+    return math.inf
+  return float(max(singular.max() / singular.min(), singular.max(), 1 / singular.min()))
 
 
 def tubeCoordinates(points, tube, tubeFace):
