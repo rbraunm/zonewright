@@ -9,6 +9,7 @@ import math
 import numpy
 from PIL import Image, ImageDraw
 
+import eqAxes
 import planDrawing
 import serverMapFiles
 
@@ -45,7 +46,7 @@ swatchSize = 14
 def collisionFrame(serverTriangles, longSide):
   """A plan frame holding every triangle with a margin, its longer side longSide pixels and its shape the triangles' extent's (no
   narrower than half its longer side)."""
-  points = serverMapFiles.inZoneAxes(serverTriangles).reshape(-1, 3).astype(numpy.float64)
+  points = eqAxes.zoneFromServer(serverTriangles).reshape(-1, 3).astype(numpy.float64)
   low, high = points[:, :2].min(axis=0), points[:, :2].max(axis=0)
   across, up = max(high[1] - low[1], 1e-6), max(high[0] - low[0], 1e-6)
   aspect = min(max(across / up, 0.5), 2.0)
@@ -163,7 +164,7 @@ def regionColor(region):
 def drawCollision(serverTriangles, regions, frame):
   """The collision plan (server-axis triangles, as mapCollision gives them) with the .wtr's region boxes (readWater's) outlined in
   their type's color and numbered above them in file order with their type, over a coordinate grid with a scale bar and north."""
-  image = shadedCollision(serverMapFiles.inZoneAxes(serverTriangles), frame).convert("RGBA")
+  image = shadedCollision(eqAxes.zoneFromServer(serverTriangles), frame).convert("RGBA")
   layer = Image.new("RGBA", frame.size, (0, 0, 0, 0))
   draw = ImageDraw.Draw(layer)
   planDrawing.drawGrid(draw, frame)
@@ -195,10 +196,10 @@ def drawCollisionComparison(first, firstRegions, second, secondRegions, titles, 
   size = frame.size
   differing = differingTriangles(first, second, tolerance)
   longer = first if len(first) >= len(second) else second
-  faded = Image.blend(shadedCollision(serverMapFiles.inZoneAxes(first), frame), Image.new("RGB", size, (255, 255, 255)), 1 - fadedShare)
+  faded = Image.blend(shadedCollision(eqAxes.zoneFromServer(first), frame), Image.new("RGB", size, (255, 255, 255)), 1 - fadedShare)
   marks = Image.new("RGBA", size, (0, 0, 0, 0))
   draw = ImageDraw.Draw(marks)
-  for triangle in serverMapFiles.inZoneAxes(longer[differing]).astype(numpy.float64):
+  for triangle in eqAxes.zoneFromServer(longer[differing]).astype(numpy.float64):
     draw.polygon([frame.pixel(corner[:2]) for corner in triangle], fill=(*differenceColor, 255), outline=(*differenceColor, 255))
   difference = Image.alpha_composite(faded.convert("RGBA"), marks).convert("RGB")
   panels = [drawCollision(first, firstRegions, frame), drawCollision(second, secondRegions, frame), difference]

@@ -11,6 +11,7 @@ from PIL import Image
 from conftest import StagedServer, junction, pinnedBlender, pinnedRecast
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
+import eqAxes
 import planDrawing
 import recastHelper
 import serverMapDrawing
@@ -27,7 +28,7 @@ def noProgress(done, of, message):
 def floor(x0, x1, y0, y1, z):
   """A flat square floor in zone axes, wound to face up, as two triangles in server axes (zone y, zone x, z)."""
   corners = numpy.array([[x0, y0, z], [x1, y0, z], [x1, y1, z], [x0, y1, z]], dtype=numpy.float32)
-  return corners[[0, 1, 2, 0, 2, 3]].reshape(2, 3, 3)[..., [1, 0, 2]]
+  return eqAxes.serverFromZone(corners[[0, 1, 2, 0, 2, 3]].reshape(2, 3, 3))
 
 
 def soup(*floors):
@@ -158,14 +159,14 @@ def testRecastHelperRefusesWhatMapEditDrops(recastToolingRoot):
 def testNavHelperRefusesTrianglesOutsideItsBoundsAndATileDetourCannotCreate(recastToolingRoot):
   ground = floor(0, 40, 0, 40, 0)
   narrowBounds = ([0.0, 0.0, 0.0], [20.0, 0.0, 20.0])
-  narrow = recastHelper.navInput(serverMapFiles.inRecastAxes(ground), narrowBounds, [], serverNav.serverNavSettings, 1)
+  narrow = recastHelper.navInput(eqAxes.recastFromServer(ground), narrowBounds, [], serverNav.serverNavSettings, 1)
   with pytest.raises(ToolError, match=r"^recastHelper nav: collidable triangle 0 has a vertex at zone \(40\.00, 0\.00, 0\.00\), outside the nav bounds"
       r" zone \(0\.00, 0\.00, 0\.00\) to zone \(20\.00, 20\.00, 0\.00\); map_edit would drop the triangle$"):
     recastHelper.runHelper(recastToolingRoot, "nav", narrow, noProgress)
 
   # Detour stores at most 6 vertices a polygon, where Recast builds with 7.
   sevenSided = serverNav.serverNavSettings | {"verticesPerPolygon": 7}
-  tooWide = recastHelper.navInput(serverMapFiles.inRecastAxes(ground), serverNav.navBounds(ground), [], sevenSided, 1)
+  tooWide = recastHelper.navInput(eqAxes.recastFromServer(ground), serverNav.navBounds(ground), [], sevenSided, 1)
   with pytest.raises(ToolError, match=r"^recastHelper nav: tile \(0, 0\), zone x 0\.0 to 409\.6, y 0\.0 to 409\.6: dtCreateNavMeshData failed$"):
     recastHelper.runHelper(recastToolingRoot, "nav", tooWide, noProgress)
 

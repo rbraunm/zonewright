@@ -10,7 +10,7 @@ An EQEmu server loads three map files per zone from its `maps` folder: the colli
 | Server (`.map` collidable vertices and the rebuilt collision) | zone y | zone x | z |
 | Recast and Detour (`.nav`) | zone y | zone z | zone x |
 
-`inZoneAxes` and `inRecastAxes` turn server-axis points into the other two.
+`server/eqAxes.py` holds every conversion between them (`serverFromZone`, `zoneFromServer`, `recastFromZone`, `zoneFromRecast`, `recastFromServer`), each taking a point or an array of points.
 
 ## How each server input fails, and what answers it
 

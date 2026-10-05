@@ -184,7 +184,7 @@ def placementFrame(location, headingDegrees, x, y, z, heading):
     raise ToolError("x, y, z, and heading go together")
   # The server and the live dumps give positions in the server's axes: measured, every kind of placement lands on the zone geometry
   # only through eqAxes' swap.
-  return eqAxes.zoneFromServer([x, y, z]), eqAxes.turnFromEQHeading(heading)
+  return eqAxes.zoneFromServer([x, y, z]).tolist(), eqAxes.turnFromEQHeading(heading)
 
 
 def modelSummary(details):

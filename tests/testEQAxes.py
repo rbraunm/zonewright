@@ -21,13 +21,17 @@ def testEQHeadingInvertsPlacementFrame():
 
 def testAxesRoundTripAndRecastKeepsWinding():
   # Highpass Hold's safe point, zone (-148, -219, -24), is the server's (-219, -148, -24).
-  assert eqAxes.serverFromZone([-148, -219, -24]) == [-219, -148, -24]
-  assert eqAxes.recastFromZone([-148, -219, -24]) == [-219, -24, -148]
+  assert eqAxes.serverFromZone([-148, -219, -24]).tolist() == [-219, -148, -24]
+  assert eqAxes.recastFromZone([-148, -219, -24]).tolist() == [-219, -24, -148]
+  assert eqAxes.recastFromServer([-219, -148, -24]).tolist() == [-219, -24, -148]
   triangle = [[1.5, -2.0, 0.25], [7.0, 3.0, -1.0], [-4.0, 6.5, 2.0]]
   for corner in triangle:
-    assert eqAxes.zoneFromServer(eqAxes.serverFromZone(corner)) == corner
-    assert eqAxes.zoneFromRecast(eqAxes.recastFromZone(corner)) == corner
+    assert eqAxes.zoneFromServer(eqAxes.serverFromZone(corner)).tolist() == corner
+    assert eqAxes.zoneFromRecast(eqAxes.recastFromZone(corner)).tolist() == corner
+    assert eqAxes.recastFromServer(eqAxes.serverFromZone(corner)).tolist() == eqAxes.recastFromZone(corner).tolist()
   zoneCorners = numpy.array(triangle)
+  # A whole array converts at once, as each corner does.
+  assert numpy.array_equal(eqAxes.serverFromZone(numpy.array([triangle, triangle])), numpy.array([[eqAxes.serverFromZone(corner) for corner in triangle]] * 2))
   zoneNormal = numpy.cross(zoneCorners[1] - zoneCorners[0], zoneCorners[2] - zoneCorners[0])
   recastCorners = numpy.array([eqAxes.recastFromZone(corner) for corner in triangle])
   serverCorners = numpy.array([eqAxes.serverFromZone(corner) for corner in triangle])

@@ -9,6 +9,7 @@ import zlib
 import numpy
 
 import eqArchive
+import eqAxes
 import eqgFiles
 
 mapVersion = 0x02000000
@@ -167,7 +168,7 @@ def mapContent(zoneFiles):
     if terrainForClient and not bakedByAzone:
       raise ValueError(f"{label}: azone would place a terrain whose file ends otherwise than .ter as a model, while the client draws it where its vertices are")
     if terrainForClient:
-      terrainCorners.append(model["vertices"].astype(numpy.float32)[model["triangles"]][:, :, [1, 0, 2]])
+      terrainCorners.append(eqAxes.serverFromZone(model["vertices"].astype(numpy.float32)[model["triangles"]]))
       terrainPassable.append((model["triangleFlags"] & eqgFiles.passableFlag) != 0)
       continue
     if mapModels.setdefault(mapName, archiveName) != archiveName:
@@ -293,21 +294,13 @@ def collisionTriangles(content, source="the .map"):
     model = models[placement["name"]]
     corners = model["vertices"][model["polygons"]["indices"][model["polygons"]["vis"] != 0]]
     placed = turned(corners, placement["rotation"]) * placement["scale"] + placement["position"]
-    parts.append(placed[..., [1, 0, 2]])
+    parts.append(eqAxes.serverFromZone(placed))
   return numpy.concatenate(parts).astype(numpy.float32)
 
 
 def mapCollision(data, source="the .map"):
   """Float32 triangles (n, 3 corners, xyz) in server axes, as the server builds them from a .map's bytes."""
   return collisionTriangles(readMap(data, source), source)
-
-
-def inZoneAxes(serverPoints):
-  return serverPoints[..., [1, 0, 2]]
-
-
-def inRecastAxes(serverPoints):
-  return serverPoints[..., [0, 2, 1]]
 
 
 def waterBytes(regions):

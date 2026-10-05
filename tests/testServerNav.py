@@ -9,6 +9,7 @@ from conftest import everquestClient
 from serverReference import referenceBytes
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
+import eqAxes
 import machineProfile
 import recastHelper
 import serverMapDrawing
@@ -16,8 +17,8 @@ import serverMapFiles
 import serverNav
 
 pytestmark = pytest.mark.clientData("serverNav")
-# Peridot's zone row gives the safe point (-219, -148, -24) in server axes.
-highpassSafePoint = (-148.0, -219.0, -24.0)
+# Peridot's zone row gives the safe point in server axes.
+highpassSafePoint = tuple(eqAxes.zoneFromServer([-219.0, -148.0, -24.0]).tolist())
 # thulehouse2.navprj, the map_edit project Peridot's thulehouse2.nav was built from, lowers its bounds' top by hand to 255.2.
 thulehouseProjectCeiling = numpy.float32(255.2)
 detailCounts = ("detailVertexCount", "detailTriangleCount")
@@ -119,7 +120,7 @@ def testNavReproducesThulehouse2TileForTile(recastToolingRoot):
   kept = collision[(collision[..., 2] <= thulehouseProjectCeiling).all(axis=1)]
   assert len(collision) - len(kept) == 2
   inputBytes = recastHelper.navInput(
-    serverMapFiles.inRecastAxes(kept), (low, high), serverNav.navVolumes(water), serverNav.serverNavSettings, machineProfile.workerCount(),
+    eqAxes.recastFromServer(kept), (low, high), serverNav.navVolumes(water), serverNav.serverNavSettings, machineProfile.workerCount(),
   )
   payload, report = recastHelper.runHelper(recastToolingRoot, "nav", inputBytes, noProgress)
   ours = serverMapFiles.navFile(payload)
@@ -154,7 +155,7 @@ def testNavFromOurHighpassMapMatchesPeridots(recastToolingRoot):
 
   # Which grid tiles' rasterized squares (the tile and its 5-cell border) any terrain or placed-model triangle's footprint reaches, in
   # Recast x and z.
-  collision = serverMapFiles.inRecastAxes(serverMapFiles.mapCollision(ourMap))[..., [0, 2]]
+  collision = eqAxes.recastFromServer(serverMapFiles.mapCollision(ourMap))[..., [0, 2]]
   terrainCount = len(serverMapFiles.readMap(ourMap)["collidableIndices"]) // 3
   low, high = collision.min(axis=1), collision.max(axis=1)
   origin = numpy.array(mine["parameters"]["origin"])[[0, 2]]

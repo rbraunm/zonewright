@@ -9,6 +9,7 @@ import pytest
 from PIL import Image, ImageDraw
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
+import eqAxes
 import eqgFiles
 import eqgWriter
 import planDrawing
@@ -91,8 +92,8 @@ def testMapCollisionAgreesWithTheZoneReader():
     (terrain if placement["model"].endswith(".ter") else placed).append(eqgFiles.placeVertices(model["vertices"], placement)[solid])
   reader = numpy.concatenate(terrain + placed)
   assert reader.shape == (272_230, 3, 3)
-  peridot = serverMapFiles.inZoneAxes(serverMapFiles.mapCollision(referenceBytes("base/highpasshold.map")))
-  ours = serverMapFiles.inZoneAxes(serverMapFiles.mapCollision(serverMapFiles.mapBytes(zoneFiles)))
+  peridot = eqAxes.zoneFromServer(serverMapFiles.mapCollision(referenceBytes("base/highpasshold.map")))
+  ours = eqAxes.zoneFromServer(serverMapFiles.mapCollision(serverMapFiles.mapBytes(zoneFiles)))
   # The 73,565 terrain triangles are stored, not computed: exact. Placed ones are computed in float32, ours from the .zon's turns
   # (6.7e-5 measured) and Peridot's from azone's round trip of them (3.23e-4 measured).
   assert numpy.array_equal(peridot[:73_565], reader[:73_565]) and numpy.array_equal(ours[:73_565], reader[:73_565])
@@ -209,7 +210,7 @@ def testMapCollisionPlacesATurnedModelAsTheZoneReaderDoes():
   turns = (0.7, -0.3, 0.2)
   files = zoneFiles({"ter_test.ter": modelFile("ter", *squareTerrain(50)), "obj_crate.mod": crateFile()},
     [("ter_test.ter", "TER_test", (0, 0, 0), (0, 0, 0), 1.0), ("obj_crate.mod", "OBJ_crate01", (12, -7, 3), turns, 2.5)])
-  collision = serverMapFiles.inZoneAxes(serverMapFiles.mapCollision(serverMapFiles.mapBytes(files)))
+  collision = eqAxes.zoneFromServer(serverMapFiles.mapCollision(serverMapFiles.mapBytes(files)))
   zone = eqgFiles.parseZone(files["zon"], "test.zon")
   crate = eqgFiles.parseModel(files["models"]["obj_crate.mod"], "obj_crate.mod")
   expected = eqgFiles.placeVertices(crate["vertices"], zone["placements"][1])[crate["triangles"]]

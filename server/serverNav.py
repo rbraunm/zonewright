@@ -4,6 +4,7 @@ Detour work in (zone y, zone z, zone x), an even permutation that keeps winding.
 import numpy
 from mcp.server.mcpserver.exceptions import ToolError
 
+import eqAxes
 import machineProfile
 import recastHelper
 import serverMapFiles
@@ -36,14 +37,6 @@ serverPathing = {
 }
 
 
-def recastFromZone(points):
-  return numpy.asarray(points)[..., [1, 2, 0]]
-
-
-def zoneFromRecast(points):
-  return numpy.asarray(points)[..., [2, 0, 1]]
-
-
 def navVolumes(waterRecords):
   """map_edit's volume for each .wtr record, in .wtr order (a later one marks over an earlier): the box's corners v5, v2, v3, and v8
   (scaled and moved as the server places the box) in Recast axes, its height range, and its nav area. A turned record is refused:
@@ -63,14 +56,14 @@ def navVolumes(waterRecords):
     low, high = numpy.minimum(-extents, extents), numpy.maximum(-extents, extents)
     local = numpy.array([low, [low[0], high[1], high[2]], high, [high[0], low[1], low[2]]], dtype=numpy.float32)
     placed = numpy.asarray(record["position"], dtype=numpy.float32) + numpy.asarray(record["scale"], dtype=numpy.float32) * local
-    corners = recastFromZone(placed).astype(numpy.float32)
+    corners = eqAxes.recastFromZone(placed).astype(numpy.float32)
     volumes.append({"corners": corners, "low": float(corners[:, 1].min()), "high": float(corners[:, 1].max()), "area": volumeAreas[kind]})
   return volumes
 
 
 def navBounds(collision):
   """The nav bounds map_edit takes by default: the collidable extents, Recast axes, as (minimum, maximum)."""
-  points = serverMapFiles.inRecastAxes(numpy.asarray(collision, dtype=numpy.float32)).reshape(-1, 3)
+  points = eqAxes.recastFromServer(numpy.asarray(collision, dtype=numpy.float32)).reshape(-1, 3)
   return [float(value) for value in points.min(axis=0)], [float(value) for value in points.max(axis=0)]
 
 
@@ -87,7 +80,7 @@ def navFromCollision(collision, waterRecords, toolingRoot, reportProgress):
   if serverNavSettings["partitioning"] != "watershed":
     raise ValueError(f"the helper partitions by watershed only, not {serverNavSettings['partitioning']}")
   inputBytes = recastHelper.navInput(
-    serverMapFiles.inRecastAxes(triangles), navBounds(triangles), navVolumes(waterRecords), serverNavSettings, machineProfile.workerCount(),
+    eqAxes.recastFromServer(triangles), navBounds(triangles), navVolumes(waterRecords), serverNavSettings, machineProfile.workerCount(),
   )
   payload, report = recastHelper.runHelper(toolingRoot, "nav", inputBytes, reportProgress)
   return serverMapFiles.navFile(payload), report
@@ -120,9 +113,9 @@ def zoneBox(component):
   """A component's bounds, center, and size in zone axes."""
   return {
     "polygons": component["polygons"], "area": round(component["area"], 1),
-    "boundsMin": [round(float(value), 2) for value in zoneFromRecast(component["boundsMin"])],
-    "boundsMax": [round(float(value), 2) for value in zoneFromRecast(component["boundsMax"])],
-    "center": [round(float(value), 2) for value in zoneFromRecast(component["center"])],
+    "boundsMin": [round(float(value), 2) for value in eqAxes.zoneFromRecast(component["boundsMin"])],
+    "boundsMax": [round(float(value), 2) for value in eqAxes.zoneFromRecast(component["boundsMax"])],
+    "center": [round(float(value), 2) for value in eqAxes.zoneFromRecast(component["center"])],
   }
 
 
@@ -136,8 +129,8 @@ def inspectNav(navFile, safePoint, targets, toolingRoot, reportProgress):
   point}, zone axes); with no safe point, none is searched and the result names them. Every polygon is listed by tile, in the file's
   order, with its area, its component (-1 for none), and its outline in zone plan axes."""
   payload = serverMapFiles.navPayload(serverMapFiles.readNav(navFile))
-  recastSafe = None if safePoint is None else [float(value) for value in recastFromZone(safePoint)]
-  recastTargets = [[float(value) for value in recastFromZone(target["point"])] for target in targets]
+  recastSafe = None if safePoint is None else eqAxes.recastFromZone(safePoint).astype(float).tolist()
+  recastTargets = [eqAxes.recastFromZone(target["point"]).astype(float).tolist() for target in targets]
   _, report = recastHelper.runHelper(toolingRoot, "inspect", recastHelper.inspectInput(payload, recastSafe, recastTargets, serverPathing), reportProgress)
   components = report["components"]
   findings = []
@@ -162,7 +155,7 @@ def inspectNav(navFile, safePoint, targets, toolingRoot, reportProgress):
     "key": (tile["x"], tile["y"], tile["layer"]),
     "polygons": [{
       "area": polygon["area"], "component": polygon["component"],
-      "outline": [(corner[2], corner[0]) for corner in polygon["corners"]],
+      "outline": [tuple(corner[:2]) for corner in eqAxes.zoneFromRecast(polygon["corners"]).tolist()],
     } for polygon in tile["polygons"]],
   } for tile in report["tiles"]]
   safePolygon = None if report["safePolygon"] is None else {"tile": tiles[report["safePolygon"][0]]["key"], "polygon": report["safePolygon"][1]}
