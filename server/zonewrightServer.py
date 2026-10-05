@@ -2524,8 +2524,9 @@ async def generateCopies(
 @guardedTool()
 async def settleObjects(context: Context, names: list[str], depth: float = 0.0, tiltShare: float = 0.0, onto: str | None = None):
   """Drop objects onto what lies below them by their footprint rather than their origin, from above the whole scene, or where rock lies
-  over their middle (a cave's ceiling, an overhang; looked for from halfway up each) from their own tops, or from just under the rock
-  where a top reaches it, so one in a cave lands on its floor, not on the hill over it, even a column up to a hall's ceiling: onto the ground (what
+  over ground at their middle (a cave's ceiling, an overhang; looked for from halfway up each) from their own tops, or from just under
+  the rock where a top reaches it, so one in a cave lands on its floor, not on the hill over it, even a column up to a hall's ceiling
+  (one sunk into a solid with no ground under it, such as a ramp raised through it, rises onto its top): onto the ground (what
   players stand on, apart from the objects being settled), sunk to the lowest ground under the footprint so no edge floats; or onto a
   named object, resting on it with no vertex below its surface (a crate on a table, or tilted on a ramp); then `depth` lower. tiltShare
   (0 to 1) turns each that share of the way toward the slope of the ground under it, keeping its heading (and replacing any tilt it
