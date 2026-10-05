@@ -13,6 +13,8 @@ import bridgeCaveData
 import bridgeCaves
 import bridgeExport
 import bridgeGrading
+import bridgeKitData
+import bridgeKitGeometry
 import bridgeMeshAccess
 import bridgePasses
 import bridgeShaping
@@ -462,6 +464,11 @@ def getObjectDetail(name):
     }
   if sceneObject.instance_type == "COLLECTION" and sceneObject.instance_collection is not None:
     detail["instanceCollection"] = sceneObject.instance_collection.name
+  if bridgeKitData.isPlacedPiece(sceneObject):
+    placement = bridgeKitGeometry.describePlacement(sceneObject)
+    detail["kitPiece"] = {key: value for key, value in placement["piece"].items() if key != "size"} | {"facingDegrees": placement["facingDegrees"], "sockets": placement["sockets"]}
+  elif sceneObject.type == "MESH" and (piece := bridgeKitData.pieceOfMesh(sceneObject)) is not None:
+    detail["kitPiece"] = bridgeKitGeometry.describePiece(piece)
   return detail
 
 

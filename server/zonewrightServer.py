@@ -1403,7 +1403,10 @@ async def getObjectDetail(context: Context, name: str):
   vertex, face, and triangle counts, faces per material, UV layers, world units per texture repeat, vertex groups, shaping passes,
   surfacing layers, its defined passes (graded routes, the plots graded on it, in the order made) and its caves (cutCave), each with
   whether its ground moved since it was made (stale: grading it again would move it, or the ground within the cave's reach moved, and
-  how far), which regradeTerrain or editCave puts right."""
+  how far), which regradeTerrain or editCave puts right. A placed kit piece gives kitPiece: its kit, piece, kind, module, passable,
+  fingerprint, facing, and its sockets in the world, each joined to another's or free; a kit piece's own mesh gives kitPiece: its
+  record (kind, sockets, passable, openings), size, module, triangles, each material's texture and measured repeat, seams, and
+  fingerprint."""
   return await callBridge(context, "getObjectDetail", {"name": name})
 
 
@@ -2498,6 +2501,146 @@ async def linkKitAsset(
   """Link a collection marked as an asset in a kit .blend (absolute path) and place an instance of it; the result gives its size. Its
   materials draw in the preview lit as the open file's own are."""
   return await callBridge(context, "linkKitAsset", {"kitPath": kitPath, "assetName": assetName, "instanceName": instanceName, "location": location, "rotationDegrees": rotationDegrees, "scale": scale, "collection": collection})
+
+
+# Kits
+
+kitPieceHelp = (
+  " A kit is a .blend of pieces (eqzones library\\kits\\<kitName>.blend, one per family): each piece a collection marked as an asset whose"
+  " name starts with the kit file's stem (hpTimberPlank in hpTimber.blend), holding its meshes and its record (kind, sockets, passable,"
+  " openings); its origin is its base center (the collection's instance_offset), its front faces +Y, its length runs along X and its"
+  " height up Z. A socket {name, at, direction} is a point of the piece where another meets it: two placed sockets within 0.01 facing"
+  " each other are joined. Client sizes: a 25 module (12.5 and 50 too), 30 a storey, about 10 thick, doors about 10 x 16; walls repeat"
+  " every 11 to 12.5, floorboards 10 to 15, beams and trims 2.5 to 5."
+)
+facingHelp = (
+  " facingDegrees is the way a placed piece's front (+Y) faces: 0 = +Y, clockwise; placements turn only about the vertical and keep"
+  " scale 1, as the client's structure placements do."
+)
+
+
+def requireKitPath(kitPath):
+  if kitPath is not None and (not os.path.isabs(kitPath) or not kitPath.lower().endswith(".blend") or not os.path.isfile(kitPath)):
+    raise ToolError(f"kitPath must be an absolute path to an existing .blend (or null for the open file's own pieces), got '{kitPath}'")
+
+
+@guardedTool(description=(
+  "Model one kit module to exact size, as the client's kits are made: a collection `name` holding one mesh object and mesh `name`, its"
+  " base center at `location` [x, y, z] in this file (so pieces lie side by side to look at) and that point its origin, marked as an"
+  " asset, its record written. `kind` is wall (a box without a bottom; roles face for front and back, edge for its ends and top;"
+  " sockets start and end at its base ends facing out along X, top up), floor (a slab; top, edge, under; start, end, front, back at the"
+  " base), post (an upright without a bottom; side, top; base down, top up), beam (a bar; side, end; start, end), plank (a board; top for"
+  " its broad faces, edge; start, end), rail (a bar; side, end; start, end; passable), ropeRail (a ribbon of two faces back to back;"
+  " rope, a cutout material; start, end; passable), or cap (a block without a bottom; side, top; base down). `size` is [length, depth,"
+  " height] along X, Y, Z (a ropeRail's depth exactly 0); `materials` and `worldUnitsPerRepeat` give exactly the kind's roles a material"
+  " createMaterial made and a repeat, each role box-mapped in the piece's frame from its start corner (-length/2, -depth/2, 0), so a 25"
+  " module at 12.5 a repeat tiles without a seam. `passable` overrides the kind's (rails and ropes pass players, as the client's do)."
+  " Refine with the mesh tools and cutOpening; markKitPiece if its sockets change. Returns the record, its size, module, triangles,"
+  " each material's texture and measured repeat, each role's measured repeat, and seams: materials whose repeat does not fit the"
+  " length (or height) the piece joins along a whole number of times, so a texture seam shows where two meet (reported, not refused)."
+  + kitPieceHelp
+))
+async def createKitPiece(
+  context: Context, name: str, kind: str, size: list[float], materials: dict[str, str], worldUnitsPerRepeat: dict[str, float],
+  location: list[float], passable: bool | None = None,
+):
+  return await callBridge(context, "createKitPiece", {
+    "name": name, "kind": kind, "size": size, "materials": materials, "worldUnitsPerRepeat": worldUnitsPerRepeat, "location": location, "passable": passable,
+  })
+
+
+@guardedTool(description=(
+  "Make a collection of this file a kit piece, or change a piece's kind, sockets, origin, or passability: its origin (instance_offset)"
+  " set to `origin` (file coordinates) or the base center of its meshes (the middle of their plan bounds at their lowest point),"
+  " marked as an asset, its record written. `kind` is any createKitPiece kind, roof, or custom (a corner block, a portal frame, a"
+  " bench; placed only); `sockets` [{name, at [x, y, z] in the piece frame, direction}] (each direction a unit vector, level or straight"
+  " up or down; each within 1 unit of the piece's bounds), or the kind's defaults from its bounds (custom has none); a wall, beam, plank,"
+  " rail, or ropeRail needs start and end facing apart; a corner is custom with turned sockets (a 10 x 10 block: start at (-5, 0, 0)"
+  " facing -X, end at (0, 5, 0) facing +Y). `passable` true marks its meshes passable, false takes the mark off, null keeps the piece's"
+  " (or takes the kind's for a new piece). Every face needs a material createMaterial made and texture coordinates. Placed instances"
+  " keep their transforms, so a moved origin or socket shows in them: look after. Returns the record, what is derived from it (as"
+  " createKitPiece), and unmappable: faces whose texture coordinates are not affine in position within 1 percent, which map oddly where"
+  " a span stretches or bends the piece." + kitPieceHelp
+))
+async def markKitPiece(
+  context: Context, collectionName: str, kind: str, sockets: list[dict] | None = None, origin: list[float] | None = None, passable: bool | None = None,
+):
+  return await callBridge(context, "markKitPiece", {"collectionName": collectionName, "kind": kind, "sockets": sockets, "origin": origin, "passable": passable})
+
+
+@guardedTool(description=(
+  "Cut a door or window through a wall piece of this file, front to back: centered `along` from its middle along X, its bottom `sill`"
+  " over the base (a door 0, a window above 0), `width` wide with jambs `height` tall; with `archRise` its head a round arch rising"
+  " that far over the jambs in `archSegments` straight pieces (a semicircle at half the width). The cut is an exact boolean of a prism"
+  " through the piece; its reveal takes the material and texture density of the faces it cuts through, or with `frame` {width, depth,"
+  " material, worldUnitsPerRepeat} the reveal and a band `width` wide round the opening on both faces (jambs, head, and a window's sill),"
+  " standing `depth` proud, take the frame's material box-mapped at its repeat, as the client trims its openings. The opening and its"
+  " frame leave at least 1 unit of wall at each end and above (and below a window) and overlap no opening cut before; it is recorded in"
+  " the piece's openings. Zones that link the kit show it when next opened. Returns the opening's corners [x, z] in the piece frame,"
+  " its clear width and height as cut, the faces made, and the triangles before and after."
+))
+async def cutOpening(
+  context: Context, piece: str, kind: str, along: float, width: float, height: float, sill: float = 0.0, archRise: float | None = None,
+  archSegments: int = 8, frame: dict | None = None,
+):
+  return await callBridge(context, "cutOpening", {
+    "piece": piece, "kind": kind, "along": along, "width": width, "height": height, "sill": sill, "archRise": archRise, "archSegments": archSegments, "frame": frame,
+  })
+
+
+@guardedTool(description=(
+  "Model a roof as a kit piece (kind roof) at `location` (its wall plate's middle, its origin) for a rectangular `footprint` [length X,"
+  " depth Y], or for the plan bounds of the meshes or placed pieces of this file named in `over`; give exactly one. Each slope's"
+  " underside passes through the footprint's edges at the plate (z 0), so it sits on walls of that footprint; slopes at `pitchDegrees`"
+  " (5 to 60), running out `overhang` past every side (the eaves drop overhang x tan(pitch) under the plate), `thickness` thick square to"
+  " the slope. `kind` gable: two slopes meeting at a ridge along `ridgeAlong` (\"x\" or \"y\"), gable triangles closing its ends down to"
+  " the plate; hip: four slopes, the ridge along `ridgeAlong` (the longer side) shortened by hips at 45 degrees in plan, a point over a"
+  " square; shed: one slope rising toward the back (-Y), its ends closed by gable triangles. Roles: roof (slope tops, mapped in their"
+  " plane, u level along the eaves and v up the slope, so shingles run level), under (undersides, the same), gable (gable and shed ends,"
+  " box-mapped; not hip), edge (fascia and verges, box-mapped). Socket plate (0, 0, 0) facing down. Returns the record, its ridge height"
+  " (the top), its eave height (the eaves' underside), size, triangles, and with `over`, plateOver: the point to place it at"
+  " (placeKitPiece, facing 0) to sit on those objects." + kitPieceHelp
+))
+async def addRoof(
+  context: Context, name: str, kind: str, pitchDegrees: float, overhang: float, thickness: float, materials: dict[str, str],
+  worldUnitsPerRepeat: dict[str, float], location: list[float], footprint: list[float] | None = None, over: list[str] | None = None,
+  ridgeAlong: str = "x",
+):
+  return await callBridge(context, "addRoof", {
+    "name": name, "kind": kind, "pitchDegrees": pitchDegrees, "overhang": overhang, "thickness": thickness, "materials": materials,
+    "worldUnitsPerRepeat": worldUnitsPerRepeat, "location": location, "footprint": footprint, "over": over, "ridgeAlong": ridgeAlong,
+  })
+
+
+@guardedTool(description=(
+  "Place one kit piece as the client places its kits: an empty instancing the piece's collection, linked from the kit at `kitPath`"
+  " (absolute) or the open file's own with null (as in a kit file), sharing the piece's one model with every other placement. Either at"
+  " `location` [x, y, z] (its base center) facing `facingDegrees`; or at [x, y] facing `facingDegrees`, settled by its footprint as"
+  " settleObjects settles (onto the lowest ground under it), then `depth` lower (refused where rock lies over ground: give z); or"
+  " snapped: `snapTo` {object, socket, pieceSocket} puts the piece where its pieceSocket meets the placed piece object's socket face to"
+  " face (Freeport's wall runs stand exactly 25.0 apart): a level pair turns the piece to meet it (no facingDegrees), a vertical pair"
+  " (a post on a wall's top) keeps facingDegrees, by default the object's. A socket already joined is refused, naming its partner. A"
+  " placed piece is an ordinary placement (transformObjects, deleteObjects, settleObjects work on it), never in the terrain collection."
+  " Returns where it stands and faces, the piece {kit, piece, kind, size, module, passable, fingerprint}, its sockets in the world each"
+  " joined to another's or free, and settleObjects' report when settled." + facingHelp + kitPieceHelp
+))
+async def placeKitPiece(
+  context: Context, name: str, kitPath: str | None, piece: str, location: list[float] | None = None, facingDegrees: float | None = None,
+  snapTo: dict | None = None, depth: float = 0.0, collection: str = "structures",
+):
+  requireKitPath(kitPath)
+  return await callBridge(context, "placeKitPiece", {
+    "name": name, "kitPath": kitPath, "piece": piece, "location": location, "facingDegrees": facingDegrees, "snapTo": snapTo, "depth": depth, "collection": collection,
+  })
+
+
+@guardedTool()
+async def swapKitPiece(context: Context, names: list[str], piece: str):
+  """Put another piece of the same kit in place of placed ones, each keeping where it stands and how it faces: a window section for a
+  plain one, without breaking the run. The new piece's sockets must be the old one's (names, places within 0.01, directions), so every
+  joint holds; otherwise none is swapped and each difference is named. Returns each placement with its new piece and its sockets,
+  joined or free."""
+  return await callBridge(context, "swapKitPiece", {"names": names, "piece": piece})
 
 
 # Water

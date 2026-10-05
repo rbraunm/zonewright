@@ -16,6 +16,7 @@ import bridgeEnvironment
 import bridgeExportChecks
 import bridgeGrading
 import bridgeHousing
+import bridgeKits
 import bridgePasses
 import bridgeReview
 import bridgeReviewGuides
@@ -315,7 +316,7 @@ commands = {
   "pick": (pick, False),
   "renderPasses": (renderPasses, False),
   "renderModelThumbnails": (bridgeViews.renderModelThumbnails, False),
-} | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands | bridgeModels.commands | bridgeExportChecks.commands | bridgePasses.commands | bridgeEnvironment.commands | bridgeReview.commands | bridgeReviewGuides.commands | bridgeAuthoring.commands | bridgeWater.commands | bridgeHousing.commands | bridgeGrading.commands | bridgeSketch.commands | bridgeSwim.commands | bridgeArrangement.commands | bridgeBoundaries.commands | bridgeCaves.commands
+} | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands | bridgeModels.commands | bridgeExportChecks.commands | bridgePasses.commands | bridgeEnvironment.commands | bridgeReview.commands | bridgeReviewGuides.commands | bridgeAuthoring.commands | bridgeWater.commands | bridgeHousing.commands | bridgeGrading.commands | bridgeSketch.commands | bridgeSwim.commands | bridgeArrangement.commands | bridgeBoundaries.commands | bridgeCaves.commands | bridgeKits.commands
 
 
 def dispatch(command, arguments):
