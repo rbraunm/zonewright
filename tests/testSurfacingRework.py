@@ -580,17 +580,30 @@ def testRegionEditsAreValidated(stageBlenderServer):
   async def steps(session):
     await freshScene(session)
     await session.expectSuccess("createRegion", {"name": "camp", "outline": [[0, 0], [10, 0], [10, 10]], "bottom": -10, "top": 10, "intent": "a camp", "access": "play"})
-    return [
+    await session.expectSuccess("transformObjects", {"names": ["camp"], "translate": [5, 0, 0]})
+    before = await session.expectSuccess("getRegions", {})
+    refusals = [
       await session.expectError("editRegion", {"name": "camp"}),
-      await session.expectError("editRegion", {"name": "camp", "bottom": 10}),
+      await session.expectError("editRegion", {"name": "camp", "bottom": 10, "access": "none", "intent": "a moved camp"}),
+      await session.expectError("editRegion", {"name": "camp", "intent": "   ", "access": "view", "top": 20}),
+      await session.expectError("editRegion", {"name": "camp", "outline": [[0, 0], [1, 1]], "access": "none"}),
+      await session.expectError("editRegion", {"name": "camp", "access": "walk", "intent": "a moved camp", "bottom": -20}),
       await session.expectError("createRegion", {"name": "camp", "outline": [[0, 0], [10, 0], [10, 10]], "bottom": -10, "top": 10, "intent": "again", "access": "play"}),
       await session.expectError("createRegion", {"name": "field", "outline": [[0, 0], [10, 0], [10, 10]], "bottom": -10, "top": 10, "intent": "  ", "access": "play"}),
     ]
+    after = await session.expectSuccess("getRegions", {})
+    return before, refusals, after
 
-  empty, inverted, duplicate, blank = stageBlenderServer.session(steps)
+  before, (empty, inverted, blankIntent, twoPoints, badAccess, duplicate, blank), after = stageBlenderServer.session(steps)
   assert "editRegion needs an outline, bottom, top, intent, or access" in empty
   assert "A region's bottom must lie below its top, got 10.0 and 10.0" in inverted
+  assert "A region needs its intent" in blankIntent
+  assert "A region outline is at least three [x, y] points" in twoPoints
+  assert "A region's access is one of ['play', 'view', 'none']" in badAccess and "got 'walk'" in badAccess
   assert "camp" in duplicate and "A region needs its intent" in blank
+  # A refused edit changes nothing: not the access or intent given with the bad value, nor where the region was moved to.
+  assert before["regions"][0]["outline"] == [[5, 0], [15, 0], [15, 10]]
+  assert after == before
 
 
 def testCutContoursByHeightCarriesTheProjection(stageBlenderServer, tmp_path):

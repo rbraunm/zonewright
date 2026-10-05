@@ -89,10 +89,14 @@ def requireAccess(access):
     raise ValueError(f"A region's access is one of {list(regionAccess)} (players walk or swim there; seen but never entered; never reached), got {access!r}")
 
 
-def createRegion(name, outline, bottom, top, intent, access):
-  bridgeObjects.requireNewName(name)
+def requireIntent(intent):
   if not intent.strip():
     raise ValueError("A region needs its intent: what the area is to become")
+
+
+def createRegion(name, outline, bottom, top, intent, access):
+  bridgeObjects.requireNewName(name)
+  requireIntent(intent)
   requireAccess(access)
   regionObject = bpy.data.objects.new(name, regionMesh(name, outline, bottom, top))
   regionObject[bridgeMeshAccess.regionIntentProperty] = intent.strip()
@@ -109,16 +113,20 @@ def editRegion(name, outline, bottom, top, intent, access):
     raise ValueError("editRegion needs an outline, bottom, top, intent, or access")
   if access is not None:
     requireAccess(access)
-    regionObject[bridgeMeshAccess.regionAccessProperty] = access
-  currentOutline, currentBottom, currentTop = bridgeMeshAccess.regionShape(regionObject)
+  if intent is not None:
+    requireIntent(intent)
+  mesh = None
   if outline is not None or bottom is not None or top is not None:
+    currentOutline, currentBottom, currentTop = bridgeMeshAccess.regionShape(regionObject)
+    mesh = regionMesh(name, outline if outline is not None else currentOutline.tolist(), currentBottom if bottom is None else bottom, currentTop if top is None else top)
+  if mesh is not None:
     oldMesh = regionObject.data
     regionObject.matrix_world = mathutils.Matrix.Identity(4)
-    regionObject.data = regionMesh(name, outline if outline is not None else currentOutline.tolist(), currentBottom if bottom is None else bottom, currentTop if top is None else top)
+    regionObject.data = mesh
     bpy.data.meshes.remove(oldMesh)
+  if access is not None:
+    regionObject[bridgeMeshAccess.regionAccessProperty] = access
   if intent is not None:
-    if not intent.strip():
-      raise ValueError("A region needs its intent: what the area is to become")
     regionObject[bridgeMeshAccess.regionIntentProperty] = intent.strip()
   return describeRegion(regionObject)
 

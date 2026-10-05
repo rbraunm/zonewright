@@ -1960,7 +1960,8 @@ async def editRegion(
   context: Context, name: str, outline: list[list[float]] | None = None, bottom: float | None = None, top: float | None = None, intent: str | None = None,
   access: str | None = None,
 ):
-  """Change a region's outline, bottom, top, intent, or access (play, view, or none) as the plan changes."""
+  """Change a region's outline, bottom, top, intent, or access (play, view, or none) as the plan changes. Refused, changing nothing,
+  when any of them is invalid."""
   return await callBridge(context, "editRegion", {"name": name, "outline": outline, "bottom": bottom, "top": top, "intent": intent, "access": access})
 
 
