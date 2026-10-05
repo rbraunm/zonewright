@@ -834,7 +834,7 @@ def entrancePoint(plot):
 def plotEntrances():
   """Each plot's entrance (entrancePoint), facing into the plot: [{plot, at, headingDegrees}]."""
   return [
-    {"plot": plot.name, "at": [round(float(value), 3) for value in entrancePoint(plot)], "headingDegrees": round((facingOf(plot) + 180) % 360, 3)}
+    {"plot": plot.name, "at": [round(float(value), 3) + 0.0 for value in entrancePoint(plot)], "headingDegrees": round((facingOf(plot) + 180) % 360, 3)}
     for plot in plotObjects()
   ]
 

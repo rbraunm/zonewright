@@ -373,4 +373,9 @@ def testRenderSketchDrawsEntriesAndAccess(stageBlenderServer, tmp_path):
     x, y = frame.pixel(point)
     inside = planPixels[round(y), round(x)]
     assert (inside.min() >= 200) if isolated else (inside.max() <= 60), (name, inside)
+  # The plot faces -Y, the plan's right: its own entrance mark points out of the middle of that side, rightward, where its entrance's
+  # arrow stands 10 beyond.
+  x, y = frame.pixel([0, 150])
+  red, green, blue = planPixels[round(y), round(x) + 6]
+  assert red - blue > 80 and red > green > blue, (red, green, blue)
   assert drawn["width"] == sketchView["width"]

@@ -305,6 +305,13 @@ def boundaryLabelSpot(frame, boundary):
   return centroidOf([frame.pixel(point) for area in boundary["areas"] for point in area])
 
 
+def pixelDirection(headingDegrees):
+  """A heading (0 = +Y, clockwise) as a direction in plan pixels, which run with -Y (east) right and +X (north) up: its world step
+  (sin, cos) is (-cos, -sin) there."""
+  heading = math.radians(headingDegrees)
+  return (-math.cos(heading), -math.sin(heading))
+
+
 def drawRegions(draw, frame, regions):
   for region in regions:
     points = [frame.pixel(point) for point in region["outline"]]
@@ -338,9 +345,7 @@ def drawEntries(draw, frame, entries):
     if entry["headingDegrees"] == "keep":
       draw.ellipse([x - entryMarkWidth / 2, y - entryMarkWidth / 2, x + entryMarkWidth / 2, y + entryMarkWidth / 2], outline=(*entryColor, 255), width=3)
       continue
-    heading = math.radians(entry["headingDegrees"])
-    # Plan pixels run with -Y (east) right and +X (north) up, so a heading's (sin, cos) world step is (-cos, -sin) in pixels.
-    ahead = (-math.cos(heading), -math.sin(heading))
+    ahead = pixelDirection(entry["headingDegrees"])
     side = (-ahead[1], ahead[0])
     tip = (x + ahead[0] * entryMarkLength, y + ahead[1] * entryMarkLength)
     back = (x - ahead[0] * entryMarkLength / 2, y - ahead[1] * entryMarkLength / 2)
@@ -357,8 +362,7 @@ def drawPlots(draw, frame, plots):
     points = [frame.pixel(point) for point in plot["corners"]]
     draw.polygon(points, outline=(*plotColor, 255), width=2)
     middle = ((points[0][0] + points[1][0]) / 2, (points[0][1] + points[1][1]) / 2)
-    heading = math.radians(plot["facingDegrees"])
-    out = (math.sin(heading), -math.cos(heading))
+    out = pixelDirection(plot["facingDegrees"])
     side = (-out[1], out[0])
     tip = (middle[0] + out[0] * entranceMarkLength, middle[1] + out[1] * entranceMarkLength)
     draw.polygon([tip, (middle[0] + side[0] * entranceMarkWidth / 2, middle[1] + side[1] * entranceMarkWidth / 2), (middle[0] - side[0] * entranceMarkWidth / 2, middle[1] - side[1] * entranceMarkWidth / 2)], fill=(*plotColor, 255))

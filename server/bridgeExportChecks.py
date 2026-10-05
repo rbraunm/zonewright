@@ -1,6 +1,7 @@
 """Checks before a zone export, writing nothing and changing nothing. Failures stop an export: what no zone file can hold (among it a
 kit that cannot be found), and for a game export what it must have decided (blockout, swimming, the zone row's values, zone line
-targets, structures laid on ground or a kit that changed since, containment). Findings are for an artist to look at: texture coverage
+targets, the player space's regions, their access, and entries on their footing, structures laid on ground or a kit that changed
+since, containment). Findings are for an artist to look at: texture coverage
 (the base material showing where no surfacing layer covers a face, ground borders without a transition strip, stretched or collapsed
 texture coordinates, faces wound against the rest of their surface), and for a test export what a game export would still refuse.
 Each names the object, material, image, and face count, with where the faces lie. The report also gives each structure's models and
