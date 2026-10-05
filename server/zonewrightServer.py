@@ -812,8 +812,8 @@ async def zoneFigureModel(zone):
 
 
 async def scaleFigureModel(zone, view):
-  """The scale figure's model for a view that may stand her (standAt, or a review camera saved from such a view), else None."""
-  return await zoneFigureModel(zone) if {"standAt", "camera"} & set(view) else None
+  """The scale figure's model for a view that may stand her (standAt, standOn, or a review camera saved from a standAt view), else None."""
+  return await zoneFigureModel(zone) if {"standAt", "standOn", "camera"} & set(view) else None
 
 
 @guardedTool(description=(
@@ -826,7 +826,9 @@ async def scaleFigureModel(zone, view):
   ", or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race"
   " default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera, or stood"
   " by hand facing the camera with \"figureAt\": [x,y] or [x,y,z] in the view, its ground found as standAt's is, on a ledge or ramp"
-  " too narrow to walk her ahead on), or {\"map\": {\"center\": [x,y], \"width\": w}}: the layout from straight above, orthographic,"
+  " too narrow to walk her ahead on); {\"standOn\": [x,y,z], \"headingDegrees\": h, \"pitchDegrees\": p} stands so exactly on [x,y,z],"
+  " no ground looked for (a footing another tool found on what the zone ships, as placeEntry's arrival view stands on its entry's);"
+  " or {\"map\": {\"center\": [x,y], \"width\": w}}: the layout from straight above, orthographic,"
   " the game's north (+X) up and east (-Y) right as the in-game map draws, `width` units across (along y), without fog. {\"frame\":"
   " {\"objects\": [names], \"headingDegrees\": h, \"pitchDegrees\": p}} looks at the named meshes, collection instances, or"
   " structures (all their parts) from that heading and pitch, standing back so they fit (its result's eye and target reproduce that"
@@ -2468,15 +2470,17 @@ async def placeEntry(
   port. at [x, y] takes the highest footing there, [x, y, z] the footing from 3 above z down to 50 below it, as standAt finds it, on
   what the zone ships and the client collides with: reference zones, placed client objects, guides, and what players pass through are
   no ground. Refused, changing nothing: no footing, footing steeper than players walk or with less headroom than a player's height
-  (playerScale), footing inside a zone line or a swim volume (players would arrive swimming), or under the surface of a pool or river
-  whose swimming is undecided (a floating pool over the point, with its basin between, is not over it). Placing an entry's name again
-  replaces it; transformObjects moves it and deleteObjects removes it, and getEntries says when one no longer stands on its footing,
-  which a game export refuses. Entries are never exported as geometry. Returns the entry and its arrival view: standing there facing
-  its heading, in client shading, with the scale figure ahead."""
+  (playerScale), a zone line or a swim volume reaching into the player's height over the footing (the client tests a player's origin,
+  which stands somewhere in it by race and size: players would zone out at once, or arrive in the water), or footing under the surface
+  of a pool or river whose swimming is undecided (a floating pool over the point, with its basin between, is not over it). Placing an
+  entry's name again replaces it; transformObjects moves it and deleteObjects removes it, and getEntries says when one no longer
+  stands on its footing, which a game export refuses. Entries are never exported as geometry. Returns the entry and its arrival view:
+  standing on its footing (a standOn view, so reference content there does not lift the eye) facing its heading, in client shading,
+  with the scale figure ahead."""
   placed = await callBridge(context, "placeEntry", {
     "name": name, "at": at, "headingDegrees": headingDegrees, "kind": kind, "fromZone": fromZone, "fromNumber": fromNumber, "isolated": isolated,
   })
-  view = {"standAt": placed["at"], "headingDegrees": placed["headingDegrees"], "pitchDegrees": 0.0}
+  view = {"standOn": placed["at"], "headingDegrees": placed["headingDegrees"], "pitchDegrees": 0.0}
   outputPath = newRenderPath()
   zone = await callBridge(context, "getZoneProperties", {})
   arrival = await callBridge(context, "renderView", {
@@ -2491,8 +2495,11 @@ async def getEntries(context: Context):
   """Every place players arrive, stored and derived, each with its point, heading, source, and state (onFooting, or offFooting with
   the footing found there and how far off): the entries placeEntry placed (zoneIn with fromZone and fromNumber, landing, isolated);
   the safe point; the landing of each zone line whose target is this zone's shortName at a whole point (a teleport, named T<number>);
-  and each plot's entrance, facing into the plot. Footing is read on what the zone ships, as placeEntry reads it. notFollowed lists
-  the zone lines whose landing cannot be placed, with why (a kept coordinate, or no shortName to tell which lead back here)."""
+  and each plot's entrance, facing into the plot. Footing is read on what the zone ships, as placeEntry reads it. The safe point and a
+  teleport's landing are where the client puts a player's origin, as /loc gives it, which stands over the floor, and a plot's entrance
+  stands at the plot's level, so these can read offFooting by that height: the footing given is where players stand there.
+  notFollowed lists the zone lines whose landing cannot be placed, with why (a kept coordinate, or no shortName to tell which lead
+  back here)."""
   return await callBridge(context, "getEntries", {})
 
 

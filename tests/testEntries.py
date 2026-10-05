@@ -32,8 +32,9 @@ async def groundGrid(session, folder, name="ground", size=200, location=(0, 0, 0
 async def entryPlot(session, folder):
   """Flat ground at 0, 200 across, with a dais 10 high at (60, 60), a ramp steeper than players walk at (-60, 0), a slab whose
   underside leaves less than a player's height over the ground at (-60, 60), a pond of undecided swimming at (-60, -60), a terrace
-  floating over the ground at (0, 70), its rim 20 up and a pool of undecided swimming 16 up in its basin, whose floor is 12 up, a swim volume
-  on the ground at (30, -70), one floating 20 over it at (70, -70), and a zone line at (-95, 0)."""
+  floating over the ground at (0, 70), its rim 20 up and a pool of undecided swimming 16 up in its basin, whose floor is 12 up, a swim
+  volume on the ground at (30, -70), one floating 20 over it at (70, -70) and one 3 over it at (-20, -30), a zone line on the ground at
+  (-95, 0), and one 2 over it at (30, 30)."""
   await freshScene(session)
   await groundGrid(session, folder)
   await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "dais", "size": [20, 20, 10], "location": [60, 60, 0]})
@@ -47,7 +48,9 @@ async def entryPlot(session, folder):
   await session.expectSuccess("floodWater", {"name": "terracePool", "seed": [0, 70], "level": 16, "material": "water", "within": [[-12, 58], [12, 58], [12, 82], [-12, 82]]})
   await session.expectSuccess("placeSwimVolume", {"name": "wading", "liquid": "water", "minimum": [20, -80, -5], "maximum": [40, -60, 10]})
   await session.expectSuccess("placeSwimVolume", {"name": "skyPool", "liquid": "water", "minimum": [60, -80, 20], "maximum": [80, -60, 30]})
+  await session.expectSuccess("placeSwimVolume", {"name": "lowPool", "liquid": "water", "minimum": [-25, -35, 3], "maximum": [-15, -25, 10]})
   await session.expectSuccess("placeZoneLine", {"number": 1, "label": "west", "minimum": [-100, -10, -5], "maximum": [-90, 10, 40], "target": otherZone})
+  await session.expectSuccess("placeZoneLine", {"number": 5, "label": "arch", "minimum": [25, 25, 2], "maximum": [35, 35, 12], "target": otherZone})
   await session.expectSuccess("setZoneProperties", environment)
 
 
@@ -71,6 +74,8 @@ def testPlaceEntryStandsOnShippedFooting(stageBlenderServer, tmp_path):
       "terracePool": await session.expectError("placeEntry", entryArguments("inTheTerracePool", [0, 70])),
       "swimBox": await session.expectError("placeEntry", entryArguments("inTheShallows", [30, -70])),
       "zoneLine": await session.expectError("placeEntry", entryArguments("inTheGate", [-95, 0])),
+      "swimBoxOverhead": await session.expectError("placeEntry", entryArguments("underTheLowPool", [-20, -30])),
+      "zoneLineOverhead": await session.expectError("placeEntry", entryArguments("underTheArch", [30, 30])),
       "clash": await session.expectError("placeEntry", entryArguments("dais", [0, 30])),
       "kind": await session.expectError("placeEntry", entryArguments("portal", [0, 30], "portal")),
       "noFromZone": await session.expectError("placeEntry", entryArguments("nowhere", [0, 30], "zoneIn")),
@@ -87,7 +92,7 @@ def testPlaceEntryStandsOnShippedFooting(stageBlenderServer, tmp_path):
     "state": "onFooting", "replaced": False,
   }
   # Its arrival view stands on the footing at a player's eye, facing its heading, with the scale figure ahead.
-  assert placed["arrivalView"]["view"] == {"standAt": [0.0, 0.0, 0.0], "headingDegrees": 90.0, "pitchDegrees": 0.0}
+  assert placed["arrivalView"]["view"] == {"standOn": [0.0, 0.0, 0.0], "headingDegrees": 90.0, "pitchDegrees": 0.0}
   assert placed["arrivalView"]["eye"] == [0.0, 0.0, eyeHeight] and placed["arrivalView"]["figure"][0] > 0
   assert Image.open(io.BytesIO(view)).size == (960, 540) and Path(placed["arrivalView"]["outputPath"]).is_file()
   # [x, y] takes the highest footing: the dais's top.
@@ -103,8 +108,13 @@ def testPlaceEntryStandsOnShippedFooting(stageBlenderServer, tmp_path):
   assert f"slopes {steepDegrees:.1f} degrees, steeper than players walk ({math.degrees(math.acos(walkableNormalZ)):.1f}" in refusals["steep"]
   assert f"has {playerHeight - 1:.2f} of headroom, under a player's height ({playerHeight:g}" in refusals["headroom"]
   assert "under the surface of 'pond', whose swimming is undecided" in refusals["undecided"]
-  assert "inside swim volume 'AWT_wading': players would arrive swimming" in refusals["swimBox"]
-  assert "inside zone line 'ATP_1_west'" in refusals["zoneLine"]
+  # A box reaching into the player's height over the footing refuses it, whether it holds the footing or starts over it: the client
+  # tests a player's origin, which stands somewhere in that height.
+  standing = f"({playerHeight:g} tall, playerScale) reaches into"
+  assert f"A player standing on the footing at [30.0, -70.0, 0.0] {standing} swim volume 'AWT_wading': players would arrive in its water" in refusals["swimBox"]
+  assert f"A player standing on the footing at [-20.0, -30.0, 0.0] {standing} swim volume 'AWT_lowPool'" in refusals["swimBoxOverhead"]
+  assert f"A player standing on the footing at [-95.0, 0.0, 0.0] {standing} zone line 'ATP_1_west'" in refusals["zoneLine"]
+  assert f"A player standing on the footing at [30.0, 30.0, 0.0] {standing} zone line 'ATP_5_arch'" in refusals["zoneLineOverhead"]
   assert "'dais' is the name of 'dais', which is not an entry" in refusals["clash"]
   assert "An entry's kind is one of ['zoneIn', 'landing'], got 'portal'" in refusals["kind"]
   assert "A zoneIn needs fromZone" in refusals["noFromZone"]
@@ -130,6 +140,8 @@ def testEntryFootingIgnoresReferenceContent(stageBlenderServer, tmp_path):
   # kiln there is none.
   assert measured["points"][0][2] > 1 and measured["points"][1][2] > 1
   assert besideKiln["at"] == [20.0, 20.0, 0.0]
+  # Its arrival view stands on that footing, not on the kiln over it.
+  assert besideKiln["arrivalView"]["eye"] == [20.0, 20.0, eyeHeight]
   assert "No ground the zone ships lies at [300.0, 300.0]" in overFarKiln
 
 

@@ -74,10 +74,24 @@ def entryHeading(entry):
   return math.degrees(math.atan2(forward.x, forward.y)) % 360
 
 
-def insideBox(box, point):
-  """Whether a point lies in a box empty (a swim volume or zone line: a unit cube scaled to its half extents), its faces included."""
-  local = box.matrix_world.inverted() @ point
-  return all(abs(component) <= 1.0 for component in local)
+def standsInto(box, footing):
+  """Whether the space a player stands in over a footing, playerHeight up from it, meets a box empty (a swim volume or zone line: a
+  unit cube scaled to its half extents), its faces included. The client tests a player's origin, which stands somewhere in that space
+  by race and size."""
+  inverse = box.matrix_world.inverted()
+  start, end = inverse @ footing, inverse @ (footing + up * playerHeight)
+  low, high = 0.0, 1.0
+  for axis in range(3):
+    step = end[axis] - start[axis]
+    if step == 0:
+      if abs(start[axis]) > 1.0:
+        return False
+      continue
+    near, far = sorted(((-1.0 - start[axis]) / step, (1.0 - start[axis]) / step))
+    low, high = max(low, near), min(high, far)
+    if low > high:
+      return False
+  return True
 
 
 def undecidedSurfaceOver(footing):
@@ -102,11 +116,17 @@ def footingProblem(footing, at):
   if footing.overhead is not None and footing.overhead[0].z - footing.point.z < playerHeight:
     return f"The footing at {point} has {footing.overhead[0].z - footing.point.z:.2f} of headroom, under a player's height ({playerHeight:g}, playerScale)"
   for line in bridgeBoundaries.zoneLineObjects():
-    if bridgeBoundaries.isAuthored(line) and insideBox(line, footing.point):
-      return f"The footing at {point} lies inside zone line '{line.name}': players arriving there would zone out at once"
+    if bridgeBoundaries.isAuthored(line) and standsInto(line, footing.point):
+      return (
+        f"A player standing on the footing at {point} ({playerHeight:g} tall, playerScale) reaches into zone line '{line.name}': players"
+        " arriving there would zone out at once"
+      )
   for box in bridgeSwim.swimBoxes():
-    if insideBox(box, footing.point):
-      return f"The footing at {point} lies inside swim volume '{box.name}': players would arrive swimming"
+    if standsInto(box, footing.point):
+      return (
+        f"A player standing on the footing at {point} ({playerHeight:g} tall, playerScale) reaches into swim volume '{box.name}': players"
+        " would arrive in its water, wading or swimming by its depth"
+      )
   body = undecidedSurfaceOver(footing)
   if body is not None:
     return f"The footing at {point} lies under the surface of '{body}', whose swimming is undecided: whether players arrive wading or swimming is not designed yet (buildSwimVolumes, placeSwimVolume, or editWater swimmable false)"
