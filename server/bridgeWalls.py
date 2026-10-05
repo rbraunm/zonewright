@@ -350,4 +350,4 @@ def wallViewSet(definition, groundHeight):
   return views
 
 
-bridgeStructures.registerKind("wall", "buildWall", wallKeys, layWall, None, wallViewSet)
+bridgeStructures.registerKind("wall", wallKeys, layWall, None, wallViewSet)

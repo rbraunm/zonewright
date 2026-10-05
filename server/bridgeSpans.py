@@ -92,7 +92,7 @@ def postBar(bake, data, center, direction, bottom, top, label):
 
 
 def railBars(bake, rail, tops):
-  """Rail bars from post to post, their tops at the given points (post centers at rail height); returns their length."""
+  """Rail bars between consecutive points, their tops on them, or a rope swept along them, its top on them; returns the rail's length."""
   data, length = rail["data"], 0.0
   if data["record"]["kind"] == "ropeRail":
     cardHeight = size(data, 2)
@@ -109,11 +109,6 @@ def railBars(bake, rail, tops):
     bake.add(stretchedPlaced(data, (span / size(data, 0), 1.0, 1.0), origin, xAxis, yAxis))
     length += span
   return length
-
-
-def ropeLine(tops, follow):
-  """The line a rope follows: the posts' rail tops, or the given points along the deck between them."""
-  return follow if follow is not None else tops
 
 
 def refuseUnderside(what, depth, where, along):
@@ -292,10 +287,10 @@ def layBridge(laying):
   if rail is not None:
     length = 0.0
     for side in rail["sides"]:
-      follow = None
       if rail["data"]["record"]["kind"] == "ropeRail":
-        follow = line + profile.left * side * (width + size(postData, 1)) / 2 + up * rail["height"]
-      length += railBars(bake, rail, ropeLine(railTops[side], follow))
+        length += railBars(bake, rail, line + profile.left * side * (width + size(postData, 1)) / 2 + up * rail["height"])
+      else:
+        length += railBars(bake, rail, railTops[side])
     railReport = {"piece": rail["piece"], "sides": ["left" if side == 1 else "right" for side in rail["sides"]], "height": rail["height"], "length": round(length, 3)}
   bentReport = []
   if bents is not None:
@@ -914,6 +909,6 @@ def walkwayViewSet(definition, groundHeight):
   return views
 
 
-bridgeStructures.registerKind("bridge", "buildBridge", bridgeKeys, layBridge, bridgeWalkLine, bridgeViewSet)
-bridgeStructures.registerKind("stairs", "buildStairs", stairsKeys, layStairs, stairsWalkLine, stairsViewSet)
-bridgeStructures.registerKind("walkway", "buildWalkway", walkwayKeys, layWalkway, walkwayWalkLine, walkwayViewSet, indexKeys=("stairLegs", "legs"))
+bridgeStructures.registerKind("bridge", bridgeKeys, layBridge, bridgeWalkLine, bridgeViewSet)
+bridgeStructures.registerKind("stairs", stairsKeys, layStairs, stairsWalkLine, stairsViewSet)
+bridgeStructures.registerKind("walkway", walkwayKeys, layWalkway, walkwayWalkLine, walkwayViewSet, indexKeys=("stairLegs", "legs"))

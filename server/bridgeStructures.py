@@ -39,7 +39,7 @@ castNudge = bridgeMeshAccess.castNudge
 up = mathutils.Vector((0.0, 0.0, 1.0))
 down = mathutils.Vector((0.0, 0.0, -1.0))
 sideNames = ("both", "left", "right")
-# Each kind: the build tool that makes it, its definition's keys, its lay, its walk line (or None), and its views.
+# Each kind: its definition's keys, its lay, its walk line (or None), and its views.
 kinds = {}
 
 
@@ -49,12 +49,12 @@ def placeCollections():
 
 
 class Kind:
-  def __init__(self, tool, keys, lay, walkLine, views, indexKeys=()):
-    self.tool, self.keys, self.lay, self.walkLine, self.views, self.indexKeys = tool, keys, lay, walkLine, views, indexKeys
+  def __init__(self, keys, lay, walkLine, views, indexKeys=()):
+    self.keys, self.lay, self.walkLine, self.views, self.indexKeys = keys, lay, walkLine, views, indexKeys
 
 
-def registerKind(kind, tool, keys, lay, walkLine, views, indexKeys=()):
-  kinds[kind] = Kind(tool, keys, lay, walkLine, views, indexKeys)
+def registerKind(kind, keys, lay, walkLine, views, indexKeys=()):
+  kinds[kind] = Kind(keys, lay, walkLine, views, indexKeys)
 
 
 def isNumber(value):
@@ -485,11 +485,6 @@ def walkLine(collection):
     beyond = end + mathutils.Vector((end.x - inner.x, end.y - inner.y, 0.0)).normalized() * walkExtension
     extensions.append([list(beyond)] if onFooting(end) and onFooting(beyond) else [])
   return extensions[0] + [list(point) for point in points] + extensions[1]
-
-
-def structureWalkLine(name):
-  collection = bridgeStructureData.findStructure(name)
-  return None if collection is None else walkLine(collection)
 
 
 def groundHeight(x, y):
