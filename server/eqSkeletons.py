@@ -55,6 +55,17 @@ def bindTransforms(worldFile, dags):
   return [frameTransform(trackFrames(worldFile, trackInstance(worldFile, dag["track"])[0])[0]) for dag in dags]
 
 
+def boundingSphere(skeletonFragment):
+  """A skeleton's bounding sphere (0x10): its center's offset (flag 0x1, else none) and radius (flag 0x2); the radius MQPeridotEmu's
+  dumps show a hierarchical actor holding (+0x144) is this times the actor's scale."""
+  body = skeletonFragment.body
+  flags = struct.unpack_from("<I", body, 4)[0]
+  if not flags & 2:
+    raise ValueError(f"Skeleton '{skeletonFragment.name}' stores no bounding radius")
+  center = numpy.array(struct.unpack_from("<3f", body, 16)) if flags & 1 else numpy.zeros(3)
+  return {"center": center, "radius": struct.unpack_from("<f", body, 16 + (12 if flags & 1 else 0))[0]}
+
+
 def readSkeleton(worldFile, skeletonFragment):
   """Bones (dags) with their tracks, children, and attachment; and, when flag 0x200 is set, the skinned meshes' references (0x2D)."""
   body = skeletonFragment.body
@@ -128,10 +139,10 @@ def turnedNormals(normals, transform):
   return turned / numpy.maximum(numpy.linalg.norm(turned, axis=1, keepdims=True), 1e-12)
 
 
-def posedSkeleton(worldFile, skeletonFragment, skinned, meshArrays, localTransforms=None):
+def posedSkeleton(worldFile, skeletonFragment, skinned, skinArrays, attachedArrays, localTransforms=None):
   """Skinned meshes (0x36 fragments rigged to this skeleton) and the meshes attached to its bones, posed by its bones at localTransforms
-  (the bind pose when None), their normals turned with them; meshArrays turns one posed mesh into its part. Also returns each bone's
-  posed transform by name."""
+  (the bind pose when None), their normals turned with them; skinArrays and attachedArrays turn one posed skin or attached mesh into its
+  part. Also returns each bone's posed transform by name."""
   dags, _ = readSkeleton(worldFile, skeletonFragment)
   worldTransforms = poseSkeleton(dags, bindTransforms(worldFile, dags) if localTransforms is None else localTransforms)
   parts = []
@@ -150,11 +161,11 @@ def posedSkeleton(worldFile, skeletonFragment, skinned, meshArrays, localTransfo
       start += count
     if start != len(posed):
       raise ValueError(f"{worldFile.sourceName}: bone pieces of '{mesh['name']}' cover {start} of {len(posed)} vertices")
-    parts.append(meshArrays(mesh | {"vertices": posed, "normals": turned}))
+    parts.append(skinArrays(mesh | {"vertices": posed, "normals": turned}))
   attached, particleClouds = boneAttachments(worldFile, dags)
   for bone, meshFragment in attached:
     mesh = worldFile.mesh(worldFile.fragment(meshFragment.index, 0x36))
     transform = worldTransforms[bone]
     normals = None if mesh["normals"] is None else turnedNormals(mesh["normals"], transform)
-    parts.append(meshArrays(mesh | {"vertices": mesh["vertices"] @ transform[:3, :3].T + transform[:3, 3], "normals": normals}))
+    parts.append(attachedArrays(mesh | {"vertices": mesh["vertices"] @ transform[:3, :3].T + transform[:3, 3], "normals": normals}))
   return parts, particleClouds, {dag["name"]: transform for dag, transform in zip(dags, worldTransforms)}

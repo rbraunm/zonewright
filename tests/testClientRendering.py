@@ -3,6 +3,7 @@ import math
 import sys
 from pathlib import Path
 
+import numpy
 from PIL import Image
 import pytest
 
@@ -147,10 +148,62 @@ def testImportZoneBringsTheClientsZone(stageBlenderServer):
     "archive": "poknowledge.s3d", "format": "wld", "regionMeshes": 1802, "placements": 1249, "placedObjects": 1249,
     "objectArchives": ["poknowledge_obj.s3d"], "missingModels": [], "missingTextures": [], "environmentMapsNotCube": [], "droppedTriangles": 0,
     "particleCloudsNotDrawn": None,
+    "placementColorsIgnoredBySkeletalActors": 0, "placementColorsShort": [], "placementsLitAtLoad": 883, "placementsParkedBelowTheWorld": {},
+    "drawnOtherwise": {},
   }
   assert imported["dimensions"] == [1968.0, 1968.0, 1011.931]
   # A classic zone's zone lines are BSP regions, whose places are not read.
   assert imported["zoneLines"] is None and imported["zoneLinesTilted"] is None
+  assert imported["lights"] == 620 and imported["lightsOfRadiusZero"] == [] and imported["filesTheClientNeverOpens"] == []
+
+
+@pytest.mark.clientData("clientFiles")
+def testImportZoneLeavesOutALightOfRadiusZero(stageBlenderServer):
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    return await session.expectSuccess("importZone", {"zone": "runnyeye"})
+
+  imported = stageBlenderServer.session(steps)
+  # Every Runnyeye placement carries its own vertex colors; one of its 383 lights has radius 0, which lights nothing in the client.
+  assert imported["source"]["placements"] == imported["source"]["placedObjects"] == 648 and imported["source"]["placementColorsShort"] == []
+  assert imported["lights"] == 382 and imported["lightsOfRadiusZero"] == ["L277_LDEF"]
+
+
+@pytest.mark.clientData("clientFiles")
+def testObjectsAZoneParksBelowTheWorldStandThereWithoutStretchingLayoutBands(stageBlenderServer):
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    imported = await session.expectSuccess("importZone", {"zone": "cauldron"})
+    await session.expectSuccess("setZoneProperties", environment)
+    _, layout = await session.expectImage("renderView", {"view": {"map": {"center": [0, 0], "width": 6000}}, "shading": "layout", "bandHeight": 50})
+    return imported, layout
+
+  imported, layout = stageBlenderServer.session(steps)
+  # The Cauldron parks eight rocks at -32767.998, as the RoF2 client draws them: the zone object reaches down to them, while its
+  # layout bands run over the zone itself, from its lowest point at -468.469.
+  assert imported["source"]["placementsParkedBelowTheWorld"] == {"CAULROCK1_ACTORDEF": 3, "CAULROCK3_ACTORDEF": 5}
+  assert imported["dimensions"][2] > 33000
+  assert layout["heightRange"] == [-468.469, 727.938]
+
+
+@pytest.mark.clientData("clientFiles")
+def testAViewsCharacterSetsTheSpecialAmbientOfTheFloorItStandsOn(stageBlenderServer):
+  view = {"eye": [-2061.1, -665.3, 95.5], "target": [-2000, -665.3, 92]}
+
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    await session.expectSuccess("importZone", {"zone": "cauldron"})
+    await session.expectSuccess("setZoneProperties", environment)
+    bare, _ = await session.expectImage("renderView", {"view": view})
+    standing, described = await session.expectImage("renderView", {"view": view, "carriedLight": {"lightType": 0, "at": [-2061.1, -665.3, 90.0], "headingDegrees": 0}})
+    return bare, standing, described
+
+  bare, standing, described = stageBlenderServer.session(steps)
+  # The Cauldron's floor there carries alpha about 11 at its corners, below the least share of scene light, 0.1: a character standing on
+  # it takes the special ambient 0.08 times 0.9, 18/255 in each channel, in place of the zone's own 0.05, 0, 0, and carries no light.
+  assert described["viewer"] == {"share": 0.1, "specialAmbientColor": [18 / 255] * 3, "character": "HUM of height 6"} and "carriedLight" not in described
+  bareMean, standingMean = (numpy.asarray(Image.open(io.BytesIO(image)).convert("RGB"), dtype=float).mean(axis=(0, 1)) for image in (bare, standing))
+  assert standingMean[1] > bareMean[1] + 1 and standingMean[2] > bareMean[2] + 1
 
 
 def pixelAt(image, x, y):
@@ -263,7 +316,26 @@ def testImportZoneBringsATerrainZone(stageBlenderServer):
     "placements": 5730, "objectGroups": 5, "missingObjectGroups": ["drgbrownie"],
   }
   # Every tile placement is drawn, plus the merchant tent and the zone-out wall of the two object groups the archive holds; the wall's
-  # baked light file does not fit its model.
+  # baked light file does not fit its model. No quad is a hole and every map and baked light file the zone names is in its archive.
   assert source["placedObjects"] == 5732
   assert source["litFilesNotMatchingModels"] == ["zoneout_obj_zone_out.lit"]
   assert source["missingModels"] == [] and source["missingTextures"] == []
+  assert (source["holeQuads"], source["terrainMapsMissing"], source["litFilesMissing"], source["litFilesShorterThanTheirCount"]) == (0, {}, [], [])
+
+
+@pytest.mark.clientData("clientFiles")
+def testATerrainDetailMapTheArchiveLacksDrawsBlack(stageBlenderServer):
+  # cryptofshade.eqg names detail map di_hill_grass_muddy.dds and normal map ground_grass_10n.dds for the only layer of 'grass', the
+  # ecosystem on every tile, without holding either: the client's empty sampler reads black, so the ground draws black where no later
+  # ecosystem covers it, while its placed rocks draw with their textures.
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    imported = await session.expectSuccess("importZone", {"zone": "cryptofshade"})
+    await session.expectSuccess("setZoneProperties", environment | {"fogOn": False})
+    image, _ = await session.expectImage("renderView", {"view": {"map": {"center": [-300, 1300], "width": 2400}}, "guides": False})
+    return imported, image
+
+  imported, image = stageBlenderServer.session(steps)
+  assert imported["source"]["terrainMapsMissing"] == {"detailMaps": ["di_hill_grass_muddy.dds"], "normalMaps": ["ground_grass_10n.dds"]}
+  pixels = numpy.asarray(Image.open(io.BytesIO(image)).convert("RGB"), dtype=numpy.int64)
+  assert (pixels.max(axis=2) <= 2).mean() > 0.9 and pixels.max() > 40

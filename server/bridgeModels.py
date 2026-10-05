@@ -14,25 +14,23 @@ import bridgeObjects
 import bridgeSurfacing
 
 alphaThreshold = 0.5
-missingTextureColor = (1.0, 0.0, 1.0, 1.0)
+# Direct3D 9 reads a sampler with no texture bound as 0, 0, 0, 1.
+emptySamplerColor = (0.0, 0.0, 0.0, 1.0)
 untinted = 0xFFFFFF
 liquidKeyProperty = "eqLiquidKey"
 
 
-def missingTextureMaterial(textureName):
-  """Faces whose texture no linked archive holds: flat magenta, unlit and unfogged, so the gap is visible in every render."""
-  materialName = f"eq_missing_{textureName}"
+def missingTextureMaterial(textureName, lit):
+  """Faces whose texture no linked archive holds: the client's effect samples no texture there, which reads black and opaque, so they
+  draw black, lit and fogged as any surface (docs/clientRendering.md, EQG zones)."""
+  materialName = f"eq_missing_{textureName}{'_lit' if lit else ''}"
   material = bpy.data.materials.get(materialName)
   if material is None:
     material = bpy.data.materials.new(materialName)
     material.use_nodes = True
-    nodes = material.node_tree.nodes
-    for unused in [node for node in nodes if node.type == "BSDF_PRINCIPLED"]:
-      nodes.remove(unused)
-    emission = nodes.new("ShaderNodeEmission")
-    emission.inputs["Color"].default_value = missingTextureColor
-    output = next(node for node in nodes if node.type == "OUTPUT_MATERIAL")
-    material.node_tree.links.new(emission.outputs["Emission"], output.inputs["Surface"])
+    empty = material.node_tree.nodes.new("ShaderNodeRGB")
+    empty.outputs["Color"].default_value = emptySamplerColor
+    bridgeClientLight.surfaceOutput(material, empty.outputs["Color"], None, "opaque", lit, alphaThreshold)
   return material
 
 
@@ -94,7 +92,8 @@ def dataImage(path):
 
 def terrainMaterial(folder, comboIndex):
   """A terrain tile's ecosystems as the client draws them (docs/clientRendering.md, EQ terrain), its passes summed: per ecosystem, its
-  color map times twice the detail textures weighed by its detail mask, times the vertex tint, weighed by the color map's coverage."""
+  color map times the detail textures weighed by its detail mask, times the vertex tint (doubled by the bump effects, tintScale),
+  weighed by the color map's coverage."""
   materialName = f"eq_{os.path.basename(folder)}_terrain{comboIndex}"
   material = bpy.data.materials.get(materialName)
   if material is not None and material.get("eqFolder") == folder:
@@ -131,7 +130,6 @@ def terrainMaterial(folder, comboIndex):
   tint = nodes.new("ShaderNodeAttribute")
   tint.attribute_type = "GEOMETRY"
   tint.attribute_name = bridgeClientLight.tintAttribute
-  doubledTint = vectorMath("SCALE", tint.outputs["Color"], 2.0)
   total = None
   for slot in combo:
     colorMap = texture(slot["colorMap"], atlas.outputs["UV"], "EXTEND")
@@ -142,7 +140,7 @@ def terrainMaterial(folder, comboIndex):
       repeated = vectorMath("SCALE", detail.outputs["UV"], float(layer["repeat"]))
       weighed = vectorMath("SCALE", texture(layer["texture"], repeated, "REPEAT").outputs["Color"], weights.outputs[channel])
       details = weighed if details is None else vectorMath("ADD", details, weighed)
-    passColor = vectorMath("MULTIPLY", vectorMath("MULTIPLY", colorMap.outputs["Color"], details), doubledTint)
+    passColor = vectorMath("MULTIPLY", vectorMath("MULTIPLY", colorMap.outputs["Color"], details), vectorMath("SCALE", tint.outputs["Color"], float(slot["tintScale"])))
     covered = vectorMath("SCALE", passColor, colorMap.outputs["Alpha"])
     total = covered if total is None else vectorMath("ADD", total, covered)
   bridgeClientLight.surfaceOutput(material, total, None, "opaque", True, alphaThreshold)
@@ -174,6 +172,8 @@ def buildModelMesh(folder, meshName):
   if "trianglePassable" in data:
     passable = mesh.attributes.new(bridgeMeshAccess.passableAttribute, "BOOLEAN", "FACE")
     passable.data.foreach_set("value", data["trianglePassable"].astype(bool))
+  if "heightsWithoutParked" in data:
+    mesh[bridgeMeshAccess.heightsWithoutParkedProperty] = [float(value) for value in data["heightsWithoutParked"]]
   if "detailUVs" in data:
     detailLayer = mesh.uv_layers.new(name=bridgeClientLight.detailUVMap)
     detailLayer.data.foreach_set("uv", data["detailUVs"][triangles.ravel()].astype(numpy.float32).ravel())
@@ -185,7 +185,7 @@ def buildModelMesh(folder, meshName):
     if key[0].startswith("terrain:"):
       mesh.materials.append(terrainMaterial(folder, int(key[0].split(":")[1])))
     elif key[0] in missing:
-      mesh.materials.append(missingTextureMaterial(key[0]))
+      mesh.materials.append(missingTextureMaterial(key[0], lit))
     elif str(liquid):
       mesh.materials.append(liquidModelMaterial(folder, key[0], json.loads(str(liquid)), lit))
     else:
@@ -226,6 +226,16 @@ def placeModel(modelFolder, name, location, rotationDegrees, scale, avatarHeight
   return bridgeObjects.describeTransform(placed) | {"ground": ground and bridgeObjects.roundVector(ground), "dimensions": bridgeObjects.roundVector(placed.dimensions)}
 
 
+def importedZones():
+  """The client zones importZone placed in the scene: each object's name (the zone's short name) and whether it still stands where the
+  import placed it (unmoved, unturned, unscaled)."""
+  return {"zones": [
+    {"name": sceneObject.name, "asImported": sceneObject.matrix_world == mathutils.Matrix.Identity(4)}
+    for sceneObject in bpy.context.scene.objects if sceneObject.type == "MESH" and sceneObject.get(bridgeMeshAccess.clientContentProperty) == "zone"
+  ]}
+
+
 commands = {
   "placeModel": (placeModel, True),
+  "importedZones": (importedZones, False),
 }

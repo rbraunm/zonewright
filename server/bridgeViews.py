@@ -431,7 +431,19 @@ def sceneCorners(preview):
 
 
 def sceneHeightRange(preview):
-  heights = [corner.z for corner in sceneCorners(preview)]
+  """The lowest and highest the scene's meshes reach, an imported zone's without the objects it parks far below itself."""
+  depsgraph = preview.depsgraph()
+  heights = []
+  for sceneObject in preview.scene.objects:
+    if sceneObject.type != "MESH":
+      continue
+    corners = [mathutils.Vector(corner) for corner in sceneObject.evaluated_get(depsgraph).bound_box]
+    withoutParked = sceneObject.data.get(bridgeMeshAccess.heightsWithoutParkedProperty)
+    if withoutParked is not None:
+      corners = [mathutils.Vector((corner.x, corner.y, height)) for corner in corners for height in withoutParked]
+    heights += [(sceneObject.matrix_world @ corner).z for corner in corners]
+  if not heights:
+    raise ValueError("The scene has no meshes")
   return min(heights), max(heights)
 
 
@@ -623,11 +635,14 @@ def liquidTimeModulo(liquidTime):
   return math.fmod(liquidTime, 100.0)
 
 
-def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes, labels, emitters, frame=None, liquidTime=None):
+def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes, labels, emitters, frame=None, liquidTime=None, carriedLight=None):
   """Render a view; in client shading the zone's point lights and emitters are drawn too (emitters: the server's prepared emitter
-  assets, or None without a client), and its liquids as they stand at liquidTime on the effect clock (0 when it is None)."""
+  assets, or None without a client), its liquids as they stand at liquidTime on the effect clock (0 when it is None), and the light
+  the view's character carries (a clientPointLights.carriedLight record, or None)."""
   if shading not in viewShadings:
     raise ValueError(f"shading must be one of {list(viewShadings)}, got '{shading}'")
+  if carriedLight is not None and shading != "client":
+    raise ValueError(f"A carried light draws only in client shading, not '{shading}'")
   if frame is not None and ("map" in view or "camera" in view):
     raise ValueError("A frame is set for an eye, standAt, or frame view; a map keeps the preview's frame and a review camera its own")
   if liquidTime is not None:
@@ -648,7 +663,7 @@ def renderView(sourceScene, zone, sky, view, outputPath, figureModel, shading, b
     if labels is not None or shading in valueShadings:
       description |= bridgeShadings.prepareView(preview, shading, labels, os.path.splitext(outputPath)[0] + "_pass.exr")
     if shading == "client":
-      description["pointLights"] = bridgePointLights.applyPointLights(preview, sourceScene)
+      description["pointLights"] = bridgePointLights.applyPointLights(preview, sourceScene, [] if carriedLight is None else [carriedLight])
       description["emitters"] = bridgeEmitterDrawing.drawEmitters(preview, sourceScene, emitters)
     if shading == "coverage":
       description["coverage"] = bridgeExportChecks.drawCoverage(preview)

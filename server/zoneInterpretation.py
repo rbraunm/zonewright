@@ -6,7 +6,7 @@ import re
 import shutil
 from pathlib import Path
 
-import eqZones
+import zoneSources
 import zoneSurvey
 
 versionPattern = re.compile(r"^Interpretive procedure version: (\d+)$", re.MULTILINE)
@@ -235,8 +235,8 @@ def interpretationFolder(toolingRoot, zoneName):
 
 
 def drawnVariantHashes(clientRoot, cache, zoneName):
-  """The key of the variant importZone draws for the zone, and its source files' SHA-256 now."""
-  key, source = eqZones.drawnVariant(clientRoot, zoneName)
+  """The key of the variant the client loads for the zone, which importZone draws, and its source files' SHA-256 now."""
+  key, source = zoneSources.loadedVariant(clientRoot, zoneName)
   return key, zoneSurvey.variantFileHashes(clientRoot, cache, {key: source})[key]
 
 

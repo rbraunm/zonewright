@@ -25,6 +25,7 @@ import assetSurvey
 import blenderBridge
 import buildTolerances
 import checkpoints
+import clientPointLights
 import conceptComparison
 import emitterAssets
 import eqAxes
@@ -37,17 +38,21 @@ import eqgFiles
 import eqModels
 import eqRaces
 import eqRecording
+import eqArchive
 import eqSky
 import eqTextures
+import eqWorldFile
 import eqZones
 import exportPipeline
 import extensionCatalog
+import loadTimeLight
 import machineProfile
 import planDrawing
 import playerScale
 import recastHelper
 import skyDrawing
 import toolingLog
+import viewerLight
 import viewSheets
 import toolingManifest
 import toolingStatus
@@ -198,6 +203,7 @@ def modelSummary(details):
     "model": details["model"], "kind": definition["kind"], "archive": definition["archive"], "linkedBy": definition["via"], "tier": definition["tier"],
     "pose": details["pose"], "pieces": details["pieces"], "unattached": details["unattached"], "swappedMaterials": details["swappedMaterials"],
     "missingTextures": details["missingTextures"], "droppedTriangles": details["droppedTriangles"], "particleCloudsNotDrawn": details["particleCloudsNotDrawn"],
+    "drawnOtherwise": details["drawnOtherwise"],
   }
 
 
@@ -443,7 +449,7 @@ async def getZoneNotes(context: Context, zone: str, text: str | None = None):
   if not zoneSurvey.brewallMapPaths(clientRoot, zoneName):
     raise ToolError(f"No Brewall map files for zone '{zone}' in {clientRoot / 'maps' / 'Brewall'}")
   try:
-    variant = eqZones.drawnVariant(clientRoot, zoneName)[0]
+    variant = zoneSources.loadedVariant(clientRoot, zoneName)[0]
   except ValueError as error:
     raise ToolError(f"Zone '{zone}' has Brewall maps, but its labels cannot be placed against the zone: {error}") from error
   surveys, _ = await anyio.to_thread.run_sync(zoneSurvey.surveyMeasured, clientRoot, toolingRoot, [zoneName], ["dimensions"], progressReporter(context))
@@ -772,6 +778,7 @@ async def setZoneProperties(
   safePoint: list[float] | None = None,
   underworld: float | None = None,
   shortName: str | None = None,
+  zoneId: int | None = None,
 ):
   """Set the zone's EQ properties stored in the .blend, in the client's lighting terms (docs/clientRendering.md): ambient, special
   ambient, bounce, and sun colors (0-1, raw as the client uses them); the direction toward the sun (azimuth 0 = +Y, clockwise;
@@ -790,12 +797,13 @@ async def setZoneProperties(
   row's safe point; heading 0 = +Y, clockwise) and underworld the height below it under which the client puts a falling player back;
   a game export needs both, with ground the zone ships under the safe point above the underworld. shortName is the zone's short name
   (1 to 31 lowercase letters and digits): a zone line whose target is it leads back into this zone, a teleport whose landing
-  getEntries lists. The result gives how the client resolves the sky and the light it supplies."""
+  getEntries lists. zoneId is the zone's id as the server sends it (the zone header's ZoneID), by which the client caps the reach of
+  the lights characters carry (renderView carriedLight). The result gives how the client resolves the sky and the light it supplies."""
   updates = {
     "ambientColor": ambientColor, "specialAmbientColor": specialAmbientColor, "bounceColor": bounceColor, "sunColor": sunColor,
     "sunAzimuthDegrees": sunAzimuthDegrees, "sunElevationDegrees": sunElevationDegrees, "fogColor": fogColor, "fogStart": fogStart,
     "fogEnd": fogEnd, "fogDensity": fogDensity, "fogOn": fogOn, "minClip": minClip, "maxClip": maxClip, "newEngineZone": newEngineZone, "sky": sky,
-    "safePoint": safePoint, "underworld": underworld, "shortName": shortName,
+    "safePoint": safePoint, "underworld": underworld, "shortName": shortName, "zoneId": zoneId,
   }
   given = {key: value for key, value in updates.items() if value is not None}
   if not given:
@@ -805,6 +813,72 @@ async def setZoneProperties(
   stored = await callBridge(context, "setZoneProperties", {"updates": given})
   resolved = await zoneSky(stored["zone"])
   return stored | {"sky": None if resolved is None else {key: resolved[key] for key in ("chain", "dayFraction", "lightFrom", "environment")}}
+
+
+def viewersCarriedLight(zone, carriedLight):
+  """The light the view's character carries (clientPointLights.carriedLight) from a view's carriedLight, or None without one or for a
+  character carrying none (light type 0)."""
+  if carriedLight is None:
+    return None
+  keys = {"lightType", "at", "headingDegrees"}
+  if not isinstance(carriedLight, dict) or set(carriedLight) != keys:
+    raise ToolError(f"carriedLight is {{lightType, at, headingDegrees}}, got {carriedLight!r}")
+  at = carriedLight["at"]
+  if not isinstance(at, list) or len(at) != 3 or not all(isinstance(value, (int, float)) and not isinstance(value, bool) for value in at):
+    raise ToolError(f"carriedLight's at is the character's feet [x, y, z], got {at!r}")
+  if isinstance(carriedLight["lightType"], bool) or not isinstance(carriedLight["lightType"], int):
+    raise ToolError(f"carriedLight's lightType is the spawn's light, an integer, got {carriedLight['lightType']!r}")
+  if carriedLight["lightType"] == 0:
+    return None
+  if "zoneId" not in zone:
+    raise ToolError("A carried light's reach depends on the zone's id (the zone header's ZoneID): set zoneId with setZoneProperties")
+  try:
+    return clientPointLights.carriedLight(carriedLight["lightType"], at, float(carriedLight["headingDegrees"]), zone["zoneId"])
+  except ValueError as error:
+    raise ToolError(str(error)) from error
+
+
+classicZoneFloors = {}
+
+
+def zoneFloors(clientRoot, zoneName):
+  """The floors a drop in a client zone lands on (loadTimeLight.ShareFloors), kept for the server's life by the zone's archive and its
+  state; None for a zone the client loads as an EQG or EQ terrain zone."""
+  source = zoneSources.loadedVariant(clientRoot, zoneName)[1]
+  if source["format"] != "wld":
+    return None
+  state = source["archive"].stat()
+  key = (str(source["archive"]), state.st_size, state.st_mtime_ns)
+  if key not in classicZoneFloors:
+    archive = eqArchive.EQArchive(source["archive"])
+    meshes = eqWorldFile.WorldFile(archive.read(f"{zoneName}.wld"), f"{source['archive'].name}:{zoneName}.wld").meshes()
+    classicZoneFloors[key] = loadTimeLight.ShareFloors(meshes, eqZones.colorlessRegionColor[3])
+  return classicZoneFloors[key]
+
+
+async def viewersSpecialAmbient(context, zone, carriedLight):
+  """The special ambient the client gives a view's character where it stands (viewerLight), with the share of scene light it stands
+  in, for a view that says where its character stands (carriedLight) in an imported classic zone; for an EQG or EQ terrain zone, why
+  the zone's own specialAmbientColor stands; None without a character or an imported zone."""
+  if carriedLight is None:
+    return None
+  imported = (await callBridge(context, "importedZones", {}))["zones"]
+  if not imported:
+    return None
+  if len(imported) > 1:
+    raise ToolError(f"The share of scene light under a view's character is found in one imported zone, and the scene holds {[entry['name'] for entry in imported]}")
+  if not imported[0]["asImported"]:
+    raise ToolError(f"'{imported[0]['name']}' has moved since importZone placed it; the share of scene light under a view's character is found on the zone as the client places it")
+  clientRoot = zoneSources.resolveClientRoot()
+  try:
+    floors = await anyio.to_thread.run_sync(zoneFloors, clientRoot, imported[0]["name"])
+    if floors is None:
+      return {"share": None, "why": "how the client finds the share of scene light under a character in an EQG or EQ terrain zone is not traced; the zone's specialAmbientColor stands"}
+    body = await anyio.to_thread.run_sync(viewerLight.viewerBody, clientRoot, toolingRoot / "models", bool(zone["newEngineZone"]))
+  except (OSError, ValueError) as error:
+    raise ToolError(str(error)) from error
+  share = viewerLight.viewerShare(floors, carriedLight["at"], body)
+  return {"share": round(share, 6), "specialAmbientColor": viewerLight.specialAmbient(share), "character": f"{viewerLight.viewerModel} of height {viewerLight.viewerHeight}"}
 
 
 async def zoneFigureModel(zone):
@@ -872,21 +946,33 @@ async def scaleFigureModel(zone, view):
   " `liquidTime` seconds on the client's effect clock, each layer scrolled by its slides as the client's effects scroll it (time"
   " modulo 100): two views a second or two apart show which way and how fast a fall or river moves (liquid materials made before"
   " previews scrolled are refused, to be made again); emitters draw at the same moment of their steady state either way."
+  " carriedLight {\"lightType\": n, \"at\": [x, y, z], \"headingDegrees\": h} draws, in client shading, the light the character the view"
+  " belongs to carries, as the client draws a character's light source: n is its light type (the dumps' spawn light, 1-15, or 0 for a"
+  " character carrying none), at its feet and h its heading (0 = +Y, clockwise); the light takes its type's color and reach (capped by"
+  " the zone's zoneId, which must be set), stands 4 above the feet and 2 toward +X (within 5 degrees), outranks the zone's lights, and"
+  " lights baked geometry too; the result gives it. In an imported classic zone the character also sets the view's special ambient as"
+  " the client sets it for the player: the floor of its vision (0.08) times one less the share of scene light of the floor under it,"
+  " found by the drop the client makes under the player's actor, the character taken to be a human of height 6; the result's viewer"
+  " gives the share and the color, or, for an EQG or EQ terrain zone, why the zone's specialAmbientColor stands."
 ))
 async def renderView(
   context: Context, view: dict, shading: str = "client", bandHeight: float = 50.0, guides: bool = True, swimVolumes: bool = False, labels: list[str] | None = None,
   liquidTime: float | None = None,
+  carriedLight: dict | None = None,
 ):
   outputPath = newRenderPath()
   zone = await callBridge(context, "getZoneProperties", {})
+  carried = viewersCarriedLight(zone, carriedLight)
+  viewer = await viewersSpecialAmbient(context, zone, carriedLight)
   description = await callBridge(context, "renderView", {
     "view": view, "outputPath": str(outputPath), "figureModel": await scaleFigureModel(zone, view), "shading": shading, "bandHeight": bandHeight,
     "guides": guides, "sky": await zoneSky(zone), "swimVolumes": swimVolumes, "labels": labels, "emitters": await previewEmitterAssets(),
     "liquidTime": liquidTime,
+    "carriedLight": carried, "viewerSpecialAmbient": viewer and viewer.get("specialAmbientColor"),
   })
   if labels is not None:
     await anyio.to_thread.run_sync(viewSheets.writeNames, outputPath, description["labels"]["shown"])
-  return [Image(data=outputPath.read_bytes(), format="png"), description]
+  return [Image(data=outputPath.read_bytes(), format="png"), description | ({} if carried is None else {"carriedLight": carried}) | ({} if viewer is None else {"viewer": viewer})]
 
 
 placementHelp = (
@@ -895,7 +981,7 @@ placementHelp = (
   " eqgame.exe turns a spawn toward a point. zone names the zone whose archives the client"
   " loads (none searches only the global lists); the model is found through the client's own links (see findModel), never by name in an"
   " unrelated archive. source (\"archive\" or \"archive:entry\") takes a definition other than the first the client loads."
-  " The result's source lists the archive and link used and anything the client data lacks (missingTextures draw magenta)."
+  " The result's source lists the archive and link used and anything the client data lacks (missingTextures draw black, as the client's effect reads a sampler with no texture)."
 )
 
 
@@ -1020,13 +1106,26 @@ def bridgeEmitters(emitters):
   return [{key: list(value) if key == "position" else value for key, value in emitter.items()} | {"name": emitter["name"] or f"emitter{emitter['definition']}"} for emitter in emitters]
 
 
+def emittersNotMade(emitters):
+  """The list's lines the client makes no emitter for, grouped by why (eqEmitters.notMadeReason), against the client's environment
+  emitter definitions."""
+  try:
+    definitionsPath = eqEmitterDefinitions.environmentDefinitionsPath(zoneSources.resolveClientRoot())
+    definitionCount = len(eqEmitterDefinitions.parseDefinitions(definitionsPath.read_bytes(), definitionsPath.name))
+  except (OSError, ValueError) as error:
+    raise ToolError(str(error)) from error
+  return eqEmitters.notMadeGroups(emitters, definitionCount)
+
+
 async def placeZoneEnvironment(context, zone, lights, emitters, clientContent):
-  """A placed zone's lights and emitters, each set in its own collection named for the zone; None for what is not read."""
-  placed = {"lights": None if lights is None else 0, "emitters": 0}
+  """A placed zone's lights and emitters, each set in its own collection named for the zone, the emitters as its list holds them
+  with the lines the client makes no emitter for listed (none drawn in previews); None for what is not read."""
+  placed = {"lights": None if lights is None else 0, "emitters": 0, "emittersNotMade": []}
   if lights:
     placed["lights"] = (await callBridge(context, "placeLights", {"lights": bridgeLights(lights), "collection": f"{zone} lights", "clientContent": clientContent}))["lights"]
   if emitters:
     placed["emitters"] = (await callBridge(context, "placeEmitters", {"emitters": bridgeEmitters(emitters), "collection": f"{zone} emitters", "clientContent": clientContent}))["emitters"]
+    placed["emittersNotMade"] = emittersNotMade(emitters)
   return placed
 
 
@@ -1051,26 +1150,44 @@ def readEmitterList(path):
 async def importZone(context: Context, zone: str, collection: str | None = None):
   """Bring a client zone into the open scene as one object named for it, drawn as the client draws it, with the vertex colors and normals
   the client lights it by: a classic (WLD) zone's region meshes and the objects its objects.wld places, or an EQ terrain zone's tiles
-  (each ecosystem's cover and detail textures blended as the client blends them) and the objects and object groups its tiles place on
-  the ground, or an EQG (EQGZ) zone's terrain and placed models (the loose .zon beside the archive when the client has one, as it
-  loads it), with baked light where its count fits each model. It keeps the zone file's coordinates, which the scene shares (Blender
+  (each ecosystem's cover and detail textures blended as the client blends them, hole quads left out) and the objects and object
+  groups its tiles place, or an EQG (EQGZ) zone's terrain and placed models, from the loose .zon beside the archive when the client has
+  one, as it loads it, with baked light where its count fits each model; the result lists what the client draws without (maps and
+  baked light files the archive lacks or that do not fit). A skinned (boned) model an EQG or EQ terrain zone places is posed at the
+  first key of its <model>_DEFAULT animation, which the client loops from a random point (the bind pose without one). The result's
+  source counts what the build left out or drew in another way by model (bakedLightNotFitting, bakedLightPastFileEnd, animatedModels),
+  never by placement; the triangles drawn by a stand-in, by stand-in (drawnOtherwise: an MPL material by its diffuse alone, an AddAlpha
+  one opaque, water opaque and without point light 0, lava taking point light 0 through its vertex light); and what an EQ terrain zone holds
+  that the client draws and the preview does not (waterNotDrawn, radialFloraNotDrawn, lightsNotDrawn, each None where it holds none).
+  A classic zone's placed static objects without colors of their own draw with the colors the client computes for them at load
+  (placementsLitAtLoad); those it parks near -32768, far below itself, stand there as in the client and are named by actor
+  (placementsParkedBelowTheWorld), and layout and relief shadings band heights without them. It keeps the zone file's coordinates, which the scene shares (Blender
   x, y are the server's y, x). The zone's lights (classic and EQG zones) come in as point lights in "<zone> lights" and its emitters as
-  empties in "<zone> emitters", as placeLights and placeEmitters make them. An EQG zone's zone-line regions come in as zone-line guides in
+  empties in "<zone> emitters", as placeLights and placeEmitters make them, every line of its emitter list among them; emittersNotMade
+  groups the lines the client makes no emitter for (a negative or too high definition index, a lifespan of 0 or less), which previews
+  do not draw. An EQG zone's zone-line regions come in as zone-line guides in
   "<zone> zone lines", as placeZoneLine makes them, named as the zone file names them (the number the client reads from the name) and
   turned about Z as it turns them, with no target (the zone file never says where one leads; the server's zone points do); getZoneLines
   lists them and plans and views draw them. Those with a tilt field set, whose reading is untraced, are listed in zoneLinesTilted, not
   placed. A classic or EQ terrain zone's zone lines are not read (zoneLines None). Water whose environment map is not a DDS cube map,
-  which the client cannot load and so draws without a reflection, is drawn so and its maps listed in source.environmentMapsNotCube."""
+  which the client cannot load and so draws without a reflection, is drawn so and its maps listed in source.environmentMapsNotCube.
+  Lights of radius 0, which light nothing in the client, are left out and named in lightsOfRadiusZero; files beside the zone that the
+  client never opens (a Luclin zone's <zone>.dat) are named in filesTheClientNeverOpens."""
   placed = await placeZone(context, zone, collection)
   clientRoot = zoneSources.resolveClientRoot()
   try:
     lights = await anyio.to_thread.run_sync(eqZones.zoneLights, clientRoot, zone)
     emitters = readEmitterList(eqEmitters.emitterListPath(clientRoot, zone))
     zoneLines = await anyio.to_thread.run_sync(eqZones.zoneLines, clientRoot, zone)
+    unreadFiles = eqZones.unreadZoneFiles(clientRoot, zone)
   except ValueError as error:
     raise ToolError(str(error)) from error
-  environment = await placeZoneEnvironment(context, zone, lights, emitters, "zone")
-  return placed | environment | (await placeZoneLineGuides(context, zone, zoneLines, "zone") if zoneLines is not None else {"zoneLines": None, "zoneLinesTilted": None})
+  drawnLights = None if lights is None else [light for light in lights if not eqZones.lightsNothing(light)]
+  radiusZero = [light["name"] for light in lights or [] if eqZones.lightsNothing(light)]
+  environment = await placeZoneEnvironment(context, zone, drawnLights, emitters, "zone")
+  return placed | environment | {"lightsOfRadiusZero": radiusZero, "filesTheClientNeverOpens": unreadFiles} | (
+    await placeZoneLineGuides(context, zone, zoneLines, "zone") if zoneLines is not None else {"zoneLines": None, "zoneLinesTilted": None}
+  )
 
 
 zoneFileSourceKeys = ("zoneCacheFormat", "modelCacheFormat", "sha256", "textureSources", "lit", "minimum", "maximum")
@@ -1087,8 +1204,9 @@ async def importZoneFile(context: Context, path: str, collection: str | None = N
   archivePath = Path(path)
   if not archivePath.is_absolute() or archivePath.suffix.lower() != ".eqg" or not archivePath.is_file():
     raise ToolError(f"'{path}' is not an absolute path to an existing .eqg file")
+  clientRoot = zoneSources.resolveClientRoot()
   try:
-    folder, details = await anyio.to_thread.run_sync(eqZones.buildZoneFile, toolingRoot / "models", archivePath)
+    folder, details = await anyio.to_thread.run_sync(eqZones.buildZoneFile, clientRoot, toolingRoot / "models", archivePath)
   except (OSError, ValueError) as error:
     raise ToolError(f"{type(error).__name__}: {error}") from error
   placed = await callBridge(context, "placeModel", {
@@ -2021,7 +2139,8 @@ async def placeEmitters(context: Context, emitters: list[dict], collection: str 
   """Place particle emitters: [{name, position [x,y,z], definition (the client emitter definition index), lifespan (the list's lifespan
   field; 4000000 on most of the client's emitters)}] as empties in `collection`. exportZone writes them to <zone>_EnvironmentEmitters.txt
   beside the archive, and client-shaded views draw their particles as they stand at a moment of the client's steady state, from its
-  EnvironmentEmittersNew.edd (docs/clientRendering.md, Particle emitters); the client makes no emitter whose lifespan is 0. The asset
+  EnvironmentEmittersNew.edd (docs/clientRendering.md, Particle emitters); the client makes no emitter whose definition index is
+  negative or past its definitions or whose lifespan is 0 or less. The asset
   catalog (findAssets kind emitter) says what each definition shows and under which names client zones place it."""
   return await callBridge(context, "placeEmitters", {"emitters": [emitter | {"alwaysVisible": None} for emitter in emitters], "collection": collection, "clientContent": None})
 
@@ -2231,6 +2350,7 @@ async def renderReviewSet(context: Context, names: list[str] | None = None, shad
 async def compareToConcept(
   context: Context, camera: str | None = None, concept: str | None = None, view: dict | None = None,
   verticalFieldOfViewDegrees: float = 46.5, saveAs: str | None = None, note: str | None = None, guides: bool = True,
+  carriedLight: dict | None = None,
 ):
   """Compare concept art with the zone seen as the art sees it, as an artist checks work against the art: the zone rendered at the art's
   aspect with a vertical field of view of verticalFieldOfViewDegrees (the client's is 46.5), beside the art; the art at half over the
@@ -2242,7 +2362,8 @@ async def compareToConcept(
   pitchDegrees}, or {frame} view as renderView takes them; no scale figure is drawn) and move it until the art and the render line up;
   keep it with saveAs (a name) and note (what to judge from it): a review camera that holds the art's path (relative to the .blend once it
   is saved), its frame, and its field of view, which renderView {"camera": name}, renderReviewSet, and compareToConcept camera render as
-  matched. compareToConcept camera compares a kept one with its art again."""
+  matched. compareToConcept camera compares a kept one with its art again. carriedLight draws the light the view's character carries
+  and sets the special ambient it stands in, as renderView's does (for art that is a client screenshot taken by a character)."""
   if camera is not None:
     if concept is not None or view is not None or saveAs is not None or note is not None:
       raise ToolError("compareToConcept takes a kept camera alone, or concept and view (with saveAs and note to keep the camera)")
@@ -2268,10 +2389,13 @@ async def compareToConcept(
     frame = {"size": size, "verticalFieldOfViewDegrees": fieldOfView}
   zone = await callBridge(context, "getZoneProperties", {})
   sky = await zoneSky(zone)
+  carried = viewersCarriedLight(zone, carriedLight)
+  viewer = await viewersSpecialAmbient(context, zone, carriedLight)
   renderPath = newRenderPath()
   described = await callBridge(context, "renderView", {
     "view": renderedView, "outputPath": str(renderPath), "figureModel": None, "shading": "client", "bandHeight": 50.0, "guides": guides,
-    "sky": sky, "swimVolumes": False, "labels": None, "emitters": await previewEmitterAssets(), "frame": frame,
+    "sky": sky, "swimVolumes": False, "labels": None, "emitters": await previewEmitterAssets(), "frame": frame, "carriedLight": carried,
+    "viewerSpecialAmbient": viewer and viewer.get("specialAmbientColor"),
   })
   sheetPath = newRenderPath().with_suffix(".jpg")
   try:
@@ -2291,7 +2415,7 @@ async def compareToConcept(
     "frameSize": [width, height], "verticalFieldOfViewDegrees": fieldOfView,
     "horizontalFieldOfViewDegrees": round(math.degrees(2 * math.atan(math.tan(math.radians(fieldOfView) / 2) * width / height)), 2),
     "keptCamera": keptCamera,
-  } | compared]
+  } | compared | ({} if carried is None else {"carriedLight": carried}) | ({} if viewer is None else {"viewer": viewer})]
 
 
 @guardedTool()

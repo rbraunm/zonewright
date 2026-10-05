@@ -70,23 +70,34 @@ def animatedLocals(bones, tracks, frame, rootDrop):
   return localMatrices(positions, rotations, scales)
 
 
-def skinVertices(vertices, weights, skinMatrices, sourceName):
-  """Each vertex blended by its weighted bones: the sum over its influences of weight times the vertex through bind-inverse-then-pose.
-  Also returns which vertices have no weights, which the caller must not draw."""
+def blendedRows(rows, weights, matrices, sourceName):
+  """Each row vector blended by its weighted bones: the sum over its influences of weight times the row through that bone's matrix."""
   counts = weights["count"].astype(numpy.int64)
   if (counts > 4).any():
     raise ValueError(f"{sourceName}: {int((counts > 4).sum())} vertices have more than 4 weights")
   bones = weights["influences"]["bone"].astype(numpy.int64)
   usedInfluences = numpy.arange(4)[None, :] < counts[:, None]
-  if ((bones < 0) | (bones >= len(skinMatrices)))[usedInfluences].any():
-    raise ValueError(f"{sourceName}: weights name bones outside its {len(skinMatrices)} bones")
-  homogeneous = numpy.concatenate([vertices, numpy.ones((len(vertices), 1))], axis=1)
-  skinned = numpy.zeros((len(vertices), 4))
+  if ((bones < 0) | (bones >= len(matrices)))[usedInfluences].any():
+    raise ValueError(f"{sourceName}: weights name bones outside its {len(matrices)} bones")
+  blended = numpy.zeros(rows.shape)
   for influence in range(4):
     used = influence < counts
     weight = numpy.where(used, weights["influences"]["weight"][:, influence], 0.0)
-    skinned += weight[:, None] * numpy.einsum("ni,nij->nj", homogeneous, skinMatrices[numpy.where(used, bones[:, influence], 0)])
-  return skinned[:, :3], counts == 0
+    blended += weight[:, None] * numpy.einsum("ni,nij->nj", rows, matrices[numpy.where(used, bones[:, influence], 0)])
+  return blended
+
+
+def skinVertices(vertices, weights, skinMatrices, sourceName):
+  """Each vertex blended by its weighted bones through bind-inverse-then-pose. Also returns which vertices have no weights, which the
+  caller must not draw."""
+  homogeneous = numpy.concatenate([vertices, numpy.ones((len(vertices), 1))], axis=1)
+  return blendedRows(homogeneous, weights, skinMatrices, sourceName)[:, :3], weights["count"] == 0
+
+
+def skinNormals(normals, weights, skinMatrices, sourceName):
+  """Each normal blended by its weighted bones through each bone's inverse transpose, as the skinned effects turn it (SkinMeshCB1.fxo
+  blends a_am44WorldIT by the same weights) and left unnormalized, as they leave it."""
+  return blendedRows(normals, weights, numpy.transpose(numpy.linalg.inv(skinMatrices[:, :3, :3]), (0, 2, 1)), sourceName)
 
 
 def skinMatrices(bindWorlds, poseWorlds):

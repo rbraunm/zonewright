@@ -32,7 +32,7 @@ sharedInstallLockSeconds = 900
 zoneSurveySkill = Path(".claude") / "skills" / "zone-survey"
 readerFiles = {f"server/{name}.py" for name in (
   "eqAnimations", "eqArchive", "eqCubeMaps", "eqEmitterDefinitions", "eqEmitters", "eqLinks", "eqLooks", "eqModels", "eqRaces", "eqSkeletons",
-  "eqTerrainTextures", "eqTextures", "eqWorldFile", "eqZones", "eqgFiles", "eqgSkeletons", "eqgTerrain", "zoneGeometry", "zoneSources",
+  "eqTerrainTextures", "eqTextures", "eqWorldFile", "eqZones", "eqgFiles", "eqgSkeletons", "eqgTerrain", "loadTimeLight", "viewerLight", "zoneGeometry", "zoneSources",
   "bridgeModels", "emitterAssets", "emitterParticles", "bridgeEmitterDrawing",
 )}
 # The slow tiers, in groups by the code their tests check. A run of the whole suite takes a group only when that code changed since the

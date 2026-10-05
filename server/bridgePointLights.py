@@ -167,9 +167,10 @@ def litCopy(preview, part, light, label):
   return preview.addObject(copy)
 
 
-def applyPointLights(preview, sourceScene):
-  """Draw the source scene's zone lights on the preview's meshes; returns what was lit and what could not be."""
-  lights = sceneLights(sourceScene)
+def applyPointLights(preview, sourceScene, carriedLights):
+  """Draw the source scene's zone lights, and the lights the view's character carries (clientPointLights.carriedLight), on the preview's
+  meshes; returns what was lit and what could not be."""
+  lights = sceneLights(sourceScene) + list(carriedLights)
   if not lights:
     return {"lights": 0, "litObjects": 0, "notLit": []}
   terrainCollection = bpy.data.collections.get(bridgeExport.terrainCollectionName)

@@ -60,6 +60,33 @@ def testGeometryWithBakedLightTakesOnlyTheLightsMarkedForIt():
   assert [entry["name"] for entry in clientPointLights.eligible(lights, True)] == ["LIB_torch", "lib_lamp", "LIT_torch", "LI", "xxB"]
 
 
+def testACarriedLightTakesItsTypesColorAndReachAndStandsByTheFeet():
+  torch = clientPointLights.carriedLight(2, [10.0, 20.0, 30.0], 90.0, 383)
+  # Facing +X the heading is 0 of 512, so the client's tables put the light exactly 2 toward +X and 4 above the feet.
+  assert torch == {
+    "name": "carried torch", "position": [12.0, 20.0, 34.0], "color": [0.9959999918937683, 0.9412000179290771, 0.6273999810218811],
+    "radius": 100.0, "carriedByViewer": True,
+  }
+  # Facing -Y (heading 384 of 512, 4.71 once turned to radians) the offset turns by 4 of the table's 512 steps, not by three quarters.
+  turned = clientPointLights.carriedLight(14, [0.0, 0.0, 0.0], 180.0, 383)
+  assert numpy.allclose(turned["position"], [2 * math.cos(2 * math.pi * 4 / 512), 2 * math.sin(2 * math.pi * 4 / 512), 4.0], atol=1e-12)
+  assert turned["color"] == [0.5, 0.25999999046325684, 0.0] and turned["radius"] == 150.0
+  # Zones 121 and 158 cap the reach at 25 and 100; a lantern of type 8 reaches 400 elsewhere.
+  assert [clientPointLights.carriedLight(8, [0, 0, 0], 0.0, zone)["radius"] for zone in (121, 158, 383)] == [25.0, 100.0, 400.0]
+  with pytest.raises(ValueError, match="carried light type"):
+    clientPointLights.carriedLight(0, [0, 0, 0], 0.0, 383)
+
+
+def testTheViewersLightOutranksTheZonesAndLightsBakedGeometry():
+  white = (1.0, 1.0, 1.0)
+  carried = clientPointLights.carriedLight(2, [-50.0, 0.0, -4.0], 90.0, 383)
+  zoneLights = [light("LIB_a", (1, 0, 0), white, 10), light("LIB_b", (0, 1, 0), white, 10), light("LIB_c", (0, 0, 1), white, 10)]
+  # Each zone light scores 2 * 1 * 100 / 1 = 200 at the center; the carried torch, 48 away, 2 * 0.81 * 100^2 * 100 / 48^2 = 703.
+  chosen = clientPointLights.selectForDraw(zoneLights + [carried], (0, 0, 0), numpy.array([-1, -1, -1]), numpy.array([1, 1, 1]), False)
+  assert [entry["name"] for entry in chosen] == ["carried torch", "LIB_a", "LIB_b"]
+  assert clientPointLights.eligible([carried, light("LIT_x", (0, 0, 0), white, 10)], False) == [carried]
+
+
 def testEachVertexOfARegionTakesTheThreeLightsScoringHighestAtIt():
   white = (1.0, 1.0, 1.0)
   first, second = (0.0, 0.0, 0.0), (100.0, 0.0, 0.0)
@@ -228,6 +255,61 @@ def testPointLightsLightWhatTheyReachAsTheClientDoes(stageBlenderServer, tmp_pat
   assert numpy.allclose(slab, expected([0.1 + 0.75 * channel + beside for channel in (0.5, 0.5, 1)]), atol=1.5 / 255)
 
 
+def testTheViewersCarriedLightLightsTheTerrainAsTheClientDraws(stageBlenderServer, tmp_path):
+  texturePath = writePNG(tmp_path / "stone.png", 8, 8, texture)
+  view = {"eye": [0, 0, 30], "target": [0, 0.001, 0]}
+  # A torch carried 2 toward +X and 4 above feet at (-2, 0, 6) stands 10 over the ground's middle.
+  torch = {"lightType": 2, "at": [-2, 0, 6], "headingDegrees": 90}
+
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [40, 40], "spacing": 4, "location": [0, 0, 0], "collection": "terrain"})
+    await session.expectSuccess("createMaterial", {"name": "stone", "diffuseTexture": str(texturePath)})
+    await session.expectSuccess("assignMaterial", {"objectName": "ground", "materialName": "stone"})
+    await session.expectSuccess("setZoneProperties", darkEnvironment)
+    withoutZoneId = await session.expectError("renderView", {"view": view, "carriedLight": torch})
+    await session.expectSuccess("setZoneProperties", {"zoneId": 383})
+    unlit = await centerPixel(session, view)
+    _, description = await session.expectImage("renderView", {"view": view, "carriedLight": torch})
+    pixels = numpy.asarray(Image.open(description["outputPath"]).convert("RGB"), dtype=numpy.float64) / 255
+    return withoutZoneId, unlit, pixels[pixels.shape[0] // 2, pixels.shape[1] // 2], description
+
+  withoutZoneId, (unlit, _), lit, description = stageBlenderServer.session(steps)
+  assert "set zoneId with setZoneProperties" in withoutZoneId
+  carried = clientPointLights.carriedLight(2, [-2, 0, 6], 90, 383)
+  assert description["carriedLight"] == carried and carried["position"] == [0.0, 0.0, 10.0]
+  assert description["pointLights"] == {"lights": 1, "litObjects": 1, "notLit": []}
+  assert numpy.allclose(unlit, [channel / 255 * 0.1 for channel in texture[:3]], atol=1.5 / 255)
+  # Terrain carries baked light and takes only the lights marked for it, which a carried light is: 10 below it, facing it, 1 - (10/100)^2
+  # of its color over the ambient 0.1, clamped to 1.
+  light = [min(1.0, 0.1 + 0.99 * channel) for channel in carried["color"]]
+  assert numpy.allclose(lit, [channel / 255 * value for channel, value in zip(texture, light)], atol=1.5 / 255)
+
+
+@pytest.mark.clientData("clientFiles")
+def testATextureDrawnBlendedAndAddedDrawsAgain(stageBlenderServer):
+  # Definitions 50 (added) and 204 (blended), both Guardian of the Gears' smoke, share pt_add_smoke.dds: one image, two materials.
+  definitionsPath = eqEmitterDefinitions.environmentDefinitionsPath(everquestClient)
+  definitions = eqEmitterDefinitions.parseDefinitions(definitionsPath.read_bytes(), definitionsPath.name)
+  assert [(definitions[index]["texture"].lower(), definitions[index]["additive"]) for index in (50, 204)] == [("pt_add_smoke.dds", 1), ("pt_add_smoke.dds", 0)]
+  view = {"eye": [0, -30, 3], "target": [0, 0, 3]}
+  emitters = [
+    {"name": "added", "position": [-3, 0, 0], "definition": 50, "lifespan": 4000000},
+    {"name": "blended", "position": [3, 0, 0], "definition": 204, "lifespan": 4000000},
+  ]
+
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    await session.expectSuccess("setZoneProperties", darkEnvironment)
+    await session.expectSuccess("placeEmitters", {"emitters": emitters})
+    _, first = await session.expectImage("renderView", {"view": view})
+    _, second = await session.expectImage("renderView", {"view": view})
+    return first, second
+
+  first, second = stageBlenderServer.session(steps)
+  assert first["emitters"]["emitters"] == second["emitters"]["emitters"] == 2 and first["emitters"]["notDrawn"] == []
+
+
 @pytest.mark.clientData("clientFiles")
 def testEmittersDrawTheirParticlesWhereTheyStand(stageBlenderServer, tmp_path):
   texturePath = writePNG(tmp_path / "stone.png", 8, 8, texture)
@@ -236,6 +318,7 @@ def testEmittersDrawTheirParticlesWhereTheyStand(stageBlenderServer, tmp_path):
     {"name": "flame", "position": [0, 0, 2], "definition": 57, "lifespan": 4000000},
     {"name": "neverMade", "position": [10, 0, 2], "definition": 57, "lifespan": 0},
     {"name": "unknown", "position": [-10, 0, 2], "definition": 9999, "lifespan": 4000000},
+    {"name": "negative", "position": [-12, 0, 2], "definition": -7, "lifespan": 0},
   ]
 
   async def steps(session):
@@ -253,7 +336,9 @@ def testEmittersDrawTheirParticlesWhereTheyStand(stageBlenderServer, tmp_path):
   drawn, without = stageBlenderServer.session(steps)
   # new_torch_flame makes 12 events a second of one particle living one second: 12 alive, all drawn this near (its detail distance is 80).
   assert drawn["emitters"] | {"notDrawn": None} == {"emitters": 1, "particles": 12, "notDrawn": None}
+  # The client checks the index before the lifespan: a negative index with a lifespan of 0 is refused for its index.
   assert sorted(drawn["emitters"]["notDrawn"], key=lambda group: group["reason"]) == [
+    {"reason": "definition -7: the client makes no emitter for a negative definition index", "count": 1, "emitters": ["negative"]},
     {"reason": "definition 9999 is past the client's 626 environment emitter definitions", "count": 1, "emitters": ["unknown"]},
     {"reason": "lifespan 0: the client makes an emitter only for a lifespan above 0", "count": 1, "emitters": ["neverMade"]},
   ]

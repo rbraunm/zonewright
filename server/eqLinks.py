@@ -38,15 +38,6 @@ def readListLines(path):
   return [line.strip() for line in path.read_text(encoding="latin1").splitlines() if line.strip()]
 
 
-def zoneFormat(clientRoot, zoneName):
-  formats = {source["format"] for source in zoneSources.zoneVariants(clientRoot, zoneName).values()}
-  if not formats:
-    raise ValueError(f"'{zoneName}' is not a zone in {clientRoot}")
-  if len(formats) > 1:
-    raise ValueError(f"Zone '{zoneName}' ships both a classic and an EQG version ({sorted(formats)}); which one the client loads is not linked in its files")
-  return formats.pop()
-
-
 def characterListArchives(clientRoot, listName):
   """<zone>_chr.txt: a count line, then code,source. When the source starts with the code the client loads source.eqg (or, failing that, source.s3d); otherwise it loads only that code's actor from source.s3d."""
   path = clientRoot / listName
@@ -70,9 +61,11 @@ def characterListArchives(clientRoot, listName):
 
 
 def zoneLinks(clientRoot, zoneName):
-  """The archives the client loads for a zone, in its load order, each with the file or rule that links it; and named archives the client lacks."""
+  """The archives the client loads for the zone variant it loads (zoneSources.loadedVariant), in its load order (eqgame.exe 0x49b200),
+  each with the file or rule that links it; and named archives the client lacks. An EQG zone's <zone>.eqg loads first, and then no
+  classic zone archive."""
   zoneName = zoneName.lower()
-  zoneKind = zoneFormat(clientRoot, zoneName)
+  zoneKind = zoneSources.loadedVariant(clientRoot, zoneName)[1]["format"]
   archives, missing = [], []
 
   def add(fileName, via, codes=None):
@@ -80,13 +73,15 @@ def zoneLinks(clientRoot, zoneName):
     if found:
       archives.append({"archive": found, "via": via, "codes": codes})
 
+  if zoneKind != "wld":
+    add(f"{zoneName}.eqg", "zone load order")
   listed, listMissing = characterListArchives(clientRoot, f"{zoneName}_pre_chr.txt")
   archives += listed
   missing += listMissing
-  for fileName in hardcodedZoneArchives.get(zoneName, []):
-    add(fileName, "eqgame.exe")
   if zoneKind == "wld":
-    for pattern in ("{}_obj2.s3d", "{}_obj.s3d", "{}.s3d", "{}_2_obj.s3d", "{}_chr2.s3d"):
+    for fileName in hardcodedZoneArchives.get(zoneName, []):
+      add(fileName, "eqgame.exe")
+    for pattern in ("{}_obj2.s3d", "{}_obj.s3d", "{}_2_obj.s3d", "{}_chr2.s3d"):
       add(pattern.format(zoneName), "zone load order")
     if zoneName in secondCharacterZones:
       add(f"{zoneName}2_chr.s3d", "eqgame.exe")
@@ -103,8 +98,8 @@ def zoneLinks(clientRoot, zoneName):
         archives.append({"archive": line.lower(), "via": assetList.name, "codes": None})
       else:
         missing.append({"list": assetList.name, "line": line})
-  if zoneKind != "wld":
-    add(f"{zoneName}.eqg", "zone load order")
+  if zoneKind == "wld":
+    add(f"{zoneName}.s3d", "zone load order")
   return {"zone": zoneName, "format": zoneKind, "archives": archives, "missing": missing}
 
 

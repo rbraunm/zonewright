@@ -400,7 +400,7 @@ def surveyClientZone(clientRoot, cacheRoot, catalogRoot, zoneName):
       placements = eqgFiles.parseZone(zonBytes, zoneName)["placements"]
     else:
       terrainArchive = library.archives[0]
-      terrain = eqgTerrain.parseTerrain(terrainArchive.read(source["zon"]).decode("latin1"), terrainArchive.read(source["zon"][:-4] + ".dat"), zoneName)
+      terrain = eqgTerrain.parseTerrain(*zoneSources.terrainFiles(source), zoneName)
       placements = terrain["placements"]
       ecosystems, layerUses = ecosystemFacts(zoneName, terrainArchive, terrain["header"]["quadsPerTile"] * terrain["header"]["unitsPerVertex"])
       models |= ecosystems

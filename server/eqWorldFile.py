@@ -11,6 +11,7 @@ invisibleRenderMethod = 0
 fragmentAlignment = 4
 # Measured: every mesh in the client with mesh operations fits only 6-byte records.
 meshOperationBytes = 6
+vertexColorsOffset = 24
 
 
 def decodeString(encodedBytes):
@@ -120,8 +121,13 @@ class WorldFile:
     return [self.material(reference) for reference in materialReferences]
 
   def mesh(self, meshFragment):
+    """A mesh (0x36). The client takes one UV, normal, and color per vertex from the start of each stored array, leaving any more
+    unread (EQGraphicsDX9.dll 0x1001f630 regions, 0x10057060 objects, 0x1004ad50 skins); an array the file leaves empty is None. Its
+    bounding sphere holds the box the file stores about the mesh's center: the box's center and half its diagonal, the radius
+    MQPeridotEmu's dumps show a placed actor holding (+0x144)."""
     body = meshFragment.body
     (_, materialListReference, _, _, _, centerX, centerY, centerZ) = struct.unpack_from("<IiiIIfff", body, 4)
+    boxLow, boxHigh = numpy.array(struct.unpack_from("<3f", body, 52)), numpy.array(struct.unpack_from("<3f", body, 64))
     counts = struct.unpack_from("<10H", body, 76)
     vertexCount, uvCount, normalCount, colorCount, polygonCount, vertexPieceCount, polygonTextureCount, vertexTextureCount, meshOperationCount, scaleShift = counts
     position = 96
@@ -151,22 +157,40 @@ class WorldFile:
     if int(polygonTextures[:, 0].sum()) != polygonCount:
       raise ValueError(f"{self.sourceName}: mesh '{meshFragment.name}' polygon texture runs cover {int(polygonTextures[:, 0].sum())} of {polygonCount} polygons")
     polygonMaterials = numpy.repeat(polygonTextures[:, 1], polygonTextures[:, 0])
+    for label, count in (("UVs", uvCount), ("normals", normalCount), ("colors", colorCount)):
+      if 0 < count < vertexCount:
+        raise ValueError(f"{self.sourceName}: mesh '{meshFragment.name}' stores {count} {label} for {vertexCount} vertices; the client reads one per vertex past them")
     return {
       "name": meshFragment.name,
       "vertices": vertices,
-      "uvs": uvs if uvCount == vertexCount else None,
-      "normals": normals if normalCount == vertexCount else None,
+      "uvs": uvs[:vertexCount] if uvCount else None,
+      "normals": normals[:vertexCount] if normalCount else None,
       # Per-vertex baked light and the share of scene light received (alpha), as RGBA bytes.
-      "colors": colors if colorCount == vertexCount else None,
+      "colors": colors[:vertexCount] if colorCount else None,
       # WLD winds clockwise against its stored normals; reorder to counter-clockwise like EQG and Blender.
       "triangles": polygons["indices"][:, [0, 2, 1]].astype(numpy.int64),
       "isPassable": (polygons["flags"] & passablePolygonFlag) != 0,
       "triangleMaterials": polygonMaterials.astype(numpy.int64),
       "materials": self.materialList(materialListReference) if materialListReference > 0 else [],
+      "boundingSphere": {"center": numpy.array((centerX, centerY, centerZ)) + (boxLow + boxHigh) / 2, "radius": float(numpy.linalg.norm(boxHigh - boxLow) / 2)},
     }
 
   def meshes(self):
     return [self.mesh(fragment) for fragment in self.fragmentsOfType(0x36)]
+
+  def vertexColorTrack(self, reference):
+    """A placement's own vertex colors as RGBA bytes: the track (0x33) names its definition (0x32), whose D3DCOLOR values the client
+    copies whole (EQGraphicsDX9.dll 0x100bfdf0, 0x10054880)."""
+    track = self.referenced(reference)
+    if track.fragmentType != 0x33:
+      raise ValueError(f"{self.sourceName}: vertex color reference {reference} is fragment type {track.fragmentType:#x}, not a color track (0x33)")
+    definition = self.referenced(struct.unpack_from("<i", track.body, 4)[0])
+    if definition.fragmentType != 0x32:
+      raise ValueError(f"{self.sourceName}: color track '{track.name}' names fragment type {definition.fragmentType:#x}, not its colors (0x32)")
+    count = struct.unpack_from("<I", definition.body, 8)[0]
+    if len(definition.body) != vertexColorsOffset + 4 * count:
+      raise ValueError(f"{self.sourceName}: colors '{definition.name}' hold {count} colors in {len(definition.body)} bytes")
+    return numpy.frombuffer(definition.body, dtype=numpy.uint8, count=4 * count, offset=vertexColorsOffset).reshape(count, 4)[:, [2, 1, 0, 3]]
 
   def lightDefinition(self, definitionFragment):
     """A light source definition (0x1B): its frames' levels and RGB colors (0-1), which the client steps through to flicker."""

@@ -42,6 +42,30 @@ def parseEmitters(text, sourceName):
   return emitters
 
 
+def notMadeReason(emitter, definitionCount):
+  """Why the client makes no emitter for a list line, or None when it makes one: the scene graph's emitter creation
+  (EQGraphicsDX9.dll 0x1006af00, which eqgame.exe 0x4a1ba0 calls for every line and whose refusal it ignores) checks, in this order,
+  the definition index against 0 and the environment definitions' count, then the lifespan against 0."""
+  index, lifespan = emitter["definition"], emitter["lifespan"]
+  if index < 0:
+    return f"definition {index}: the client makes no emitter for a negative definition index"
+  if index >= definitionCount:
+    return f"definition {index} is past the client's {definitionCount} environment emitter definitions"
+  if lifespan <= 0:
+    return f"lifespan {lifespan}: the client makes an emitter only for a lifespan above 0"
+  return None
+
+
+def notMadeGroups(emitters, definitionCount):
+  """The lines the client makes no emitter for, grouped by why: each reason with its count and every emitter's name."""
+  groups = {}
+  for emitter in emitters:
+    reason = notMadeReason(emitter, definitionCount)
+    if reason is not None:
+      groups.setdefault(reason, []).append(emitter["name"])
+  return [{"reason": reason, "count": len(names), "emitters": names} for reason, names in sorted(groups.items())]
+
+
 def emitterListText(emitters):
   """A list under the client's seven-field header when every emitter has alwaysVisible, else its six-field one (most of the client's
   lists use it), each line's fields in the order the client reads them; CRLF, as the client's files are."""

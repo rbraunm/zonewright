@@ -7,14 +7,15 @@ import struct
 import numpy
 
 tileCoordinateOrigin = 100000
+noWaterLevel = -1000.0
 supportedTerrainVersions = ("4", None)
 supportedDataVersions = (20, 21)
 # Quad flag bit choosing the diagonal: clear splits the quad from its (0, 0) corner to (1, 1), set from (1, 0) to (0, 1)
 # (the client's height query, 0x100f2fc0).
 quadDiagonalFlag = 0x80
-# The quad kind bits (set by 0x100f2100): 1 reads back as kind -1 and 4 as kind 1 (0x100f20c0), while 2, like no bit, reads back as the
-# ordinary kind 0. How the client draws kinds -1 and 1 is not traced yet.
-quadKindFlags = 0x05
+# Quad kind bit 1 (kind -1, 0x100f2100): the tile triangulator leaves both triangles of such a quad out of the drawn mesh (0x10105a70,
+# 0x10106020). Bit 4 (kind 1) only keeps a quad at full resolution, which every quad is drawn at here.
+holeFlag = 0x01
 ecosystemLayerKeys = {
   "MINHEIGHT": ("minHeight", float), "MAXHEIGHT": ("maxHeight", float), "HEIGHTTOL": ("heightTolerance", float),
   "MINSLOPE": ("minSlope", int), "MAXSLOPE": ("maxSlope", int), "SLOPETOL": ("slopeTolerance", int),
@@ -64,13 +65,18 @@ def parseTerrainHeader(zonText, sourceName):
   }
 
 
+def dataFileName(zonText, sourceName):
+  """The .dat a terrain project loads: its *NAME and .dat (EQGraphicsDX9.dll 0x1010c0d0)."""
+  return parseTerrainHeader(zonText, sourceName)["name"].lower() + ".dat"
+
+
 def tileOrigin(longitude, latitude, tileSize):
   return (longitude - tileCoordinateOrigin) * tileSize, (latitude - tileCoordinateOrigin) * tileSize
 
 
-def readPlacement(reader, version, tileSize):
-  """An object a tile places: its model, the ecosystem that placed it (empty for one placed by hand), and its position from its own
-  tile's origin, z above the ground beneath it."""
+def readPlacement(reader, version, tileSize, listingTile):
+  """An object a tile places: its model, the ecosystem that placed it (empty for one placed by hand), its position from the origin of
+  the tile its own coordinates name, the tile whose record lists it, and its offset, z above the ground."""
   modelName = reader.string().lower()
   ecosystem = reader.string().lower() if version > 5 else ""
   longitude, latitude = reader.read("ii")
@@ -79,14 +85,18 @@ def readPlacement(reader, version, tileSize):
     reader.read("B")
   originX, originY = tileOrigin(longitude, latitude, tileSize)
   return {
-    "model": modelName + ".mod", "ecosystem": ecosystem, "position": (originX + x, originY + y, z), "rotationDegrees": (rotationX, rotationY, rotationZ),
-    "scale": (scaleX, scaleY, scaleZ),
+    "model": modelName + ".mod", "ecosystem": ecosystem, "position": (originX + x, originY + y, z), "listingTile": listingTile, "offset": (x, y, z),
+    "rotationDegrees": (rotationX, rotationY, rotationZ), "scale": (scaleX, scaleY, scaleZ),
   }
 
 
 def parseTerrain(zonText, datBytes, sourceName):
   """EQTZP terrain: each tile's height grid, vertex colors (tint and baked light), quad flags, and ecosystem layers (the first
-  covering the tile, each later one with its coverage mask), the objects and object groups the tiles place, in world units."""
+  covering the tile, each later one with its coverage mask), the objects and object groups the tiles place, in world units. A group's
+  z is a height in the world, not above the ground (its members are placed from it unchanged, 0x101038c0), and its tenth value lifts
+  its members. Also each tile's level (noWaterLevel on most tiles, by its spread a water height on the rest) and, from data version 21,
+  whether it stores a water sheet rectangle, and the tiles' point lights by name and light definition (.def); none of these is
+  drawn yet."""
   header = parseTerrainHeader(zonText, sourceName)
   quads = header["quadsPerTile"]
   vertexSide = quads + 1
@@ -97,17 +107,19 @@ def parseTerrain(zonText, datBytes, sourceName):
     raise ValueError(f"{sourceName}: terrain data version {version} is not supported (only {supportedDataVersions})")
   baseTexture = reader.string().lower()
   tileCount = reader.read("I")
-  tiles, placements, groups, regionNames = [], [], [], []
+  tiles, placements, groups, regionNames, lights = [], [], [], [], []
   for _ in range(tileCount):
     longitude, latitude, _ = reader.read("iii")
     heights = reader.array("<f4", vertexSide * vertexSide).reshape(vertexSide, vertexSide)
     tints = reader.array("<u4", vertexSide * vertexSide).reshape(vertexSide, vertexSide)
     baked = reader.array("<u4", vertexSide * vertexSide).reshape(vertexSide, vertexSide)
     quadFlags = reader.array("u1", quads * quads).reshape(quads, quads)
-    reader.read("f")
+    level = reader.read("f")
+    waterSheet = False
     if version > 20:
       reader.read("i")
-      if reader.read("B"):
+      waterSheet = bool(reader.read("B"))
+      if waterSheet:
         reader.read("4f")
     reader.read("f")
     layers = []
@@ -121,10 +133,10 @@ def parseTerrain(zonText, datBytes, sourceName):
     tileX, tileY = tileOrigin(longitude, latitude, tileSize)
     tiles.append({
       "longitude": longitude, "latitude": latitude, "x": tileX, "y": tileY, "heights": heights, "tints": tints, "baked": baked, "quadFlags": quadFlags,
-      "layers": layers, "baseLayer": layers[0]["ecosystem"] if layers else None,
+      "layers": layers, "baseLayer": layers[0]["ecosystem"] if layers else None, "level": level, "waterSheet": waterSheet,
     })
     for _ in range(reader.read("I")):
-      placements.append(readPlacement(reader, version, tileSize))
+      placements.append(readPlacement(reader, version, tileSize, (tileX, tileY)))
     for _ in range(reader.read("I")):
       regionNames.append(reader.string())
       reader.read("i")
@@ -132,30 +144,32 @@ def parseTerrain(zonText, datBytes, sourceName):
       reader.read("II")
       reader.read("12f")
     for _ in range(reader.read("I")):
-      reader.string()
-      reader.string()
+      name = reader.string()
+      definition = reader.string().lower()
       reader.read("b")
       reader.read("II")
       reader.read("10f")
+      lights.append({"name": name, "definition": definition})
     for _ in range(reader.read("I")):
       name = reader.string().lower()
       groupLongitude, groupLatitude = reader.read("ii")
-      x, y, z, rotationX, rotationY, rotationZ, scaleX, scaleY, scaleZ, _ = reader.read("10f")
+      x, y, z, rotationX, rotationY, rotationZ, scaleX, scaleY, scaleZ, memberLift = reader.read("10f")
       originX, originY = tileOrigin(groupLongitude, groupLatitude, tileSize)
       groups.append({
         "group": name, "position": (originX + x, originY + y, z), "rotationDegrees": (rotationX, rotationY, rotationZ), "scale": (scaleX, scaleY, scaleZ),
+        "memberLift": memberLift,
       })
   if reader.position != len(datBytes):
     raise ValueError(f"{sourceName}: terrain data ends at {reader.position} of {len(datBytes)} bytes")
   return {
     "header": header, "dataVersion": version, "baseTexture": baseTexture, "tileSize": tileSize, "tiles": tiles, "placements": placements,
-    "groups": groups, "regionNames": regionNames,
+    "groups": groups, "regionNames": regionNames, "lights": lights,
   }
 
 
 def tileTriangles(quadFlags):
-  """A tile's grid triangles (vertex index row * (quads + 1) + column, counter-clockwise from above), each quad split along the
-  diagonal its flag picks."""
+  """A tile's drawn grid triangles (vertex index row * (quads + 1) + column, counter-clockwise from above), each quad split along the
+  diagonal its flag picks; hole quads draw none."""
   quads = quadFlags.shape[0]
   rows, columns = numpy.meshgrid(numpy.arange(quads), numpy.arange(quads), indexing="ij")
   corner = (rows * (quads + 1) + columns).ravel()
@@ -163,23 +177,22 @@ def tileTriangles(quadFlags):
   crossed = (quadFlags.ravel() & quadDiagonalFlag) != 0
   first = numpy.where(crossed[:, None], numpy.stack([corner, right, up], axis=1), numpy.stack([corner, right, upRight], axis=1))
   second = numpy.where(crossed[:, None], numpy.stack([right, upRight, up], axis=1), numpy.stack([corner, upRight, up], axis=1))
-  return numpy.concatenate([first, second])
+  drawn = (quadFlags.ravel() & holeFlag) == 0
+  return numpy.concatenate([first[drawn], second[drawn]])
 
 
-def quadKinds(terrain):
-  """The unordinary quad kind bits any tile sets."""
-  return sorted(set().union(*(set(numpy.unique(tile["quadFlags"] & quadKindFlags).tolist()) for tile in terrain["tiles"])) - {0})
+def holeQuadCount(terrain):
+  return sum(int(((tile["quadFlags"] & holeFlag) != 0).sum()) for tile in terrain["tiles"])
 
 
-def groundHeight(terrain, tilesByOrigin, x, y):
-  """The height of the drawn ground at (x, y): the plane of the grid triangle beneath it."""
+def tileHeight(terrain, tile, localX, localY):
+  """A tile's ground height at a point measured from its origin, as the client's tile query reads it (0x100f2fc0): the plane of the
+  grid triangle there, and 0 off the tile."""
   tileSize, spacing = terrain["tileSize"], terrain["header"]["unitsPerVertex"]
-  originX, originY = math.floor(x / tileSize) * tileSize, math.floor(y / tileSize) * tileSize
-  tile = tilesByOrigin.get((originX, originY))
-  if tile is None:
-    raise ValueError(f"No terrain tile beneath ({x:.2f}, {y:.2f})")
+  if not (0 <= localX < tileSize and 0 <= localY < tileSize):
+    return 0.0
   quads = terrain["header"]["quadsPerTile"]
-  localX, localY = (x - originX) / spacing, (y - originY) / spacing
+  localX, localY = localX / spacing, localY / spacing
   column, row = min(int(localX), quads - 1), min(int(localY), quads - 1)
   fractionX, fractionY = localX - column, localY - row
   heights = tile["heights"]
@@ -234,7 +247,18 @@ def placementMatrix(rotationDegrees, scale):
   return aroundZ @ aroundY @ aroundX @ numpy.diag(scale)
 
 
+def wrappedIntoTile(offset, tileSize):
+  """An offset as the client's WorldToTile reads it into a tile (0x100eb280): its remainder by the tile size, a tile size added when
+  it is negative."""
+  remainder = math.fmod(offset, tileSize)
+  return remainder + tileSize if offset < 0 else remainder
+
+
 def placedPosition(terrain, tilesByOrigin, placement):
-  """Where a placement stands: its x and y, and its z above the ground there."""
-  x, y, z = placement["position"]
-  return numpy.array((x, y, groundHeight(terrain, tilesByOrigin, x, y) + z))
+  """Where a tile's placement stands: its x and y, and its z above the ground of the tile that lists it, read where its offset falls
+  once wrapped into that tile (0x100f2a30), so an offset past the tile's edge takes the height of its own tile's far side."""
+  x, y, _ = placement["position"]
+  offsetX, offsetY, offsetZ = placement["offset"]
+  tileSize = terrain["tileSize"]
+  ground = tileHeight(terrain, tilesByOrigin[placement["listingTile"]], wrappedIntoTile(offsetX, tileSize), wrappedIntoTile(offsetY, tileSize))
+  return numpy.array((x, y, ground + offsetZ))

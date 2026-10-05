@@ -1,4 +1,5 @@
 """EverQuest models found through the client's own links (eqLinks) and built into per-model caches: EQG models (.mod, static or skinned), EQG skinned piece models (.mds), and WLD static and skeletal actors."""
+import collections
 import concurrent.futures
 import hashlib
 import json
@@ -22,8 +23,8 @@ import eqWorldFile
 import machineProfile
 import zoneSources
 
-indexFormat = 10
-modelCacheFormat = 19
+indexFormat = 11
+modelCacheFormat = 21
 actorTrailingBytes = 4
 staticKinds = ("wldStatic",)
 defaultAppearance = {
@@ -32,9 +33,11 @@ defaultAppearance = {
 }
 eqgPlayerOnly = ("faceStyle", "hairColor", "facialHair", "facialHairColor", "eyeColor1", "heritage", "tattoo", "details")
 bindTolerance = 1e-3
-# A WLD mesh without vertex colors (most placed objects): no baked light and the full share of scene light. Where the client takes
-# this from is not traced; calibration against screenshots checks it.
+# A placed WLD object's mesh without vertex colors: no baked light and the full share of scene light. Not settled: the client's object
+# builder fills 0xFFFFFFFF (EQGraphicsDX9.dll 0x10057060), which SModelC1 would draw at full texture brightness (docs/clientRendering.md).
 colorlessMeshColor = (0, 0, 0, 255)
+# No baked light and the full share of scene light: how SkinMeshOld lights a skin, which has no vertex colors.
+sceneLitColor = (0, 0, 0, 255)
 
 
 def actorReferences(worldFile, actorFragment):
@@ -384,6 +387,24 @@ def eqgLiquids(materials, triangleMaterials, mesh):
   return [eqgLiquid(materials[index], mesh) if index >= 0 else None for index in triangleMaterials]
 
 
+def eqgStandIns(material):
+  """What the preview draws in place of what the client draws for an EQG material, by name (docs/clientRendering.md, EQG zones):
+  mplByDiffuseAlone, an MPL material by its diffuse alone, without its coverage map, the vertex buffer's second color, or point light 0
+  through its normal map; additiveDrawnOpaque, an AddAlpha material opaque; waterOpaque, water opaque where the client's alpha follows
+  its fresnel, and without point light 0 by its normal; lavaPointLightByVertex, lava taking point light 0 through the vertex light with
+  falloff, where the client lights its crust through the normal maps without falloff and brightens an object's glow by it."""
+  shader = material["shader"].lower()
+  liquid = liquidShaders.get(shader)
+  return tuple(label for label, applies in (
+    ("mplByDiffuseAlone", "_mpl" in shader), ("additiveDrawnOpaque", "addalpha" in shader), ("waterOpaque", liquid == "water"),
+    ("lavaPointLightByVertex", liquid == "lava"),
+  ) if applies)
+
+
+def eqgTriangleStandIns(materials, triangleMaterials):
+  return [eqgStandIns(materials[index]) if index >= 0 else () for index in triangleMaterials]
+
+
 def staticEQGUVs(uvs):
   """A static (boneless) EQG model's texture coordinates as Blender counts them, v up from a texture's bottom: measured against
   screenshots, the Neighborhood's map board and guild gate show upright only with v flipped, while skinned models (a Drakkin's face)
@@ -391,10 +412,11 @@ def staticEQGUVs(uvs):
   return uvs * (1, -1) + (0, 1)
 
 
-def meshPart(vertices, triangles, uvs, textures, alphaModes, lighting=None, liquids=None, passable=None):
+def meshPart(vertices, triangles, uvs, textures, alphaModes, lighting=None, liquids=None, passable=None, standIns=None):
   """Drawn triangles only; triangles with non-finite vertices are dropped and counted. lighting is the file's per-vertex normals and
   RGBA colors as the client lights them ({normals, colors}), or None for a mesh lit without them; liquids, each triangle's liquid
-  (eqgLiquid) or None; passable, whether the file lets players through each triangle, or None for a model that does not say."""
+  (eqgLiquid) or None; passable, whether the file lets players through each triangle, or None for a model that does not say;
+  standIns, each triangle's stand-ins (eqgStandIns), or None for a mesh drawn as the client draws it."""
   finite = triangleKeep(vertices, triangles)
   keep = numpy.array([texture is not None for texture in textures], dtype=bool) & finite
   keptTextures = [texture for texture, kept in zip(textures, keep) if kept]
@@ -403,6 +425,7 @@ def meshPart(vertices, triangles, uvs, textures, alphaModes, lighting=None, liqu
     "tints": [eqLooks.untinted] * len(keptTextures), "dropped": int((~finite).sum()), "lighting": lighting,
     "liquids": [None] * len(keptTextures) if liquids is None else [liquid for liquid, kept in zip(liquids, keep) if kept],
     "passable": None if passable is None else numpy.asarray(passable, dtype=bool)[keep],
+    "standIns": [()] * len(keptTextures) if standIns is None else [labels for labels, kept in zip(standIns, keep) if kept],
   }
 
 
@@ -416,6 +439,34 @@ def eqgSkeletonPose(bones, animation, sourceName):
   bind = eqgSkeletons.worldMatrices(eqgSkeletons.bindLocals(bones), parents, order)
   posed = eqgSkeletons.worldMatrices(eqgSkeletons.animatedLocals(bones, animation["tracks"], animation["frame"], animation["rootDrop"]), parents, order)
   return {"bind": dict(zip(bones["names"], bind)), "posed": dict(zip(bones["names"], posed))}
+
+
+def animationRootDrop(resource, rootOffsets):
+  """How far EQGraphicsDX9.dll lowers ROOT_BONE's keys as it loads an animation (0x1003c960): by the moddat.ini ROffset of the section
+  named by the resource name's last three characters, or 3.125 without one, except in an animation named _MT_ or whose first _IT is
+  followed by a digit."""
+  name = resource.upper()
+  marker = name.find("_IT")
+  if "_MT_" in name or (marker >= 0 and name[marker + 3:marker + 4].isdigit()) or len(name) <= 2:
+    return 0.0
+  return rootOffsets.get(name[-3:], eqRaces.defaultAvatarOffset)
+
+
+def placedSkinnedPose(model, tracks, resource, rootOffsets, sourceName):
+  """A skinned .mod a zone places, as the client poses it: a CHierarchicalActor that loops its <model>_DEFAULT animation from a random
+  point (rand() / 32767 of its length, EQGraphicsDX9.dll 0x10044550), drawn here at the animation's first key; the bind pose when the
+  zone registers no such animation (tracks None). Returns the posed vertices and normals."""
+  if tracks is None:
+    return model["vertices"], model["normals"]
+  bones = model["bones"]
+  parents, order = eqgSkeletons.boneParents(bones, sourceName)
+  bindWorlds = eqgSkeletons.worldMatrices(eqgSkeletons.bindLocals(bones), parents, order)
+  poseWorlds = eqgSkeletons.worldMatrices(eqgSkeletons.animatedLocals(bones, tracks, 0, animationRootDrop(resource, rootOffsets)), parents, order)
+  matrices = eqgSkeletons.skinMatrices(bindWorlds, poseWorlds)
+  vertices, unweighted = eqgSkeletons.skinVertices(model["vertices"], model["weights"], matrices, sourceName)
+  if unweighted[model["triangles"]].any():
+    raise ValueError(f"{sourceName}: triangles use vertices with no bone weights; how the client poses them is not known")
+  return vertices, eqgSkeletons.skinNormals(model["normals"], model["weights"], matrices, sourceName)
 
 
 def eqgSkinnedPart(mesh, bones, pose, textures, alphaModes, sourceName, pointBone=None):
@@ -520,7 +571,10 @@ def eqgModelParts(archive, definition, appearance, context):
       raise ValueError(f"Model '{definition['model']}' is static; it has no animations")
     if changedAppearance(appearance):
       raise ValueError(f"Model '{definition['model']}' is static; appearance does not apply, got {changedAppearance(appearance)}")
-    return {"parts": [meshPart(model["vertices"], model["triangles"], staticEQGUVs(model["uvs"]), *eqgMaterialTextures(model["materials"], model["triangleMaterials"], {}))], "pose": {"static": True}}
+    return {"parts": [meshPart(
+      model["vertices"], model["triangles"], staticEQGUVs(model["uvs"]), *eqgMaterialTextures(model["materials"], model["triangleMaterials"], {}),
+      standIns=eqgTriangleStandIns(model["materials"], model["triangleMaterials"]),
+    )], "pose": {"static": True}}
   code = definition["model"].upper()
   if eqLooks.isEQGPlayerModel(code):
     unread = {key: value for key, value in changedAppearance(appearance).items() if key in ("variation", "headType", "textureSet")}
@@ -596,9 +650,11 @@ def eqgSkinnedParts(archive, definition, appearance, context):
   }
 
 
-def wldMeshPart(mesh, materialSwaps, lit):
-  """A WLD mesh's drawn triangles; lit keeps its normals and vertex colors, which a posed skin's would no longer match. A mesh the
-  client draws none of (a collision mesh) needs neither UVs nor normals."""
+def wldMeshPart(mesh, materialSwaps, colorless):
+  """A WLD mesh's drawn triangles with the per-vertex values the client builds it with: a UV of (0, 0) and a zero normal where the file
+  stores none (EQGraphicsDX9.dll 0x1001f630 regions, 0x10057060 objects, 0x1004ad50 skins). Lit by its normals and vertex colors,
+  colorless (RGBA) standing for colors the file does not store; unlit when colorless is None (a posed character, whose normals and
+  colors would no longer match it)."""
   materials = [materialSwaps.get(material["name"].upper(), material) for material in mesh["materials"]]
   textures, alphaModes = [], []
   for index in mesh["triangleMaterials"]:
@@ -607,17 +663,13 @@ def wldMeshPart(mesh, materialSwaps, lit):
     textures.append(material["textureNames"][0].removesuffix("_layer") if drawn else None)
     alphaModes.append("cutout" if drawn and material["renderMethod"] & 0xFF == 0x13 else "opaque")
   vertexCount = len(mesh["vertices"])
-  drawsNothing = all(texture is None for texture in textures)
-  if mesh["uvs"] is None and not drawsNothing:
-    raise ValueError(f"mesh '{mesh['name']}' has no per-vertex UVs")
+  # The client's (0, 0), flipped as every WLD texture coordinate is.
+  uvs = mesh["uvs"] if mesh["uvs"] is not None else numpy.tile((0.0, 1.0), (vertexCount, 1))
   lighting = None
-  if lit:
-    if mesh["normals"] is None and not drawsNothing:
-      raise ValueError(f"mesh '{mesh['name']}' lacks per-vertex normals, which the client lights it by")
-    colors = mesh["colors"] if mesh["colors"] is not None else numpy.tile(numpy.array(colorlessMeshColor, dtype=numpy.uint8), (vertexCount, 1))
+  if colorless is not None:
+    colors = mesh["colors"] if mesh["colors"] is not None else numpy.tile(numpy.array(colorless, dtype=numpy.uint8), (vertexCount, 1))
     lighting = {"normals": mesh["normals"] if mesh["normals"] is not None else numpy.zeros((vertexCount, 3)), "colors": colors}
-  uvs = mesh["uvs"] if mesh["uvs"] is not None else numpy.zeros((vertexCount, 2))
-  return meshPart(mesh["vertices"], mesh["triangles"], uvs, textures, alphaModes, lighting) | {"colored": mesh["colors"] is not None}
+  return meshPart(mesh["vertices"], mesh["triangles"], uvs, textures, alphaModes, lighting)
 
 
 def wldActor(archive, definition):
@@ -626,9 +678,10 @@ def wldActor(archive, definition):
 
 
 def wldStaticParts(archive, definition, appearance, context):
+  """A static WLD actor's meshes, each with its bounding sphere (eqWorldFile mesh)."""
   worldFile, actor = wldActor(archive, definition)
-  meshes = [worldFile.fragment(struct.unpack_from("<i", reference.body, 4)[0], 0x36) for reference in actorReferences(worldFile, actor)]
-  return {"parts": [wldMeshPart(worldFile.mesh(meshFragment), {}, True) for meshFragment in meshes], "pose": {"static": True}}
+  meshes = [worldFile.mesh(worldFile.fragment(struct.unpack_from("<i", reference.body, 4)[0], 0x36)) for reference in actorReferences(worldFile, actor)]
+  return {"parts": [wldMeshPart(mesh, {}, colorlessMeshColor) | {"boundingSphere": mesh["boundingSphere"]} for mesh in meshes], "pose": {"static": True}}
 
 
 def wldTextureSetSwaps(worldFile, code, textureSet):
@@ -646,11 +699,16 @@ def wldTextureSetSwaps(worldFile, code, textureSet):
 
 
 def wldSkeletalBindParts(archive, definition):
-  """A skeletal WLD actor's meshes in the bind pose, lit by their normals and vertex colors: a placed zone object such as a torch."""
+  """A skeletal WLD actor's meshes in the bind pose, lit by their normals: a placed zone object such as a torch. Its skins take no
+  vertex colors: the client builds them without any (EQGraphicsDX9.dll 0x1004ae5f, vertex format 0x112) and lights them by scene light
+  alone (SkinMeshOld); the meshes on its bones keep theirs."""
   worldFile, actor = wldActor(archive, definition)
   skeleton = worldFile.fragment(struct.unpack_from("<i", actorReferences(worldFile, actor)[0].body, 4)[0], 0x10)
   _, skins = eqSkeletons.readSkeleton(worldFile, skeleton)
-  parts, particleClouds, _ = eqSkeletons.posedSkeleton(worldFile, skeleton, eqSkeletons.skinMeshes(worldFile, skins), lambda mesh: wldMeshPart(mesh, {}, True))
+  parts, particleClouds, _ = eqSkeletons.posedSkeleton(
+    worldFile, skeleton, eqSkeletons.skinMeshes(worldFile, skins), lambda mesh: wldMeshPart(mesh | {"colors": None}, {}, sceneLitColor),
+    lambda mesh: wldMeshPart(mesh, {}, colorlessMeshColor),
+  )
   return parts, particleClouds
 
 
@@ -681,7 +739,10 @@ def wldSkeletalParts(archive, definition, appearance, context):
   if clashing:
     raise ValueError(f"Model {code}: the eye colors and the face or texture set both swap {clashing}; which the client keeps is not known")
   swaps |= eyes
-  parts, particleClouds, boneWorlds = eqSkeletons.posedSkeleton(worldFile, skeleton, chosen, lambda mesh: wldMeshPart(mesh, swaps, False), localTransforms)
+  def unlit(mesh):
+    return wldMeshPart(mesh, swaps, None)
+
+  parts, particleClouds, boneWorlds = eqSkeletons.posedSkeleton(worldFile, skeleton, chosen, unlit, unlit, localTransforms)
   attached, unattached = wldHeadItems(context, code, appearance, boneWorlds)
   return {
     "parts": parts + [item["part"] for item in attached], "pose": pose, "pieces": [mesh.name for mesh in chosen] + [item["piece"] for item in attached],
@@ -939,6 +1000,10 @@ def writePartsCache(modelFolder, parts, textureHolders, label):
     return json.dumps(liquid | {"textures": {key: name for key, name in found.items() if name is not None}}, sort_keys=True)
 
   passable = numpy.concatenate(passableChunks)
+  drawnOtherwise = collections.Counter(label for part in parts for labels in part.get("standIns") or () for label in labels)
+  # Views band heights over the zone without the objects it parks far below itself.
+  parked = numpy.concatenate([numpy.full(len(part["vertices"]), part.get("parked", False)) for part in parts])[used]
+  heightsWithoutParked = {"heightsWithoutParked": numpy.array([vertices[~parked, 2].min(), vertices[~parked, 2].max()], dtype=numpy.float32)} if parked.any() else {}
   palette, triangleMaterials = {}, numpy.empty(len(textures), dtype=numpy.int32)
   for index, key in enumerate(zip(textures, alphaModes, tints, (liquidKey(liquid) for liquid in liquids))):
     triangleMaterials[index] = palette.setdefault(key, len(palette))
@@ -950,9 +1015,11 @@ def writePartsCache(modelFolder, parts, textureHolders, label):
     **{key: value.astype(numpy.float32) if value.dtype == numpy.float64 else value for key, value in (lighting | terrainAttributes).items()},
     **lightChoice,
     **({"trianglePassable": passable} if passable.any() else {}),
+    **heightsWithoutParked,
   )
   return {
     "textureSources": textureSources, "missingTextures": missingTextures, "environmentMapsNotCube": notCube,
     "droppedTriangles": sum(part["dropped"] for part in parts), "lit": bool(litParts),
+    "drawnOtherwise": dict(sorted(drawnOtherwise.items())),
     "minimum": [float(value) for value in vertices.min(0)], "maximum": [float(value) for value in vertices.max(0)],
   }

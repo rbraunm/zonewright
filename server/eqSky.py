@@ -24,6 +24,15 @@ lightColumn = 31
 lightRows = {"sun": 0, "moon": 1, "fog": 2, "ambient": 3, "sunBounce": 28, "moonBounce": 29}
 domeRows = 30
 horizonRow = 30
+# CSky lights the scene by the moon before the first and after the second of these fractions of a day (EQGraphicsDX9.dll 0x100c20a0,
+# single-precision constants 0x1013f984 and 0x1013f988: 5:55 and 18:20), and eqgame.exe takes the time as minutes times 1/1440
+# (0x496b8d), both in single precision.
+moonBefore = numpy.float32(0.2465277761220932)
+moonAfter = numpy.float32(0.7638888955116272)
+minuteOfDay = numpy.float32(0.0006944444612599909)
+# eqgame.exe raises each channel of the ambient it hands the scene to the viewer's floor (0x494461-0x49471d): 0.08 for a character
+# without infravision or ultravision.
+ambientFloor = 0.08
 
 
 def readProfile(path):
@@ -161,13 +170,20 @@ def colorOf(pixel):
   return [round(int(component) / 255, 4) for component in pixel[:3]]
 
 
+def lightsByMoon(hour, minute):
+  """Whether CSky lights the scene by the moon at a time (0x100c20a0), from the day fraction as eqgame.exe computes it."""
+  fraction = numpy.float32(float(hour * 60 + minute) * float(minuteOfDay))
+  return bool(fraction < moonBefore or fraction > moonAfter)
+
+
 def directionAngles(direction):
   return round(math.degrees(math.atan2(direction[0], direction[1])) % 360, 3), round(math.degrees(math.asin(max(-1.0, min(1.0, direction[2])))), 3)
 
 
 def skyState(clientRoot, cachePath, sky):
   """What the client draws for a sky {type, weather (the type's DefaultWeather when left out), hour, minute} and the scene light it
-  sets: ambient, fog color, the directional light's color and direction, and its bounce. hour and minute place the sun: t = (hour * 60 +
+  sets: ambient (raised to the floor of a character without infravision or ultravision), fog color, the directional light's color and
+  direction (the sun's, or before 5:55 and after 18:20 the moon's), and its bounce. hour and minute place the sun: t = (hour * 60 +
   minute) / 1440 of a day, the sun at its highest at 12:00."""
   hour, minute = sky["hour"], sky["minute"]
   files = SkyFiles(clientRoot)
@@ -203,12 +219,12 @@ def skyState(clientRoot, cachePath, sky):
       "minWidth": horizonValues["minwidth"], "maxWidth": horizonValues["maxwidth"], "minCameraZ": horizonValues["mincameraz"], "maxCameraZ": horizonValues["maxcameraz"],
     }
   sun = satelliteDirection(2 * math.pi * dayFraction, 0.0)
-  # eqgame.exe lights the scene by the moon when CSky says so (vtable 0x4c, not traced); the sun below the horizon is taken as that.
-  byDay = sun[2] >= 0
+  # By the moon, eqgame.exe lights from the moon's angle, the sun's plus half a turn (0x496f9a, 0x496bc7): the sun's direction reversed.
+  byDay = not lightsByMoon(hour, minute)
   light = colors[:, lightColumn]
   azimuth, elevation = directionAngles(sun if byDay else -sun)
   environment = {
-    "ambientColor": colorOf(light[lightRows["ambient"]]), "fogColor": colorOf(light[lightRows["fog"]]),
+    "ambientColor": [max(value, ambientFloor) for value in colorOf(light[lightRows["ambient"]])], "fogColor": colorOf(light[lightRows["fog"]]),
     "sunColor": colorOf(light[lightRows["sun" if byDay else "moon"]]), "bounceColor": colorOf(light[lightRows["sunBounce" if byDay else "moonBounce"]]),
     "sunAzimuthDegrees": azimuth, "sunElevationDegrees": elevation,
   }

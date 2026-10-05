@@ -170,8 +170,7 @@ def buildEQGGeometry(clientRoot, source):
 def buildTerrainGeometry(clientRoot, source):
   archivePaths, missingArchives = zoneSources.assetArchivePaths(clientRoot, source)
   library = zoneSources.ModelLibrary(archivePaths, source["zone"])
-  archive = library.archives[0]
-  terrain = eqgTerrain.parseTerrain(archive.read(source["zon"]).decode("latin1"), archive.read(source["zon"][:-4] + ".dat"), source["zone"])
+  terrain = eqgTerrain.parseTerrain(*zoneSources.terrainFiles(source), source["zone"])
   quads = terrain["header"]["quadsPerTile"]
   spacing = terrain["header"]["unitsPerVertex"]
   rows, columns = numpy.meshgrid(numpy.arange(quads + 1), numpy.arange(quads + 1), indexing="ij")

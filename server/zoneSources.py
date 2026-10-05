@@ -6,8 +6,10 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 import eqArchive
 import eqgFiles
+import eqgTerrain
 
 listingExtensions = (".s3d", ".eqg", ".zon")
+eqgModelExtensions = (".mod", ".mds", ".ter", ".zon")
 
 
 def resolveClientRoot():
@@ -43,6 +45,12 @@ def wldVariants(archivePath):
   return {}
 
 
+def terrainDataFile(zonBytes, archive, sourceName):
+  """The .dat an EQ terrain .zon loads from the archive, or None when the archive lacks it and the project cannot load."""
+  dataName = eqgTerrain.dataFileName(zonBytes.decode("latin1"), sourceName)
+  return dataName if dataName in archive.entries else None
+
+
 def eqgVariants(archivePath):
   zoneName = archivePath.stem.lower()
   archive = eqArchive.EQArchive(archivePath)
@@ -51,19 +59,37 @@ def eqgVariants(archivePath):
     if not entryName.endswith(".zon"):
       continue
     zonBytes = archive.read(entryName)
-    if zonBytes[:5] == b"EQTZP" and entryName[:-4] + ".dat" in archive.entries:
-      variants[f"{zoneName}:eqtzp"] = {"zone": zoneName, "format": "eqtzp", "archive": archivePath, "zon": entryName}
+    if zonBytes[:5] == b"EQTZP":
+      dataName = terrainDataFile(zonBytes, archive, f"{archivePath.name}:{entryName}")
+      if dataName is not None:
+        variants[f"{zoneName}:eqtzp"] = {"zone": zoneName, "format": "eqtzp", "archive": archivePath, "zon": entryName, "dat": dataName}
     elif zonBytes[:4] == b"EQGZ":
       variants[f"{zoneName}:eqgz"] = {"zone": zoneName, "format": "eqgz", "archive": archivePath, "zon": entryName}
   return variants
 
 
 def looseVariants(clientRoot, zonPath):
+  """The zone a loose <archive>.zon makes, which the client loads over the archive's own (EQGraphicsDX9.dll 0x10066230): an EQG zone
+  (EQGZ), or an EQ terrain project (EQTZP) whose .dat its *NAME names in the archive."""
   zoneName = zonPath.stem.lower()
   archivePath = clientRoot / f"{zonPath.stem}.eqg"
-  if zonPath.read_bytes()[:4] == b"EQGZ" and archivePath.is_file():
+  if not archivePath.is_file():
+    return {}
+  zonBytes = zonPath.read_bytes()
+  if zonBytes[:4] == b"EQGZ":
     return {f"{zoneName}:eqgz:loose": {"zone": zoneName, "format": "eqgz", "archive": archivePath, "zonPath": zonPath}}
+  if zonBytes[:5] == b"EQTZP":
+    dataName = terrainDataFile(zonBytes, eqArchive.EQArchive(archivePath), zonPath.name)
+    if dataName is not None:
+      return {f"{zoneName}:eqtzp:loose": {"zone": zoneName, "format": "eqtzp", "archive": archivePath, "zonPath": zonPath, "dat": dataName}}
   return {}
+
+
+def terrainFiles(source):
+  """An EQ terrain variant's .zon text, the loose one when the client has it, and its .dat bytes."""
+  archive = eqArchive.EQArchive(source["archive"])
+  zonBytes = source["zonPath"].read_bytes() if "zonPath" in source else archive.read(source["zon"])
+  return zonBytes.decode("latin1"), archive.read(source["dat"])
 
 
 def discoverZones(clientRoot):
@@ -88,6 +114,21 @@ def zoneVariants(clientRoot, zoneName):
   if zonPath.is_file():
     variants |= looseVariants(clientRoot, zonPath)
   return variants
+
+
+def loadedVariant(clientRoot, zoneName):
+  """The key and source of the variant the client loads for a zone. It tries <zone>.eqg first and, once that loads, opens no classic
+  zone file (eqgame.exe 0x49b3d0-0x49b4d0, the gates at 0x49b9a2 and 0x49c25c); within it a loose <zone>.zon stands over the archive's
+  own (EQGraphicsDX9.dll 0x10066230). The .eqg loads only when one of its model, terrain, or zone files does (0x10065c00), so one
+  holding none leaves the zone to <zone>.s3d: nektulos.eqg, a copy of nektulos.s3d, does."""
+  variants = zoneVariants(clientRoot, zoneName)
+  if not variants:
+    raise ValueError(f"'{zoneName}' is not a zone in {clientRoot}")
+  key = next(key for key in (f"{zoneName}:eqgz:loose", f"{zoneName}:eqtzp:loose", f"{zoneName}:eqgz", f"{zoneName}:eqtzp", f"{zoneName}:wld") if key in variants)
+  archivePath = clientRoot / f"{zoneName}.eqg"
+  if key.endswith(":wld") and archivePath.is_file() and any(name.endswith(eqgModelExtensions) for name in eqArchive.EQArchive(archivePath).entries):
+    raise ValueError(f"Zone '{zoneName}': {archivePath.name} holds models but no zone, which the client would load over {zoneName}.s3d; not read")
+  return key, variants[key]
 
 
 def assetArchivePaths(clientRoot, source):
@@ -131,3 +172,10 @@ class ModelLibrary:
       holder = next((archive for archive in self.archives if modelName in archive.entries), None)
       self.models[modelName] = eqgFiles.parseModel(holder.read(modelName), f"{self.zoneName}:{modelName}") if holder else None
     return self.models[modelName]
+
+  def animationTracks(self, resource):
+    """An animation the archives register by resource name (an .ani entry's name without .ani): its tracks from the first archive
+    holding it, or None."""
+    entry = resource.lower() + ".ani"
+    holder = next((archive for archive in self.archives if entry in archive.entries), None)
+    return eqgFiles.parseAnimation(holder.read(entry), f"{holder.archivePath.name}:{entry}") if holder else None

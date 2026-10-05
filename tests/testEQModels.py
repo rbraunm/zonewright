@@ -1,9 +1,11 @@
+import io
 import re
 import sys
 from pathlib import Path
 
 import numpy
 import pytest
+from PIL import Image
 
 from conftest import everquestClient, pinnedBlender
 
@@ -179,16 +181,26 @@ def testDoorsAndObjectsComeFromTheZonesArchives(stageBlenderServer):
     firstLoaded = await session.expectSuccess("placeObject", {"zone": "neighborhood", "model": "IT67", "name": "it67", "location": [0, 60, 0], "headingDegrees": 0})
     chosen = await session.expectSuccess("placeObject", {"zone": "neighborhood", "model": "IT67", "name": "it67b", "location": [0, 70, 0], "headingDegrees": 0, "source": "gequip.s3d"})
     treeDetail = await session.expectSuccess("getObjectDetail", {"name": "tree"})
-    return door, bigDoor, kiln, tree, firstLoaded, chosen, treeDetail
+    await session.expectSuccess("setZoneProperties", {
+      "ambientColor": [0.3, 0.3, 0.3], "specialAmbientColor": [0, 0, 0], "bounceColor": [0, 0, 0], "sunColor": [0.6, 0.6, 0.6], "sunAzimuthDegrees": 0,
+      "sunElevationDegrees": 45, "fogColor": [0.5, 0.6, 0.7], "fogStart": 0, "fogEnd": 3000, "fogDensity": 0.33, "fogOn": False, "maxClip": 4000, "newEngineZone": False,
+    })
+    trunkView = {"eye": [30, 10, 6], "target": [30, 30, 6]}
+    trunk, _ = await session.expectImage("renderView", {"view": trunkView, "shading": "client"})
+    trunkPick = await session.expectSuccess("pick", {"view": trunkView, "pixel": [480, 270]})
+    return door, bigDoor, kiln, tree, firstLoaded, chosen, treeDetail, trunk, trunkPick
 
-  door, bigDoor, kiln, tree, firstLoaded, chosen, treeDetail = stageBlenderServer.session(steps)
+  door, bigDoor, kiln, tree, firstLoaded, chosen, treeDetail, trunk, trunkPick = stageBlenderServer.session(steps)
   assert (door["source"]["archive"], door["source"]["linkedBy"], door["source"]["kind"]) == ("poknowledge_obj.s3d", "zone load order", "wldStatic")
   assert door["location"] == [0.0, 0.0, 0.0]
   assert abs(bigDoor["dimensions"][2] - 1.5 * door["dimensions"][2]) < 0.002
   assert (kiln["source"]["archive"], kiln["source"]["linkedBy"]) == ("tradeskill_objects.eqg", "neighborhood_assets.txt")
-  # neighborhood.eqg ships only the bark's normal map; no archive the zone loads has its diffuse, so it draws as missing.
+  # neighborhood.eqg ships only the bark's normal map; no archive the zone loads has its diffuse, so the client's effect samples no
+  # texture there and the bark draws black, lit or not.
   assert tree["source"]["missingTextures"] == ["ab_dg_treebark_c.dds"]
   assert "eq_missing_ab_dg_treebark_c.dds" in [entry["material"] for entry in treeDetail["materials"]]
+  assert trunkPick["material"] == "eq_missing_ab_dg_treebark_c.dds"
+  assert Image.open(io.BytesIO(trunk)).convert("RGB").getpixel((480, 270)) == (0, 0, 0)
   assert firstLoaded["source"]["archive"] == "equipment-01.eqg"
   assert chosen["source"]["archive"] == "gequip.s3d"
 
