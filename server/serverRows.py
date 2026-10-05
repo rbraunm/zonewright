@@ -164,7 +164,8 @@ def zonePointRows(zone, zoneLines, clientZones):
       targetID = clientZones[target["zone"]]
     else:
       raise ValueError(f"Zone line '{line['name']}' leads to '{target['zone']}', which the client does not register and is not this zone")
-    center = [(low + high) / 2 for low, high in zip(line["minimum"], line["maximum"])]
+    # getZoneLines gives corners to 2 decimals, so their midpoint holds at most 3; rounding there drops only float noise.
+    center = [round((low + high) / 2, 3) for low, high in zip(line["minimum"], line["maximum"])]
     serverCenter = [float(value) for value in eqAxes.serverFromZone(center)]
     kept = {axis: target[axis] == "keep" for axis in ("x", "y", "z", "headingDegrees")}
     rows.append({
