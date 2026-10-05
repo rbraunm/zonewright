@@ -49,7 +49,6 @@ frameMinimumRadius = 0.5
 figureDistance = 15.0
 figureStep = 1.0
 figureClearance = 1.5
-figureStepDrop = 4.0
 figureMinimumDistance = 3.0
 figureSideOffset = 1.5
 mapClearance = 100.0
@@ -560,13 +559,13 @@ def placeMapCamera(preview, mapView):
 
 def placeScaleFigure(preview, surfaces, ground, headingDegrees, figureModel):
   """Walk ahead along what players stand on (surfaces, bridgeMeshAccess.PlayerSurfaces), as a player would, until figureDistance or a
-  wall, drop, or climb stops the walk; then stand the figure there."""
+  wall, or a climb or drop over a step (playerScale), stops the walk; then stand the figure there."""
   heading = math.radians(headingDegrees)
   ahead = mathutils.Vector((math.sin(heading), math.cos(heading), 0))
   side = mathutils.Vector((math.cos(heading), -math.sin(heading), 0))
   down = mathutils.Vector((0, 0, -1))
   position = ground.copy()
-  sideHit = surfaces.cast(position + side * figureSideOffset + mathutils.Vector((0, 0, stepHeight)), down, stepHeight + figureStepDrop)
+  sideHit = surfaces.cast(position + side * figureSideOffset + mathutils.Vector((0, 0, stepHeight)), down, 2 * stepHeight)
   if sideHit is not None:
     position = sideHit
   walked = 0.0
@@ -574,7 +573,7 @@ def placeScaleFigure(preview, surfaces, ground, headingDegrees, figureModel):
     chest = position + mathutils.Vector((0, 0, figureModel["avatarHeight"]))
     if surfaces.cast(chest, ahead, figureStep + figureClearance) is not None:
       break
-    nextGround = surfaces.cast(position + ahead * figureStep + mathutils.Vector((0, 0, stepHeight)), down, stepHeight + figureStepDrop)
+    nextGround = surfaces.cast(position + ahead * figureStep + mathutils.Vector((0, 0, stepHeight)), down, 2 * stepHeight)
     if nextGround is None:
       break
     position = nextGround
