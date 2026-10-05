@@ -175,19 +175,27 @@ def drawGrid(draw, frame):
     draw.line([(px, 0), (px, frame.size[1])], fill=gridColor, width=1)
 
 
+def scalePanel(frame, step):
+  """Where drawScale draws its bar, bottom left: the bar's left end and baseline, and the panel behind it."""
+  x0, y0 = 20, frame.size[1] - 24
+  return x0, y0, [x0 - 6, y0 - 26, x0 + frame.length(step) + 70, y0 + 10]
+
+
 def labelGrid(board, frame):
-  _, xs, ys = gridLines(frame)
-  for x in xs:
-    board.write((4, frame.pixel((x, 0))[1] - 3), str(x), gridLabelColor, 13, "ld")
-  for y in ys:
-    board.write((frame.pixel((0, y))[0] + 3, 4), str(y), gridLabelColor, 13, "la")
+  """Each grid line's coordinate at the drawing's left and top edges, leaving out any the scale bar's panel (drawScale with the grid's
+  step) covers, whichever is drawn first."""
+  step, xs, ys = gridLines(frame)
+  _, _, panel = scalePanel(frame, step)
+  labels = [((4, frame.pixel((x, 0))[1] - 3), str(x), "ld") for x in xs] + [((frame.pixel((0, y))[0] + 3, 4), str(y), "la") for y in ys]
+  for position, text, anchor in labels:
+    if not boxesOverlap(board.textBox(position, text, 13, anchor), panel):
+      board.write(position, text, gridLabelColor, 13, anchor)
 
 
 def drawScale(board, frame, step):
   draw = board.draw
   bar = frame.length(step)
-  x0, y0 = 20, frame.size[1] - 24
-  panel = [x0 - 6, y0 - 26, x0 + bar + 70, y0 + 10]
+  x0, y0, panel = scalePanel(frame, step)
   draw.rectangle(panel, fill=(255, 255, 255, 200))
   board.reserve(panel)
   draw.line([(x0, y0), (x0 + bar, y0)], fill=(0, 0, 0), width=4)

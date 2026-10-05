@@ -6,10 +6,12 @@ from pathlib import Path
 
 import numpy
 import pytest
+from PIL import Image, ImageDraw
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
 import eqgFiles
 import eqgWriter
+import planDrawing
 import serverMapDrawing
 import serverMapFiles
 from serverReference import referenceBytes
@@ -465,3 +467,22 @@ def testDrawCollisionShowsTheTopSurfaceAndEachBoxWhereItIs():
   assert [at(sheet, point, *second) for point in sidesOf(regions[1])] == [lava] * 4 and water not in [at(sheet, point, *second) for point in sidesOf(regions[0])]
   assert labelColorsAbove(sheet, regions[0], *first) == [water] and labelColorsAbove(sheet, regions[1], *second) == [lava]
   assert at(sheet, (-25, -35), *difference) == serverMapDrawing.differenceColor and at(sheet, (35, 25), *difference) not in (serverMapDrawing.differenceColor, (45, 73, 104))
+
+
+def testGridLabelsLeaveTheScaleBarClear():
+  # The grid line x = -150 runs 30 pixels above the bottom edge, so its label at the left edge falls on the scale bar's panel.
+  frame = planDrawing.PlanFrame((20, 0), 400, (400, 400))
+  step, xs, ys = planDrawing.gridLines(frame)
+  _, _, panel = planDrawing.scalePanel(frame, step)
+  assert step == 50 and frame.pixel((-150, 0))[1] == 370
+  for scaleFirst in (False, True):
+    board = planDrawing.LabelBoard(ImageDraw.Draw(Image.new("RGBA", frame.size)), frame.size)
+    if scaleFirst:
+      planDrawing.drawScale(board, frame, step)
+    placedBefore = len(board.taken)
+    planDrawing.labelGrid(board, frame)
+    gridLabels = board.taken[placedBefore:]
+    covered = board.textBox((4, 367), "-150", 13, "ld")
+    assert planDrawing.boxesOverlap(covered, panel) and covered not in gridLabels
+    assert len(gridLabels) == len(xs) + len(ys) - 1
+    assert not any(planDrawing.boxesOverlap(label, panel) for label in gridLabels)
