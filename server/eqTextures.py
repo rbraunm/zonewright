@@ -1,6 +1,13 @@
 """Texture bytes as the client stores them, made readable by Blender."""
 import struct
 
+cubeMapFlag = 0x200
+
+
+def isCubeMap(textureBytes):
+  """Whether texture bytes are a DDS cube map (DDSCAPS2_CUBEMAP), the only environment map the client's water loads."""
+  return textureBytes[:4] == b"DDS " and len(textureBytes) >= 128 and bool(struct.unpack_from("<I", textureBytes, 112)[0] & cubeMapFlag)
+
 
 def repairDDS(ddsBytes):
   """EQ's DDS headers declare mipmaps with a count of 0; set the count to the levels actually present so readers accept them."""

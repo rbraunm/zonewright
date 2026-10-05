@@ -9,9 +9,11 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
 import eqArchive
+import eqCubeMaps
 import eqEmitters
 import eqgFiles
-from conftest import writePNG
+import eqgWriter
+from conftest import writeCubeDDS, writePNG
 from testModelsAndDressing import freshScene, readShapedMesh
 
 environment = {
@@ -41,7 +43,7 @@ result = {"levels": [point.z for point in boundary], "ground": heights}
 async def liquidMaterials(session, tmp_path):
   diffuse = writePNG(tmp_path / "water_c.png", 4, 4, (40, 90, 110, 255))
   normal = writePNG(tmp_path / "water_n.png", 4, 4, (128, 128, 255, 255))
-  environment = writePNG(tmp_path / "water_e.png", 4, 4, (200, 150, 100, 255))
+  environment = writeCubeDDS(tmp_path / "water_e.dds", 4, [(200, 150, 100, 255)] * 6)
   fall = writePNG(tmp_path / "fall_c.png", 4, 4, (220, 230, 240, 160))
   await session.expectSuccess("createLiquidMaterial", {"name": "water", "liquid": "water", "diffuseTexture": str(diffuse), "normalTexture": str(normal), "environmentTexture": str(environment)})
   await session.expectSuccess("createLiquidMaterial", {"name": "falls", "liquid": "waterfall", "diffuseTexture": str(fall)})
@@ -800,7 +802,7 @@ def testFallsAndRiversRunTheirTexturesAsTheClientsDoAndExportSo(stageBlenderServ
 def testFlowSetsSlidesAndGetWaterSaysWhichWayEachBodyFlows(stageBlenderServer, tmp_path):
   async def steps(session):
     await cliffScene(session, tmp_path)
-    water = {"liquid": "water", "diffuseTexture": str(tmp_path / "water_c.png"), "normalTexture": str(tmp_path / "water_n.png"), "environmentTexture": str(tmp_path / "water_e.png")}
+    water = {"liquid": "water", "diffuseTexture": str(tmp_path / "water_c.png"), "normalTexture": str(tmp_path / "water_n.png"), "environmentTexture": str(tmp_path / "water_e.dds")}
     flowing = await session.expectSuccess("createLiquidMaterial", water | {"name": "flowing", "flow": [0.2, 0.05]})
     ribbon = await session.expectSuccess("createLiquidMaterial", {"name": "ribbon", "liquid": "waterfall", "diffuseTexture": str(tmp_path / "fall_c.png"), "flow": [0.5, 0.25]})
     await session.expectSuccess("createLiquidMaterial", {"name": "backwards", "liquid": "waterfall", "diffuseTexture": str(tmp_path / "fall_c.png"), "slides": [0, 0.3, 0, 0.2]})
@@ -925,7 +927,7 @@ def testLiquidTimeScrollsEachLayerAlongItsBodyAsTheClientDoes(stageBlenderServer
     await session.expectSuccess("setZoneProperties", environment)
     await session.expectSuccess("createLiquidMaterial", {"name": "stripedFall", "liquid": "waterfall", "diffuseTexture": stripes(tmp_path / "fallBand.png", (255, 255, 255, 255), (20, 20, 20, 255)), "flow": [0.25, 0.25]})
     await session.expectSuccess("createLiquidMaterial", {
-      "name": "stripedRiver", "liquid": "water", "diffuseTexture": str(tmp_path / "water_c.png"), "environmentTexture": writePNG(tmp_path / "black.png", 4, 4, (0, 0, 0, 255)).as_posix(),
+      "name": "stripedRiver", "liquid": "water", "diffuseTexture": str(tmp_path / "water_c.png"), "environmentTexture": writeCubeDDS(tmp_path / "black_e.dds", 4, [(0, 0, 0, 255)] * 6).as_posix(),
       "normalTexture": stripes(tmp_path / "riverBand.png", (255, 128, 128, 255), (128, 128, 255, 255)), "waterColor1": [0, 0, 0], "waterColor2": [1, 1, 1],
       "reflectionAmount": 0, "flow": [0.25, 0.25],
     })
@@ -949,3 +951,187 @@ def testLiquidTimeScrollsEachLayerAlongItsBodyAsTheClientDoes(stageBlenderServer
   assert "liquidTime is seconds on the client's effect clock, 0 or more" in backwards
   # A material made before previews scrolled would draw still at any time, so a view at a liquid time refuses it; at time 0 it draws.
   assert "Liquid materials ['stripedRiver'] were made before previews scrolled liquids" in older
+
+
+def patchColor(png, row, column, half=10):
+  """The median color of a square of a rendered view."""
+  pixels = numpy.asarray(Image.open(io.BytesIO(png)).convert("RGB"), dtype=numpy.float64)
+  return numpy.median(pixels[row - half:row + half, column - half:column + half].reshape(-1, 3), axis=0)
+
+
+cubeFaceColors = [(200, 40, 40, 255), (40, 200, 40, 255), (40, 40, 200, 255), (200, 200, 40, 255), (40, 200, 200, 255), (200, 40, 200, 255)]
+
+
+def testWaterMirrorsTheCubeFaceItsReflectedViewFinds(stageBlenderServer, tmp_path):
+  # Each view's middle lies on the pool; seen from it, the view reflected off the water runs up (cube +Y, the client's lookup turning
+  # the world's z up into the cube's y), or out along +X, -X, +Y (cube +Z), or -Y (cube -Z).
+  views = {
+    2: {"eye": [30, 20, 150], "target": [0, 0, -5]}, 0: {"eye": [-90, 10, 5], "target": [0, 0, -5]}, 1: {"eye": [90, 10, 5], "target": [0, 0, -5]},
+    4: {"eye": [10, -90, 5], "target": [0, 0, -5]}, 5: {"eye": [10, 90, 5], "target": [0, 0, -5]},
+  }
+
+  async def steps(session):
+    await freshScene(session)
+    await basin(session)
+    diffuse = str(writePNG(tmp_path / "water_c.png", 4, 4, (40, 90, 110, 255)))
+    normal = str(writePNG(tmp_path / "water_n.png", 4, 4, (128, 128, 255, 255)))
+    flat = str(writePNG(tmp_path / "flat_e.png", 4, 4, (200, 150, 100, 255)))
+    notCube = await session.expectError("createLiquidMaterial", {"name": "flatMirror", "liquid": "water", "diffuseTexture": diffuse, "normalTexture": normal, "environmentTexture": flat})
+    # Black water with fresnel held at 1 (bias 1) draws its reflection alone.
+    await session.expectSuccess("createLiquidMaterial", {
+      "name": "mirror", "liquid": "water", "diffuseTexture": diffuse, "normalTexture": normal, "environmentTexture": str(writeCubeDDS(tmp_path / "six_e.dds", 8, cubeFaceColors)),
+      "fresnelBias": 1.0, "reflectionAmount": 1.0, "reflectionColor": [1, 1, 1], "waterColor1": [0, 0, 0], "waterColor2": [0, 0, 0],
+    })
+    await session.expectSuccess("floodWater", {"name": "pool", "seed": [0, 0], "level": -5, "material": "mirror"})
+    await session.expectSuccess("setZoneProperties", environment | {"fogOn": False})
+    return notCube, {face: (await session.expectImage("renderView", {"view": view, "guides": False}))[0] for face, view in views.items()}
+
+  notCube, images = stageBlenderServer.session(steps)
+  assert "flat_e.png is not a DDS cube map" in notCube
+  drawn = {face: patchColor(image, 270, 480) for face, image in images.items()}
+  assert all(numpy.abs(drawn[face] - cubeFaceColors[face][:3]).max() <= 1 for face in drawn), drawn
+
+
+calmWater = """
+import bpy, bridgeSurfacing
+bpy.ops.mesh.primitive_plane_add(size=200, location=(0, 0, 0))
+plane = bpy.context.active_object
+material = bpy.data.materials.new("calm")
+material.use_nodes = True
+values = {"fresnelBias": 1.0, "fresnelPower": 8.0, "reflectionAmount": 1.0, "reflectionColor": [1, 1, 1], "waterColor1": [0, 0, 0], "waterColor2": [0, 0, 0]}
+bridgeSurfacing.liquidNodes(material, "water", values, diffusePath, {"environment": lookupPath}, False, "object")
+plane.data.materials.append(material)
+result = plane.name
+"""
+
+
+def testCalmWaterSeenStraightDownMirrorsTheFaceAbove(stageBlenderServer, tmp_path):
+  # A client water without a normal map is flat, so in a map every pixel's reflected view is exactly up.
+  cube = writeCubeDDS(tmp_path / "six_e.dds", 8, cubeFaceColors)
+  lookup = tmp_path / "six_e.lookup.png"
+  lookup.write_bytes(eqCubeMaps.environmentLookupPNG(cube.read_bytes(), cube.name))
+  diffuse = writePNG(tmp_path / "water_c.png", 4, 4, (40, 90, 110, 255))
+
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("runPython", {"code": f"diffusePath = {str(diffuse)!r}\nlookupPath = {str(lookup)!r}\n" + calmWater})
+    await session.expectSuccess("setZoneProperties", environment | {"fogOn": False})
+    return (await session.expectImage("renderView", {"view": {"map": {"center": [0, 0], "width": 100}}, "guides": False}))[0]
+
+  view = stageBlenderServer.session(steps)
+  assert numpy.abs(patchColor(view, 270, 480) - cubeFaceColors[2][:3]).max() <= 1
+
+
+def testOwnLavaGlowsUnlitWhereItsAlphaIsClearAndExportsItsMask(stageBlenderServer, tmp_path):
+  crust, glow = (250, 90, 10), (255, 200, 40)
+  archivePath = tmp_path / "lavaplot.eqg"
+  # From straight above, 400 across centered on (70, 70): +X up and -Y to the right, 2.4 pixels a unit.
+  plan = {"map": {"center": [70, 70], "width": 400}}
+  crustPixel, glowPixel = (438, 648), (102, 312)
+
+  async def steps(session):
+    await freshScene(session)
+    await basin(session)
+    await session.expectSuccess("sculptAlongPath", {"objectName": "ground", "mode": "carve", "path": [[140, 140, -20]], "radius": 50, "strength": 1, "profile": [[0, 0], [1, 20]], "conformRim": False})
+    ground = writePNG(tmp_path / "ground.png", 4, 4, (90, 120, 60, 255))
+    await session.expectSuccess("createMaterial", {"name": "grass", "diffuseTexture": str(ground)})
+    await session.expectSuccess("assignMaterial", {"objectName": "ground", "materialName": "grass"})
+    await session.expectSuccess("projectUVs", {"objectName": "ground", "method": "planar", "worldUnitsPerRepeat": 64, "direction": [0, 0, 1]})
+    normal = str(writePNG(tmp_path / "lava_n.png", 4, 4, (128, 128, 255, 255)))
+    second = str(writePNG(tmp_path / "lava_d.png", 4, 4, (*glow, 255)))
+    for name, alpha in (("crust", 255), ("glow", 0)):
+      diffuse = str(writePNG(tmp_path / f"{name}_c.png", 4, 4, (*crust, alpha)))
+      await session.expectSuccess("createLiquidMaterial", {"name": name, "liquid": "lava", "diffuseTexture": diffuse, "normalTexture": normal, "secondDiffuseTexture": second})
+    await session.expectSuccess("floodWater", {"name": "crustpool", "seed": [0, 0], "level": -5, "material": "crust"})
+    await session.expectSuccess("floodWater", {"name": "glowpool", "seed": [140, 140], "level": -5, "material": "glow"})
+    await session.expectSuccess("setZoneProperties", environment | {"fogOn": False})
+    day, _ = await session.expectImage("renderView", {"view": plan, "guides": False})
+    await session.expectSuccess("setZoneProperties", environment | {"ambientColor": [0.05, 0.05, 0.05], "sunColor": [0, 0, 0], "fogOn": False})
+    night, _ = await session.expectImage("renderView", {"view": plan, "guides": False})
+    await session.expectSuccess("saveFile", {"path": str(tmp_path / "lavaplot.blend")})
+    await session.expectSuccess("exportZone", {"path": str(archivePath), "purpose": "test"})
+    return day, night
+
+  day, night = stageBlenderServer.session(steps)
+  # The crust is the diffuse lit by the scene (ambient 0.3 plus the sun's 0.6 at 45 degrees on level ground, then 0.05 at night); the
+  # glow is the second diffuse whatever the light, as SModelLava draws a placed object's lava (an exported pool is one).
+  dayLight = 0.3 + 0.6 * math.sin(math.radians(45))
+  assert numpy.abs(patchColor(day, *crustPixel) - numpy.array(crust) * dayLight).max() <= 1.5
+  assert numpy.abs(patchColor(night, *crustPixel) - numpy.array(crust) * 0.05).max() <= 1.5
+  assert numpy.abs(patchColor(day, *glowPixel) - glow).max() <= 1 and numpy.abs(patchColor(night, *glowPixel) - glow).max() <= 1
+  archive = eqArchive.EQArchive(archivePath)
+  material = eqgFiles.parseModel(archive.read("obj_glowpool.mod"), "obj_glowpool.mod")["materials"][0]
+  assert material["shader"] == "Opaque_MaxLava.fx"
+  assert {key: material["properties"][key] for key in ("e_TextureDiffuse0", "e_TextureDiffuse1", "e_TextureNormal0")} == {
+    "e_TextureDiffuse0": "glow_c.dds", "e_TextureDiffuse1": "lava_d.dds", "e_TextureNormal0": "lava_n.dds",
+  }
+  # The glow's mask, the first diffuse's alpha, ships as painted.
+  shipped = numpy.asarray(Image.open(io.BytesIO(archive.read("glow_c.dds"))).convert("RGBA"))
+  assert (shipped == (*crust, 0)).all()
+
+
+def solidDDS(rgba):
+  return eqgWriter.ddsBytes(numpy.full((4, 4, 4), rgba, dtype=numpy.uint8))
+
+
+def quad(x0, x1, y0, y1):
+  """A level square at height 0 as positions and two triangles."""
+  return [[x0, y0, 0], [x1, y0, 0], [x1, y1, 0], [x0, y1, 0]], [[0, 1, 2], [0, 2, 3]]
+
+
+def meshOfQuads(quads):
+  """Positions, normals, texture coordinates, triangles, and each triangle's material for (square, material) pairs."""
+  positions, triangles, materials = [], [], []
+  for (corners, faces), material in quads:
+    triangles += [[corner + len(positions) for corner in face] for face in faces]
+    positions += corners
+    materials += [material] * len(faces)
+  uvs = [[position[0] / 40, position[1] / 40] for position in positions]
+  return positions, [[0, 0, 1]] * len(positions), uvs, triangles, materials, [0] * len(triangles)
+
+
+def testImportedLiquidsDrawAsTheClientsEffectsDrawThemOnTheirMeshes(stageBlenderServer, tmp_path):
+  glow = (100, 60, 20)
+  waterColors = {"red": [0.6, 0.1, 0.1], "blue": [0.1, 0.1, 0.6]}
+  lava = {"name": "lava", "diffuseTexture": "lava_c.dds", "normalTexture": "lava_n.dds", "cutout": False, "liquid": {"liquid": "lava", "values": {"slides": [0, 0, 0, 0]}, "secondDiffuseTexture": "lava_d.dds"}}
+
+  def water(name, color, environment):
+    values = {"fresnelBias": 1.0, "fresnelPower": 8.0, "reflectionAmount": 1.0, "reflectionColor": [1, 1, 1], "waterColor1": color, "waterColor2": color, "slides": [0, 0, 0, 0]}
+    return {"name": name, "diffuseTexture": "water_c.dds", "normalTexture": "water_n.dds", "cutout": False, "liquid": {"liquid": "water", "values": values, "environmentTexture": environment}}
+
+  # The terrain and an object carry the same lava, its diffuse all glow (alpha 0). The object's three waters share a diffuse: red and
+  # blue mirror a black cube map, and the third, red again, a white 2D map, which the client cannot load as a cube and so reflects nothing.
+  terrain = meshOfQuads([(quad(-30, -10, 50, 70), 0)])
+  pools = meshOfQuads([(quad(-30, -10, 20, 40), 0), (quad(10, 30, 50, 70), 1), (quad(10, 30, 20, 40), 2), (quad(10, 30, -10, 10), 3)])
+  placements = [
+    {"model": "ter_liquids.ter", "name": "TER_liquids", "position": (0.0, 0.0, 0.0), "rotation": (0.0, 0.0, 0.0), "scale": 1.0},
+    {"model": "obj_pools.mod", "name": "OBJ_pools", "position": (0.0, 0.0, 0.0), "rotation": (0.0, 0.0, 0.0), "scale": 1.0},
+  ]
+  archivePath = tmp_path / "liquids.eqg"
+  archivePath.write_bytes(eqgWriter.archiveBytes({
+    "liquids.zon": eqgWriter.zoneBytes(["ter_liquids.ter", "obj_pools.mod"], placements, [], []),
+    "ter_liquids.ter": eqgWriter.modelBytes("ter", [lava], *terrain),
+    "obj_pools.mod": eqgWriter.modelBytes("mod", [lava, water("red", waterColors["red"], "black_e.dds"), water("blue", waterColors["blue"], "black_e.dds"), water("redFlat", waterColors["red"], "white_e.dds")], *pools),
+    "lava_c.dds": solidDDS((250, 90, 10, 0)), "lava_d.dds": solidDDS((*glow, 255)), "lava_n.dds": solidDDS((128, 128, 255, 255)),
+    "water_c.dds": solidDDS((40, 90, 110, 255)), "water_n.dds": solidDDS((128, 128, 255, 255)), "white_e.dds": solidDDS((255, 255, 255, 255)),
+    "black_e.dds": writeCubeDDS(tmp_path / "black_e.dds", 4, [(0, 0, 0, 255)] * 6).read_bytes(),
+  }))
+
+  async def steps(session):
+    await freshScene(session)
+    imported = await session.expectSuccess("importZoneFile", {"path": str(archivePath)})
+    await session.expectSuccess("setZoneProperties", environment | {"fogOn": False})
+    # From straight above, 160 across centered on (0, 30): +X up and -Y to the right, 6 pixels a unit.
+    view, _ = await session.expectImage("renderView", {"view": {"map": {"center": [0, 30], "width": 160}}, "guides": False})
+    return imported, view
+
+  imported, view = stageBlenderServer.session(steps)
+  assert imported["source"]["environmentMapsNotCube"] == ["white_e.dds"]
+  # Lava glows at twice its second diffuse on the terrain (RegionLava) and at once on an object (SModelLava), unlit either way.
+  assert numpy.abs(patchColor(view, 390, 300) - numpy.array(glow) * 2).max() <= 1
+  assert numpy.abs(patchColor(view, 390, 480) - glow).max() <= 1
+  # Each water keeps its own colors, lit by the scene (ambient 0.3 plus the sun's 0.6 at 45 degrees), the 2D map adding nothing.
+  light = 0.3 + 0.6 * math.sin(math.radians(45))
+  drawn = {name: patchColor(view, 150, column) for name, column in (("red", 300), ("blue", 480), ("redFlat", 660))}
+  expected = {"red": waterColors["red"], "blue": waterColors["blue"], "redFlat": waterColors["red"]}
+  assert all(numpy.abs(drawn[name] - numpy.array(expected[name]) * 255 * light).max() <= 1.5 for name in drawn), drawn

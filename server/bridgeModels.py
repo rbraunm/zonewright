@@ -1,4 +1,5 @@
 """EQ models built from the server's model cache (model.npz plus textures) into Blender objects. Runs under Blender's Python."""
+import hashlib
 import json
 import math
 import os
@@ -15,6 +16,7 @@ import bridgeSurfacing
 alphaThreshold = 0.5
 missingTextureColor = (1.0, 0.0, 1.0, 1.0)
 untinted = 0xFFFFFF
+liquidKeyProperty = "eqLiquidKey"
 
 
 def missingTextureMaterial(textureName):
@@ -66,17 +68,20 @@ def modelMaterial(folder, textureName, alphaMode, tint, lit):
 
 
 def liquidModelMaterial(folder, textureName, liquid, lit):
-  """A client liquid material, drawn as the preview draws liquids (bridgeSurfacing.liquidNodes), reused across objects from one cache;
-  it keeps its liquid, so where its file lets players through it they swim (bridgeMeshAccess.swumFaces)."""
-  materialName = f"eq_{os.path.basename(folder)}_{textureName}_{liquid['liquid']}{'_lit' if lit else ''}"
+  """A client liquid material, drawn as the preview draws liquids (bridgeSurfacing.liquidNodes), reused across objects from one cache
+  only where the whole liquid is the same (materials sharing a diffuse differ in colors and environment); it keeps its liquid, so where
+  its file lets players through it they swim (bridgeMeshAccess.swumFaces)."""
+  key = json.dumps({"folder": folder, "texture": textureName, "liquid": liquid, "lit": lit}, sort_keys=True)
+  materialName = f"eq_{os.path.basename(folder)}_{textureName}_{liquid['liquid']}_{hashlib.sha256(key.encode()).hexdigest()[:8]}{'_lit' if lit else ''}"
   material = bpy.data.materials.get(materialName)
-  if material is not None and material.node_tree.nodes[bridgeSurfacing.diffuseNodeName].image.filepath == os.path.join(folder, textureName):
+  if material is not None and material.get(liquidKeyProperty) == key:
     return material
   material = bpy.data.materials.new(materialName)
   material[bridgeMeshAccess.clientLiquidProperty] = liquid["liquid"]
+  material[liquidKeyProperty] = key
   material.use_nodes = True
-  paths = {key: os.path.join(folder, name) for key, name in liquid["textures"].items()}
-  bridgeSurfacing.liquidNodes(material, liquid["liquid"], liquid["values"], os.path.join(folder, textureName), paths, lit)
+  paths = {kind: os.path.join(folder, name) for kind, name in liquid["textures"].items()}
+  bridgeSurfacing.liquidNodes(material, liquid["liquid"], liquid["values"], os.path.join(folder, textureName), paths, lit, liquid["mesh"])
   return material
 
 

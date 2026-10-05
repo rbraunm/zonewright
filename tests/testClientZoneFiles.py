@@ -58,14 +58,14 @@ def testClientTerrainStandsWhereItsVerticesAre():
 def testClientWaterMaterialsReadAsLiquids():
   archive = eqArchive.EQArchive(everquestClient / "highpasshold.eqg")
   model = eqgFiles.parseModel(archive.read("ter_highpass05.ter"), "ter_highpass05.ter")
-  liquids = {material["name"]: eqModels.eqgLiquid(material) for material in model["materials"]}
+  liquids = {material["name"]: eqModels.eqgLiquid(material, "terrain") for material in model["materials"]}
   water, falls = liquids["water"], liquids["waterfalls"]
-  assert water["liquid"] == "water" and water["textures"] == {"normal": "rc_cavewater_n.dds", "environment": "env_tutorialb_noswap.dds"}
+  assert water["liquid"] == "water" and water["textures"] == {"normal": "rc_cavewater_n.dds", "environment": "env_tutorialb_noswap.dds"} and water["mesh"] == "terrain"
   # e_fWaterColor1 0xFF1A2433 and e_fWaterColor2 0xFF00457F, as 0-1 RGB.
   assert numpy.allclose(water["values"]["waterColor1"], [0x1A / 255, 0x24 / 255, 0x33 / 255])
   assert numpy.allclose(water["values"]["waterColor2"], [0, 0x45 / 255, 0x7F / 255])
   assert numpy.isclose(water["values"]["fresnelBias"], 0.3) and water["values"]["fresnelPower"] == 8.0
-  assert falls == {"liquid": "waterfall", "values": {"slides": falls["values"]["slides"]}, "textures": {}} and numpy.allclose(falls["values"]["slides"], [-0.12, -0.32, 0.0, -0.5])
+  assert falls == {"liquid": "waterfall", "values": {"slides": falls["values"]["slides"]}, "textures": {}, "mesh": "terrain"} and numpy.allclose(falls["values"]["slides"], [-0.12, -0.32, 0.0, -0.5])
   assert all(liquid is None for name, liquid in liquids.items() if name not in ("water", "waterfalls"))
 
 
