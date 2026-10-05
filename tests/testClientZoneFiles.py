@@ -88,6 +88,12 @@ def testTrianglesDrawnByAStandInAreCountedByStandIn(tmp_path):
   written = eqModels.writePartsCache(tmp_path, [part], [archive], "Highpass Hold's terrain")
   assert len(model["triangles"]) == 76765 and len(part["triangles"]) == 76765 - 496
   assert written["drawnOtherwise"] == {"mplByDiffuseAlone": 73069, "waterOpaque": 2996}
+  archive = eqArchive.EQArchive(everquestClient / "brellsrest.eqg")
+  model = eqgFiles.parseModel(archive.read("ter_brellsrest.ter"), "ter_brellsrest.ter")
+  colors = numpy.tile(numpy.array(eqZones.unlitColor, dtype=numpy.uint8), (len(model["vertices"]), 1))
+  part = eqZones.placedEQGPart(model, numpy.identity(3), numpy.zeros(3), colors, "terrain")
+  written = eqModels.writePartsCache(tmp_path / "brellsrest", [part], [archive], "Brell's Rest's terrain")
+  assert written["drawnOtherwise"] == {"lavaPointLightByVertex": 1829, "mplByDiffuseAlone": 101153, "waterOpaque": 1588}
 
 
 @pytest.mark.clientData("clientFiles")
