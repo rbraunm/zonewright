@@ -140,6 +140,11 @@ def testNavIsDeterministic(recastToolingRoot):
 def testNavFromOurHighpassMapMatchesPeridots(recastToolingRoot):
   client = Path(everquestClient)
   ourMap = serverMapFiles.mapBytes(serverMapFiles.zoneFilesOf((client / "highpasshold.eqg").read_bytes(), (client / "highpasshold.zon").read_bytes()))
+  ourCollision, theirCollision = serverMapFiles.mapCollision(ourMap), serverMapFiles.mapCollision(referenceBytes("base/highpasshold.map"))
+  assert ourCollision.shape == theirCollision.shape == (272230, 3, 3)
+  moved = (ourCollision != theirCollision).any(axis=(1, 2))
+  assert int(moved.sum()) == 33184
+  assert float(numpy.abs(ourCollision - theirCollision).max()) <= 3.3e-4
   ours, report = serverNav.navBytes(ourMap, referenceBytes("water/highpasshold.wtr"), recastToolingRoot, noProgress)
   mine, theirs = serverMapFiles.readNav(ours, "our .nav"), serverMapFiles.readNav(referenceBytes("nav/highpasshold.nav"), "Peridot's .nav")
   assert mine["parameters"] == theirs["parameters"]

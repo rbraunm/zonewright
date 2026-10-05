@@ -129,6 +129,13 @@ def testNavContainerRoundTrips():
   assert serverMapFiles.navPayload(nav) == zlib.decompress(data[21:])
 
 
+@pytest.mark.clientData("serverMaps")
+@pytest.mark.parametrize("zone", ["highpasshold", "thulehouse2", "guildhall", "freeporteast", "freeportwest", "qeynos2"])
+def testEveryReferenceNavReEncodesToItsOwnPayload(zone):
+  data = referenceBytes(f"nav/{zone}.nav")
+  assert serverMapFiles.navPayload(serverMapFiles.readNav(data)) == zlib.decompress(data[21:])
+
+
 def modelFile(kind, positions, triangles):
   positions = numpy.array(positions, dtype=numpy.float32)
   normals = numpy.tile(numpy.array([0, 0, 1], dtype=numpy.float32), (len(positions), 1))
