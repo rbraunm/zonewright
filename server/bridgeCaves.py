@@ -1586,9 +1586,10 @@ def weldMouth(editor, faces, rankOf, pointOf, shortest, plugOf):
         continue
       length = (pointOf[first] - pointOf[second]).length
       if length < shortest:
-        candidates.append((length, edge))
+        candidates.append((length, sorted((tuple(pointOf[first]), tuple(pointOf[second]))), edge))
     targets, claimed = {}, set()
-    for _, edge in sorted(candidates, key=lambda candidate: candidate[0]):
+    # BMesh elements hash by address, so edges of one length go by where they lie, or each process welds a different one first.
+    for _, _, edge in sorted(candidates, key=lambda candidate: candidate[:2]):
       first, second = edge.verts
       if first in claimed or second in claimed:
         continue
@@ -1607,15 +1608,12 @@ def weldMouth(editor, faces, rankOf, pointOf, shortest, plugOf):
 def foldedFlaps(caveFaces):
   """Faces a weld pressed flat over a neighbour, turned over: a face on an edge three faces share, facing opposite one of the others it
   lies on, with an edge of its own no other face shares. It encloses nothing; taking it out leaves the other two."""
-  flaps = set()
+  flaps = []
   for face in caveFaces:
     if not face.is_valid or not any(len(edge.link_faces) == 1 for edge in face.edges):
       continue
-    for edge in face.edges:
-      if len(edge.link_faces) != 3:
-        continue
-      if any(other is not face and other.normal.dot(face.normal) < -flapAntiparallel for other in edge.link_faces):
-        flaps.add(face)
+    if any(len(edge.link_faces) == 3 and any(other is not face and other.normal.dot(face.normal) < -flapAntiparallel for other in edge.link_faces) for edge in face.edges):
+      flaps.append(face)
   return flaps
 
 
@@ -1947,10 +1945,10 @@ def spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, pa
   if definition["trimBands"]:
     shortest = min(shortest, tube["shortestStretch"] / 2)
   welded = weldMouth(editor, newFaces, rankOf, pointOf, shortest, plugOf)
-  caveFaces = {face for face in newFaces if face.is_valid}
+  caveFaces = [face for face in newFaces if face.is_valid]
   polygons = [face for face in caveFaces if len(face.verts) > 3]
   if polygons:
-    caveFaces |= set(bmesh.ops.triangulate(editor, faces=polygons, quad_method="BEAUTY", ngon_method="BEAUTY")["faces"])
+    caveFaces = list(dict.fromkeys(caveFaces + bmesh.ops.triangulate(editor, faces=polygons, quad_method="BEAUTY", ngon_method="BEAUTY")["faces"]))
   # A weld can close a sliver of lining between two pieces of ground onto their own corners: a lining face and a piece on the same
   # vertices, back to back, enclosing nothing. Both go.
   byCorners = {}
@@ -1958,7 +1956,7 @@ def spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, pa
     byCorners.setdefault(frozenset(face.verts), []).append(face)
   doubled = [face for faces in byCorners.values() if len(faces) > 1 for face in faces]
   if doubled:
-    doubledEdges = {edge for face in doubled for edge in face.edges}
+    doubledEdges = list(dict.fromkeys(edge for face in doubled for edge in face.edges))
     bmesh.ops.delete(editor, geom=doubled, context="FACES_ONLY")
     for edge in doubledEdges:
       if edge.is_valid and not edge.link_faces:
@@ -1966,12 +1964,12 @@ def spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, pa
     for vertex in made.values():
       if vertex.is_valid and not vertex.link_faces:
         editor.verts.remove(vertex)
-  caveFaces = {face for face in caveFaces if face.is_valid}
+  caveFaces = [face for face in caveFaces if face.is_valid]
   editor.normal_update()
   flaps = foldedFlaps(caveFaces)
   if flaps:
-    flapEdges = {edge for face in flaps for edge in face.edges}
-    bmesh.ops.delete(editor, geom=list(flaps), context="FACES_ONLY")
+    flapEdges = list(dict.fromkeys(edge for face in flaps for edge in face.edges))
+    bmesh.ops.delete(editor, geom=flaps, context="FACES_ONLY")
     for edge in flapEdges:
       if edge.is_valid and not edge.link_faces:
         editor.edges.remove(edge)
@@ -1989,7 +1987,7 @@ def spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, pa
 
 def requireSealed(caveFaces, pointOf):
   """Refuse a cut that came out broken: an edge at the cave on three or more faces, or open where its lining should meet the ground."""
-  edges = {edge for face in caveFaces for vertex in face.verts for edge in vertex.link_edges}
+  edges = dict.fromkeys(edge for face in caveFaces for vertex in face.verts for edge in vertex.link_edges)
   broken = [edge for edge in edges if len(edge.link_faces) not in (0, 2)]
   if broken:
     overUsed = sum(1 for edge in broken if len(edge.link_faces) > 2)
@@ -2096,7 +2094,7 @@ def cutReport(faces, liningFaces, pointOf):
   and lowest and highest point; an opening not at an end is the tube breaking through the ground), and the shortest edges of its
   lining, of the pieces of ground at its mouth, and of its seams, as the mesh shows them."""
   lining = set(liningFaces)
-  seam = {edge for face in liningFaces for edge in face.edges if any(other not in lining for other in edge.link_faces)}
+  seam = list(dict.fromkeys(edge for face in liningFaces for edge in face.edges if any(other not in lining for other in edge.link_faces)))
   parent = {}
 
   def root(vertex):
@@ -2183,8 +2181,7 @@ def takeBack(sceneObject, name):
     bmesh.ops.delete(editor, geom=[editor.verts[int(row)] for row in numpy.flatnonzero(tags < 0)], context="VERTS")
     for vertices, values, corners in restoring:
       layerSet.write(editor.faces.new(vertices), values, corners)
-    plugVertices = set(byIdentifier.values())
-    for edge in [edge for vertex in plugVertices for edge in vertex.link_edges if not edge.link_faces]:
+    for edge in [edge for vertex in byIdentifier.values() for edge in vertex.link_edges if not edge.link_faces]:
       if edge.is_valid:
         editor.edges.remove(edge)
     for collection, prefix in ((editor.verts.layers.int, bridgeCaveData.vertexTagPrefix), (editor.verts.layers.int, bridgeCaveData.sourcePrefix), (editor.verts.layers.float_vector, bridgeCaveData.weightsPrefix),

@@ -297,6 +297,105 @@ def testFloorStrokeRefusals(stageBlenderServer, tmp_path):
   assert detail["caves"] == []
 
 
+# The cave demo: a cave under a cliff 150 high, a level way from its mouth over the graded approach, two branches and a gallery opening
+# back into the main run, rubble and scree on its floors.
+undercliff = {
+  "objectName": "ground", "name": "undercliff", "edgeLength": 8, "breakup": {"featureSize": 40, "amplitude": 3, "seed": 11}, "mouthFade": 6,
+  "wallMaterial": "caveRock", "floorMaterial": "scree", "worldUnitsPerRepeat": 48,
+  "path": [[-150, -45, 2], [-150, 30, 2], [-150, 70, 2], [-150, 90, 2], [-150, 170, 2]], "widths": [36, 36, 36, 100, 100], "heights": [36, 36, 36, 50, 50],
+  "daylight": [1, 0.6, 0.15, 0, 0],
+  "branches": [
+    {
+      "name": "stair", "from": "main", "path": [[-130, 150, 2], [-80, 150], [60, 150], [60, 100], [-100, 100], [-125, 100], [-215, 100]],
+      "grades": [0, 18, 0, 18, 0, 0], "landings": [2, 3], "widths": [24, 26, 26, 26, 26, 72, 72], "heights": [26, 28, 28, 28, 34, 40, 40], "daylight": [0] * 7,
+    },
+    {
+      "name": "store", "from": "main", "path": [[-165, 128, 2], [-205, 152], [-222, 166], [-258, 204]], "grades": [0, 0, 0], "widths": [24, 24, 64, 64],
+      "heights": [26, 26, 34, 34], "daylight": [0] * 4,
+    },
+    {
+      "name": "gallery", "from": "stair", "path": [[-205, 90, 83.23], [-205, 40], [-118, 40], [-118, 118, 20]], "grades": [0, None, None], "widths": [16] * 4,
+      "heights": [16] * 4, "daylight": [0] * 4, "into": "main",
+    },
+  ],
+  "floor": [
+    {"kind": "level", "name": "way", "run": "main", "from": 0, "to": {"point": 4}, "across": [-9, 9], "material": "flagstones"},
+    {"kind": "level", "name": "storeThreshold", "run": "main", "from": 166, "to": 196, "across": [-50, -9], "material": "flagstones"},
+    {
+      "kind": "rough", "name": "rockEast", "run": "main", "outline": [[-138, 96], [-100, 96], [-100, 132], [-138, 132]], "rise": 6, "edge": 6, "bank": 10,
+      "breakup": {"featureSize": 24, "amplitude": 2.5, "seed": 21}, "material": "caveRock",
+    },
+    {
+      "kind": "rough", "name": "rockWest", "run": "main", "outline": [[-200, 96], [-162, 96], [-162, 110], [-200, 110]], "rise": 5, "edge": 6, "bank": 9,
+      "breakup": {"featureSize": 24, "amplitude": 2.5, "seed": 22}, "material": "caveRock",
+    },
+    {
+      "kind": "rough", "name": "rockNorth", "run": "main", "outline": [[-200, 160], [-162, 160], [-162, 200], [-200, 200]], "rise": 5, "edge": 6, "bank": 9,
+      "breakup": {"featureSize": 24, "amplitude": 2.5, "seed": 23}, "material": "caveRock",
+    },
+    {"kind": "level", "name": "stairWay", "run": "stair", "from": 0, "to": {"point": 5}, "across": [-6, 6], "material": "flagstones"},
+    {
+      "kind": "rough", "name": "stairScreeNorth", "run": "stair", "outline": [[-78, 157], [52, 157], [52, 166], [-78, 166]], "rise": 2.5, "edge": 3, "bank": 5,
+      "breakup": {"featureSize": 24, "amplitude": 2.5, "seed": 41},
+    },
+    {
+      "kind": "rough", "name": "stairScreeSouth", "run": "stair", "outline": [[-78, 134], [52, 134], [52, 143], [-78, 143]], "rise": 2.5, "edge": 3, "bank": 5,
+      "breakup": {"featureSize": 24, "amplitude": 2.5, "seed": 42},
+    },
+    {
+      "kind": "rough", "name": "upperScreeNorth", "run": "stair", "outline": [[52, 107], [-90, 107], [-90, 116], [52, 116]], "rise": 2.5, "edge": 3, "bank": 5,
+      "breakup": {"featureSize": 24, "amplitude": 2.5, "seed": 43},
+    },
+    {
+      "kind": "rough", "name": "upperScreeSouth", "run": "stair", "outline": [[52, 84], [-90, 84], [-90, 93], [52, 93]], "rise": 2.5, "edge": 3, "bank": 5,
+      "breakup": {"featureSize": 24, "amplitude": 2.5, "seed": 44},
+    },
+    {"kind": "pad", "name": "plotPad", "run": "stair", "from": 412, "to": 468, "across": [-22, 22], "rise": 2, "edge": 0.5, "material": "flagstones"},
+    {"kind": "level", "name": "hallWay", "run": "stair", "from": {"point": 5}, "to": 412, "across": [-6, 6], "material": "flagstones"},
+    {
+      "kind": "rough", "name": "hallRockNorth", "run": "stair", "outline": [[-225, 126], [-110, 126], [-110, 140], [-225, 140]], "rise": 4, "edge": 5, "bank": 8,
+      "breakup": {"featureSize": 24, "amplitude": 2.5, "seed": 31}, "material": "caveRock",
+    },
+    {
+      "kind": "rough", "name": "hallRockSouth", "run": "stair", "outline": [[-190, 60], [-110, 60], [-110, 74], [-190, 74]], "rise": 4, "edge": 5, "bank": 8,
+      "breakup": {"featureSize": 24, "amplitude": 2.5, "seed": 32}, "material": "caveRock",
+    },
+    {"kind": "level", "name": "storeFloor", "run": "store", "from": 0, "to": {"point": 3}, "across": [-11, 11], "material": "flagstones"},
+  ],
+}
+# The ground's vertex count, and digests of its vertices' coordinates and of its faces' corners in order.
+readMeshDigest = r"""
+import hashlib, numpy
+mesh = bpy.data.objects['ground'].data
+coordinates = numpy.empty(len(mesh.vertices) * 3, dtype=numpy.float32)
+mesh.vertices.foreach_get('co', coordinates)
+corners = numpy.empty(len(mesh.loops), dtype=numpy.int32)
+mesh.loops.foreach_get('vertex_index', corners)
+result = {'vertices': len(mesh.vertices), 'coordinates': hashlib.sha256(coordinates.tobytes()).hexdigest(), 'corners': hashlib.sha256(corners.tobytes()).hexdigest()}
+"""
+
+
+def testACaveCutInTwoBlenderProcessesLeavesTheSameMesh(freshBlenderServer, tmp_path):
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    for name, color in (("caveRock", (80, 76, 72, 255)), ("scree", (120, 100, 80, 255)), ("flagstones", (150, 140, 120, 255))):
+      await session.expectSuccess("createMaterial", {"name": name, "diffuseTexture": str(writePNG(tmp_path / f"{name}.png", 4, 4, color))})
+    await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [720, 640], "spacing": 8, "location": [0, 180, 0], "collection": "terrain"})
+    await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "cliff"})
+    await session.expectSuccess("sculptOutline", {"objectName": "ground", "mode": "fill", "outline": [[-400, 0], [400, 0], [400, 500], [-400, 500]], "base": 0, "profile": [[-26, 0], [0, 150], [500, 150]]})
+    await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "breakup"})
+    await session.expectSuccess("warp", {"objectName": "ground", "featureSize": 80, "amplitude": 12, "seed": 4, "plane": "horizontal"})
+    await session.expectSuccess("roughen", {"objectName": "ground", "featureSize": 20, "amplitude": 2.5, "octaves": 3, "roughness": 0.5, "seed": 5, "direction": "normal"})
+    await session.expectSuccess("gradeRoute", {"objectName": "ground", "name": "approach", "points": [[-150, -110, 2], [-150, -45, 2]], "width": 48})
+    cut = await session.expectSuccess("cutCave", undercliff)
+    return cut["weldedAtMouth"], (await session.expectSuccess("runPython", {"code": readMeshDigest}))["result"]
+
+  # The mouth's floor, level over the graded approach, crosses the grid's lines at even spacing, so many of its short edges have one
+  # length; the weld takes them in the same order in every process.
+  first, second = freshBlenderServer.session(steps), freshBlenderServer.session(steps)
+  assert first == second
+
+
 def testAPlotOnAPadMeasuresThePad(stageBlenderServer, tmp_path):
   housing = {"role": "featured", "intent": "plots in caves", "placement": "world", "plotBudget": {"player": 1, "guild": 0}}
   plotPad = {"kind": "pad", "name": "plotPad", "run": "main", "from": 190, "to": 290, "across": [-50, 50], "rise": 3, "edge": 4}
