@@ -288,12 +288,25 @@ def rockOverGround(castWithNormal, x, y, top):
   return highest[0].z, underside[0].z, floor[0].z
 
 
-def describeRockOverGround(where, levels):
-  top, underside, floor = levels
-  return (
-    f"rock lies over ground at {where}: the highest ground there, at {top:.1f}, is the top of rock whose underside is at {underside:.1f},"
-    f" over ground at {floor:.1f} (a cave or an overhang)"
-  )
+def overGroundOn(surfaces, x, y, top):
+  """rockOverGround on PlayerSurfaces, with the name of the object whose underside stands over the ground: its levels and that name, or
+  None."""
+  levels = rockOverGround(surfaces.castWithNormal, x, y, top)
+  if levels is None:
+    return None
+  over = surfaces.castOn(mathutils.Vector((x, y, levels[1] - castNudge)), up, levels[0] - levels[1] + 2 * castNudge)
+  return levels, None if over is None else over[2]
+
+
+def describeRockOverGround(where, levels, name=None):
+  """A refusal's account of rock over ground, naming the object over the ground when known (a placed roof, a hill over a cave)."""
+  top, underside, floor = (round(level, 1) + 0.0 for level in levels)
+  if name is None:
+    return (
+      f"rock lies over ground at {where}: the highest ground there, at {top:.1f}, is the top of rock whose underside is at {underside:.1f},"
+      f" over ground at {floor:.1f} (a cave or an overhang)"
+    )
+  return f"'{name}' stands over the ground at {where}: the highest ground there, at {top:.1f}, is the top of '{name}', whose underside, at {underside:.1f}, stands over ground at {floor:.1f}"
 
 
 def swimSurfaces():

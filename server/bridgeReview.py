@@ -311,9 +311,16 @@ def walkRoute(path, sampleSpacing):
   widths = [(row["left"] if row["left"] is not None else routeSideReach) + (row["right"] if row["right"] is not None else routeSideReach) for row in rows]
   narrowest = int(numpy.argmin(widths))
   wet = [row for row in rows if row["waterDepth"] is not None]
+  # A flight's treads stand level, so the slope stood on reads 0 up a stair; the climb between samples reads its grade.
+  climbs = [
+    (math.degrees(math.atan2(abs(second["at"][2] - first["at"][2]), second["distance"] - first["distance"])), first, second)
+    for first, second in zip(rows[:-1], rows[1:]) if second["distance"] > first["distance"]
+  ]
+  steepestClimb = max(climbs, key=lambda climb: climb[0]) if climbs else None
   return {
     "length": round(walk.travelled, 1), "samples": len(rows), "walkable": not walk.problems, "problems": walk.problems, "oneWay": walk.oneWay,
     "steepest": {"slopeDegrees": round(walk.steepest[0], 1), "at": roundVector(walk.steepest[1])},
+    "steepestGrade": None if steepestClimb is None else {"degrees": round(steepestClimb[0], 1), "from": steepestClimb[1]["at"], "to": steepestClimb[2]["at"]},
     "narrowest": {"width": round(widths[narrowest], 1), "at": rows[narrowest]["at"], "left": rows[narrowest]["left"], "right": rows[narrowest]["right"]},
     "lowestHeadroom": None if walk.lowest is None else {"headroom": round(walk.lowest[0], 1), "at": roundVector(walk.lowest[1])},
     "deepestWater": max(({"depth": row["waterDepth"], "at": row["at"]} for row in wet), key=lambda item: item["depth"]) if wet else None,

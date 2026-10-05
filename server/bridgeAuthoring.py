@@ -1169,6 +1169,13 @@ def projectUVs(objectName, method, worldUnitsPerRepeat, selector, direction):
   faceMask, selectedLoops, projected = bridgeSurfacing.projectedUVs(sceneObject, method, worldUnitsPerRepeat, selector, direction)
   faceMask = bridgeCaveData.requireSurfaceSelection(sceneObject, selector, faceMask)
   selectedLoops = faceMask[numpy.repeat(numpy.arange(len(faceMask)), bridgeMeshAccess.faceLoops(sceneObject)[0])]
+  writeProjection(sceneObject, selectedLoops, projected)
+  return {"object": objectName, "method": method, "faces": int(faceMask.sum()), "worldUnitsPerRepeat": worldUnitsPerRepeat}
+
+
+def writeProjection(sceneObject, selectedLoops, projected):
+  """Set the selected corners' mapping to a projection: on a mesh whose layers map transitions, into its base mapping (compose); else
+  into its UV map."""
   mesh = sceneObject.data
   if bridgeSurfacing.baseMappingName in mesh.attributes:
     mapping = readCornerVectors(mesh, bridgeSurfacing.baseMappingName)
@@ -1186,7 +1193,6 @@ def projectUVs(objectName, method, worldUnitsPerRepeat, selector, direction):
     uvs[selectedLoops] = projected[selectedLoops]
     uvLayer.data.foreach_set("uv", uvs.ravel())
     mesh.update()
-  return {"object": objectName, "method": method, "faces": int(faceMask.sum()), "worldUnitsPerRepeat": worldUnitsPerRepeat}
 
 
 # Broad strokes: taking an area back

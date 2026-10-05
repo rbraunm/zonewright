@@ -18,8 +18,10 @@ import bridgeObjects
 import bridgeShaping
 import bridgeStructureData
 import bridgeSurfacing
+from playerScale import stepHeight
 
 openingKinds = ("door", "window")
+openingPieceKinds = ("wall", "custom")
 frameKeys = {"width", "depth", "material", "worldUnitsPerRepeat"}
 snapKeys = {"object", "socket", "pieceSocket"}
 # An opening leaves at least this much wall at each end and above it (and below a window).
@@ -30,6 +32,8 @@ sourceAttribute = "zonewrightOpeningSource"
 capAttribute = "zonewrightOpeningCap"
 frameSource, openingSource = 1, 2
 pitchRange = (5.0, 60.0)
+# Placements a roof goes over stand turned alike within this many degrees.
+frameTolerance = 0.01
 ridgeDirections = ("x", "y")
 defaultPlacementCollection = "structures"
 
@@ -367,11 +371,11 @@ def capOpenings(member):
 def cutOpening(piece, kind, along, width, height, sill, archRise, archSegments, frame):
   collection = bridgeKitData.requireLocalPiece(piece)
   record = bridgeKitData.readRecord(collection)
-  if record["kind"] != "wall":
-    raise ValueError(f"'{piece}' is a {record['kind']}; openings are cut through wall pieces")
+  if record["kind"] not in openingPieceKinds:
+    raise ValueError(f"'{piece}' is a {record['kind']}; openings are cut through wall pieces and custom pieces (a curved wall section)")
   members = bridgeKitData.pieceMembers(collection)
   if len(members) != 1:
-    raise ValueError(f"Wall piece '{piece}' is {len(members)} meshes; an opening is cut through a wall of one mesh (joinObjects joins them)")
+    raise ValueError(f"Piece '{piece}' is {len(members)} meshes; an opening is cut through a wall of one mesh (joinObjects joins them)")
   member = members[0]
   if not isNumber(along):
     raise ValueError(f"along is a number (from the wall's middle along X), got {along!r}")
@@ -388,12 +392,13 @@ def cutOpening(piece, kind, along, width, height, sill, archRise, archSegments, 
   }
   left, right, bottom, top = openingExtent(opening, base)
   what = f"The {kind}" + (" with its frame" if frame is not None else "")
-  leftovers = [("its -X end", left - low[0]), ("its +X end", high[0] - right), ("above it", high[2] - top)]
+  leftovers = [("at its -X end", "its -X end", left - low[0]), ("at its +X end", "its +X end", high[0] - right), ("above it", "its top", high[2] - top)]
   if kind == "window":
-    leftovers.append(("below it", bottom - base))
-  for where, leftover in leftovers:
+    leftovers.append(("below it", "its base", bottom - base))
+  for where, edge, leftover in leftovers:
     if leftover < openingMargin - 1e-9:
-      raise ValueError(f"{what} leaves {leftover:.2f} of wall at {where}; it needs at least {openingMargin:g}, so it is {openingMargin - leftover:.2f} too wide, tall, or near the edge")
+      found = f"reaches {-leftover:.2f} past the wall's {edge.split(' ', 1)[1]}" if leftover < 0 else f"leaves only {leftover:.2f} of wall {where}"
+      raise ValueError(f"{what} {found}; it needs at least {openingMargin:g} of wall {where}, so it is {openingMargin - leftover:.2f} too wide, tall, or near the edge")
   for index, earlier in enumerate(record["openings"]):
     earlierLeft, earlierRight, earlierBottom, earlierTop = openingExtent(earlier, base)
     if left < earlierRight and earlierLeft < right and bottom < earlierTop and earlierBottom < top:
@@ -415,9 +420,12 @@ def cutOpening(piece, kind, along, width, height, sill, archRise, archSegments, 
     if not crossed:
       raise ValueError(f"The {kind} at {along:g} along misses the faces of '{piece}'")
     crossedTree = bridgeShaping.worldFaceTree(member, crossed)
+    # A frame stands proud of the faces the opening goes through, not of the piece's bounds, which earlier frames have widened.
+    crossedPoints = numpy.array([list(member.matrix_world @ member.data.vertices[vertex].co) for index in crossed for vertex in member.data.polygons[index].vertices]) - offset
+    faceLow, faceHigh = float(crossedPoints[:, 1].min()), float(crossedPoints[:, 1].max())
     capOpenings(member)
     if frame is not None:
-      framePrism = prismObject(f"{piece}FrameCutter", frameOutline(kind, outline, frame["width"], base), low[1] - depth, high[1] + depth, offset, frameSource)
+      framePrism = prismObject(f"{piece}FrameCutter", frameOutline(kind, outline, frame["width"], base), faceLow - depth, faceHigh + depth, offset, frameSource)
       cutters.append(framePrism)
       applyBoolean(member, framePrism, "UNION")
     applyBoolean(member, openingPrism, "DIFFERENCE")
@@ -488,17 +496,49 @@ def cutOpening(piece, kind, along, width, height, sill, archRise, archSegments, 
   }
 
 
-def overBounds(names):
-  """The plan bounds of named meshes or placements of this file and the height of their top."""
-  corners = []
+def bodyCorners(sceneObject, depsgraph):
+  """An object's box in the world: a placed piece's own body (a wall's faces, not the frames standing proud of them), else its bounds."""
+  if not bridgeKitData.isPlacedPiece(sceneObject):
+    return numpy.array([list(corner) for corner in bridgeMeshAccess.worldBoundsCorners(sceneObject, depsgraph)])
+  collection = sceneObject.instance_collection
+  low, high = bridgeKitGeometry.pieceBounds(collection)
+  proud = bridgeKitData.frameProud(bridgeKitData.readRecord(collection))
+  low, high = low + [0.0, proud, 0.0], high - [0.0, proud, 0.0]
+  box = numpy.array([[x, y, z] for x in (low[0], high[0]) for y in (low[1], high[1]) for z in (low[2], high[2])])
+  matrix = bridgeMeshAccess.matrixArray(sceneObject.matrix_world)
+  return box @ matrix[:3, :3].T + matrix[:3, 3]
+
+
+def overFrame(names):
+  """What a roof goes over, measured square to the named meshes or placements of this file: they stand turned alike (or a quarter turn
+  apart), and their bodies are measured along that turn, so a roof placed at the returned facing sits on them. Returns the facing, the
+  plan size [along X, along Y] of that frame, the world point under its middle at the top's height."""
   depsgraph = bpy.context.evaluated_depsgraph_get()
+  objects = []
   for name in names:
     sceneObject = bridgeMeshAccess.requireObject(name)
     if sceneObject.type != "MESH" and not bridgeMeshAccess.isCollectionInstance(sceneObject):
       raise ValueError(f"'{name}' is a {sceneObject.type}; a roof goes over meshes and placed pieces")
-    corners.extend(list(corner) for corner in bridgeMeshAccess.worldBoundsCorners(sceneObject, depsgraph))
-  corners = numpy.array(corners)
-  return corners.min(0), corners.max(0)
+    xAxis = sceneObject.matrix_world.col[0].xyz
+    objects.append((sceneObject, (math.degrees(math.atan2(xAxis.y, xAxis.x)) + 45.0) % 90.0 - 45.0))
+  first, turn = objects[0]
+  for sceneObject, other in objects[1:]:
+    apart = (other - turn + 45.0) % 90.0 - 45.0
+    if abs(apart) > frameTolerance:
+      raise ValueError(
+        f"'{sceneObject.name}' stands turned {apart:+.2f} degrees against '{first.name}' (beyond a quarter turn); a roof goes over pieces turned alike,"
+        " or a quarter turn apart, and is measured square to them"
+      )
+  radians = math.radians(turn)
+  along, across = numpy.array([math.cos(radians), math.sin(radians)]), numpy.array([-math.sin(radians), math.cos(radians)])
+  corners = numpy.vstack([bodyCorners(sceneObject, depsgraph) for sceneObject, _ in objects])
+  measured = numpy.column_stack([corners[:, :2] @ along, corners[:, :2] @ across])
+  low, high = measured.min(0), measured.max(0)
+  middle = along * (low[0] + high[0]) / 2 + across * (low[1] + high[1]) / 2
+  facing = (-turn) % 360.0
+  # Placements' single-precision turns leave their measure a few millionths off whole; a footprint is held to four places.
+  footprint = bridgeKitData.roundVector(high - low)
+  return 0.0 if abs(facing - 360.0) < 1e-9 else facing, footprint, [float(middle[0]), float(middle[1]), float(corners[:, 2].max())]
 
 
 def addRoof(name, kind, pitchDegrees, overhang, thickness, materials, worldUnitsPerRepeat, location, footprint, over, ridgeAlong):
@@ -518,13 +558,12 @@ def addRoof(name, kind, pitchDegrees, overhang, thickness, materials, worldUnits
   location = requirePoint("location", location)
   if (footprint is None) == (over is None):
     raise ValueError("Give footprint [length X, depth Y] or over [names of meshes or placed pieces], one of them")
-  plateOver = None
+  plateOver = facingOver = None
   if over is not None:
     if not isinstance(over, list) or not over:
       raise ValueError(f"over names meshes or placed pieces of this file, got {over!r}")
-    low, high = overBounds(over)
-    footprint = [float(high[0] - low[0]), float(high[1] - low[1])]
-    plateOver = bridgeKitData.roundVector([(low[0] + high[0]) / 2, (low[1] + high[1]) / 2, high[2]])
+    facingOver, footprint, plate = overFrame(over)
+    plateOver = bridgeKitData.roundVector(plate)
   elif not isinstance(footprint, list) or len(footprint) != 2 or not all(isNumber(value) and value > 0 for value in footprint):
     raise ValueError(f"footprint is [length X, depth Y], two positive numbers, got {footprint!r}")
   if kind == "hip" and footprint[0 if ridgeAlong == "x" else 1] < footprint[1 if ridgeAlong == "x" else 0]:
@@ -535,7 +574,7 @@ def addRoof(name, kind, pitchDegrees, overhang, thickness, materials, worldUnits
     "roof": kind, "footprint": bridgeKitData.roundVector(footprint), "ridgeHeight": round(ridgeHeight, 4), "eaveHeight": round(eaveHeight, 4),
     "roles": roleSummary(mesh, shape, roleMaterials),
   }
-  return described | ({"plateOver": plateOver} if plateOver is not None else {})
+  return described | ({"plateOver": plateOver, "facingOver": round(facingOver, 4)} if plateOver is not None else {})
 
 
 def requireSnap(snapTo):
@@ -576,6 +615,7 @@ def placeKitPiece(name, kitPath, piece, location, facingDegrees, snapTo, depth, 
       target = bridgeMeshAccess.requireObject(snapTo["object"])
       if not bridgeKitData.isPlacedPiece(target):
         raise ValueError(f"'{snapTo['object']}' is not a placed kit piece; pieces snap to placed pieces' sockets")
+      bridgeKitData.requireUpright(target, "snapping to it as it stands")
       _, targetAt, targetDirection = socketNamed(bridgeKitData.worldSockets(target), snapTo["socket"], f"'{target.name}'")
       partner = bridgeKitData.partnerOf(target, targetAt, targetDirection, bridgeKitData.placedPieces())
       if partner is not None:
@@ -594,10 +634,9 @@ def placeKitPiece(name, kitPath, piece, location, facingDegrees, snapTo, depth, 
       placedAt, facingDegrees = bridgeKitGeometry.snappedPlacement(targetAt, targetDirection, socket, bridgeKitData.facingOf(target) if facingDegrees is None else facingDegrees)
       location = list(placedAt)
     elif settling:
-      surfaces = bridgeMeshAccess.PlayerSurfaces()
-      levels = bridgeMeshAccess.rockOverGround(surfaces.castWithNormal, location[0], location[1], bridgeMeshAccess.sceneTopHeight() + bridgeArrangement.settleLift)
-      if levels is not None:
-        raise ValueError(f"At [{location[0]:g}, {location[1]:g}] {bridgeMeshAccess.describeRockOverGround(location, [round(level, 1) for level in levels])}, so which ground is a choice: give z")
+      found = bridgeMeshAccess.overGroundOn(bridgeMeshAccess.PlayerSurfaces(), location[0], location[1], bridgeMeshAccess.sceneTopHeight() + bridgeArrangement.settleLift)
+      if found is not None:
+        raise ValueError(f"At [{location[0]:g}, {location[1]:g}] {bridgeMeshAccess.describeRockOverGround(location, found[0], found[1])}, so which ground is a choice: give z")
     instance = bpy.data.objects.new(name, None)
     instance.instance_type = "COLLECTION"
     instance.instance_collection = pieceCollection
@@ -606,7 +645,22 @@ def placeKitPiece(name, kitPath, piece, location, facingDegrees, snapTo, depth, 
     bridgeObjects.targetCollection(collection).objects.link(instance)
     bpy.context.view_layer.update()
     settled = bridgeArrangement.settleObjects([name], depth, 0.0, None)["settled"][0] if settling else None
-  return bridgeKitGeometry.describePlacement(instance) | ({"settled": settled} if settled is not None else {})
+  return bridgeKitGeometry.describePlacement(instance) | ({"settled": settled} if settled is not None else {"footing": footing(instance)})
+
+
+def footing(instance):
+  """What lies under a piece placed by its socket or at a given height: the lowest and highest surface players stand on under its
+  footprint (found from a step over its base), and how far its base floats over the lowest, so a run snapped out over a drop says so."""
+  bottom, _, samples = bridgeArrangement.footprint(instance)
+  others = bridgeMeshAccess.playerSolidObjects({instance.name})
+  surfaces = bridgeMeshAccess.PlayerSurfaces(objects=others) if others else None
+  heights = [] if surfaces is None else [
+    found.z for x, y in samples if (found := surfaces.footingBelow(mathutils.Vector((x, y, bottom + stepHeight)), bridgeMeshAccess.waterReach)) is not None
+  ]
+  if not heights:
+    return {"base": round(bottom, 3), "under": None, "floats": None}
+  gap = bottom - min(heights)
+  return {"base": round(bottom, 3), "under": [round(min(heights), 3), round(max(heights), 3)], "floats": round(gap, 3) if gap > stepHeight else None}
 
 
 def swapKitPiece(names, piece):
@@ -646,5 +700,4 @@ commands = {
   "cutOpening": (cutOpening, True),
   "addRoof": (addRoof, True),
   "placeKitPiece": (placeKitPiece, True),
-  "swapKitPiece": (swapKitPiece, True),
 }

@@ -13,6 +13,7 @@ import numpy
 
 import bridgeAuthoring
 import bridgeBoundaries
+import bridgeCaveData
 import bridgeCaves
 import bridgeCommands
 import bridgeExport
@@ -134,7 +135,10 @@ def materialImages(material):
 
 
 def materialProblems(material, images, clashing):
-  """What stops a material exporting: [(problem, fields naming the image)]."""
+  """What stops a material exporting: [(problem, fields naming the image)]; nothing for a kit's material while its kit is missing, which
+  the kit's own failure names."""
+  if material.library is not None and material.library.is_missing:
+    return []
   if not isZonewrightMaterial(material):
     return [("material not made by createMaterial or createLiquidMaterial", {})]
   nodes = material.node_tree.nodes
@@ -446,20 +450,31 @@ def placedStatuses(entry, problemsOf, usual, failures, findings, blockouts):
       record(findings, "zero texture area", zero & (slotOf == slot), {"material": None if material is None else material.name_full})
   base = numpy.zeros(faceCount, dtype=bool)
   deciders = bridgeAuthoring.shownSurface(entry["part"])[1] if bridgeMeshAccess.surfaceLayers(entry["part"]) else None
+  # A cave's lining takes its materials from its definition, not from surfacing, and meets the ground at its mouth by design: it is
+  # surfaced as cut. (A terrain holding caves has no modifiers, so its faces are the exported ones.)
+  lining = caveLining(entry["part"]) if bridgeCaveData.holdsCaves(entry["part"]) else numpy.zeros(faceCount, dtype=bool)
   if deciders is not None and len(deciders) != faceCount:
     failures.add("surfacing layers unlike the exported faces", (), owner, part, {"message": f"'{part}' has modifiers that change its faces, so its surfacing layers cannot be checked against what it exports; apply or remove them"})
   elif deciders is not None:
-    base = deciders == -1
+    base = (deciders == -1) & ~lining
     for slot in numpy.unique(slotOf[base]):
       material = slotMaterials[slot]
       record(findings, "base material showing", base & (slotOf == slot), {"material": None if material is None else material.name_full})
   border = numpy.zeros(faceCount, dtype=bool)
   if entry["role"] == "terrain":
-    border = groundBorders(entry, slotOf, slotMaterials, base, findings)
+    border = groundBorders(entry, slotOf, slotMaterials, base | lining, findings)
   statuses = numpy.full(faceCount, statusNames.index("ok"))
   for name, mask in (("border", border), ("base", base), ("stretch", stretch), ("blockout", blockout), ("zeroTexture", zero), ("error", error)):
     statuses[mask] = statusNames.index(name)
   return statuses
+
+
+def caveLining(sceneObject):
+  """The faces of a terrain that are a cave's lining."""
+  lining = numpy.zeros(len(sceneObject.data.polygons), dtype=bool)
+  for name in bridgeCaveData.caves(sceneObject):
+    lining |= bridgeCaveData.faceTags(sceneObject, name) == bridgeCaveData.liningFaceTag
+  return lining
 
 
 def roundedPoint(point):

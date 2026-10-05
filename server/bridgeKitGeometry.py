@@ -83,6 +83,15 @@ def pieceShape(kind, size):
   return shape
 
 
+def gableEnds(shape, half, outline):
+  """A roof's end walls over its plate at x = -half and half, each an [y, z] outline: one face looking out and one, on corners of its
+  own, looking in, so a walk-in building's gable is seen from inside as the client draws one-sided faces."""
+  for x in (-half, half):
+    for facing in (1, -1):
+      corners = [shape.point((x, y, z)) for y, z in outline]
+      shape.face(corners, "gable", "box", (facing * math.copysign(1, x), 0, 0))
+
+
 def roofShape(kind, footprint, pitchDegrees, overhang, thickness, ridgeAlong):
   """A roof over a footprint [length X, depth Y] whose slopes' undersides pass through its edges at the plate (z 0), and its ridge
   and eave heights. Built with its ridge along X, then turned when it runs along Y."""
@@ -105,9 +114,7 @@ def roofShape(kind, footprint, pitchDegrees, overhang, thickness, ridgeAlong):
       shape.face((eaveUnder[0], eaveUnder[1], eaveTop[1], eaveTop[0]), "edge", "box", (0, side, 0))
       for end, x in enumerate(ends):
         shape.face((eaveUnder[end], ridgeUnder[end], ridgeTop[end], eaveTop[end]), "edge", "box", (math.copysign(1, x), 0, 0))
-    for x in (-half, half):
-      corners = [shape.point(point) for point in ((x, -halfDepth, 0), (x, halfDepth, 0), (x, 0, ridge))]
-      shape.face(corners, "gable", "box", (math.copysign(1, x), 0, 0))
+    gableEnds(shape, half, ((-halfDepth, 0), (halfDepth, 0), (0, ridge)))
     ridgeHeight, eaveHeight = ridge + lift, -overhang * rise
   elif kind == "hip":
     outerX, outerY, ridgeHalf, ridge = half + overhang, halfDepth + overhang, half - halfDepth, halfDepth * rise
@@ -144,9 +151,7 @@ def roofShape(kind, footprint, pitchDegrees, overhang, thickness, ridgeAlong):
     shape.face((highUnder[0], highUnder[1], highTop[1], highTop[0]), "edge", "box", (0, -1, 0))
     for end, x in enumerate(ends):
       shape.face((lowUnder[end], highUnder[end], highTop[end], lowTop[end]), "edge", "box", (math.copysign(1, x), 0, 0))
-    for x in (-half, half):
-      corners = [shape.point(point) for point in ((x, halfDepth, 0), (x, -halfDepth, 0), (x, -halfDepth, depth * rise))]
-      shape.face(corners, "gable", "box", (math.copysign(1, x), 0, 0))
+    gableEnds(shape, half, ((halfDepth, 0), (-halfDepth, 0), (-halfDepth, depth * rise)))
     ridgeHeight, eaveHeight = highZ + lift, lowZ
   if ridgeAlong == "y":
     shape.transformed([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
@@ -479,18 +484,20 @@ def bisected(geometry, planes, clearOuter=False):
   return cut
 
 
-def polylineFrames(points):
-  """Each segment's tangent, level side (left of travel), and up (tangent x side)."""
+def polylineFrames(points, plumb=False):
+  """Each segment's tangent, level side (left of travel), and up: tangent x side, or straight up when plumb."""
   tangents = numpy.diff(points, axis=0)
   tangents /= numpy.linalg.norm(tangents, axis=1, keepdims=True)
   sides = numpy.column_stack([-tangents[:, 1], tangents[:, 0], numpy.zeros(len(tangents))])
   sides /= numpy.linalg.norm(sides, axis=1, keepdims=True)
-  return tangents, sides, numpy.cross(tangents, sides)
+  ups = numpy.tile([0.0, 0.0, 1.0], (len(tangents), 1)) if plumb else numpy.cross(tangents, sides)
+  return tangents, sides, ups
 
 
-def swept(geometry, points, acrossScale=1.0):
+def swept(geometry, points, acrossScale=1.0, plumb=False):
   """Bent along a polyline: X stretched to its length (texture carried) and cut where it bends, so X runs along it; Y and Z offsets
-  taken in each segment's frame (tangent, level side, up); vertices on a cut lie on the miter between the segments meeting there."""
+  taken in each segment's frame (tangent, level side, up, or straight up when plumb, so a hanging card's uprights hang plumb on a
+  slope); vertices on a cut lie on the miter between the segments meeting there."""
   points = numpy.asarray(points, dtype=numpy.float64)
   arcs = numpy.concatenate([[0.0], numpy.cumsum(numpy.linalg.norm(numpy.diff(points, axis=0), axis=1))])
   low, high = geometry["low"][0], geometry["high"][0]
@@ -500,7 +507,7 @@ def swept(geometry, points, acrossScale=1.0):
   laid = moved(geometry, straight)
   if len(points) > 2:
     laid = bisected(laid, [((arc, 0.0, 0.0), (1.0, 0.0, 0.0)) for arc in arcs[1:-1]])
-  tangents, sides, ups = polylineFrames(points)
+  tangents, sides, ups = polylineFrames(points, plumb)
   along = laid["positions"][:, 0]
   segments = numpy.clip(numpy.searchsorted(arcs, along, side="right") - 1, 0, len(points) - 2)
   offsets = laid["positions"][:, 1:2] * sides[segments] + laid["positions"][:, 2:3] * ups[segments]

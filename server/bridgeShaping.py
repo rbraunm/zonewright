@@ -709,6 +709,13 @@ def planarTurn(first, second, third):
   return (second[0] - first[0]) * (third[1] - first[1]) - (second[1] - first[1]) * (third[0] - first[0])
 
 
+def diagonalTaken(edge):
+  """Whether the other diagonal of an edge's two triangles is already an edge: bmesh turns an edge onto it without refusing (where the
+  ground folds over the cell), leaving two faces on the same corners."""
+  first, second = (next(vertex for vertex in face.verts if vertex not in edge.verts) for face in edge.link_faces)
+  return any(second in other.verts for other in first.link_edges)
+
+
 def diagonalTurnGain(edge, heights, planar, margin, sliverArea, layers):
   """How much turning an edge between two triangles to their cell's other diagonal improves the cell: infinite when it removes a
   sliver or a fold (three corners snapped onto one break, the middle one just past the line), else how much it shortens the height
@@ -721,7 +728,9 @@ def diagonalTurnGain(edge, heights, planar, margin, sliverArea, layers):
   winding = [vertex.index for vertex in faces[0].verts]
   if winding[(winding.index(first) + 1) % 3] != second:
     first, second = second, first
-  across = [next(vertex.index for vertex in face.verts if vertex.index not in (first, second)) for face in faces]
+  if diagonalTaken(edge):
+    return 0.0
+  across = [next(vertex.index for vertex in face.verts if vertex not in edge.verts) for face in faces]
   if math.dist(planar[across[0]], planar[across[1]]) > diagonalStretch * math.dist(planar[first], planar[second]):
     return 0.0
 
@@ -776,7 +785,7 @@ def triangulateAlongContours(sceneObject, worldPositions, vertexMask):
         turning.append(edge)
     if not turning:
       break
-    turned += sum(bmesh.utils.edge_rotate(edge) is not None for edge in turning)
+    turned += sum(bmesh.utils.edge_rotate(edge) is not None for edge in turning if not diagonalTaken(edge))
   bridgeMeshAccess.storeSplitBMesh(meshEditor, sceneObject)
   return {"splitCells": len(quads), "turnedDiagonals": turned}
 

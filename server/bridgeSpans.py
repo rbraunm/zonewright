@@ -23,12 +23,14 @@ maximumDeckRange = (0.0, 60.0)
 steepestFlightDegrees = 45.0
 maximumRiser = stepHeight
 maximumTurnDegrees = 150.0
-# Ground this far over a deck's underside meets it.
+# Ground this far over a deck's underside meets it; a flight's end this far under what it stands on is buried in it.
 meetingTolerance = 1e-3
+buriedTolerance = 0.05
 # Arc lengths along a bridge's deck are measured over this many pieces, and its swept parts and walk follow it every this far in plan.
 profileSamples = 1024
 followSpacing = 2.0
 viewBack = 12.0
+headBack = 3.0
 up = numpy.array([0.0, 0.0, 1.0])
 
 
@@ -97,7 +99,7 @@ def railBars(bake, rail, tops):
   if data["record"]["kind"] == "ropeRail":
     cardHeight = size(data, 2)
     line = numpy.array(tops)
-    bake.add(bridgeKitGeometry.swept(shifted(data, (0.0, 0.0, -cardHeight)), line))
+    bake.add(bridgeKitGeometry.swept(shifted(data, (0.0, 0.0, -cardHeight)), line, plumb=True))
     return float(numpy.linalg.norm(numpy.diff(line, axis=0), axis=1).sum())
   for first, second in zip(tops[:-1], tops[1:]):
     first, second = numpy.asarray(first), numpy.asarray(second)
@@ -207,11 +209,17 @@ def layBridge(laying):
   stringers = None if definition["stringers"] is None else laying.kit.piece(definition["stringers"], ("beam",), "stringers")
   posts = definition["posts"]
   if posts is not None:
-    requireKeys("posts", posts, ("piece", "spacing"), ("above",))
+    requireKeys("posts", posts, ("piece", "spacing"), ("above", "sides"))
     requireRepeatable("posts", posts, sides=False)
     postData = laying.kit.piece(posts["piece"], ("post",), "posts")
     above = requireNonNegative("posts above", posts.get("above", 0.0))
   rail = railsSpec(laying, definition["rails"], posts)
+  postSides = ()
+  if posts is not None:
+    # An open side's posts would stand as stubs at the deck's edge, so posts follow the rails unless given their own sides.
+    postSides = requireSides("posts sides", posts["sides"]) if "sides" in posts else rail["sides"] if rail is not None else (1, -1)
+    if rail is not None and not set(rail["sides"]) <= set(postSides):
+      raise ValueError("Rails run from post to post: give posts on every side the rails run (posts sides)")
   bents = definition["bents"]
   if bents is not None:
     requireKeys("bents", bents, ("stations", "post"), ("beam",))
@@ -266,7 +274,7 @@ def layBridge(laying):
     for index in range(intervals + 1):
       t = index / intervals
       deckTop = profile.heightAt(t)
-      for side in (1, -1):
+      for side in postSides:
         center = profile.pointAt(t) + profile.left * side * (width + postDepth) / 2
         railed = rail is not None and side in rail["sides"]
         top = deckTop + (rail["height"] if railed else 0.0) + above
@@ -399,6 +407,7 @@ class Station:
   def __init__(self, point, height, underside, direction, outward, stretch, label, bracketed=False):
     self.point, self.height, self.underside, self.direction, self.outward, self.stretch, self.label = point, height, underside, direction, outward, stretch, label
     self.bracketed = bracketed
+    self.offsetOut = outward
 
 
 def layGroundedPosts(laying, bake, postData, stations, rail, side, sink, onlyRaised):
@@ -407,20 +416,26 @@ def layGroundedPosts(laying, bake, postData, stations, rail, side, sink, onlyRai
   reports, tops = [], []
   postDepth = size(postData, 1)
   for station in stations:
-    center = station.point + station.outward * postDepth / 2
+    center = station.point + station.offsetOut * postDepth / 2
     ground = laying.lookups.below((center[0], center[1], station.underside))
     if ground is None:
       raise ValueError(f"The post at {roundVector(center[:2], 2)} ({station.label}) has no ground within {bridgeStructures.groundReach:g} below it")
     railed = rail is not None and side in rail["sides"]
     top = station.height + rail["height"] if railed else station.underside
     bottom = ground - sink
-    if (onlyRaised and station.underside - ground <= stepHeight) or top - bottom <= 0:
+    railAt = station.point + station.offsetOut * (railOut(rail, postDepth) if railed else 0.0)
+    railTop = [railAt[0], railAt[1], station.height + rail["height"]] if railed else None
+    # A rail runs the whole stretch, so a railed station keeps its post however low the walk runs there; where what it stands on
+    # already reaches the rail's height (the post of a walkway the flight lands on), the rail meets that.
+    if railed and ground >= top - stepHeight:
+      tops.append(railTop)
+      continue
+    if (onlyRaised and not railed and station.underside - ground <= stepHeight) or top - bottom <= 0:
       tops.append(None)
       continue
     length = postBar(bake, postData, center, station.direction, bottom, top, "A post")
     reports.append({"at": roundVector(center[:2], 2), "side": "left" if side == 1 else "right", "bottom": round(bottom, 3), "top": round(top, 3), "length": round(length, 3)})
-    railAt = station.point + station.outward * (railOut(rail, postDepth) if railed else 0.0)
-    tops.append([railAt[0], railAt[1], station.height + rail["height"]] if railed else None)
+    tops.append(railTop)
   return reports, tops
 
 
@@ -441,6 +456,11 @@ def railRuns(tops, breaks=()):
   if len(current) > 1:
     runs.append(current)
   return runs
+
+
+def mitered(first, second):
+  """The plan offset that stands a unit out from two edges at once, their outward directions first and second, at the corner they meet."""
+  return (first + second) / (1.0 + float(first @ second))
 
 
 def evenStations(length, spacing):
@@ -490,7 +510,20 @@ def layStairs(laying):
     found = laying.lookups.footing(point)
     if found is None:
       raise ValueError(f"The flight's {label} {roundVector(point, 2)} has no footing within a step ({stepHeight:g}) below it")
+    if found - point[2] > buriedTolerance:
+      raise ValueError(
+        f"The flight's {label} {roundVector(point, 2)} lies {found - point[2]:.2f} under what it stands on there (the top of '{laying.lookups.lastOwner}' at"
+        f" {found:.2f}), so its {'top tread would run into its side' if label == 'head' else 'first treads would lie in it'}; set the {label} on that top (z {found:.2f})"
+      )
     gaps[label] = round(float(point[2] - found), 3)
+  thickness = size(treadData, 2)
+  lastMiddle = flight.planPoint(flight.run - flight.tread / 2)
+  underLast = laying.lookups.below((lastMiddle[0], lastMiddle[1], top[2] - thickness / 2))
+  if underLast is not None and underLast > top[2] - thickness + meetingTolerance:
+    raise ValueError(
+      f"The flight's top tread would lie inside what its head stands on ('{laying.lookups.lastOwner}', its top at {underLast:.2f}), the two tops one surface:"
+      f" the head runs onto it; set the head at its edge, where the flight meets it"
+    )
   bake = bridgeKitGeometry.Bake()
   report = flight.lay(bake, width, treadData, stringerData)
   least = flightClearance(laying, flight, width, size(treadData, 2), "The flight")
@@ -519,16 +552,22 @@ def stairsWalkLine(definition):
 
 
 def stairsViewSet(definition, groundHeight):
+  """From the foot looking up it, from just behind the head looking down it (from further back a steep flight hides behind its top
+  tread), and from the side its eye stands in the open on, not inside the hill the flight climbs beside."""
   bottom, top = numpy.array(definition["bottom"]), numpy.array(definition["top"])
   direction = unit(plan(top - bottom))
   run = float(numpy.linalg.norm(plan(top - bottom)))
   rise = float(top[2] - bottom[2])
   middle = (bottom + top) / 2
-  side = max(run, rise) * 1.2 + 10
+  reach = max(run, rise) * 1.2 + 10
+  eyes = [middle + leftOf(direction) * side * reach for side in (1, -1)]
+  grounds = [groundHeight(eye[0], eye[1]) for eye in eyes]
+  buried = [-math.inf if ground is None else ground - eye[2] for ground, eye in zip(grounds, eyes)]
+  headPitch = -math.degrees(math.atan2(bridgeStructures.bridgeViews.eyeHeight + rise / 2, headBack + run / 2))
   return {
     "fromFoot": bridgeStructures.standView(bottom - direction * viewBack, bottom, direction, groundHeight, round(math.degrees(math.atan2(rise, run + viewBack)), 2)),
-    "fromHead": bridgeStructures.standView(top + direction * viewBack, top, -direction, groundHeight, round(-math.degrees(math.atan2(rise, run + viewBack)), 2)),
-    "side": bridgeStructures.lookView(middle + leftOf(direction) * side, middle),
+    "fromHead": bridgeStructures.standView(top + direction * headBack, top, -direction, groundHeight, round(headPitch, 2)),
+    "side": bridgeStructures.lookView(eyes[int(numpy.argmin(buried))], middle),
   }
 
 
@@ -833,6 +872,8 @@ def layWalkway(laying):
           if stations and numpy.linalg.norm(stations[-1].point - point) < 1e-6:
             if isFlight or (stations[-1].stretch == "flight") != isFlight:
               breaks.add(len(stations) - 1)
+            # Where the edge turns, a post and its rail stand out along the miter, on both edges' offset lines at once.
+            stations[-1].offsetOut = mitered(stations[-1].outward, outward)
             continue
           stations.append(Station(point, height, height - below, direction, outward, "flight" if isFlight else stretch["kind"], label, bracketed))
       if isFlight and stations:
@@ -858,7 +899,7 @@ def layWalkway(laying):
         if reach is None:
           raise ValueError(f"No rock within reach {brackets['reach']:g} beside the bracket station at {roundVector(station.point[:2], 2)} ({station.label}, {'left' if side == 1 else 'right'})")
         length = width + reach + sink
-        center = station.point - station.outward * width / 2 + station.outward * length / 2
+        center = station.point - station.outward * width + station.outward * length / 2
         center[2] = station.underside - size(bracketData, 2)
         bake.add(stretchedPlaced(bracketData, (length / size(bracketData, 0), 1.0, 1.0), center, station.outward, numpy.cross(up, station.outward)))
         bracketReport.append({"at": roundVector(station.point[:2], 2), "station": station.label, "reach": round(reach, 3), "length": round(length, 3)})

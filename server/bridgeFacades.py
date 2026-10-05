@@ -1,5 +1,5 @@
 """Dressed faces at cave mouths: a defined pass, "facade <cave> <end>", that presses the cliff at a cave's open end into a flat vertical
-face square to its path over a level apron, so a hall (cutCave with wallShare 1) reads as carved into the rock rather than as a cave
+face square to its path (or turned to the cliff's line) over a level apron, so a hall (cutCave with wallShare 1) reads as carved into the rock rather than as a cave
 mouth. Its definition keeps the face itself, so it is graded again (bridgeGrading) whether the cave is cut or taken back: the ground it
 reads is every face no cave made and every cave's plug faces on their vertices, as the ground stands with the caves taken back. Runs
 under Blender's Python."""
@@ -17,6 +17,10 @@ facadePassPrefix = "facade "
 # coordinate only to about 1e-5.
 lineTolerance = 1e-3
 movedTolerance = 1e-9
+# A face turned further from square to its cave than this would cross the cave on a line too long to frame it squarely.
+steepestTurnDegrees = 45.0
+# Ground in front of a face higher than its top by more than this is rock the dressing would have to cut away.
+overTopTolerance = 1e-3
 
 
 def passName(cave, end):
@@ -48,7 +52,7 @@ def facingDirection(facingDegrees):
   return numpy.array([math.sin(radians), math.cos(radians)])
 
 
-def facadeDefinition(sceneObject, cave, end, faceAt, width, height, apron, blend):
+def facadeDefinition(sceneObject, cave, end, faceAt, width, height, apron, blend, turnDegrees):
   """A facade's definition at a cave's open end, refusing what cannot be dressed there."""
   record = bridgeCaves.requireCave(sceneObject, cave)
   if end not in ("start", "end"):
@@ -57,6 +61,8 @@ def facadeDefinition(sceneObject, cave, end, faceAt, width, height, apron, blend
     raise ValueError(f"faceAt is how far in from the cave's {end} along its path the face stands, positive, got {faceAt}")
   if apron < 0 or blend <= 0:
     raise ValueError(f"apron is at least 0 and blend positive, got {apron} and {blend}")
+  if not -steepestTurnDegrees <= turnDegrees <= steepestTurnDegrees:
+    raise ValueError(f"turnDegrees turns the face from square to the cave's path toward the cliff's line, at most {steepestTurnDegrees:g} either way, got {turnDegrees}")
   caveDefinition = bridgeCaves.caveDefinition(**record["definition"])
   line = bridgeCaves.CaveLine(caveDefinition)
   straight = straightFrom(line, end)
@@ -67,17 +73,30 @@ def facadeDefinition(sceneObject, cave, end, faceAt, width, height, apron, blend
   kind = endKindOnUncutGround(sceneObject, caveDefinition, floors[0], directions[0], widths[0], heights[0], end)
   if kind != "open":
     raise ValueError(f"The cave's {end} at {bridgeCaves.roundedPoint(floors[0])} is {kind}, not open: a face is dressed at a mouth that opens on the ground in front of it")
-  if width < widths[1] + 2:
-    raise ValueError(f"width {width:g} does not frame the cave, {widths[1]:.1f} wide where the face stands: give at least {widths[1] + 2:.1f}")
+  # The face crosses a cave turned against it on a longer line than the cave's width.
+  crossing = widths[1] / math.cos(math.radians(turnDegrees))
+  if width < crossing + 2:
+    raise ValueError(
+      f"width {width:g} does not frame the cave, {widths[1]:.1f} wide where the face stands" + (f" and crossing the face turned {turnDegrees:g} degrees on {crossing:.1f}" if turnDegrees else "")
+      + f": give at least {crossing + 2:.1f}"
+    )
   if height < heights[1] + 1:
     raise ValueError(f"height {height:g} does not frame the cave, {heights[1]:.1f} tall where the face stands: give at least {heights[1] + 1:.1f}")
   inward = directions[1] if end == "start" else -directions[1]
   outward = -inward
   return {
-    "kind": facadeKind, "cave": cave, "end": end, "center": [float(value) for value in floors[1]],
-    "facingDegrees": math.degrees(math.atan2(outward[0], outward[1])) % 360.0, "width": float(width), "height": float(height),
+    "kind": facadeKind, "cave": cave, "end": end, "faceAt": float(faceAt), "turnDegrees": float(turnDegrees), "center": [float(value) for value in floors[1]],
+    "facingDegrees": (math.degrees(math.atan2(outward[0], outward[1])) + turnDegrees) % 360.0, "width": float(width), "height": float(height),
     "apron": float(apron), "blend": float(blend),
   }
+
+
+def redefined(sceneObject, definition):
+  """A facade's definition made again from what the artist gave it, on its cave as the cave now stands."""
+  return facadeDefinition(
+    sceneObject, definition["cave"], definition["end"], definition["faceAt"], definition["width"], definition["height"], definition["apron"], definition["blend"],
+    definition["turnDegrees"],
+  )
 
 
 def straightFrom(line, end):
@@ -175,6 +194,14 @@ def planFacade(sceneObject, definition, ground):
   targets[onApron, 2] = floor
   beyond = numpy.hypot(numpy.maximum(numpy.abs(along) - half, 0.0), numpy.maximum(-definition["apron"] - depth, 0.0))
   easing = inFront & ~onApron & (depth < -lineTolerance) & (beyond < definition["blend"])
+  overTop = (onApron | easing) & ~bridgeCaveData.caveMadeVertices(sceneObject) & (ground[:, 2] > floor + height + overTopTolerance)
+  if overTop.any():
+    highest = numpy.flatnonzero(overTop)[ground[overTop, 2].argmax()]
+    raise ValueError(
+      f"The ground in front of the face rises to {ground[highest, 2]:.1f} at {bridgeCaves.roundedPoint(ground[highest])}, over the face's top at"
+      f" {floor + height:.1f}: the face stands behind the cliff's face there, and dressing would cut a notch through the rock in front of it. Move"
+      " faceAt out toward the cliff's face, raise the height, or turn the face to the cliff's line (turnDegrees)"
+    )
   share = beyond[easing] / definition["blend"]
   targets[easing, 2] += (floor - ground[easing, 2]) * (1 - share * share * (3 - 2 * share))
   offsets, liningLeft = bridgeCaveData.guardedOffsets(sceneObject, targets - ground)
@@ -189,7 +216,7 @@ def planFacade(sceneObject, definition, ground):
       "corners": [[round(float(value), 3) for value in corner] for corner in corners],
       "frame": {"center": [round(float(value), 3) for value in frame.center], "facingDegrees": definition["facingDegrees"], "width": definition["width"], "height": height},
       "faceVertices": int(face.sum()), "movedVertices": int(moved.sum()),
-      "apron": {"vertices": int(apronGround.sum()), "deepestCut": round(-float(apronChange.min(initial=0.0)), 2), "highestFill": round(float(apronChange.max(initial=0.0)), 2)},
+      "apron": {"vertices": int(apronGround.sum()), "deepestCut": round(-float(apronChange.min(initial=0.0)), 2) + 0.0, "highestFill": round(float(apronChange.max(initial=0.0)), 2) + 0.0},
     } | bridgeCaveData.liningReport(liningLeft),
   }
 
@@ -200,6 +227,7 @@ def requireClear(sceneObject, definition, ground, moved):
   if len(border):
     raise ValueError(f"The facade's apron or blend reaches the edge of '{sceneObject.name}' near {bridgeCaves.roundedPoint(ground[border[0]])}; shorten them or dress further inside")
   if bridgeCaveData.holdsCaves(sceneObject):
-    others = [name for name in bridgeCaveData.CaveVertices(sceneObject).namesOf(moved) if name != definition["cave"]]
+    tagged = set(bridgeCaveData.CaveVertices(sceneObject).namesOf(moved))
+    others = sorted(name for name in bridgeCaveData.caves(sceneObject) if name != definition["cave"] and (name in tagged or (moved & bridgeCaveData.reachOf(sceneObject, name)).any()))
     if others:
-      raise ValueError(f"The facade's apron or blend reaches the ground of cave(s) {others}; shorten them, or take those caves back first")
+      raise ValueError(f"The facade's apron or blend reaches the ground within reach of cave(s) {others}, which would then no longer fit it; shorten them, or take those caves back first")

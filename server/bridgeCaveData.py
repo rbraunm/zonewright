@@ -53,6 +53,11 @@ def attributeValues(mesh, name, width=1):
   return values.reshape(-1, 3).astype(numpy.float64) if width == 3 else values
 
 
+def reachOf(sceneObject, name):
+  """The vertices of the ground within a cave's reach as it was cut, whose moving makes the cave stale."""
+  return ~numpy.isnan(attributeValues(sceneObject.data, groundPrefix + name, 3)).any(axis=1)
+
+
 def plugIndices(tags):
   """Each plug id's vertex, -1 for an id no vertex carries."""
   rows = numpy.flatnonzero(tags > 0)

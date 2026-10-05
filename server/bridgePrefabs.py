@@ -164,17 +164,22 @@ def assemblePrefab(name, parts, entrances):
   entrances = requireEntrances(entrances)
   if interiorPart in gathered and not entrances:
     raise ValueError("A building with an interior part is walked into, so it names at least one entrance {name, at, facingDegrees} at a doorway")
-  bpy.context.view_layer.update()
-  floor = min(member.matrix_world.translation.z for member in gathered.get("exterior") or [member for members in gathered.values() for member in members])
-  positions = numpy.concatenate([bridgeMeshAccess.partTriangles(bridgeMeshAccess.objectParts(member))[0] for members in gathered.values() for member in members])
-  hull = convexHull(positions[positions[:, 2] <= floor + stepHeight][:, :2])
+  hull, floor = measuredHull(gathered)
   low, high = hull.min(0), hull.max(0)
   origin = numpy.array([(low[0] + high[0]) / 2, (low[1] + high[1]) / 2, floor])
   footprint = hull - origin[:2]
   for entrance in entrances:
-    outside = distanceOutside(footprint, numpy.array(entrance["at"][:2]) - origin[:2])
+    at = numpy.array(entrance["at"][:2]) - origin[:2]
+    outside = distanceOutside(footprint, at)
     if outside > stepHeight:
       raise ValueError(f"Entrance '{entrance['name']}' at {roundVector(entrance['at'])} lies {outside:.2f} outside the building's footprint; an entrance is a doorway's threshold, within {stepHeight:g} of it")
+    out = headingVector(entrance["facingDegrees"])
+    leaving, entering = exitDistance(footprint, at, out), exitDistance(footprint, at, -out)
+    if leaving > entering:
+      raise ValueError(
+        f"Entrance '{entrance['name']}' at {roundVector(entrance['at'])} faces {entrance['facingDegrees']:g} degrees, into the building: the footprint runs on"
+        f" {leaving:.2f} that way and {entering:.2f} the other; facingDegrees is the way out of the doorway, {(entrance['facingDegrees'] + 180.0) % 360.0:g} here"
+      )
   if existing is None:
     existing = bpy.data.collections.new(name)
     bpy.context.scene.collection.children.link(existing)
@@ -210,6 +215,36 @@ def assemblePrefab(name, parts, entrances):
   })
   bpy.context.view_layer.update()
   return describePrefab(existing)
+
+
+def measuredHull(gathered):
+  """The plan outline of what the parts' pieces stand on (their points within a step of the floor), and the floor: the lowest base of
+  the exterior's pieces (or of all, without an exterior)."""
+  bpy.context.view_layer.update()
+  floor = min(member.matrix_world.translation.z for member in gathered.get("exterior") or [member for members in gathered.values() for member in members])
+  positions = numpy.concatenate([bridgeMeshAccess.partTriangles(bridgeMeshAccess.objectParts(member))[0] for members in gathered.values() for member in members])
+  return convexHull(positions[positions[:, 2] <= floor + stepHeight][:, :2]), floor
+
+
+def prefabMembers(collection):
+  record = bridgeKitData.readPrefab(collection)
+  return {part: sorted(requirePartCollection(collection, part).objects, key=lambda member: member.name) for part in record["parts"]}
+
+
+def swapKitPiece(names, piece):
+  """bridgeKits.swapKitPiece; in a kit, a prefab whose parts it changed has its footprint measured again about its origin, keeping its
+  entrances, so placed buildings go stale (its fingerprint covers its parts) and are laid on the footprint they now stand on."""
+  swapped = bridgeKits.swapKitPiece(names, piece)
+  owners = sorted({owner["prefab"] for name in names if (owner := bridgeKitData.prefabPartOf(bridgeMeshAccess.requireObject(name))) is not None})
+  measured = []
+  for prefab in owners:
+    collection = bridgeKitData.requirePrefab(None, prefab)
+    record = bridgeKitData.readPrefab(collection)
+    hull, _ = measuredHull(prefabMembers(collection))
+    footprint = [roundVector(point, 4) for point in hull - numpy.array(collection.instance_offset)[:2]]
+    measured.append({"prefab": prefab, "footprintBefore": record["footprint"], "footprint": footprint, "entrances": record["entrances"]})
+    bridgeKitData.writePrefab(collection, record | {"footprint": footprint})
+  return swapped | ({"prefabs": measured} if measured else {})
 
 
 def describePrefab(collection):
@@ -265,6 +300,7 @@ class Placement:
   def __init__(self, location, facingDegrees):
     self.x, self.y = location[0], location[1]
     self.floor = location[2] if len(location) == 3 else None
+    self.floorOn = None
     self.facingDegrees = facingDegrees
     self.turn = numpy.array(bridgeKitGeometry.turnAbout(facingDegrees))
 
@@ -285,8 +321,9 @@ def seat(lookups, placement, samples):
       top = lookups.overhead(float(x), float(y))
       if top is None:
         raise ValueError(f"Nothing lies under the footprint at [{x:.1f}, {y:.1f}] to seat the building on")
-      tops.append(top)
-    placement.floor = max(tops)
+      tops.append((top, lookups.lastOwner, [float(x), float(y)]))
+    placement.floor, owner, at = max(tops, key=lambda entry: entry[0])
+    placement.floorOn = {"object": owner, "at": roundVector(at, 2)}
   grounds = []
   for x, y in world:
     found = lookups.below((float(x), float(y), placement.floor + stepHeight))
@@ -345,9 +382,14 @@ def layPrefab(laying):
     )
   drop = placement.floor - grounds[lowest]
   if plinth is None and drop > stepHeight + 1e-6:
+    # A floor low enough not to float stands at most a step over the lowest ground; it must also stand at most a step under the highest.
+    lowered = (
+      f", or lower the floor to {grounds[lowest] + stepHeight:.2f} or less" if grounds[highest] - stepHeight <= grounds[lowest] + stepHeight + 1e-6
+      else f"; no floor without one stands on it, the ground under the footprint running from {grounds[lowest]:.2f} to {grounds[highest]:.2f}, more than two steps apart, so grade the site"
+    )
     raise ValueError(
       f"The floor at {placement.floor:.2f} stands {drop:.2f} over the ground at [{world[lowest][0]:.1f}, {world[lowest][1]:.1f}] under the footprint,"
-      f" so it would float: give a plinth, or lower the floor to {grounds[lowest] + stepHeight:.2f} or less"
+      f" so it would float: give a plinth{lowered}"
     )
   standing = (placement.x, placement.y, placement.floor)
   for part, partCollection in partCollections:
@@ -359,12 +401,19 @@ def layPrefab(laying):
     outline = footprint if margin == 0 else bridgeKits.offsetOutline(footprint, margin)
     plinthObject = laying.addMeshObject(laying.name + "Plinth", plinthMesh(laying.name + "Plinth", outline, bottom, plinth["material"], plinth["worldUnitsPerRepeat"]), standing, placement.facingDegrees)
     plinthReport = {"top": round(placement.floor, 3), "bottom": round(placement.floor + bottom, 3), "triangles": bridgeMeshAccess.triangleCount(plinthObject)}
+  floorOn = placement.floorOn
+  if floorOn is not None:
+    floorOn["ground"] = bridgeStructures.isTerrainObject(floorOn["object"])
+  warnings = [] if floorOn is None or floorOn["ground"] else [
+    f"The floor at {placement.floor:.2f} was set by '{floorOn['object']}' at {floorOn['at']}, the highest thing under the footprint, not by the ground:"
+    f" move the building or '{floorOn['object']}' apart, or give the floor's height (location [x, y, z])"
+  ]
   return {
     "prefab": {"kit": bridgeKitData.kitPathOf(prefab), "prefab": prefab.name, "parts": record["parts"], "fingerprint": laying.kit.used[prefab.name]},
-    "location": roundVector(standing), "facingDegrees": placement.facingDegrees, "floor": round(placement.floor, 3),
+    "location": roundVector(standing), "facingDegrees": placement.facingDegrees, "floor": round(placement.floor, 3), "floorOn": floorOn,
     "ground": {"lowest": round(float(grounds[lowest]), 3), "lowestAt": roundVector(world[lowest], 2), "highest": round(float(grounds[highest]), 3), "highestAt": roundVector(world[highest], 2), "samples": len(samples)},
     "plinth": plinthReport, "entrances": [entranceReport(laying.lookups, placement, footprint, entrance) for entrance in record["entrances"]],
-  }
+  } | ({"warnings": warnings} if warnings else {})
 
 
 def entranceWalk(entrance):
@@ -404,4 +453,5 @@ bridgeStructures.registerKind("prefab", prefabKeys, layPrefab, None, prefabViews
 commands = {
   "assemblePrefab": (assemblePrefab, True),
   "placePrefab": (placePrefab, True),
+  "swapKitPiece": (swapKitPiece, True),
 }

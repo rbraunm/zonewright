@@ -1444,7 +1444,8 @@ async def walkRoute(context: Context, path: list[list[float]] | None = None, rou
   bridge, flight, or walkway named `route` (its centerline at deck height, run on 5 past each end that stands on footing), whose heights only need to
   be within a step of the footing (so a route can run over an arch or under it). Judged for a player 6 units tall who walks slopes up
   to 60 degrees and steps up 2, in half-unit strides whatever `sampleSpacing`, which sets only the profile's rows (give `path` or
-  `route`, not both; renderRouteStrip shows the walk in pictures). Returns the length walked, the steepest face stood on, the narrowest footing
+  `route`, not both; renderRouteStrip shows the walk in pictures). Returns the length walked, the steepest face stood on, the steepest
+  grade climbed or descended between two profile rows (steepestGrade: a stair's level treads stand at 0 but climb at its pitch), the narrowest footing
   (how far it runs to each side before a drop of more than a player's height, a wall, a step too high, or a face too steep; null
   beyond 60), the lowest headroom, the deepest water over the footing; `problems`, everything that stops a player, each once over the
   stretch it covers: blocked (a boundary across the way at half a player's height, where it stands), rise (a wall or step over 2 in
@@ -1517,7 +1518,8 @@ async def setShapingPass(context: Context, objectName: str, name: str, strength:
 @guardedTool()
 async def removeShapingPass(context: Context, objectName: str, name: str):
   """Remove a shaping pass and what it holds; the other passes keep theirs. A graded route's pass takes its definition with it; a
-  facade's pass (dressFacade) takes the dressing back and cuts its cave again to fit the ground as it was (refit)."""
+  facade's pass (dressFacade) takes the dressing back, cuts its cave again to fit the ground as it was (refit), and box-maps the faces it
+  had moved again from where they now stand (remappedFaces), so the facade can be dressed again."""
   return await callBridge(context, "removeShapingPass", {"objectName": objectName, "name": name})
 
 
@@ -1565,10 +1567,13 @@ async def regradeTerrain(context: Context, objectName: str):
   """Put every defined pass on a mesh back on target after other shaping changed the ground under them (a roughen, a sculpt, a pass
   turned up, down, or off): each graded route (gradeRoute), dressed facade (dressFacade), and the plots graded on it (gradePlot, all
   together) are taken back and graded again in the order they were first made, each on the ground as it then stands, so where two meet the later one still wins. A
-  muted or turned defined pass comes back unmuted at full strength (restoredFrom says which). Then every cave (cutCave) whose ground
-  moved since it was cut is cut again to fit it (refittedCaves, with how far its ground had moved). Reports what each one moved, in
-  order, and staleStructures: every structure (buildBridge, buildWall, ...) whose ground or kit changed since it was laid, with why;
-  editStructure lays each again."""
+  muted or turned defined pass comes back unmuted at full strength (restoredFrom says which). A defined pass graded on the ground as the
+  hand passes leave it takes back their work where it grades the ground (a facade's apron levels a mound sculpted on it): each replay
+  names the hand passes it overrode there (overrodeHandWork: pass, vertices, largest offset). Then every cave (cutCave) whose ground
+  moved since it was cut is cut again to fit it (refittedCaves, with how far its ground had moved), and the faces a facade moved are
+  box-mapped again. Whole or not at all: a refused refit leaves the mesh as it was. Reports what each one moved, in order, and
+  staleStructures: every structure (buildBridge, buildWall, ...) whose ground or kit changed since it was laid, with why; editStructure
+  lays each again."""
   return await callBridge(context, "regradeTerrain", {"objectName": objectName})
 
 
@@ -1630,8 +1635,11 @@ async def editCave(context: Context, objectName: str, name: str, changes: dict |
   """Change a cave cut into a terrain (cutCave) and cut it again in one step: `changes` holds any of its definition's path, widths,
   heights, wallMaterial, floorMaterial, worldUnitsPerRepeat, edgeLength, wallShare (1 for a hall), breakup, mouthFade,
   maximumFloorDegrees, trimBands; the cave is taken back and cut again from its definition with them merged in, against the ground as it
-  now stands, its trim bands set again and the strokes kept with its lining painted again. With no changes it refits the cave to the ground (after a sculpt at its mouth or a pass turned up). If the
-  new cut is refused, the cave stays exactly as it was. Returns what taking it back restored and what the new cut made."""
+  now stands, its trim bands set again and the strokes kept with its lining painted again. With no changes it refits the cave to the ground (after a sculpt at its mouth or a pass turned up). A
+  facade dressed at its mouth (dressFacade) follows it: made again from what it was given (faceAt, width, height, apron, blend,
+  turnDegrees) on the changed cave, dressed again where its face moved (refitFacades), and refused when it would no longer frame the
+  cave (narrower than the cave plus 2, lower than it plus 1), naming the facade to dress again or take back. If the new cut or a facade
+  is refused, the cave and the ground stay exactly as they were. Returns what taking it back restored and what the new cut made."""
   return await callBridge(context, "editCave", {"objectName": objectName, "name": name, "changes": changes})
 
 
@@ -1646,31 +1654,38 @@ async def removeCave(context: Context, objectName: str, name: str):
 @guardedTool()
 async def dressFacade(
   context: Context, objectName: str, cave: str, end: str, faceAt: float, width: float, height: float, apron: float, blend: float = 16.0,
+  turnDegrees: float = 0.0,
 ):
   """Dress the cliff at a cave's mouth into a carved face, so a hall (cutCave with wallShare 1) reads as cut into the rock rather than as
-  a cave mouth, as Crescent's halls open on dressed faces. The face stands on a vertical plane square to the cave's path, crossing it
-  `faceAt` along the path in from its `end` ("start" or "end"), `width` wide centered on the path, from the floor's height there (F) up
-  to F + `height`. On the terrain objectName: each ground edge crossing the face's line within its width has its front vertex slid along
-  the path's direction onto the line at F and its back vertex onto the line at F + height, the vertices nearest the face's two sides slid
-  along the line onto them, so the face is a flat vertical rectangle with straight edges standing in a recess in the cliff (the cliff
-  beside and above it is not moved); the ground in front of it within `apron` and the width is set level at F, cut or filled, and the
-  ground in front of its line past the apron's edges eases back to the ground as it was over `blend` (smoothstep). The ground read is the
-  ground as it stands with the caves taken back (each cave's recorded faces in place of its cut), so it dresses the same with the cave
-  cut or not; a cave's lining never moves and the vertices where it meets the ground follow that ground. It is a defined pass, "facade
-  <cave> <end>", keeping the face itself (center, facingDegrees, width, height, apron, blend), so regradeTerrain replays it in order with
-  the routes and plots and then refits stale caves; dressing again under that cave and end replaces it; removeShapingPass takes it back
-  and refits the cave. The cave is refit in the same call (refit, as editCave reports it), so it opens on the face; staleCaves names
-  others whose ground moved. Then paint the face and apron (paintSurface with a box around them), place a portal piece at the returned
-  `frame` (its front facing out), and look from the apron at eye height, from across the valley, from inside looking out, and in a
-  section along the path.
+  a cave mouth, as Crescent's halls open on dressed faces. The face stands on a vertical plane crossing the cave's path `faceAt` along
+  it in from its `end` ("start" or "end"), square to the path, or turned `turnDegrees` (clockwise from above, at most 45 either way) to
+  stand along the cliff's line where the hall enters it obliquely; `width` wide centered on the path, from the floor's height there (F)
+  up to F + `height`. On the terrain objectName: each ground edge crossing the face's line within its width has its front vertex slid
+  square onto the line at F and its back vertex onto the line at F + height, the vertices nearest the face's two sides slid along the
+  line onto them, so the face is a flat vertical rectangle with straight edges standing in a recess in the cliff (the cliff beside and
+  above it is not moved); the ground in front of it within `apron` and the width is set level at F, cut or filled, and the ground in
+  front of its line past the apron's edges eases back to the ground as it was over `blend` (smoothstep). The faces it moved are
+  box-mapped again from where they stand, each material at the repeat the faces it left alone show (remappedFaces), so the face and its
+  returns carry their texture unstretched. The ground read is the ground as it stands with the caves taken back (each cave's recorded
+  faces in place of its cut), so it dresses the same with the cave cut or not; a cave's lining never moves and the vertices where it
+  meets the ground follow that ground. It is a defined pass, "facade <cave> <end>", keeping the face itself (faceAt, turnDegrees,
+  center, facingDegrees, width, height, apron, blend), so regradeTerrain replays it in order with the routes and plots and then refits
+  stale caves, and editCave dresses it again on the changed cave; dressing again under that cave and end replaces it; removeShapingPass
+  takes it back and refits the cave. The cave is refit in the same call (refit, as editCave reports it), so it opens on the face;
+  staleCaves names others whose ground moved. foldedFaces counts faces left facing down, not the face's vertical returns. Then paint
+  the face and apron (paintSurface with a box around them), place a portal piece at the returned `frame` (its front facing out), and
+  look from the apron at eye height, from across the valley, from inside looking out, and in a section along the path.
   Refused, changing nothing: no such cave or end; an end that is not open (blind or a ledge); faceAt not positive or past the end's first
-  bend; a width less than the cave's width there plus 2 or a height less than its height there plus 1; the ground just behind the line
-  lower than F + height anywhere across the width (nothing to dress: move faceAt into the cliff, naming where); the apron or blend
-  reaching another cave's ground or the terrain's border; a mesh with modifiers. Returns the face's four corners (foot left, foot right,
-  top right, top left, looking at it), `frame` {center (the foot's middle), facingDegrees (outward), width, height}, the face's vertices
-  and all vertices moved, the apron's cut and fill, and the cave's refit."""
+  bend; turnDegrees past 45; a width less than the cave's width where it crosses the face plus 2, or a height less than its height
+  there plus 1; the ground just behind the line lower than F + height anywhere across the width (nothing to dress: move faceAt into the
+  cliff, naming where); ground in front of the face (on the apron or easing back) higher than F + height (the face stands behind the
+  cliff's face there and would cut a notch through the rock: move faceAt out, raise the height, or turn the face, naming where); the
+  apron or blend reaching the ground within another cave's reach or the terrain's border; a mesh with modifiers. Returns the face's four
+  corners (foot left, foot right, top right, top left, looking at it), `frame` {center (the foot's middle), facingDegrees (outward),
+  width, height}, the face's vertices and all vertices moved, the apron's cut and fill, and the cave's refit."""
   return await callBridge(context, "dressFacade", {
     "objectName": objectName, "cave": cave, "end": end, "faceAt": faceAt, "width": width, "height": height, "apron": apron, "blend": blend,
+    "turnDegrees": turnDegrees,
   })
 
 

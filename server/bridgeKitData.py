@@ -34,6 +34,8 @@ straightKinds = ("wall", "beam", "plank", "rail", "ropeRail")
 jointDistance = 0.01
 jointFacing = -0.999
 directionTolerance = 1e-6
+# A placement's float32 matrix holds its unit axes to about a millionth.
+uprightTolerance = 1e-4
 socketReach = 1.0
 # What a link brings into a file, taken back when the step that linked it is refused.
 linkedKinds = ("libraries", "collections", "objects", "meshes", "materials", "images", "node_groups")
@@ -220,12 +222,33 @@ def socketsByName(record):
 
 
 def moduleOf(record):
-  """The plan distance between a piece's start and end sockets, or None without both."""
+  """The plan distance between a piece's start and end sockets where they face apart, as a straight piece's do; None without both, or
+  for a corner or curve, whose sockets turn."""
   sockets = socketsByName(record)
-  if "start" not in sockets or "end" not in sockets:
+  if "start" not in sockets or "end" not in sockets or numpy.dot(sockets["start"]["direction"], sockets["end"]["direction"]) >= jointFacing:
     return None
   start, end = sockets["start"]["at"], sockets["end"]["at"]
   return round(math.hypot(end[0] - start[0], end[1] - start[1]), 4)
+
+
+def frameProud(record):
+  """How far the frames of a piece's openings stand proud of its faces: 0 without framed openings."""
+  return max((opening["frame"]["depth"] for opening in record["openings"] if opening["frame"] is not None), default=0.0)
+
+
+def isUpright(sceneObject):
+  """Whether a placement stands as placements do: at scale 1, turned only about the vertical."""
+  matrix = sceneObject.matrix_world
+  axes = [matrix.col[axis].xyz for axis in range(3)]
+  return all(abs(axis.length - 1) <= uprightTolerance for axis in axes) and abs(axes[2].z - 1) <= uprightTolerance
+
+
+def requireUpright(sceneObject, action):
+  if not isUpright(sceneObject):
+    raise ValueError(
+      f"'{sceneObject.name}' is a placed kit piece, which stands upright at scale 1 and turns only about the vertical so its sockets meet the"
+      f" next piece's; {action} would tilt or scale it"
+    )
 
 
 def isLevel(direction):
@@ -312,9 +335,17 @@ def requirePrefab(kitPath, prefab):
 
 
 def prefabFingerprint(collection):
-  """Twelve hex digits of a sha1 over a prefab's record (parts, footprint, entrances): its parts are instances, so placements follow its
-  pieces' changes, and only a changed footprint or entrance, which seating and plinths were laid from, changes this."""
-  return hashlib.sha1(json.dumps(readPrefab(collection), sort_keys=True).encode()).hexdigest()[:12]
+  """Twelve hex digits of a sha1 over a prefab's record (parts, footprint, entrances) and what each part gathers (each placed piece's
+  name, piece, and place in the kit): its parts are instances, so placements follow its pieces' changes, and only a changed footprint or
+  entrance, which seating and plinths were laid from, or a piece swapped, moved, added, or taken out of a part, changes this."""
+  record = readPrefab(collection)
+  digest = hashlib.sha1(json.dumps(record, sort_keys=True).encode())
+  for part in record["parts"]:
+    partCollection = collection.children.get(partCollectionName(collection.name, part))
+    members = [] if partCollection is None else sorted(partCollection.objects, key=lambda member: member.name)
+    gathered = [[member.name, None if member.instance_collection is None else member.instance_collection.name, (numpy.round(numpy.array(fileMatrix(member)), 4) + 0.0).tolist()] for member in members]
+    digest.update(json.dumps([part, gathered]).encode())
+  return digest.hexdigest()[:12]
 
 
 def sourceFingerprint(collection):

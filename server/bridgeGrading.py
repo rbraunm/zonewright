@@ -11,6 +11,7 @@ import mathutils
 import mathutils.bvhtree
 import numpy
 
+import bridgeAuthoring
 import bridgeCaveData
 import bridgeCaves
 import bridgeExport
@@ -21,6 +22,7 @@ import bridgePasses
 import bridgeReview
 import bridgeShaping
 import bridgeStructures
+import bridgeSurfacing
 
 routePassPrefix = "route "
 routeKind = "route"
@@ -618,6 +620,7 @@ def applyReplay(plan):
   keys = sceneObject.data.shape_keys
   active = None if keys is None or sceneObject.active_shape_key in (None, keys.reference_key) else sceneObject.active_shape_key.name
   summaries, plotOutcome = [], None
+  dressed = numpy.zeros(len(plan["shown"]), dtype=bool)
   for entry in plan["entries"]:
     graded = entry["graded"]
     if graded is None:
@@ -628,10 +631,13 @@ def applyReplay(plan):
     if feature["kind"] in (routeKind, bridgeFacades.facadeKind):
       writeDefinedPass(sceneObject, feature, graded["offsets"])
       name = {feature["kind"]: feature["name"]}
+      if feature["kind"] == bridgeFacades.facadeKind:
+        dressed |= (moved > bridgeHousing.heldTolerance) | (numpy.abs(graded["offsets"]).max(axis=1) > bridgeHousing.heldTolerance)
     else:
       plotOutcome = bridgeHousing.applyGrading(graded["plotPlan"])
       name = {"plots": plotOutcome["gradedPlots"]}
-    summaries.append(name | {"movedVertices": int((moved > bridgeHousing.heldTolerance).sum()), "largestChange": round(float(moved.max(initial=0.0)), 2)} | ({"restoredFrom": restored} if restored else {}))
+    summary = name | {"movedVertices": int((moved > bridgeHousing.heldTolerance).sum()), "largestChange": round(float(moved.max(initial=0.0)), 2)}
+    summaries.append(summary | ({"restoredFrom": restored} if restored else {}) | overriddenWork(sceneObject, feature, graded["offsets"], moved))
   keys = sceneObject.data.shape_keys
   if keys is not None:
     defined = set(bridgePasses.passDefinitions(sceneObject)) | {bridgeHousing.gradePassName(address) for address in bridgeHousing.gradedOn(sceneObject)}
@@ -649,9 +655,96 @@ def applyReplay(plan):
   if shaped.any():
     bridgeShaping.triangulateAlongContours(sceneObject, after, shaped)
     loopTotals, loopVertices = bridgeMeshAccess.faceLoops(sceneObject)
-    onFace = numpy.logical_and.reduceat(standing[loopVertices], numpy.cumsum(loopTotals) - loopTotals)
-    folded = int((bridgeShaping.overturnedFaces(sceneObject, after, shaped) & ~onFace).sum())
-  return {"summaries": summaries, "plots": plotOutcome, "foldedFaces": folded} | staleCaveReport(sceneObject)
+    starts = numpy.cumsum(loopTotals) - loopTotals
+    onFace = numpy.logical_and.reduceat(standing[loopVertices], starts)
+    # Its returns, from the face's edge on the line back to the ground beside it, stand vertical as the face does: no fold either.
+    edgeLength = bridgeShaping.medianEdgeLength(sceneObject, after, shaped)
+    vertical = numpy.abs(bridgeMeshAccess.faceNormals(sceneObject, after)[:, 2]) <= bridgeShaping.degenerateAreaShare * edgeLength * edgeLength
+    returns = numpy.logical_or.reduceat(standing[loopVertices], starts) & vertical
+    folded = int((bridgeShaping.overturnedFaces(sceneObject, after, shaped) & ~onFace & ~returns).sum())
+  remapDressed(sceneObject, dressed)
+  return {"summaries": summaries, "plots": plotOutcome, "foldedFaces": folded, "dressed": dressed} | staleCaveReport(sceneObject)
+
+
+def overriddenWork(sceneObject, feature, offsets, moved):
+  """The hand passes a replayed feature overrode: where it moved the ground, each other pass that is not a defined one still holds an
+  offset there, which the feature's new grading, made on the ground as all of them leave it, now takes back."""
+  keys = sceneObject.data.shape_keys
+  changed = moved > bridgeHousing.heldTolerance
+  if keys is None or not changed.any():
+    return {}
+  defined = set(bridgePasses.passDefinitions(sceneObject)) | {bridgeHousing.gradePassName(address) for address in bridgeHousing.gradedOn(sceneObject)}
+  reference = bridgePasses.keyCoordinates(keys.reference_key)
+  overrode = []
+  for key in list(keys.key_blocks)[1:]:
+    if key.name in defined or key.name in feature["passes"]:
+      continue
+    held = numpy.abs(worldOffsets(sceneObject, key, reference)[changed]).max(axis=1)
+    if held.max(initial=0.0) > bridgeHousing.heldTolerance:
+      overrode.append({"pass": key.name, "vertices": int((held > bridgeHousing.heldTolerance).sum()), "largestOffset": round(float(held.max()), 2)})
+  return {"overrodeHandWork": overrode} if overrode else {}
+
+
+def groundVertices(sceneObject):
+  return ~bridgeCaveData.caveMadeVertices(sceneObject)
+
+
+def carried(sceneObject, mask, groundBefore):
+  """A vertex mask carried across caves cut again: a cut makes and takes only its own ring and lining vertices, so the ground's own keep
+  their order."""
+  moved = numpy.zeros(len(sceneObject.data.vertices), dtype=bool)
+  moved[numpy.flatnonzero(groundVertices(sceneObject))] = mask[numpy.flatnonzero(groundBefore)]
+  return moved
+
+
+def remapDressed(sceneObject, dressed):
+  """Box-map again, from where they show now, the ground faces (not a cave's lining) with a vertex a facade moved, each material at its
+  repeat as box projection reads it over the faces left alone: a dressed face and its returns carry their texture unstretched, and
+  ground a facade let go of takes back the mapping it had. Returns how many faces it mapped."""
+  mesh = sceneObject.data
+  if not dressed.any() or not mesh.uv_layers:
+    return 0
+  loopTotals, loopVertices = bridgeMeshAccess.faceLoops(sceneObject)
+  loopFaces = numpy.repeat(numpy.arange(len(loopTotals)), loopTotals)
+  touched = numpy.logical_or.reduceat(dressed[loopVertices], numpy.cumsum(loopTotals) - loopTotals)
+  if bridgeCaveData.holdsCaves(sceneObject):
+    for name in bridgeCaveData.caves(sceneObject):
+      touched &= bridgeCaveData.faceTags(sceneObject, name) != bridgeCaveData.liningFaceTag
+  if not touched.any():
+    return 0
+  positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
+  _, faceNormals, _ = bridgeMeshAccess.readFaceArrays(sceneObject)
+  slots = numpy.empty(len(loopTotals), dtype=numpy.int64)
+  mesh.polygons.foreach_get("material_index", slots)
+  mesh.calc_loop_triangles()
+  triangleLoops = numpy.empty(len(mesh.loop_triangles) * 3, dtype=numpy.int64)
+  mesh.loop_triangles.foreach_get("loops", triangleLoops)
+  triangleLoops = triangleLoops.reshape(-1, 3)
+  trianglePolygons = loopFaces[triangleLoops[:, 0]]
+  uvs = numpy.empty(len(mesh.loops) * 2)
+  mesh.uv_layers.active.data.foreach_get("uv", uvs)
+  uvCorners = uvs.reshape(-1, 2)[triangleLoops]
+  corners = positions[loopVertices[triangleLoops]]
+  boxAreas = numpy.abs(numpy.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0])[numpy.arange(len(corners)), numpy.abs(faceNormals).argmax(axis=1)[trianglePolygons]]) / 2
+  uvEdges = uvCorners[:, 1:] - uvCorners[:, :1]
+  uvAreas = numpy.abs(uvEdges[:, 0, 0] * uvEdges[:, 1, 1] - uvEdges[:, 0, 1] * uvEdges[:, 1, 0]) / 2
+  left = ~touched[trianglePolygons]
+  repeats = {}
+  for slot in numpy.unique(slots[touched]).tolist():
+    measured = left & (slots[trianglePolygons] == slot)
+    repeat = bridgeMeshAccess.worldUnitsPerRepeat(boxAreas[measured].sum(), uvAreas[measured].sum())
+    if repeat is None:
+      raise ValueError(f"Material slot {slot} of '{sceneObject.name}' has no mapped faces left alone by the facade to read its repeat from; projectUVs the ground first")
+    repeats[slot] = repeat
+  boxAxes = numpy.array([bridgeSurfacing.planarAxes(numpy.eye(3)[axis]) for axis in range(3)])
+  selected = touched[loopFaces]
+  projected = numpy.zeros((len(loopFaces), 2))
+  loops = numpy.flatnonzero(selected)
+  loopAxes = boxAxes[numpy.abs(faceNormals).argmax(axis=1)[loopFaces[loops]]]
+  loopRepeats = numpy.array([repeats[int(slot)] for slot in slots[loopFaces[loops]]])
+  projected[loops] = numpy.einsum("lj,laj->la", positions[loopVertices[loops]], loopAxes) / loopRepeats[:, None]
+  bridgeAuthoring.writeProjection(sceneObject, selected, projected)
+  return int(touched.sum())
 
 
 def staleCaveReport(sceneObject):
@@ -707,8 +800,11 @@ def regradeTerrain(objectName):
   features = definedFeatures(sceneObject)
   if not features and not bridgeCaveData.holdsCaves(sceneObject):
     raise ValueError(f"'{objectName}' has no defined passes and no caves: no route graded on it (gradeRoute), no plot (gradePlot), no facade (dressFacade), and no cave (cutCave)")
-  applied = applyReplay(planReplay(sceneObject, features, 0, True)) if features else {"summaries": [], "foldedFaces": 0}
-  refitted = bridgeCaves.refitStaleCaves(sceneObject)
+  with bridgeCaves.restoredOnFailure(sceneObject):
+    applied = applyReplay(planReplay(sceneObject, features, 0, True)) if features else {"summaries": [], "foldedFaces": 0, "dressed": numpy.zeros(len(sceneObject.data.vertices), dtype=bool)}
+    groundBefore = groundVertices(sceneObject)
+    refitted = bridgeCaves.refitStaleCaves(sceneObject)
+    remapDressed(sceneObject, carried(sceneObject, applied["dressed"], groundBefore))
   return {"object": objectName, "replayed": applied["summaries"], "foldedFaces": applied["foldedFaces"], "refittedCaves": refitted, "staleStructures": bridgeStructures.staleStructures()}
 
 
@@ -730,18 +826,25 @@ def describeDefinedPasses(sceneObject):
   return described
 
 
-def dressFacade(objectName, cave, end, faceAt, width, height, apron, blend):
+def dressFacade(objectName, cave, end, faceAt, width, height, apron, blend, turnDegrees):
   sceneObject = bridgeCaves.requireTerrain(objectName)
   bridgeCaves.requireIntact(sceneObject)
-  definition = bridgeFacades.facadeDefinition(sceneObject, cave, end, faceAt, width, height, apron, blend)
-  passName = bridgeFacades.passName(cave, end)
+  definition = bridgeFacades.facadeDefinition(sceneObject, cave, end, faceAt, width, height, apron, blend, turnDegrees)
+  return {"object": objectName, "cave": cave, "end": end} | dress(sceneObject, definition)
+
+
+def dress(sceneObject, definition):
+  """Grade a facade's pass from its definition and replay what follows it, cut its cave again on the dressed ground, and map the faces
+  it moved again, whole or not at all."""
+  cave = definition["cave"]
+  passName = bridgeFacades.passName(cave, definition["end"])
   facade = {"kind": bridgeFacades.facadeKind, "name": bridgeFacades.featureName(definition), "passes": [passName], "definition": definition}
   features = definedFeatures(sceneObject)
   index = next((position for position, feature in enumerate(features) if feature["passes"] == [passName]), None)
   if index is None:
     keys = sceneObject.data.shape_keys
     if keys is not None and keys.key_blocks.get(passName) is not None:
-      raise ValueError(f"'{objectName}' already has a shaping pass '{passName}' that is not a facade; rename or remove it first")
+      raise ValueError(f"'{sceneObject.name}' already has a shaping pass '{passName}' that is not a facade; rename or remove it first")
     index = len(features)
     features.append(facade)
   else:
@@ -750,29 +853,60 @@ def dressFacade(objectName, cave, end, faceAt, width, height, apron, blend):
   report = plan["entries"][0]["graded"]["report"]
   with bridgeCaves.restoredOnFailure(sceneObject):
     applied = applyReplay(plan)
+    groundBefore = groundVertices(sceneObject)
     refit = bridgeCaves.recut(sceneObject, cave, {}) if cave in bridgeCaves.staleCaves(sceneObject) else None
-  return {"object": objectName, "cave": cave, "end": end, "pass": passName} | report | {
-    "foldedFaces": applied["foldedFaces"], "replayed": applied["summaries"][1:], "refit": refit, "staleCaves": bridgeCaves.staleCaves(sceneObject),
+    remapped = remapDressed(sceneObject, carried(sceneObject, applied["dressed"], groundBefore))
+  return {"pass": passName} | report | {
+    "foldedFaces": applied["foldedFaces"], "remappedFaces": remapped, "replayed": applied["summaries"][1:], "refit": refit, "staleCaves": bridgeCaves.staleCaves(sceneObject),
   }
 
 
+def editCave(objectName, name, changes):
+  """Cut a cave again with changes (bridgeCaves.recut), and dress its facades again where the cave they frame moved under them, refusing
+  a change a facade would no longer frame."""
+  sceneObject = bridgeCaves.requireTerrain(objectName)
+  bridgeCaves.requireIntact(sceneObject)
+  facades = [feature["definition"] for feature in definedFeatures(sceneObject) if feature["kind"] == bridgeFacades.facadeKind and feature["definition"]["cave"] == name]
+  with bridgeCaves.restoredOnFailure(sceneObject):
+    result = {"object": objectName, "cave": name, "changes": changes or {}} | bridgeCaves.recut(sceneObject, name, changes or {})
+    refitted = []
+    for definition in facades:
+      try:
+        current = bridgeFacades.redefined(sceneObject, definition)
+      except ValueError as refusal:
+        passName = bridgeFacades.passName(name, definition["end"])
+        raise ValueError(
+          f"The facade at the cave's {definition['end']} would no longer frame it: {refusal}. Dress it again to fit first (dressFacade), or take it back"
+          f" (removeShapingPass '{passName}')"
+        ) from refusal
+      if current != definition:
+        refitted.append({"end": definition["end"]} | dress(sceneObject, current))
+  return result | {"refitFacades": refitted}
+
+
 def removeShapingPass(objectName, name):
-  """Remove a shaping pass (bridgePasses); a facade's pass takes its dressing back and cuts its cave again to fit the ground as it was."""
+  """Remove a shaping pass (bridgePasses); a facade's pass takes its dressing back, cuts its cave again to fit the ground as it was, and
+  maps the faces it had moved again."""
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   definition = bridgePasses.passDefinitions(sceneObject).get(name)
   if definition is None or definition["kind"] != bridgeFacades.facadeKind:
     return bridgePasses.removeShapingPass(objectName, name)
   bridgeCaves.requireIntact(sceneObject)
+  keys = sceneObject.data.shape_keys
+  undressed = numpy.abs(worldOffsets(sceneObject, keys.key_blocks[name], bridgePasses.keyCoordinates(keys.reference_key))).max(axis=1) > bridgeHousing.heldTolerance
   with bridgeCaves.restoredOnFailure(sceneObject):
     removed = bridgePasses.removeShapingPass(objectName, name)
     cave = definition["cave"]
+    groundBefore = groundVertices(sceneObject)
     refit = bridgeCaves.recut(sceneObject, cave, {}) if cave in bridgeCaves.staleCaves(sceneObject) else None
-  return removed | {"refit": refit, "staleCaves": bridgeCaves.staleCaves(sceneObject)}
+    remapped = remapDressed(sceneObject, carried(sceneObject, undressed, groundBefore))
+  return removed | {"refit": refit, "remappedFaces": remapped, "staleCaves": bridgeCaves.staleCaves(sceneObject)}
 
 
 commands = {
   "gradeRoute": (gradeRoute, True),
   "regradeTerrain": (regradeTerrain, True),
   "dressFacade": (dressFacade, True),
+  "editCave": (editCave, True),
   "removeShapingPass": (removeShapingPass, True),
 }

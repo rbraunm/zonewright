@@ -33,6 +33,7 @@ breakupReach = 3.0
 patchEdges = 2.0
 solidDepth = 20.0
 matchDistance = 1e-4
+openFloorLift = 1e-3
 mouthEdgeShare = 1.0 / 3.0
 weldRounds = 8
 # Candidate rows lie this share of edgeLength apart; rows are kept so no point of the section moves more than edgeLength between two.
@@ -61,6 +62,7 @@ tubeFaceLayerName = "zonewrightCaveTubeFace"
 cornerOutward = math.sqrt(0.5)
 up = mathutils.Vector((0.0, 0.0, 1.0))
 down = mathutils.Vector((0.0, 0.0, -1.0))
+notGround = mathutils.Vector((math.nan, math.nan, math.nan))
 
 
 def replayStrokes(sceneObject, name, strokes):
@@ -502,6 +504,9 @@ def tubeMesh(definition, rows, surface):
   shape = rows["shape"]
   sections = sectionPoints(shape, rows["floors"], rows["directions"], rows["widths"], rows["heights"], rows["scales"])
   count, size = sections.shape[:2]
+  # Where the tube runs in the open in front of its mouth its floor lies in the ground's own plane, which the exact boolean resolves
+  # either way, at times leaving the cave's floor as a patch on the open ground; a hair over the ground there, it leaves the ground be.
+  sections[(surface.depths(rows["floors"]) <= 0)[:, None] & shape["onFloor"][None, :], 2] += openFloorLift
   vertices = sections.reshape(-1, 3)
   breakup = definition["breakup"]
   if breakup is not None:
@@ -803,12 +808,27 @@ def snappedCut(faces, sources, normals, original):
   kept, keptSources, keptNormals = [], [], []
   for face, source, normal in zip(faces, sources, normals):
     corners = [int(canonical[index]) for index in face]
-    corners = [corner for position, corner in enumerate(corners) if corner != corners[position - 1]]
-    if len(corners) >= 3:
-      kept.append(corners)
+    for loop in simpleLoops([corner for position, corner in enumerate(corners) if corner != corners[position - 1]]):
+      kept.append(loop)
       keptSources.append(int(source))
       keptNormals.append(normal)
   return kept, keptSources, keptNormals
+
+
+def simpleLoops(corners):
+  """A face's corners as loops that pass each corner once, each of at least three: snapping can pinch a face's outline at a corner it
+  passes twice, leaving two lobes meeting there."""
+  for position, corner in enumerate(corners):
+    again = corners.index(corner, position + 1) if corner in corners[position + 1:] else None
+    if again is not None:
+      return simpleLoops(corners[position:again]) + simpleLoops(corners[again:] + corners[:position])
+  return [corners] if len(corners) >= 3 else []
+
+
+def isFlat(points):
+  """Whether a triangle's corners lie in a line, within matchDistance of it."""
+  lengths = [numpy.linalg.norm(points[(position + 1) % 3] - points[position]) for position in range(3)]
+  return bool(numpy.linalg.norm(numpy.cross(points[1] - points[0], points[2] - points[0])) <= matchDistance * max(max(lengths), matchDistance))
 
 
 def withoutSlivers(positions, faces, sources, normals):
@@ -909,6 +929,8 @@ def caveLayers(editor, name):
     "ground": verts.float_vector.get(bridgeCaveData.groundPrefix + name) or verts.float_vector.new(bridgeCaveData.groundPrefix + name),
     "face": editor.faces.layers.int.get(bridgeCaveData.faceTagPrefix + name) or editor.faces.layers.int.new(bridgeCaveData.faceTagPrefix + name),
     "tube": editor.faces.layers.int.new(tubeFaceLayerName),
+    # A new vertex takes zero in every layer; in another cave's fingerprint of its ground that reads as ground moved from the origin.
+    "otherGrounds": [layer for layerName, layer in verts.float_vector.items() if layerName.startswith(bridgeCaveData.groundPrefix) and layerName != bridgeCaveData.groundPrefix + name],
   }
 
 
@@ -945,6 +967,11 @@ def weldMouth(editor, faces, rankOf, pointOf, shortest):
   return welded
 
 
+def requireApart(name, others):
+  if others:
+    raise ValueError(f"Cave '{name}' would overlap cave(s) {others} in plan: the ground within its reach holds theirs; keep caves apart (or take one back)")
+
+
 def splice(sceneObject, name, definition, strokes):
   """Cut a cave into a terrain and splice it into the mesh; keeps its record, paints its lining with the strokes, and returns what the
   cut made."""
@@ -955,18 +982,21 @@ def splice(sceneObject, name, definition, strokes):
   surface = caveSurface(shown, bridgeMeshAccess.meshTriangles(sceneObject), definition)
   line = CaveLine(definition)
   line.requireGrades(definition["maximumFloorDegrees"])
+  amplitude = definition["breakup"]["amplitude"] if definition["breakup"] is not None else 0.0
+  reach = breakupReach * amplitude + patchEdges * definition["edgeLength"]
+  owners = bridgeCaveData.CaveVertices(sceneObject) if bridgeCaveData.holdsCaves(sceneObject) else None
+  if owners is not None:
+    floors, _, widths, _ = line.at(numpy.unique(numpy.concatenate([numpy.arange(0.0, line.length, definition["edgeLength"] * rowSampleShare), line.stations])))
+    requireApart(name, owners.namesOf(nearTube(shown, {"floors": floors, "widths": widths}, reach)))
   rows = tubeRows(definition, line, surface)
   tubeVertices, tubeFaces, tubeSpans, tubeBands = tubeMesh(definition, rows, surface)
   tube = {
     "vertices": tubeVertices, "faces": tubeFaces, "spans": tubeSpans, "bands": tubeBands, "floors": rows["floors"][:, 2], "size": len(rows["shape"]["across"]),
     "shortestStretch": rows["shape"]["shortestStretch"],
   }
-  amplitude = definition["breakup"]["amplitude"] if definition["breakup"] is not None else 0.0
-  reach = breakupReach * amplitude + patchEdges * definition["edgeLength"]
   near = numpy.flatnonzero(nearTube(shown, rows, reach))
   if not len(near):
     raise ValueError(f"No ground of '{sceneObject.name}' lies within reach of the cave's path")
-  owners = bridgeCaveData.CaveVertices(sceneObject) if bridgeCaveData.holdsCaves(sceneObject) else None
   wallSlot = bridgeAuthoring.materialSlot(sceneObject, definition["wallMaterial"])
   floorSlot = bridgeAuthoring.materialSlot(sceneObject, definition["floorMaterial"])
   bandSlots = [bridgeAuthoring.materialSlot(sceneObject, band["material"]) for band in definition["trimBands"]]
@@ -982,8 +1012,8 @@ def splice(sceneObject, name, definition, strokes):
     border = next((vertex.index for face in patch for vertex in face.verts if vertex.is_boundary), None)
     if border is not None:
       raise ValueError(f"The cave reaches the edge of '{sceneObject.name}' near {[round(float(value), 1) for value in shown[border]]}; keep it {reach:g} inside the terrain's border")
-    if owners is not None and owners.namesOf(patchVertices):
-      raise ValueError(f"Cave '{name}' would overlap cave(s) {owners.namesOf(patchVertices)} in plan: the ground within its reach holds theirs; keep caves apart (or take one back)")
+    if owners is not None:
+      requireApart(name, owners.namesOf(patchVertices))
     report = spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, patch, tube, wallSlot, floorSlot, bandSlots)
     editor.faces.layers.int.remove(layers["tube"])
     editor.normal_update()
@@ -1015,6 +1045,16 @@ def spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, pa
     made = bmesh.ops.triangulate(editor, faces=polygons, quad_method="FIXED", ngon_method="EAR_CLIP")
     editor.faces.index_update()
     patch = sorted({face for face in patch if face.is_valid} | set(made["faces"]), key=lambda face: face.index)
+  byCorners = {}
+  for face in patch:
+    byCorners.setdefault(frozenset(face.verts), []).append(face)
+  doubledGround = [faces[0] for faces in byCorners.values() if len(faces) > 1]
+  if doubledGround:
+    where = roundedPoint(sceneObject.matrix_world @ doubledGround[0].calc_center_median())
+    raise ValueError(
+      f"The ground within the cave's reach holds {len(doubledGround)} pair(s) of faces on the same corners, near {where} (ground folded onto itself by an"
+      " earlier shaping); smooth the ground there (sculptAtPoint smooth) or move the cave"
+    )
   ring = patchBoundary(patch)
   patchVertices = sorted({vertex.index for face in patch for vertex in face.verts})
   localIndex = {vertex: position for position, vertex in enumerate(patchVertices)}
@@ -1041,6 +1081,14 @@ def spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, pa
   unchanged = {
     int(source) for face, source in zip(cutFaces, cutSources)
     if source >= 0 and len(face) == 3 and (original[list(face)] >= 0).all() and {int(original[vertex]) for vertex in face} == {vertex.index for vertex in patch[source].verts}
+  }
+  # A face with no area (a sliver an earlier contour triangulation left along a row) gives the boolean nothing to keep, so it would be
+  # taken out as plug with no piece in its place: an open seam along it. Where all its corners stay, it stays as it is.
+  produced = {int(source) for source in cutSources if source >= 0}
+  stayed = {int(original[vertex]) for face in cutFaces for vertex in face if original[vertex] >= 0}
+  unchanged |= {
+    position for position, face in enumerate(patch)
+    if position not in produced and all(vertex.index in stayed for vertex in face.verts) and isFlat(shown[[vertex.index for vertex in face.verts]])
   }
   changed = [position for position in range(len(patch)) if position not in unchanged]
   if not changed:
@@ -1089,6 +1137,8 @@ def spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, pa
       liningCount += 1
     else:
       continue
+    for layer in layers["otherGrounds"]:
+      vertex[layer] = notGround
     made[index] = vertex
     pointOf[vertex] = mathutils.Vector(point)
 
@@ -1142,7 +1192,14 @@ def spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, pa
     byCorners.setdefault(frozenset(face.verts), []).append(face)
   doubled = [face for faces in byCorners.values() if len(faces) > 1 for face in faces]
   if doubled:
+    doubledEdges = {edge for face in doubled for edge in face.edges}
     bmesh.ops.delete(editor, geom=doubled, context="FACES_ONLY")
+    for edge in doubledEdges:
+      if edge.is_valid and not edge.link_faces:
+        editor.edges.remove(edge)
+    for vertex in made.values():
+      if vertex.is_valid and not vertex.link_faces:
+        editor.verts.remove(vertex)
   caveFaces = [face for face in caveFaces if face.is_valid]
   requireSealed(caveFaces)
   liningFaces = [face for face in caveFaces if face[layers["face"]] == bridgeCaveData.liningFaceTag]
@@ -1281,11 +1338,17 @@ def takeBack(sceneObject, name):
     if len(numpy.unique(identifiers)) != len(identifiers):
       raise ValueError(f"Cave '{name}' of '{sceneObject.name}' has plug ids carried by two vertices (cut by another topology edit since); it cannot be taken back")
     byIdentifier = {int(identifier): editor.verts[int(row)] for identifier, row in zip(identifiers, plugRows)}
-    restoring = []
+    restoring, restoredCorners, doubled = [], set(), 0
     for position, plugFace in enumerate(record["plug"]):
       missing = [identifier for identifier in plugFace["vertices"] if identifier not in byIdentifier]
       if missing:
         raise ValueError(f"Cave '{name}' of '{sceneObject.name}' has lost plug vertices {missing}; it cannot be taken back")
+      # Ground that an earlier contour triangulation folded onto itself held two faces on the same corners; one face puts it back.
+      corners = frozenset(plugFace["vertices"])
+      if corners in restoredCorners:
+        doubled += 1
+        continue
+      restoredCorners.add(corners)
       vertices = [byIdentifier[identifier] for identifier in plugFace["vertices"]]
       values, corners = plugFace, plugFace["corner"]
       if position in largest:
@@ -1314,7 +1377,7 @@ def takeBack(sceneObject, name):
   known = bridgeCaveData.caves(sceneObject)
   del known[name]
   bridgeCaveData.writeCaves(sceneObject, known)
-  return {"restoredFaces": len(record["plug"])}
+  return {"restoredFaces": len(record["plug"]) - doubled} | ({"doubledFacesRestoredOnce": doubled} if doubled else {})
 
 
 # Checks
@@ -1421,12 +1484,6 @@ def recut(sceneObject, name, changes):
     return {"restored": restored, "cut": splice(sceneObject, name, definition, record["paint"])}
 
 
-def editCave(objectName, name, changes):
-  sceneObject = requireTerrain(objectName)
-  requireIntact(sceneObject)
-  return {"object": objectName, "cave": name, "changes": changes or {}} | recut(sceneObject, name, changes or {})
-
-
 def removeCave(objectName, name):
   sceneObject = requireTerrain(objectName)
   record = requireCave(sceneObject, name)
@@ -1518,7 +1575,6 @@ def refitStaleCaves(sceneObject):
 
 commands = {
   "cutCave": (cutCave, True),
-  "editCave": (editCave, True),
   "removeCave": (removeCave, True),
   "traceLedge": (traceLedge, False),
 }

@@ -35,6 +35,7 @@ walkSpacing = 4.0
 # A walk line runs on this far past each end that stands on footing with footing that far on.
 walkExtension = 5.0
 overheadLift = 10.0
+endInset = 2.0
 castNudge = bridgeMeshAccess.castNudge
 up = mathutils.Vector((0.0, 0.0, 1.0))
 down = mathutils.Vector((0.0, 0.0, -1.0))
@@ -167,8 +168,9 @@ class StructureGround:
     return bridgeMeshAccess.PlayerSurfaces(trees=[(name, matrix, tree) for name, matrix, _, tree in self.members if name not in skipped])
 
 
-def runProbe(surfaces, row):
-  """A probe row [kind, x, y, z, dx, dy, dz, reach, found] looked up again: what it finds now and the object it finds it on."""
+def runProbe(surfaces, row, overTop=-math.inf):
+  """A probe row [kind, x, y, z, dx, dy, dz, reach, found] looked up again (an overhead one from at least overTop): what it finds now and
+  the object it finds it on."""
   kind, origin, direction, reach = int(row[0]), mathutils.Vector(row[1:4]), mathutils.Vector(row[4:7]), float(row[7])
   if kind == bridgeStructureData.probeKinds["footing"]:
     footing = surfaces.footingOn(origin + up * (stepHeight + castNudge), reach + stepHeight + castNudge)
@@ -182,6 +184,8 @@ def runProbe(surfaces, row):
   if kind == bridgeStructureData.probeKinds["beside"]:
     hit = surfaces.castOn(origin, direction, reach)
     return (math.nan, None) if hit is None else ((hit[0] - origin).length, hit[2])
+  # Looked for again from over the whole scene as it now stands, which something placed since may have raised.
+  origin.z = max(origin.z, overTop)
   if bridgeMeshAccess.rockOverGround(surfaces.castWithNormal, origin.x, origin.y, origin.z) is not None:
     return math.nan, None
   hit = surfaces.castOn(origin, down, bridgeMeshAccess.waterReach)
@@ -194,12 +198,14 @@ class GroundLookups:
   def __init__(self, surfaces):
     self.surfaces = surfaces
     self.rows, self.standsOn = [], set()
+    self.lastOwner = None
 
   def look(self, kind, origin, direction, reach):
     row = [float(bridgeStructureData.probeKinds[kind]), *map(float, origin), *map(float, direction), float(reach), math.nan]
     found, owner = runProbe(self.surfaces, row)
     row[8] = found
     self.rows.append(row)
+    self.lastOwner = owner
     if owner is not None:
       self.standsOn.add(owner)
     return None if math.isnan(found) else found
@@ -219,9 +225,9 @@ class GroundLookups:
   def overhead(self, x, y):
     """The highest ground at [x, y], looked for from over the whole scene; refused where rock lies over ground there."""
     top = bridgeMeshAccess.sceneTopHeight() + overheadLift
-    levels = bridgeMeshAccess.rockOverGround(self.surfaces.castWithNormal, x, y, top)
-    if levels is not None:
-      raise ValueError(f"At [{x:g}, {y:g}] {bridgeMeshAccess.describeRockOverGround([x, y], [round(level, 1) for level in levels])}, so which ground is a choice: give z")
+    found = bridgeMeshAccess.overGroundOn(self.surfaces, x, y, top)
+    if found is not None:
+      raise ValueError(f"At [{x:g}, {y:g}] {bridgeMeshAccess.describeRockOverGround([x, y], found[0], found[1])}, so which ground is a choice: give z")
     return self.look("overhead", (x, y, top), (0.0, 0.0, -1.0), bridgeMeshAccess.waterReach)
 
 
@@ -304,6 +310,12 @@ def partTriangles(part):
 def isGround(collection):
   terrain = bpy.data.collections.get(bridgeExport.terrainCollectionName)
   return terrain is not None and collection.name in terrain.children
+
+
+def isTerrainObject(name):
+  """Whether a named object is ground: in the terrain collection or one under it."""
+  terrain = bpy.data.collections.get(bridgeExport.terrainCollectionName)
+  return terrain is not None and any(name in collection.objects for collection in [terrain, *terrain.children_recursive])
 
 
 def exportModel(part, collection):
@@ -422,9 +434,10 @@ def replayProbes(collection, ground):
   find now."""
   record = bridgeStructureData.readStructure(collection)
   surfaces = ground.without(skippedNames(record["order"]))
+  overTop = bridgeMeshAccess.sceneTopHeight() + overheadLift
   moved, largest, standsOn = 0, None, set()
   for row in bridgeStructureData.readProbes(collection):
-    found, owner = runProbe(surfaces, row)
+    found, owner = runProbe(surfaces, row, overTop)
     if owner is not None:
       standsOn.add(owner)
     before = row[8]
@@ -437,6 +450,10 @@ def replayProbes(collection, ground):
         largest = {"change": change, "at": roundVector(row[1:4]), "probe": bridgeStructureData.probeKindNames[int(row[0])], "before": None if math.isnan(before) else round(float(before), 3), "now": None if math.isnan(found) else round(float(found), 3)}
   if largest is not None:
     largest["change"] = None if math.isinf(largest["change"]) else round(largest["change"], 3)
+    if largest["probe"] == "overhead" and largest["now"] is None:
+      over = bridgeMeshAccess.overGroundOn(surfaces, largest["at"][0], largest["at"][1], overTop)
+      if over is not None:
+        largest["overGround"] = {"object": over[1], "top": round(over[0][0], 3), "underside": round(over[0][1], 3), "ground": round(over[0][2], 3)}
   return {"moved": moved, "largest": largest}, sorted(standsOn)
 
 
@@ -515,10 +532,12 @@ def headingOf(direction):
 
 def standView(at, end, direction, groundHeight, pitch=-5.0):
   """Standing on the approach to an end, heading along a direction: where the ground there lies within two steps of the end's height;
-  else on the end itself (a flight's foot against a wall, a lookout's open end over the ground far below)."""
+  else just inside the end, on the structure (a flight's foot against a wall, a lookout's open end over the ground far below), where its
+  edge leaves no doubt what is stood on."""
   ground = groundHeight(at[0], at[1])
   near = ground is not None and abs(ground - at[2]) <= 2 * stepHeight
-  return {"standAt": roundVector(at if near else end), "headingDegrees": headingOf(direction), "pitchDegrees": pitch}
+  inside = numpy.asarray(end, dtype=numpy.float64) + numpy.append(numpy.asarray(direction, dtype=numpy.float64)[:2], 0.0) * endInset
+  return {"standAt": roundVector(at if near else inside), "headingDegrees": headingOf(direction), "pitchDegrees": pitch}
 
 
 def lookView(eye, target):

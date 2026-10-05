@@ -30,7 +30,7 @@ primitiveKinds = ("plane", "grid", "cube") + roundShapes
 
 
 def roundVector(vector, digits=3):
-  return [round(float(component), digits) for component in vector]
+  return [round(float(component), digits) + 0.0 for component in vector]
 
 
 def targetCollection(collectionName):
@@ -308,6 +308,22 @@ def transformObjects(names, translate, rotateDegrees, scale, location, rotationD
   sceneObjects = [bridgeMeshAccess.requireObject(name) for name in names]
   for sceneObject in sceneObjects:
     bridgeStructureData.requireNotStructurePart(sceneObject, "transformObjects")
+  before = [(sceneObject.location.copy(), sceneObject.rotation_euler.copy(), sceneObject.scale.copy()) for sceneObject in sceneObjects]
+  try:
+    transformEach(sceneObjects, translate, rotateDegrees, scale, location, rotationDegrees)
+    bpy.context.view_layer.update()
+    for sceneObject in sceneObjects:
+      if bridgeKitData.isPlacedPiece(sceneObject):
+        bridgeKitData.requireUpright(sceneObject, "this transform")
+  except ValueError:
+    for sceneObject, (place, turn, size) in zip(sceneObjects, before):
+      sceneObject.location, sceneObject.rotation_euler, sceneObject.scale = place, turn, size
+    bpy.context.view_layer.update()
+    raise
+  return {"objects": [describeTransform(sceneObject) for sceneObject in sceneObjects]}
+
+
+def transformEach(sceneObjects, translate, rotateDegrees, scale, location, rotationDegrees):
   for sceneObject in sceneObjects:
     if location is not None:
       sceneObject.location = location
@@ -322,8 +338,6 @@ def transformObjects(names, translate, rotateDegrees, scale, location, rotationD
       sceneObject.rotation_euler = (worldRotation @ sceneObject.rotation_euler.to_matrix()).to_euler(sceneObject.rotation_mode)
     if scale is not None:
       sceneObject.scale = [current * factor for current, factor in zip(sceneObject.scale, scale)]
-  bpy.context.view_layer.update()
-  return {"objects": [describeTransform(sceneObject) for sceneObject in sceneObjects]}
 
 
 def duplicateObjects(names, offset, linkData):

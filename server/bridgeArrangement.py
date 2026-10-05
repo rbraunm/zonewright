@@ -8,6 +8,7 @@ import mathutils
 import mathutils.bvhtree
 import numpy
 
+import bridgeKitData
 import bridgeMeshAccess
 import bridgeObjects
 import bridgeStructureData
@@ -51,9 +52,11 @@ def placeCopies(source, copies, collection, settle, depth, tiltShare):
   if not copies:
     raise ValueError("placeCopies needs at least one copy")
   specs = [requireCopy(index, copy, settle) for index, copy in enumerate(copies)]
-  for spec in specs:
+  for index, spec in enumerate(specs):
     if spec["name"] is not None:
       bridgeObjects.requireNewName(spec["name"])
+    if bridgeKitData.isPlacedPiece(sourceObject) and (spec["scale"] != 1.0 or spec["rotationDegrees"][0] != 0.0 or spec["rotationDegrees"][1] != 0.0):
+      raise ValueError(f"Copy {index} of placed kit piece '{source}' is tilted or scaled; a placed piece stands upright at scale 1, turned only about the vertical (rotationDegrees [0, 0, turn])")
   destinations = [bridgeObjects.targetCollection(collection)] if collection is not None else list(sourceObject.users_collection)
   placed = []
   for spec in specs:
@@ -207,12 +210,13 @@ def restingLift(sceneObject, surfaces, castHeight):
 
 
 def dropHeight(sceneObject, surfaces, castHeight):
-  """Where an object drops from: from its own top where rock lies over it (in a cave, under an overhang), so it lands on the ground
-  under that rock; else from above the whole scene."""
-  _, top, samples = footprint(sceneObject)
+  """Where an object drops from: from just under the rock over its middle (in a cave, under an overhang), looked for from halfway up
+  it, so it lands on the ground under that rock even when its top touches the rock (a column under a hall's ceiling); else from above
+  the whole scene."""
+  bottom, top, samples = footprint(sceneObject)
   middle = numpy.mean(samples, axis=0)
-  location, normal, _, _ = surfaces.ray_cast(mathutils.Vector((middle[0], middle[1], top)), mathutils.Vector((0.0, 0.0, 1.0)), castHeight)
-  return top if location is not None and normal.z < 0 else castHeight
+  location, normal, _, _ = surfaces.ray_cast(mathutils.Vector((middle[0], middle[1], (bottom + top) / 2)), mathutils.Vector((0.0, 0.0, 1.0)), castHeight)
+  return location.z - bridgeMeshAccess.castNudge if location is not None and normal.z < 0 else castHeight
 
 
 def settleObjects(names, depth, tiltShare, onto):
@@ -224,6 +228,8 @@ def settleObjects(names, depth, tiltShare, onto):
   objects = [bridgeMeshAccess.requireObject(name) for name in names]
   for sceneObject in objects:
     bridgeStructureData.requireNotStructurePart(sceneObject, "settleObjects")
+    if tiltShare > 0 and bridgeKitData.isPlacedPiece(sceneObject):
+      raise ValueError(f"'{sceneObject.name}' is a placed kit piece, which stands upright and turns only about the vertical so its sockets meet; settle it with tiltShare 0")
   surfaces = surfacesExcept(set(names), onto)
   castHeight = bridgeMeshAccess.sceneTopHeight() + settleLift
   down = mathutils.Vector((0.0, 0.0, -1.0))
@@ -261,7 +267,7 @@ def settleObjects(names, depth, tiltShare, onto):
       continue
     bpy.context.view_layer.update()
     bottom, top, _ = footprint(sceneObject)
-    settled.append(describeCopy(sceneObject) | {"under": [round(min(heights), 2), round(max(heights), 2)], "spans": [round(bottom, 2), round(top, 2)]})
+    settled.append(describeCopy(sceneObject) | {"under": bridgeObjects.roundVector([min(heights), max(heights)], 2), "spans": bridgeObjects.roundVector([bottom, top], 2)})
   if missed:
     raise ValueError(f"Nothing under {missed} to settle onto" + (f" ('{onto}' lies elsewhere)" if onto is not None else ""))
   return {"settled": settled}

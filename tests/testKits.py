@@ -175,7 +175,8 @@ def testAHandModeledCollectionIsMarkedAtItsBaseCenterWithItsModuleBetweenItsSock
   assert [socket["name"] for socket in marked["sockets"]] == ["start", "end", "top"]
   assert marked["bounds"] == [[-12.5, -5.0, 0.0], [12.5, 5.0, 30.0]]
   assert corner["kind"] == "custom" and corner["sockets"] == [socket | {"at": [float(value) for value in socket["at"]], "direction": [float(value) for value in socket["direction"]]} for socket in cornerSockets]
-  assert corner["module"] == 7.0711
+  # A corner's sockets turn: the plan distance between them is no module.
+  assert corner["module"] is None
   assert "['slabPlaced'], which are not meshes" in refusals["notMesh"]
   assert "Mesh 'testKitWetBlock' has 6 faces without a material createMaterial made" in refusals["material"]
   assert "Mesh 'testKitBareBlock' has no texture coordinates on its 6 faces" in refusals["uvs"]
@@ -243,7 +244,7 @@ result = max(vertex.co.z for vertex in mesh.vertices if abs(vertex.co.x) <= 4.00
   assert abs(top - (12 + 8 + 3)) <= 1e-4
   assert window["clearHeight"] == 11.0 and window["clearWidth"] == 8.0
   assert "overlaps opening 0" in overlapping
-  assert "leaves 0.50 of wall at its +X end" in nearEnd and "0.50 too wide" in nearEnd
+  assert "leaves only 0.50 of wall at its +X end" in nearEnd and "0.50 too wide" in nearEnd
   assert len(piece["openings"]) == 1
 
 

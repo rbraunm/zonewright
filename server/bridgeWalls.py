@@ -22,7 +22,18 @@ fillTolerance = 0.01
 turnDegrees = 0.5
 sampleSpacing = 1.0
 loweringRounds = 8
+# Ground heights read back from single-precision vertices differ by about a millionth; a wall line lower than this is not lowered.
+heightTolerance = 1e-4
+# Sections sheared steeper than this would run their courses up a slope no client wall shows; a wall that steep is stepped.
+steepestShearDegrees = 30.0
 viewOut = 8.0
+# An elevation stands this far in front of a face, takes in a leg from this share of its length out (or this share of the wall's height),
+# eye at a player's height, aimed this share of the way up the wall from its foot, so the feet stay in frame.
+viewBack = 2.0
+viewEyeHeight = 6.0
+elevationLengthShare = 0.75
+elevationHeightShare = 1.3
+elevationAimShare = 0.4
 
 
 def fillLeg(length, modules):
@@ -68,6 +79,11 @@ def requireWallPath(path):
   if len(given) > 1:
     raise ValueError("path points are all [x, y] (the ground found from above) or all [x, y, z] (the ground found from a step above each z)")
   return points, given == {3}
+
+
+def bodyDepth(data):
+  """A wall piece's depth between its faces, without the frames standing proud of them."""
+  return size(data, 1) - 2 * bridgeKitData.frameProud(data["record"])
 
 
 def facingOf(direction):
@@ -123,10 +139,10 @@ def layWall(laying):
   if not isinstance(definition["sections"], list) or not definition["sections"]:
     raise ValueError(f"sections names straight wall pieces, got {definition['sections']!r}")
   pieces = [laying.kit.piece(name, ("wall",), "sections") for name in definition["sections"]]
-  depth, height = size(pieces[0], 1), size(pieces[0], 2)
+  depth, height = bodyDepth(pieces[0]), size(pieces[0], 2)
   for data in pieces:
-    if abs(size(data, 1) - depth) > 1e-6 or abs(size(data, 2) - height) > 1e-6:
-      raise ValueError(f"Sections are of one depth and height: '{data['piece']}' is {size(data, 1):g} deep and {size(data, 2):g} tall, '{pieces[0]['piece']}' {depth:g} and {height:g}")
+    if abs(bodyDepth(data) - depth) > 1e-6 or abs(size(data, 2) - height) > 1e-6:
+      raise ValueError(f"Sections are of one depth and height: '{data['piece']}' is {bodyDepth(data):g} deep and {size(data, 2):g} tall, '{pieces[0]['piece']}' {depth:g} and {height:g}")
   byModule = {}
   for data in pieces:
     module = bridgeKitData.moduleOf(data["record"])
@@ -178,8 +194,8 @@ def layWall(laying):
       raise ValueError(f"Variant index {key!r} is not a section of this wall: its sections are 0 to {len(sections) - 1}")
     data = laying.kit.piece(piece, ("wall",), "variant")
     module = bridgeKitData.moduleOf(data["record"])
-    if abs(module - sections[index]["module"]) > fillTolerance or abs(size(data, 1) - depth) > 1e-6 or abs(size(data, 2) - height) > 1e-6:
-      raise ValueError(f"Variant '{piece}' at section {index} is {module:g} long, {size(data, 1):g} deep, {size(data, 2):g} tall; section {index} is a {sections[index]['module']:g} module {depth:g} deep and {height:g} tall")
+    if abs(module - sections[index]["module"]) > fillTolerance or abs(bodyDepth(data) - depth) > 1e-6 or abs(size(data, 2) - height) > 1e-6:
+      raise ValueError(f"Variant '{piece}' at section {index} is {module:g} long, {bodyDepth(data):g} deep, {size(data, 2):g} tall; section {index} is a {sections[index]['module']:g} module {depth:g} deep and {height:g} tall")
     sections[index]["data"] = data
   jointPoints, jointGround = [], []
   lookups = laying.lookups
@@ -239,17 +255,17 @@ def layWall(laying):
     margin = sink + shearStep / 2
     heights = [ground - margin for ground in jointGround]
     for _ in range(loweringRounds):
-      lowered = False
+      # A joint two sections share is lowered once, by the more either needs, so a run on level ground stays level.
+      lowering = [0.0] * jointCount
       for section in sections:
         first, second = section["joints"]
         excess = max(heights[first] + (heights[second] - heights[first]) * share - (ground - margin) for share, ground in section["samples"])
-        if excess > 1e-9:
-          heights[first] -= excess
-          heights[second] -= excess
-          lowered = True
-      if not lowered:
+        if excess > heightTolerance:
+          lowering[first], lowering[second] = max(lowering[first], excess), max(lowering[second], excess)
+      if not any(lowering):
         break
-    steps = [math.floor((height - heights[0]) / shearStep + 1e-9) for height in heights]
+      heights = [height - lower for height, lower in zip(heights, lowering)]
+    steps = [math.floor((height - heights[0] + heightTolerance) / shearStep) for height in heights]
     jointHeights = [heights[0] + count * shearStep for count in steps]
     for section in sections:
       first, second = section["joints"]
@@ -260,12 +276,22 @@ def layWall(laying):
       base = min(ground for _, ground in section["samples"]) - sink
       section["base"] = (base, base)
       section["riseSteps"] = 0
-    jointHeights = [None] * jointCount
   shearMade, sectionReport, placements = {}, [], {}
   for index, section in enumerate(sections):
     burials = [ground - (section["base"][0] + (section["base"][1] - section["base"][0]) * share) for share, ground in section["samples"]]
     if max(burials) > maximumBurial + 1e-9:
-      raise ValueError(f"Section {index} would be buried {max(burials):.2f} deep (the ground bulges over its line), over maximumBurial {maximumBurial:g}; move or grade the wall's line, or step it (follow \"step\")")
+      sheared = definition["follow"] == "shear"
+      remedy = 'or step it (follow "step")' if sheared else "or allow a deeper burial (maximumBurial)"
+      raise ValueError(
+        f"Section {index} would be buried {max(burials):.2f} deep (the ground {'bulges over its line' if sheared else 'rises along it'}), over maximumBurial"
+        f" {maximumBurial:g}; move or grade the wall's line, {remedy}"
+      )
+    shearDegrees = math.degrees(math.atan2(abs(section["base"][1] - section["base"][0]), section["module"]))
+    if shearDegrees > steepestShearDegrees + 1e-9:
+      raise ValueError(
+        f"Section {index} would be sheared {shearDegrees:.1f} degrees (its base rising {section['base'][1] - section['base'][0]:+.2f} over its {section['module']:g}),"
+        f" steeper than {steepestShearDegrees:g}: its courses would run up the slope; step the wall (follow \"step\"), or run its line across the slope"
+      )
     leg = legs[section["leg"]]
     front = numpy.array([-leg["direction"][1], leg["direction"][0], 0.0]) * frontSign
     facing = facingOf(front)
@@ -284,9 +310,15 @@ def layWall(laying):
     entry = placements.setdefault(model, {"placements": 0, "triangles": sum(face - 2 for face in data["loopTotals"].tolist())})
     entry["placements"] += 1
     sectionReport.append({
-      "index": index, "name": name, "piece": data["piece"], "rise": round(rise, 6), "model": model, "shear": shear,
-      "deepestBurial": round(max(burials), 3), "shallowestBurial": round(min(burials), 3),
+      "index": index, "name": name, "piece": data["piece"], "base": [round(value, 6) for value in section["base"]], "rise": round(rise, 6), "model": model,
+      "shear": shear, "deepestBurial": round(max(burials), 3), "shallowestBurial": round(min(burials), 3),
     })
+  def jointBases(index):
+    """The bases of the sections meeting at a joint where they meet it: the one ending there, the one starting there (None past an end)."""
+    ending = sections[index - 1] if index > 0 or closed else None
+    starting = sections[index] if index < len(sections) else None
+    return [None if ending is None else ending["base"][1], None if starting is None else starting["base"][0]]
+
   postReport = []
   if posts is not None:
     wanted = []
@@ -311,6 +343,13 @@ def layWall(laying):
           raise ValueError(f"The post at joint {index} finds no ground under {roundVector(point, 2)}")
         lowest = found if lowest is None else min(lowest, found)
       base = lowest - sink
+      wallTop = max(value for value in jointBases(index) if value is not None) + height
+      if base + size(postData, 2) < wallTop - heightTolerance:
+        raise ValueError(
+          f"The post at joint {index} would stand {wallTop - base - size(postData, 2):.2f} under the top of the wall beside it ({wallTop:.2f}): its base, {sink:g}"
+          f" under the lowest ground at its foot, is at {base:.2f} and '{posts['piece']}' is {size(postData, 2):g} tall; give a taller post, or run the line where"
+          " the ground at the joint is flatter"
+        )
       front = numpy.array([-leg["direction"][1], leg["direction"][0], 0.0]) * frontSign
       name = f"{laying.name}Post{partNumber(number, len(wanted))}"
       laying.addInstance(name, postData["collection"], (float(center[0]), float(center[1]), base), facingOf(front))
@@ -320,10 +359,26 @@ def layWall(laying):
       postReport.append({"name": name, "joint": index, "at": roundVector(center, 3), "base": round(base, 3)})
   return {
     "legs": [{"index": leg["index"], "length": round(leg["length"], 3), "sections": [byModule[module]["piece"] for module in leg["fill"]]} for leg in legs],
-    "joints": [{"at": roundVector(point[:2], 3), "ground": round(ground, 3), "height": None if height is None else round(height, 6)} for point, ground, height in zip(jointPoints, jointGround, jointHeights)],
+    "joints": [
+      {"at": roundVector(point[:2], 3), "ground": round(ground, 3)}
+      | ({"height": round(jointHeights[index], 6)} if definition["follow"] == "shear" else {"bases": [None if base is None else round(base, 6) for base in jointBases(index)]})
+      for index, (point, ground) in enumerate(zip(jointPoints, jointGround))
+    ],
     "sections": sectionReport, "shearModels": [{"mesh": name, "state": state} for name, (_, state) in sorted(shearMade.items())],
     "posts": postReport, "models": placements, "closed": bool(closed),
   }
+
+
+def rayMeetsSegment(origin, direction, start, end):
+  """How far along a plan ray from origin it crosses the segment from start to end, or None where it does not."""
+  edge = end - start
+  denominator = direction[0] * edge[1] - direction[1] * edge[0]
+  if abs(denominator) < 1e-12:
+    return None
+  offset = start - origin
+  along = (offset[0] * edge[1] - offset[1] * edge[0]) / denominator
+  share = (offset[0] * direction[1] - offset[1] * direction[0]) / denominator
+  return float(along) if along > 0 and -1e-9 <= share <= 1 + 1e-9 else None
 
 
 def wallViewSet(definition, groundHeight):
@@ -335,15 +390,30 @@ def wallViewSet(definition, groundHeight):
   front = numpy.array([-first[1], first[0]]) * frontSign
   standAt = points[0][:2] + front * viewOut
   views["along"] = {"standAt": roundVector(list(standAt) + ([float(points[0][2])] if len(points[0]) == 3 else [])), "headingDegrees": round(facingOf(first), 3), "pitchDegrees": 2.0}
-  for index, (start, end) in enumerate(zip(points[:-1], points[1:])):
-    direction = (end[:2] - start[:2]) / numpy.linalg.norm(end[:2] - start[:2])
+  low, high = bridgeKitGeometry.pieceBounds(bridgeKitData.requirePiece(bridgeStructures.absoluteKitPath(definition["kitPath"]), definition["sections"][0]))
+  depth, height = float(high[1] - low[1]), float(high[2] - low[2])
+  legs = [(start[:2], end[:2]) for start, end in zip(points[:-1], points[1:])]
+  for index, (start, end) in enumerate(legs):
+    direction = (end - start) / numpy.linalg.norm(end - start)
     legFront = numpy.array([-direction[1], direction[0]]) * frontSign
-    middle = (start[:2] + end[:2]) / 2
-    length = float(numpy.linalg.norm(end[:2] - start[:2]))
-    ground = groundHeight(middle[0], middle[1]) if len(start) == 2 else float((start[2] + end[2]) / 2)
-    ground = 0.0 if ground is None else ground
-    eye = middle + legFront * (length * 0.9 + 20)
-    views[f"front{index}"] = bridgeStructures.lookView((eye[0], eye[1], ground + 15), (middle[0], middle[1], ground + 15))
+    middle = (start + end) / 2
+    length = float(numpy.linalg.norm(end - start))
+    face = middle + legFront * (depth / 2 + viewBack)
+    foot = groundHeight(face[0], face[1])
+    if foot is None:
+      raise ValueError(f"No ground stands in front of leg {index} of the wall at {roundVector(face, 2)} to look at it from")
+    # Far enough to take in the leg and the wall's height, but short of any other leg of the wall the eye would look through.
+    distance = max(length * elevationLengthShare + viewOut, height * elevationHeightShare)
+    for other, (otherStart, otherEnd) in enumerate(legs):
+      if other != index:
+        meeting = rayMeetsSegment(middle, legFront, otherStart, otherEnd)
+        if meeting is not None:
+          distance = min(distance, meeting - depth - viewBack)
+    distance = max(distance, depth / 2 + viewBack)
+    eye = middle + legFront * distance
+    standing = groundHeight(eye[0], eye[1])
+    eyeZ = (foot if standing is None else standing) + viewEyeHeight
+    views[f"front{index}"] = bridgeStructures.lookView((eye[0], eye[1], eyeZ), (middle[0], middle[1], foot + height * elevationAimShare))
   plans = numpy.array([point[:2] for point in points])
   low, high = plans.min(0), plans.max(0)
   views["plan"] = {"map": {"center": roundVector((low + high) / 2), "width": round(float(max(high - low)) + 60, 3)}}
