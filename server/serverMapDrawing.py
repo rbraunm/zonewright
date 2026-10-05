@@ -396,13 +396,13 @@ def islandLegend(islands, islandReach):
 
 def drawServerPlan(outputPath, mapContent, waterRecords, regionLabels, inspection, markers, islandReach=None, longSide=1000):
   """The server's view of a zone from its files alone, north up: the .map's collision in grey relief, what of it stands upright (walls,
-  the sides of blocks) as dark red lines along it, and what it holds that the server never collides with tinted blue; the nav's polygons over them (serverNav.inspectNav's), the main piece green, islands orange where
-  players reach them and grey where they do not (islandReach, by island number; None draws every island orange and the legend says
-  players' reach was not checked), numbered, and what the server's ground filter never walks (Disabled, zone line) dark; the .wtr's
-  boxes outlined in their type's color (water cyan, lava magenta, zone lines green), each with its label (regionLabels, in .wtr order);
-  and markers ({at: zone [x, y], label}), such as the safe point. Written as PNG with its legend below; returns the sheet's size, the
-  plan's frame (its center and width in zone units, its size in pixels, at the sheet's top left), the legend, and how many island
-  numbers found room."""
+  the sides of blocks) as dark red lines along it, and what it holds that the server never collides with tinted blue; the nav's
+  polygons over them (serverNav.inspectNav's), the main piece green, islands orange where players reach them and grey where they do not
+  (islandReach, by island number; None draws every island orange and the legend says players' reach was not checked), numbered, and
+  what the server's ground filter never walks (Disabled, zone line) dark; the .wtr's boxes outlined in their type's color (water cyan,
+  lava magenta, zone lines green), each with its label (regionLabels, in .wtr order); and markers ({at: zone [x, y], label}), such as
+  the safe point. Written as PNG with its legend below; returns the sheet's size, the plan's frame (its center and width in zone units,
+  its size in pixels, at the sheet's top left), the legend, and how many island numbers found room."""
   islands = inspection["islands"]
   if islandReach is not None and len(islandReach) != len(islands):
     raise ValueError(f"islandReach holds {len(islandReach)} flags for {len(islands)} islands")
