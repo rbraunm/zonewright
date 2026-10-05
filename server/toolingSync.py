@@ -189,9 +189,8 @@ def fetchRecastTree(toolingRoot, pin, stagingPath, reportProgress):
   extractedPath.rename(destination)
 
 
-def buildRecastHelper(toolingRoot, pin, studio, tree, reportProgress):
+def buildRecastHelper(toolingRoot, pin, studio, compiler, tree, reportProgress):
   """One cmd /c: vcvars64, then CMake with Ninja, building recastHelper.exe into the install folder of its fingerprint."""
-  compiler = recastHelper.compilerLine(studio["compiler"])
   fingerprint = recastHelper.helperFingerprint(pin, compiler)
   root = recastHelper.helpersRoot(toolingRoot)
   root.mkdir(parents=True, exist_ok=True)
@@ -239,7 +238,7 @@ def syncRecastHelper(toolingRoot, pin, reportProgress):
   fingerprints stay: worktrees sharing one install must not delete each other's."""
   if recastHelper.helperStatus(toolingRoot, pin)["state"] == "built":
     return []
-  studio = recastHelper.visualStudio()
+  studio, compiler = recastHelper.toolchain()
   actions = []
   tree = recastHelper.treePath(toolingRoot, pin)
   if tree.is_dir():
@@ -251,7 +250,7 @@ def syncRecastHelper(toolingRoot, pin, reportProgress):
     with tempfile.TemporaryDirectory(dir=toolingRoot, prefix="staging-") as stagingDirectory:
       fetchRecastTree(toolingRoot, pin, Path(stagingDirectory), reportProgress)
     actions.append({"tool": "recast", "action": "fetched", "commit": pin["commit"]})
-  actions.append(buildRecastHelper(toolingRoot, pin, studio, tree, reportProgress))
+  actions.append(buildRecastHelper(toolingRoot, pin, studio, compiler, tree, reportProgress))
   return actions
 
 

@@ -263,11 +263,6 @@ TileResult buildTile(const NavInput& input, const rcChunkyTriMesh& chunks, std::
     release();
     return result;
   }
-  if (polygonMesh->nverts >= 0xffff) {
-    result.error = name + " has " + std::to_string(polygonMesh->nverts) + " vertices; Detour holds at most 65,534 per tile, and map_edit drops the tile";
-    release();
-    return result;
-  }
   if (polygonMesh->npolys > (1 << polygonBits)) {
     result.error = name + " has " + std::to_string(polygonMesh->npolys) + " polygons, more than the " + std::to_string(1 << polygonBits) +
       " its " + std::to_string(polygonBits) + " polygon bits address; their references would spill into the tile bits";

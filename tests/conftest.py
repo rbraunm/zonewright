@@ -42,12 +42,12 @@ heavyGroups = {
     | {(zoneSurveySkill / "SKILL.md").as_posix()},
   "clientFiles": readerFiles,
   "calibration": {"server/eqCalibration.py", "server/bridgeClientLight.py"},
-  "serverNav": {"server/serverNav.py", "server/recastHelper.py"} | {f"recastHelper/{name}" for name in (
+  "serverNav": {"server/serverNav.py", "server/recastHelper.py", "server/navDrawing.py", "tests/peridotServerFiles.py"} | {f"recastHelper/{name}" for name in (
     "CMakeLists.txt", "main.cpp", "helperIO.h", "helperIO.cpp", "navMode.cpp", "inspectMode.cpp",
   )},
   "install": {f"server/{name}.py" for name in (
     "toolingSync", "toolingManifest", "toolingStatus", "extensionCatalog", "machineProfile", "machineBenchmark", "blenderProcess",
-  )} | {"toolingManifest.json", "recastHelper/CMakeLists.txt"},
+  )} | {"toolingManifest.json", "server/recastHelper.py", "recastHelper/CMakeLists.txt"},
 }
 
 

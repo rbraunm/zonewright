@@ -10,6 +10,8 @@ import peridotServerFiles as peridot
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
 import machineProfile
+import navDrawing
+import recastHelper
 import serverNav
 
 pytestmark = pytest.mark.clientData("serverNav")
@@ -67,13 +69,18 @@ def testNavReproducesHighpassHoldTileForTile(recastToolingRoot):
 
 def testNavReproducesThulehouse2TileForTile(recastToolingRoot):
   collision, water = peridotInputs("thulehouse2")
-  # Peridot's nav was built with its project's bounds, whose top (255.2) lies below the collision's (270.25), so map_edit dropped the
-  # triangles reaching above it. Exports always take the collidable extents; this reproduces the project to compare.
+  # Peridot's nav was built with its project's bounds, whose top (255.2) lies below the collision's (270.25), so map_edit dropped the two
+  # triangles reaching above it, which also set the collision's x and y extents. Exports always take the collidable extents
+  # (navFromCollision); to compare, the helper is given the project's bounds and the triangles map_edit kept.
   low, high = serverNav.navBounds(collision)
   high[1] = float(thulehouseProjectCeiling)
   kept = collision[(collision[..., 2] <= thulehouseProjectCeiling).all(axis=1)]
   assert len(collision) - len(kept) == 2
-  ours, report = serverNav.navFromCollision(kept, water, recastToolingRoot, noProgress, bounds=(low, high))
+  inputBytes = recastHelper.navInput(
+    serverNav.recastFromServer(kept), (low, high), serverNav.navVolumes(water), serverNav.serverNavSettings, machineProfile.workerCount(),
+  )
+  payload, report = recastHelper.runHelper(recastToolingRoot, "nav", inputBytes, noProgress)
+  ours = serverNav.navContainer(payload)
   assertTileForTile(ours, report, peridot.referenceBytes("nav/thulehouse2.nav"), 22, {0: 3440, 1: 6, 11: 114}, 1865)
   assert serverNav.inspectNav(ours, None, [], recastToolingRoot, noProgress)["polygons"] == 3560
 
@@ -94,7 +101,7 @@ def testNavIsDeterministic(recastToolingRoot):
 # count of tiles whose polygons differ recorded with its cause (the rotation floats) in docs/serverFiles.md.
 
 
-def testIslandsAndProbeOnHighpassHold(recastToolingRoot):
+def testIslandsAndProbeOnHighpassHold(recastToolingRoot, tmp_path):
   collision, water = peridotInputs("highpasshold")
   ours, _ = serverNav.navFromCollision(collision, water, recastToolingRoot, noProgress)
   targets = [{"name": f"the zone line of .wtr record {index}", "point": record["position"]} for index, record in enumerate(water) if record["type"] == 3]
@@ -102,7 +109,11 @@ def testIslandsAndProbeOnHighpassHold(recastToolingRoot):
   inspection = serverNav.inspectNav(ours, highpassSafePoint, targets, recastToolingRoot, noProgress)
   main = inspection["mainPiece"]
   assert main["standIn"] is False
-  assert all(low <= value <= high for low, value, high in zip(main["boundsMin"], highpassSafePoint, main["boundsMax"]))
+  safe = main["safePolygon"]
+  safePolygon = next(tile for tile in inspection["tiles"] if tile["key"] == safe["tile"])["polygons"][safe["polygon"]]
+  assert safePolygon["component"] == 0
+  xs, ys = zip(*safePolygon["outline"])
+  assert min(xs) - 5 <= highpassSafePoint[0] <= max(xs) + 5 and min(ys) - 5 <= highpassSafePoint[1] <= max(ys) + 5
   islands = inspection["islands"]
   assert (inspection["polygons"], inspection["excludedPolygons"], main["polygons"], len(islands)) == (8197, 53, 3677, 640)
   assert sum(island["snapRisk"] for island in islands) == 297
@@ -120,3 +131,12 @@ def testIslandsAndProbeOnHighpassHold(recastToolingRoot):
   assert len(inspection["findings"]) == 3
   theirs = serverNav.inspectNav(peridot.referenceBytes("nav/highpasshold.nav"), highpassSafePoint, targets, recastToolingRoot, noProgress)
   assert {key: theirs[key] for key in ("mainPiece", "islands", "probes", "findings")} == {key: inspection[key] for key in ("mainPiece", "islands", "probes", "findings")}
+
+  areas = ["Normal: 7,692 polygons", "Water: 452 polygons", "Disabled: 53 polygons"]
+  byArea = navDrawing.drawNav(tmp_path / "highpassholdNavByArea.png", [
+    navDrawing.areaPanel("Peridot's highpasshold.nav", theirs), navDrawing.areaPanel("ours, from Peridot's .map and .wtr", inspection),
+    navDrawing.differencePanel("polygons that differ", inspection, theirs),
+  ])
+  assert byArea["legends"] == [areas, areas, ["0 polygons the other lacks", "0 polygons only the other has"]]
+  islandsPlan = navDrawing.drawNav(tmp_path / "highpassholdIslands.png", [navDrawing.componentPanel("NPC islands of our highpasshold.nav", inspection)], panelWidth=1600)
+  assert islandsPlan["legends"] == [["main piece: 3,677 polygons", "640 islands, 297 at snap risk", "Disabled and zone line: 53 polygons"]]

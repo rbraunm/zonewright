@@ -1,5 +1,6 @@
 """The Recast helper: recastHelper.exe built from the repository's recastHelper/ sources against the pinned recastnavigation tree with
 this machine's Visual Studio, kept per fingerprint under the tooling root; its status, its input files, and its runs."""
+import functools
 import hashlib
 import json
 import logging
@@ -114,6 +115,14 @@ def compilerLine(compiler):
   return lines[0]
 
 
+@functools.cache
+def toolchain():
+  """visualStudio() and its compiler's version line, found once per process: vswhere and cl take over a second and a half, and every
+  helper run checks its build's fingerprint. A Visual Studio update shows as stale once the server restarts."""
+  studio = visualStudio()
+  return studio, compilerLine(studio["compiler"])
+
+
 def helperFingerprint(pin, compiler):
   """SHA-256 of the helper sources (every file in recastHelper/, CMakeLists.txt among them), the tree digest, cl's version line, and the
   configure arguments; a change to any of them makes a new build."""
@@ -143,8 +152,7 @@ def helperStatus(toolingRoot, pin):
   or built; with the fingerprint, the commit, and the compiler."""
   status = {"commit": pin["commit"]}
   try:
-    studio = visualStudio()
-    compiler = compilerLine(studio["compiler"])
+    _, compiler = toolchain()
   except ToolError as error:
     return status | {"state": "missing", "problem": str(error)}
   fingerprint = helperFingerprint(pin, compiler)

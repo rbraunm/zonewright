@@ -58,10 +58,14 @@ class PayloadReader {
 public:
   explicit PayloadReader(const std::vector<unsigned char>& bytes) : bytes(bytes), offset(0) {}
 
-  void read(void* destination, size_t count, const std::string& what) {
+  void require(size_t count, const std::string& what) const {
     if (bytes.size() - offset < count) {
       throw HelperError("the nav payload ends at byte " + std::to_string(bytes.size()) + " inside " + what + " at offset " + std::to_string(offset));
     }
+  }
+
+  void read(void* destination, size_t count, const std::string& what) {
+    require(count, what);
     std::memcpy(destination, bytes.data() + offset, count);
     offset += count;
   }
@@ -107,20 +111,45 @@ void loadAsTheServerDoes(const std::vector<unsigned char>& payload, LoadedMesh& 
     if (static_cast<size_t>(size) < sizeof(dtMeshHeader)) {
       throw HelperError(name + " is " + std::to_string(size) + " bytes, too short for a Detour tile header");
     }
+    reader.require(static_cast<size_t>(size), name + "'s data");
     unsigned char* data = static_cast<unsigned char*>(dtAlloc(static_cast<size_t>(size), DT_ALLOC_PERM));
     reader.read(data, static_cast<size_t>(size), name + "'s data");
-    const dtMeshHeader* header = reinterpret_cast<const dtMeshHeader*>(data);
-    if (header->polyCount > parameters.maxPolys) {
-      const std::string message = name + " (" + std::to_string(header->x) + ", " + std::to_string(header->y) + ") has " +
-        std::to_string(header->polyCount) + " polygons, more than the " + std::to_string(parameters.maxPolys) + " its polygon bits address";
+    auto refuse = [&](const std::string& message) {
       dtFree(data);
       throw HelperError(message);
+    };
+    const dtMeshHeader* header = reinterpret_cast<const dtMeshHeader*>(data);
+    if (header->magic != DT_NAVMESH_MAGIC || header->version != DT_NAVMESH_VERSION) {
+      refuse(name + " has magic " + std::to_string(header->magic) + " and version " + std::to_string(header->version) + ", not Detour's " +
+        std::to_string(DT_NAVMESH_MAGIC) + " and " + std::to_string(DT_NAVMESH_VERSION));
+    }
+    const std::string place = name + " (" + std::to_string(header->x) + ", " + std::to_string(header->y) + ", layer " + std::to_string(header->layer) + ")";
+    const int counts[] = {header->vertCount, header->polyCount, header->maxLinkCount, header->detailMeshCount, header->detailVertCount,
+      header->detailTriCount, header->bvNodeCount, header->offMeshConCount};
+    const size_t recordBytes[] = {sizeof(float) * 3, sizeof(dtPoly), sizeof(dtLink), sizeof(dtPolyDetail), sizeof(float) * 3, 4, sizeof(dtBVNode),
+      sizeof(dtOffMeshConnection)};
+    long long expected = dtAlign4(static_cast<int>(sizeof(dtMeshHeader)));
+    for (size_t section = 0; section < sizeof(counts) / sizeof(counts[0]); ++section) {
+      if (counts[section] < 0) {
+        refuse(place + " counts " + std::to_string(counts[section]) + " records in section " + std::to_string(section));
+      }
+      expected += (static_cast<long long>(counts[section]) * static_cast<long long>(recordBytes[section]) + 3) & ~3LL;
+    }
+    if (expected != size) {
+      refuse(place + " is " + std::to_string(size) + " bytes, but its header's counts make " + std::to_string(expected) +
+        "; Detour's addTile would read and write by the counts");
+    }
+    if (header->maxLinkCount == 0) {
+      refuse(place + " has no links; Detour builds no such tile, and addTile would write before its link pool");
+    }
+    if (header->polyCount > parameters.maxPolys) {
+      refuse(place + " has " + std::to_string(header->polyCount) + " polygons, more than the " + std::to_string(parameters.maxPolys) +
+        " its polygon bits address");
     }
     dtTileRef added = 0;
     const dtStatus status = loaded.mesh->addTile(data, size, DT_TILE_FREE_DATA, reference, &added);
     if (dtStatusFailed(status)) {
-      dtFree(data);
-      throw HelperError(name + " with reference " + std::to_string(reference) + " fails dtNavMesh::addTile (status " + std::to_string(status) +
+      refuse(name + " with reference " + std::to_string(reference) + " fails dtNavMesh::addTile (status " + std::to_string(status) +
         "); the server would lose it without a word");
     }
     const dtMeshTile* tile = loaded.mesh->getTileByRef(added);
@@ -317,7 +346,7 @@ void runInspect(const std::string& inputPath, const std::string& reportPath) {
     throw HelperError("dtNavMeshQuery::init failed for " + std::to_string(input.searchNodes) + " nodes");
   }
   dtPolyRef safePolygon = 0;
-  float safeNearest[3] = {0, 0, 0};
+  float safeNearest[3];
   if (input.hasSafePoint) {
     query->findNearestPoly(input.safePoint, input.nearestHalfExtents, &filter, &safePolygon, safeNearest);
   }
@@ -374,37 +403,45 @@ void runInspect(const std::string& inputPath, const std::string& reportPath) {
 
   std::vector<std::string> probes;
   const size_t targetCount = input.targets.size() / 3;
+  dtPolyRef start = 0;
+  float startNearest[3];
   if (input.hasSafePoint) {
-    dtPolyRef start = 0;
-    float startNearest[3];
     query->findNearestPoly(input.safePoint, input.pathHalfExtents, &filter, &start, startNearest);
-    std::vector<dtPolyRef> path(input.pathPolygons);
-    for (size_t target = 0; target < targetCount; ++target) {
-      reportProgress("probing NPC paths", static_cast<long long>(target), static_cast<long long>(targetCount));
-      const float* goalPoint = &input.targets[target * 3];
-      dtPolyRef goal = 0;
-      float goalNearest[3];
-      query->findNearestPoly(goalPoint, input.pathHalfExtents, &filter, &goal, goalNearest);
-      const int goalComponent = goal ? componentOf[static_cast<size_t>(globalIndex(loaded, goal))] : notInComponent;
-      if (!start) {
-        probes.push_back(probeJSON("noStartPolygon", 0, 0, goalComponent));
-        continue;
-      }
-      if (!goal) {
-        probes.push_back(probeJSON("noGoalPolygon", 0, 0, goalComponent));
-        continue;
-      }
-      int pathCount = 0;
-      const dtStatus status = query->findPath(start, goal, input.safePoint, goalPoint, &filter, path.data(), &pathCount, static_cast<int>(path.size()));
-      const char* result = dtStatusFailed(status) || pathCount == 0 ? "failed" : (path[static_cast<size_t>(pathCount - 1)] == goal ? "complete" : "partial");
-      probes.push_back(probeJSON(result, pathCount, status, goalComponent));
+  }
+  std::vector<dtPolyRef> path(input.pathPolygons);
+  for (size_t target = 0; target < targetCount; ++target) {
+    reportProgress("probing NPC paths", static_cast<long long>(target), static_cast<long long>(targetCount));
+    const float* goalPoint = &input.targets[target * 3];
+    dtPolyRef goal = 0;
+    float goalNearest[3];
+    query->findNearestPoly(goalPoint, input.pathHalfExtents, &filter, &goal, goalNearest);
+    const int goalComponent = goal ? componentOf[static_cast<size_t>(globalIndex(loaded, goal))] : notInComponent;
+    if (!input.hasSafePoint) {
+      probes.push_back(probeJSON("noSafePoint", 0, 0, goalComponent));
+      continue;
     }
+    if (!start) {
+      probes.push_back(probeJSON("noStartPolygon", 0, 0, goalComponent));
+      continue;
+    }
+    if (!goal) {
+      probes.push_back(probeJSON("noGoalPolygon", 0, 0, goalComponent));
+      continue;
+    }
+    int pathCount = 0;
+    const dtStatus status = query->findPath(start, goal, input.safePoint, goalPoint, &filter, path.data(), &pathCount, static_cast<int>(path.size()));
+    const char* result = dtStatusFailed(status) || pathCount == 0 ? "failed" : (path[static_cast<size_t>(pathCount - 1)] == goal ? "complete" : "partial");
+    probes.push_back(probeJSON(result, pathCount, status, goalComponent));
   }
   dtFreeNavMeshQuery(query);
 
   std::ostringstream report;
-  report << "{\"tiles\": " << loaded.tiles.size() << ", \"polygons\": " << loaded.polygonCount << ", \"excludedPolygons\": " << excludedPolygons;
-  report << ", \"safePolygon\": " << safePolygon << ", \"safeNearest\": " << jsonVector(safeNearest);
+  report << "{\"polygons\": " << loaded.polygonCount << ", \"excludedPolygons\": " << excludedPolygons << ", \"safePolygon\": ";
+  if (safePolygon) {
+    report << "[" << loaded.payloadIndexOfSlot[loaded.mesh->decodePolyIdTile(safePolygon)] << ", " << loaded.mesh->decodePolyIdPoly(safePolygon) << "]";
+  } else {
+    report << "null";
+  }
   report << ", \"components\": [";
   for (size_t number = 0; number < components.size(); ++number) {
     const Component& component = components[number];
@@ -412,13 +449,21 @@ void runInspect(const std::string& inputPath, const std::string& reportPath) {
       << ", \"boundsMin\": " << jsonVector(component.low) << ", \"boundsMax\": " << jsonVector(component.high)
       << ", \"center\": " << jsonVector(component.center) << ", \"snapRisk\": " << (component.snapRisk ? "true" : "false") << "}";
   }
-  report << "], \"polygonComponents\": [";
+  report << "], \"tiles\": [";
   for (size_t tileIndex = 0; tileIndex < loaded.tiles.size(); ++tileIndex) {
-    report << (tileIndex ? ", " : "") << "[";
-    for (int polygon = 0; polygon < loaded.tiles[tileIndex]->header->polyCount; ++polygon) {
-      report << (polygon ? ", " : "") << componentOf[static_cast<size_t>(loaded.firstPolygon[tileIndex] + polygon)];
+    const dtMeshTile* tile = loaded.tiles[tileIndex];
+    report << (tileIndex ? ", " : "") << "{\"x\": " << tile->header->x << ", \"y\": " << tile->header->y << ", \"layer\": " << tile->header->layer
+      << ", \"polygons\": [";
+    for (int polygon = 0; polygon < tile->header->polyCount; ++polygon) {
+      const dtPoly& poly = tile->polys[polygon];
+      report << (polygon ? ", " : "") << "{\"area\": " << static_cast<int>(poly.getArea()) << ", \"component\": "
+        << componentOf[static_cast<size_t>(loaded.firstPolygon[tileIndex] + polygon)] << ", \"corners\": [";
+      for (int corner = 0; corner < poly.vertCount; ++corner) {
+        report << (corner ? ", " : "") << jsonVector(&tile->verts[poly.verts[corner] * 3]);
+      }
+      report << "]}";
     }
-    report << "]";
+    report << "]}";
   }
   report << "], \"probes\": [";
   for (size_t index = 0; index < probes.size(); ++index) {
