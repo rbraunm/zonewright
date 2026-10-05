@@ -105,7 +105,7 @@ gallery = {"objectName": "ground", "start": [-120, -45], "end": [120, 10], "floo
 measureShares = r"""
 import numpy, mathutils, mathutils.bvhtree
 import bridgeMeshAccess
-from bridgeCaves import probeOverFloor
+from buildTolerances import probeOverFloor
 ground = bpy.data.objects['ground']
 shown, _ = bridgeMeshAccess.readVertexArrays(ground)
 tree = mathutils.bvhtree.BVHTree.FromPolygons(shown.tolist(), bridgeMeshAccess.meshTriangles(ground).tolist())

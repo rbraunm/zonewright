@@ -16,6 +16,7 @@ import bridgeCaveData
 import bridgeNoise
 import bridgeStructureData
 import playerScale
+from buildTolerances import levelProbeLift
 
 selectorKeys = (
   "all", "sphere", "box", "cylinder", "facing", "slope", "height", "nearPath", "material", "vertexGroup", "insideObject", "region", "noise",
@@ -67,9 +68,6 @@ down = mathutils.Vector((0.0, 0.0, -1.0))
 castNudge = 0.01
 # Ground inside a solid is told by level casts this far above it, clear of the ground's own rises, every sixteenth of a turn.
 enclosureProbeHeight = 1.0
-# Ground and cover for a player at a level (a plot's) are looked for from this far over it: over ground a little higher, under a
-# cave's roof.
-levelProbeLift = 2.0
 aroundDirections = [mathutils.Vector((math.cos(turn * math.pi / 8), math.sin(turn * math.pi / 8), 0.0)) for turn in range(16)]
 
 

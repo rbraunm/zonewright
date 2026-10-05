@@ -21,6 +21,7 @@ import bridgeReview
 import bridgeReviewGuides
 import bridgeStructureData
 import bridgeViews
+from buildTolerances import approachGroundReach, groundProbeLift, supportTolerance
 from playerScale import playerHeight, stepHeight
 
 structuresCollectionName = "structures"
@@ -29,15 +30,6 @@ layingSuffix = "Laying"
 probeTolerance = 0.01
 # Posts, legs, anchors, and floors find the ground within this far below them.
 groundReach = 300.0
-# A structure's end, foot, or deck this far or less over what it stands on reads as resting on it; higher, a gap shows under it, however
-# high a player steps.
-supportTolerance = 2.0
-# Footing and ground under a structure's part are looked for from this far over where the part is wanted, so ground a little higher
-# (an end sunk into it) is found.
-groundProbeLift = 2.0
-# A view of an end stands on its approach where the ground there lies within this of the end's height, else on the structure, so it
-# shows the end from where it is reached.
-approachGroundReach = 4.0
 # Decks are probed for clearance this often along their edges and centerline, and walked in samples this far apart.
 clearanceSpacing = 4.0
 walkSpacing = 4.0

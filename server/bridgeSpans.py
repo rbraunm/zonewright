@@ -11,6 +11,7 @@ import numpy
 import bridgeKitGeometry
 import bridgeStructures
 from bridgeStructures import isNumber, requireKeys, requireNonNegative, requirePoint, requirePositive, requireSides, roundVector, size
+from buildTolerances import endRest, groundProbeLift, supportTolerance
 from playerScale import eyeHeight, stepHeight, walkableNormalZ
 
 bridgeKeys = ("kitPath", "start", "end", "width", "deck", "profile", "posts", "rails", "stringers", "bents", "sink", "maximumDeckDegrees", "collection")
@@ -25,9 +26,6 @@ maximumTurnDegrees = 150.0
 # Ground this far over a deck's underside meets it; a flight's end this far under what it stands on is buried in it.
 meetingTolerance = 1e-3
 buriedTolerance = 0.05
-# A flight's or walkway's underside may rest in the ground it starts from this far in from its ends, in plan; past that it clears the
-# ground.
-endRest = 2.0
 # Arc lengths along a bridge's deck are measured over this many pieces, and its swept parts and walk follow it every this far in plan.
 profileSamples = 1024
 followSpacing = 2.0
@@ -170,7 +168,7 @@ def profileBulge(profile):
 def requireEnd(laying, label, point):
   found = laying.lookups.footing(point)
   if found is None:
-    raise ValueError(f"The {label} {roundVector(point, 2)} has no footing within {bridgeStructures.supportTolerance:g} below it; set it on the ground or a deck within that (gradeRoute the abutment)")
+    raise ValueError(f"The {label} {roundVector(point, 2)} has no footing within {supportTolerance:g} below it; set it on the ground or a deck within that (gradeRoute the abutment)")
   hit = laying.lookups.surfaces.castWithNormal(mathutils.Vector(point) + mathutils.Vector((0.0, 0.0, bridgeStructures.castNudge)), mathutils.Vector((0.0, 0.0, 1.0)), bridgeStructures.playerHeight)
   if hit is not None:
     raise ValueError(f"The {label} {roundVector(point, 2)} has rock over it {hit[0].z - point[2]:.2f} up, within a player's height ({bridgeStructures.playerHeight:g})")
@@ -283,7 +281,7 @@ def layBridge(laying):
         top = deckTop + (rail["height"] if railed else 0.0) + above
         anchor = index in (0, intervals)
         if anchor:
-          ground = laying.lookups.below((center[0], center[1], deckTop + bridgeStructures.groundProbeLift))
+          ground = laying.lookups.below((center[0], center[1], deckTop + groundProbeLift))
           if ground is None:
             raise ValueError(f"The anchor post at {roundVector(center[:2], 2)} has no ground within {bridgeStructures.groundReach:g} below it")
           bottom = ground - sink
@@ -433,7 +431,7 @@ def layGroundedPosts(laying, bake, postData, stations, rail, side, sink, onlyRai
     if railed and ground >= top - size(rail["data"], 2):
       tops.append(railTop)
       continue
-    if (onlyRaised and not railed and station.underside - ground <= bridgeStructures.supportTolerance) or top - bottom <= 0:
+    if (onlyRaised and not railed and station.underside - ground <= supportTolerance) or top - bottom <= 0:
       tops.append(None)
       continue
     length = postBar(bake, postData, center, station.direction, bottom, top, "A post")
@@ -512,7 +510,7 @@ def layStairs(laying):
   for label, point in (("foot", bottom), ("head", top)):
     found = laying.lookups.footing(point)
     if found is None:
-      raise ValueError(f"The flight's {label} {roundVector(point, 2)} has no footing within {bridgeStructures.supportTolerance:g} below it")
+      raise ValueError(f"The flight's {label} {roundVector(point, 2)} has no footing within {supportTolerance:g} below it")
     if found - point[2] > buriedTolerance:
       found = round(found, 2) + 0.0
       raise ValueError(
@@ -887,7 +885,7 @@ def layWalkway(laying):
       if station.bracketed or heldByPosts:
         continue
       ground = laying.lookups.below((station.point[0], station.point[1], station.underside))
-      if ground is not None and station.underside - ground > bridgeStructures.supportTolerance and not nearEnd(station.point):
+      if ground is not None and station.underside - ground > supportTolerance and not nearEnd(station.point):
         raise ValueError(f"The {station.label} stands {station.underside - ground:.2f} over the ground at {roundVector(station.point[:2], 2)} with its {'left' if side == 1 else 'right'} edge held by neither posts nor brackets")
     if posts is None:
       continue

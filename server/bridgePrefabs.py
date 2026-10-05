@@ -16,6 +16,7 @@ import bridgeReview
 import bridgeStructures
 import bridgeSurfacing
 from bridgeStructures import isNumber, requireKeys, requireNonNegative, requirePoint, requirePositive, roundVector
+from buildTolerances import floorTolerance, footprintBand, groundProbeLift, thresholdReach
 
 partNamePattern = re.compile(r"[a-z][A-Za-z0-9]*")
 entranceKeys = {"name", "at", "facingDegrees"}
@@ -24,13 +25,6 @@ plinthDefaults = {"sink": 2.0, "margin": 0.0}
 interiorPart = "interior"
 # The ground under a footprint is looked up this far apart across it and along its sides.
 sampleSpacing = 2.0
-# An entrance is a doorway's threshold, within this of the footprint's edge; its ground outside is looked up this far past the edge.
-thresholdReach = 2.0
-# The footprint is the plan outline of the pieces' points within this of the floor: walls' feet and floors, not a roof's eaves.
-footprintBand = 2.0
-# A floor without a plinth reads as standing on the ground within this of it: ground higher comes up through it, and ground lower
-# shows a gap under its walls, however high a player steps.
-floorTolerance = 2.0
 # An entrance's ground is looked for this far below the point thresholdReach outside it; its walk runs from this far outside it to
 # this far inside; its view stands this far out.
 entranceFootingReach = 60.0
@@ -332,7 +326,7 @@ def seat(lookups, placement, samples):
     placement.floorOn = {"object": owner, "at": roundVector(at, 2)}
   grounds = []
   for x, y in world:
-    found = lookups.below((float(x), float(y), placement.floor + bridgeStructures.groundProbeLift))
+    found = lookups.below((float(x), float(y), placement.floor + groundProbeLift))
     if found is None:
       raise ValueError(f"No ground within {bridgeStructures.groundReach:g} under the footprint at [{x:.1f}, {y:.1f}] for a floor at {placement.floor:.2f}")
     grounds.append(found)

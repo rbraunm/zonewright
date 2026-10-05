@@ -13,6 +13,7 @@ import bridgeKitGeometry
 import bridgeStructureData
 import bridgeStructures
 from bridgeStructures import requireKeys, requireNonNegative, requirePositive, roundVector, size
+from buildTolerances import groundProbeLift
 from playerScale import eyeHeight
 
 wallKeys = ("kitPath", "path", "frontSide", "sections", "follow", "shearStep", "sink", "maximumBurial", "posts", "variants", "collection")
@@ -208,7 +209,7 @@ def layWall(laying):
 
   def groundAt(point, label):
     if withHeights:
-      found = lookups.below((point[0], point[1], point[2] + bridgeStructures.groundProbeLift))
+      found = lookups.below((point[0], point[1], point[2] + groundProbeLift))
     else:
       found = lookups.overhead(point[0], point[1])
     if found is None:
@@ -239,9 +240,9 @@ def layWall(laying):
       share = step / count
       center = section["start"][:2] + (section["end"][:2] - section["start"][:2]) * share
       if withHeights:
-        top = section["start"][2] + (section["end"][2] - section["start"][2]) * share + bridgeStructures.groundProbeLift
+        top = section["start"][2] + (section["end"][2] - section["start"][2]) * share + groundProbeLift
       else:
-        top = max(jointGround[first], jointGround[second]) + bridgeStructures.groundProbeLift
+        top = max(jointGround[first], jointGround[second]) + groundProbeLift
       for face in (1, -1):
         point = center + left * face * depth / 2
         found = lookups.below((point[0], point[1], top))
@@ -333,7 +334,7 @@ def layWall(laying):
       center = jointPoints[index][:2]
       direction = leg["direction"][:2]
       left = numpy.array([-direction[1], direction[0]])
-      top = (jointGround[index] if not withHeights else jointPoints[index][2]) + bridgeStructures.groundProbeLift
+      top = (jointGround[index] if not withHeights else jointPoints[index][2]) + groundProbeLift
       lowest = None
       for corner in ((0, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)):
         point = center + direction * corner[0] * size(postData, 0) / 2 + left * corner[1] * size(postData, 1) / 2

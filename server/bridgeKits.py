@@ -17,6 +17,7 @@ import bridgeMeshAccess
 import bridgeObjects
 import bridgeShaping
 import bridgeStructureData
+from buildTolerances import floatTolerance, footingProbeLift
 
 openingKinds = ("door", "window")
 openingPieceKinds = ("wall", "custom")
@@ -26,11 +27,6 @@ snapKeys = {"object", "socket", "pieceSocket"}
 openingMargin = 1.0
 # How far an opening's prism runs past the piece, so its cut faces never lie on the piece's own.
 throughMargin = 1.0
-# A piece's base this far or less over the lowest ground under it reads as standing on it; higher, it floats, however high a player
-# steps.
-floatTolerance = 2.0
-# The ground under a piece is looked for from this far over its base, so ground its base is sunk into is found.
-footingProbeLift = 2.0
 sourceAttribute = "zonewrightOpeningSource"
 capAttribute = "zonewrightOpeningCap"
 frameSource, openingSource = 1, 2

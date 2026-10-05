@@ -23,6 +23,7 @@ import bridgeNoise
 import bridgePasses
 import bridgeSurfacing
 import playerScale
+from buildTolerances import floorHangTolerance, probeOverFloor
 
 # A pass holds single precision: a ring vertex reads back this close to its plug triangle, and ground counts as moved past this.
 ringTolerance = 1e-4
@@ -44,10 +45,6 @@ breakupRoughness = 0.5
 levelTolerance = 0.01
 patchChunk = 2048
 patchRounds = 8
-# A floor's middle this far or less over the ground reads as resting on it; higher, it hangs in the air, however high a player steps.
-floorHangTolerance = 2.0
-# Rock beside and around a cut is probed this far over its floor, clear of the ground the floor lies on.
-probeOverFloor = 2.0
 # A blind end's rows run round its quarter ellipse down to this share of the section, then close on an apex.
 endShrink = 0.3
 endRows = 16

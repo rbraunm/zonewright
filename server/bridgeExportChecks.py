@@ -29,6 +29,7 @@ import bridgeSwim
 import bridgeViews
 import bridgeWater
 from bridgeState import state
+from buildTolerances import transitionGroundNormalZ
 
 exportPurposes = ("test", "game")
 # A face's texture is stretched where a texel lies more than this many times longer one way than the other in the world, and stretched
@@ -37,9 +38,6 @@ exportPurposes = ("test", "game")
 # its repeat) does not flicker over it with float noise.
 stretchFactor = 2.0
 stretchDigits = 3
-# A ground border wants a transition strip where a side is no steeper than 60 degrees and reads as ground underfoot; a steeper face
-# reads as a cliff, where materials meet without one, however steep a player walks.
-transitionGroundNormalZ = 0.5
 zeroTextureArea = 1e-12
 degenerateArea = 1e-9
 locationsShown = 8
