@@ -1224,15 +1224,23 @@ def booleanCut(patchPositions, patchFaces, ring, tubeParts):
   return cutPositions.reshape(-1, 3), cutFaces, cutSources, cutNormals.reshape(-1, 3)
 
 
-def snappedCut(faces, sources, normals, original):
-  """The cut's faces with the corners standing on one of the ground's own vertices taken as that one corner, repeats that leaves in a
-  row dropped, and faces left with fewer than three corners dropped. Where the tube runs on the ground's own vertices and edges (a
-  hall's floor and walls on the grid's lines), the exact solver leaves copies of one point a float's rounding apart, joined by faces
-  with no area."""
+def snappedCut(positions, faces, sources, normals, original):
+  """The cut's faces with the corners standing on one of the ground's own vertices taken as that one corner, and copies of one new point
+  (within matchDistance) taken as its first, repeats that leaves in a row dropped, and faces left with fewer than three corners dropped.
+  Where the tube runs on the ground's own vertices and edges (a hall's floor and walls on the grid's lines, a tube's wall standing on
+  the ground in front of its mouth), the exact solver leaves copies of one point a float's rounding apart, joined by faces with no area."""
   canonical = numpy.arange(len(original))
   first = {}
   for index in numpy.flatnonzero(original >= 0).tolist():
     canonical[index] = first.setdefault(int(original[index]), index)
+  tree = mathutils.kdtree.KDTree(len(positions))
+  for index, point in enumerate(positions.tolist()):
+    tree.insert(point, index)
+  tree.balance()
+  for index in numpy.flatnonzero(original < 0).tolist():
+    copies = [other for _, other, _ in tree.find_range(positions[index], matchDistance) if other < index and original[other] < 0]
+    if copies:
+      canonical[index] = canonical[min(copies)]
   kept, keptSources, keptNormals = [], [], []
   for face, source, normal in zip(faces, sources, normals):
     corners = [int(canonical[index]) for index in face]
@@ -1693,7 +1701,7 @@ def spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, pa
     _, found, distance = tree.find(point)
     if distance < matchDistance:
       original[index] = patchVertices[found]
-  cutFaces, cutSources, cutNormals = withoutSlivers(cutPositions, *snappedCut(cutFaces, cutSources, cutNormals, original))
+  cutFaces, cutSources, cutNormals = withoutSlivers(cutPositions, *snappedCut(cutPositions, cutFaces, cutSources, cutNormals, original))
   cutSources = groundedFloor(cutPositions, cutFaces, cutSources, cutNormals, shown[patchVertices], [[localIndex[vertex.index] for vertex in face.verts] for face in patch])
   onTerrain, onLining = {}, numpy.zeros(len(cutPositions), dtype=bool)
   for face, source in zip(cutFaces, cutSources):

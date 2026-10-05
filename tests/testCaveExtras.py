@@ -96,7 +96,7 @@ def testALevelStrokeHoldsTheRunsFloorAndItsEdgesAreCut(stageBlenderServer, tmp_p
   async def steps(session):
     await caveCanyon(session, tmp_path)
     await pathMaterial(session, tmp_path)
-    cut = await session.expectSuccess("cutCave", room | {"floor": [way, rubble | {"outline": [[-70, 110], [70, 110], [70, 250], [-70, 250]]}]})
+    cut = await session.expectSuccess("cutCave", room | {"floor": [way, rubble | {"outline": [[-70, 110], [70, 110], [70, 250], [-70, 250]]}, pad | {"across": [-30, 30]}]})
     vertices = (await session.expectSuccess("runPython", {"code": lining("room")}))["result"]
     faces = (await session.expectSuccess("runPython", {"code": "name = 'room'\n" + readLiningFaces}))["result"]
     return cut, vertices, faces
@@ -110,7 +110,7 @@ def testALevelStrokeHoldsTheRunsFloorAndItsEdgesAreCut(stageBlenderServer, tmp_p
   vertices = numpy.array(vertices)
   along, across = vertices[:, 1] + 60, vertices[:, 0]
   inside = (along >= 160 - 1e-4) & (along <= 300 + 1e-4) & (across >= -10 - 1e-4) & (across <= 14 + 1e-4) & (vertices[:, 2] < 10)
-  # Every floor vertex inside the way stands exactly at the run's floor, though rubble is painted all round it.
+  # Every floor vertex inside the way stands exactly at the run's floor, though rubble is painted all round it and a dais crosses it.
   assert inside.sum() >= 3 * 9 and numpy.abs(vertices[inside, 2] - 2).max() <= 1e-4
   # Its ends are rows of the tube and its sides floor points in every row between them: lines of vertices exactly there.
   floorInRange = (vertices[:, 2] < 2 + 1e-4) & (along >= 160 - 1e-4) & (along <= 300 + 1e-4)
@@ -122,7 +122,7 @@ def testALevelStrokeHoldsTheRunsFloorAndItsEdgesAreCut(stageBlenderServer, tmp_p
     assert onEnd.sum() >= 3
   # Outside it the rubble rises over the floor.
   assert vertices[(along > 180) & (along < 280) & (numpy.abs(across) < 50) & ~inside, 2].max() > 2 + 3
-  assert [(stroke["name"], stroke["kind"]) for stroke in cut["floorStrokes"]] == [("way", "level"), ("rubble", "rough")]
+  assert [(stroke["name"], stroke["kind"]) for stroke in cut["floorStrokes"]] == [("way", "level"), ("rubble", "rough"), ("dais", "pad")]
 
 
 def testAPadIsLevelAtItsTopWithStraightEdges(stageBlenderServer, tmp_path):
@@ -778,7 +778,7 @@ result = sorted(known)
 def testLightOnACaveFollowsTheRunItLines(stageBlenderServer, tmp_path):
   # A dark room and a passage leaving its east wall and running north beside it outside, 12 of rock from the room's wall, daylit: a
   # vertex of the room's east wall stands 20 from the passage's middle and 60 from the room's, yet lines the room.
-  beside = {"name": "beside", "from": "main", "path": [[40, 100, 2], [84, 100], [84, 230]], "grades": [0, 0], "widths": [24] * 3, "heights": [30] * 3, "daylight": [1, 1, 1]}
+  beside = {"name": "beside", "from": "main", "path": [[40, 100, 2], [84, 100], [84, 230]], "grades": [0, 0], "widths": [24] * 3, "heights": [30] * 3, "daylight": [0.5, 0.5, 0.5]}
   readShares = r"""
 import numpy
 import bridgeCaveData, bridgeCaveLight, bridgeMeshAccess
@@ -804,7 +804,7 @@ result = {'roomWall': shares[roomWall].tolist(), 'passageWall': shares[passageWa
 
   shares, placed, malformed = stageBlenderServer.session(steps)
   assert len(shares["roomWall"]) >= 4 and set(shares["roomWall"]) == {0.0}
-  assert len(shares["passageWall"]) >= 4 and set(shares["passageWall"]) == {1.0}
+  assert len(shares["passageWall"]) >= 4 and set(shares["passageWall"]) == {0.5}
   # A light on the ceiling over a dais finds the vault from over the dais, not from inside it, and hangs 3 under it.
   assert not placed.is_error, [content.text for content in placed.content if content.type == "text"]
   report = json.loads(placed.content[1].text)["anchored"][0]
@@ -831,6 +831,106 @@ def testARefusedEditLeavesTheLightsAnchoredOnTheCaveWhereTheyStood(stageBlenderS
   # The widened hall's cut moved the lamp to its new wall before the facade refused the change; the lamp stands where it stood.
   assert "would no longer frame it" in refused
   assert before == [30.0, 110.0, 8.0] and after == before
+
+
+def testRunsKeepTheirRockFromThemselvesAndFromOtherCaves(stageBlenderServer, tmp_path):
+  # The tunnel turning back on itself: east at its end, then south again 46 east of its way in, 6 of rock between the two legs.
+  turnedBack = {"objectName": "ground", "name": "hairpin", "path": [[0, -60, 2], [0, 10, 2], [0, 150, 2], [46, 150, 2], [46, 40, 2]], "widths": [40] * 5, "heights": [45] * 5, "breakup": None} | caveMaterials
+  # From the east approach to the room: across it, and to an end whose dome comes within 5 of its east wall.
+  across = {"objectName": "ground", "name": "across", "path": [[150, -60, 2], [150, 10, 2], [150, 150, 2], [-40, 150, 2]], "widths": [24] * 4, "heights": [24] * 4} | caveMaterials
+  beside = across | {"name": "beside", "path": [[150, -60, 2], [150, 10, 2], [150, 150, 2], [77, 150, 2]]}
+  # A closed box standing wholly inside the room's lining, measured as a cave's tubes are.
+  inside = r"""
+import numpy
+import bridgeCaves, bridgeMeshAccess
+ground = bpy.data.objects['ground']
+shown, _ = bridgeMeshAccess.readVertexArrays(ground)
+corners = numpy.array([[x, y, z] for z in (10, 20) for y in (160, 170) for x in (-5, 5)], dtype=float)
+faces = [(0, 2, 3, 1), (4, 5, 7, 6), (0, 1, 5, 4), (2, 6, 7, 3), (0, 4, 6, 2), (1, 3, 7, 5)]
+tube = {'vertices': corners, 'faces': faces, 'spans': numpy.zeros((6, 2), dtype=numpy.int64), 'vertexRows': numpy.zeros(8, dtype=numpy.int64)}
+try:
+  bridgeCaves.requireRockFromOtherCaves(ground, 'box', {'minimumRock': 8.0}, shown, tube)
+  result = None
+except ValueError as refusal:
+  result = str(refusal)
+"""
+
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    itself = await session.expectError("cutCave", turnedBack)
+    await session.expectSuccess("gradeRoute", {"objectName": "ground", "name": "eastApproach", "points": [[150, -140, 2], [150, -50, 2]], "width": 56})
+    await session.expectSuccess("cutCave", room | {"breakup": None})
+    crossing = await session.expectError("cutCave", across)
+    near = await session.expectError("cutCave", beside)
+    within = (await session.expectSuccess("runPython", {"code": inside}))["result"]
+    return itself, crossing, near, within
+
+  itself, crossing, near, within = stageBlenderServer.session(steps)
+  assert "The cave passes within" in itself and "of itself" in itself and "less than minimumRock (8)" in itself
+  assert "Cave 'across' would cross cave 'room''s lining" in crossing
+  assert "Cave 'beside' would come within" in near and "of cave 'room''s lining" in near and "less than minimumRock (8)" in near
+  assert within is not None and "Cave 'box' would reach into cave 'room'" in within
+
+
+def testAnOverlookOpensHighInItsParentsWallAndStrokesKeepToTheirRuns(stageBlenderServer, tmp_path):
+  # An alcove 20 up the room's east wall, nobody walking into it; a way and rubble on the side branch; a pad on the tunnel at y 20 to 40
+  # and a way on the passage running over it at y 30, from its point 2 to its point 3.
+  loft = {"name": "loft", "from": "main", "path": [[30, 140, 22], [90, 140], [130, 140]], "grades": [0, 0], "widths": [24] * 3, "heights": [20] * 3, "overlook": True}
+  sideWay = {"kind": "level", "name": "sideWay", "run": "side", "from": 10, "to": 120, "across": [-4, 4]}
+  sideRubble = {"kind": "rough", "name": "sideRubble", "run": "side", "outline": [[70, 186], [140, 186], [140, 196], [70, 196]], "rise": 4, "edge": 3, "breakup": {"featureSize": 32, "amplitude": 2, "seed": 5}}
+  lowPad = {"kind": "pad", "name": "lowPad", "run": "main", "from": 80, "to": 100, "across": [-15, 15], "rise": 1, "edge": 0.5}
+  highWay = {"kind": "level", "name": "highWay", "run": "over", "from": {"point": 2}, "to": {"point": 3}, "across": [-10, 10]}
+  housing = {"role": "featured", "intent": "plots in caves", "placement": "world", "plotBudget": {"player": 2, "guild": 0}}
+  readSide = r"""
+import numpy
+import bridgeMeshAccess
+ground = bpy.data.objects['ground']
+mask = bridgeMeshAccess.evaluateSelector({'cave': 'branched'}, ground, 'vertices')
+shown, _ = bridgeMeshAccess.readVertexArrays(ground)
+x, y, z = shown[mask].T
+onWay = (x > 70) & (x < 130) & (numpy.abs(y - 200) <= 4 + 1e-6) & (z < 10)
+inRubble = (x > 75) & (x < 135) & (y < 194) & (y > 186) & (z < 10)
+result = {'way': z[onWay].tolist(), 'rubble': z[inRubble].tolist()}
+"""
+
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    looked = await session.expectSuccess("cutCave", branched | {"breakup": None, "branches": [side, loft], "floor": [sideWay, sideRubble]})
+    sided = (await session.expectSuccess("runPython", {"code": readSide}))["result"]
+    await session.expectSuccess("removeCave", {"objectName": "ground", "name": "branched"})
+    stacked = await session.expectSuccess("cutCave", room | {"name": "stacked", "breakup": None, "branches": [over], "floor": [lowPad, highWay]})
+    await session.expectSuccess("setZoneHousing", housing)
+    low = await session.expectSuccess("placePlot", {"address": "1 Low", "center": [0, 30], "facingDegrees": 0, "size": [20, 20], "height": 3})
+    high = await session.expectSuccess("placePlot", {"address": "2 High", "center": [0, 30], "facingDegrees": 0, "size": [20, 20], "height": 60})
+    return looked, sided, stacked, low, high
+
+  looked, sided, stacked, low, high = stageBlenderServer.session(steps)
+  # The overlook opens 20 over the room's floor, framed where it leaves the wall.
+  loftJunction = next(junction for junction in looked["junctions"] if junction["branch"] == "loft")
+  assert loftJunction["overlook"] is True and loftJunction["rise"] == 20.0 and loftJunction["frame"]["center"][0] == 60.0
+  # The side branch's own strokes shape its floor: its way held at 2, its rubble beside it rising.
+  assert len(sided["way"]) >= 4 and numpy.abs(numpy.array(sided["way"]) - 2).max() <= 1e-4 and max(sided["rubble"]) > 2 + 1
+  # A stroke from a point to a point runs between those points' stations.
+  overStations = stacked["runs"]["over"]["stations"]
+  highStroke = next(stroke for stroke in stacked["floorStrokes"] if stroke["name"] == "highWay")
+  assert [highStroke["from"], highStroke["to"]] == [overStations[2], overStations[3]]
+  # One place in plan, two levels: each plot stands on the stroke at its own height.
+  assert low["caveFloor"] == {"object": "ground", "cave": "stacked", "run": "main", "stroke": "lowPad", "kind": "pad", "height": 3.0}
+  assert high["caveFloor"] == {"object": "ground", "cave": "stacked", "run": "over", "stroke": "highWay", "kind": "level", "height": 60.0}
+
+
+def testASunkPadOverAnotherCaveIsRefusedAsHangingInTheAir(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    await session.expectSuccess("gradeRoute", {"objectName": "ground", "name": "eastApproach", "points": [[150, -140, 2], [150, -50, 2]], "width": 56})
+    under = await session.expectSuccess("cutCave", cellar)
+    cellarFloor = under["runs"]["main"]["floors"][-1]
+    # The room's pad over the cellar's last leg (y 148 to 172) sunk to the middle of the cellar's room.
+    sunk = {"kind": "pad", "name": "pit", "run": "main", "from": 212, "to": 228, "across": [-30, -5], "rise": cellarFloor + 12 - 2, "edge": 0.5}
+    return await session.expectError("cutCave", room | {"breakup": None, "floor": [sunk]})
+
+  refused = stageBlenderServer.session(steps)
+  assert "The cave's floor hangs in the air" in refused
 
 
 def testPointsWithoutHeightsTakeTheEvenGradeAndAGradedSegmentSetsItsEnd(stageBlenderServer, tmp_path):
