@@ -1726,7 +1726,8 @@ async def cutCave(
   listed to confirm until a test load shows the client takes it on a terrain placement. Light the cave with LIB_ lamps anchored on its
   lining (placeLights onCave). A bend turns on an arc the width in radius (less where the points are
   close). `breakup` {featureSize, amplitude, seed} moves the walls and vault along their outward directions by noise, the floor kept
-  flat, fading out within `mouthFade` (default twice edgeLength) of wherever the tube lies in the open, so the lip stays a clean arch.
+  flat, `amplitude` units as a typical (root mean square) move and nearly three times it in places, so a narrow run wants a small one;
+  fading out within `mouthFade` (default twice edgeLength) of wherever the tube lies in the open, so the lip stays a clean arch.
   Each end is open, some of its floor within a step of walkable ground (a mouth, its section in the open but for a sill a step deep;
   two make a through tunnel; or a gallery's end on the ground beside a cliff, part in the rock), a ledge (part in the rock, its floor
   running out over a drop beside it: a gallery's dead end up a cliff), or blind (wholly inside the rock); an end with rock in its

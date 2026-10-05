@@ -69,14 +69,18 @@ mask = bridgeMeshAccess.evaluateSelector({'cave': name}, ground, 'vertices')
 shown, _ = bridgeMeshAccess.readVertexArrays(ground)
 result = shown[mask].tolist()
 """
-# Each lining face's middle and normal, and the lining's integrity problems as the cave checks find them.
+# Each lining face's middle, normal, and material, and the lining's integrity problems as the cave checks find them.
 readLiningFaces = r"""
 import numpy
 import bridgeCaves, bridgeMeshAccess
 ground = bpy.data.objects['ground']
 mask = bridgeMeshAccess.evaluateSelector({'cave': name}, ground, 'faces')
-centers, normals, _ = bridgeMeshAccess.readFaceArrays(ground)
-result = {'centers': centers[mask].tolist(), 'normals': normals[mask].tolist(), 'problems': bridgeCaves.integrityProblems(ground)}
+centers, normals, materials = bridgeMeshAccess.readFaceArrays(ground)
+names = [slot.material.name for slot in ground.material_slots]
+result = {
+  'centers': centers[mask].tolist(), 'normals': normals[mask].tolist(), 'materials': [names[material] for material in materials[mask]],
+  'problems': bridgeCaves.integrityProblems(ground),
+}
 """
 
 
@@ -94,9 +98,15 @@ def testALevelStrokeHoldsTheRunsFloorAndItsEdgesAreCut(stageBlenderServer, tmp_p
     await pathMaterial(session, tmp_path)
     cut = await session.expectSuccess("cutCave", room | {"floor": [way, rubble | {"outline": [[-70, 110], [70, 110], [70, 250], [-70, 250]]}]})
     vertices = (await session.expectSuccess("runPython", {"code": lining("room")}))["result"]
-    return cut, vertices
+    faces = (await session.expectSuccess("runPython", {"code": "name = 'room'\n" + readLiningFaces}))["result"]
+    return cut, vertices, faces
 
-  cut, vertices = stageBlenderServer.session(steps)
+  cut, vertices, faces = stageBlenderServer.session(steps)
+  # The way's floor carries its own material, bordered on its exact edges; the floor round it keeps the cave's.
+  centers, materials = numpy.array(faces["centers"]), numpy.array(faces["materials"])
+  wayFaces = (centers[:, 1] + 60 > 160) & (centers[:, 1] + 60 < 300) & (centers[:, 0] > -10) & (centers[:, 0] < 14) & (centers[:, 2] < 2 + 1e-3)
+  assert wayFaces.sum() > 0 and set(materials[wayFaces]) == {"pathStone"}
+  assert "pathStone" not in set(materials[(centers[:, 0] < -10 - 1e-3) | (centers[:, 0] > 14 + 1e-3)])
   vertices = numpy.array(vertices)
   along, across = vertices[:, 1] + 60, vertices[:, 0]
   inside = (along >= 160 - 1e-4) & (along <= 300 + 1e-4) & (across >= -10 - 1e-4) & (across <= 14 + 1e-4) & (vertices[:, 2] < 10)
