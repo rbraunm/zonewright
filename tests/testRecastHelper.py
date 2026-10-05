@@ -97,6 +97,11 @@ def testSyncBuildsTheRecastHelper(stageWithSharedBlender):
   assert sorted(entry.name for entry in fresh.toolingRoot.iterdir()) == ["blender", "logs", "machineProfile.json"]
 
 
+def testNavRefusesWithoutABuiltHelper(tmp_path):
+  with pytest.raises(ToolError, match=r"^The Recast helper is missing; run syncTooling to build it$"):
+    serverNav.navFromCollision(floor(0, 40, 0, 40, 0), [], tmp_path / "zonewright", noProgress)
+
+
 def testRecastHelperRefusesWhatMapEditDrops(recastToolingRoot):
   ground = floor(0, 40, 0, 40, 0)
 

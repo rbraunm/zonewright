@@ -152,6 +152,30 @@ def polygonOutlines(tile):
   return outlines
 
 
+def linkSets(nav):
+  """Each polygon's links as a set of (target tile key, target polygon, edge, side, bmin, bmax), by (tile key, polygon): the mesh's
+  connectivity, free of the link pool's order and of tile references, which both follow the order tiles were added."""
+  maxTiles = struct.unpack_from("<i", nav["params"], 20)[0]
+  tileBits = maxTiles.bit_length() - 1
+  polygonBits = 22 - tileBits
+  keyOfSlot = {(tile["reference"] >> polygonBits) & ((1 << tileBits) - 1): key for key, tile in nav["tiles"].items()}
+  linkType = numpy.dtype([("ref", "<u4"), ("next", "<u4"), ("edge", "u1"), ("side", "u1"), ("bmin", "u1"), ("bmax", "u1")])
+  result = {}
+  for key, tile in nav["tiles"].items():
+    links = numpy.frombuffer(tile["sections"]["links"], linkType)
+    for index, polygon in enumerate(tile["polys"]):
+      found = set()
+      link = int(polygon["firstLink"])
+      while link != 0xFFFFFFFF:
+        entry = links[link]
+        reference = int(entry["ref"])
+        target = keyOfSlot[(reference >> polygonBits) & ((1 << tileBits) - 1)]
+        found.add((target, reference & ((1 << polygonBits) - 1), int(entry["edge"]), int(entry["side"]), int(entry["bmin"]), int(entry["bmax"])))
+        link = int(entry["next"])
+      result[(key, index)] = found
+  return result
+
+
 def detailOf(tile, index):
   """A polygon's detail mesh: its own detail vertices and its triangles, as bytes."""
   mesh = tile["detailMeshes"][index]

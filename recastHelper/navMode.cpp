@@ -364,7 +364,7 @@ void runNav(const std::string& inputPath, const std::string& payloadPath, const 
       const long long done = ++builtCount;
       std::lock_guard<std::mutex> guard(progressLock);
       const long long percent = done * 100 / tileCount;
-      if (percent != reportedPercent) {
+      if (percent > reportedPercent) {
         reportedPercent = percent;
         reportProgress("building nav tiles", done, tileCount);
       }

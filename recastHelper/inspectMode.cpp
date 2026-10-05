@@ -256,10 +256,19 @@ void runInspect(const std::string& inputPath, const std::string& reportPath) {
     }
   }
 
+  // Components are numbered, summed, and centered over the tiles in grid order, never payload order, which records the order a builder
+  // added them: the same mesh then gives the same report from any file.
+  std::vector<size_t> gridOrder(loaded.tiles.size());
+  std::iota(gridOrder.begin(), gridOrder.end(), size_t(0));
+  std::sort(gridOrder.begin(), gridOrder.end(), [&](size_t first, size_t second) {
+    const dtMeshHeader* a = loaded.tiles[first]->header;
+    const dtMeshHeader* b = loaded.tiles[second]->header;
+    return a->y != b->y ? a->y < b->y : (a->x != b->x ? a->x < b->x : a->layer < b->layer);
+  });
   std::vector<int> rootComponent(static_cast<size_t>(loaded.polygonCount), notInComponent);
   std::vector<Component> components;
   std::vector<int> componentOf(static_cast<size_t>(loaded.polygonCount), notInComponent);
-  for (size_t tileIndex = 0; tileIndex < loaded.tiles.size(); ++tileIndex) {
+  for (const size_t tileIndex : gridOrder) {
     const dtMeshTile* tile = loaded.tiles[tileIndex];
     for (int polygon = 0; polygon < tile->header->polyCount; ++polygon) {
       const int index = loaded.firstPolygon[tileIndex] + polygon;

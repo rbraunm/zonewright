@@ -10,7 +10,7 @@ import zipfile
 
 import pytest
 
-from conftest import pinnedBlender
+from conftest import pinnedBlender, pinnedRecast
 
 pytestmark = pytest.mark.install
 
@@ -35,8 +35,10 @@ def testSyncInstallsUpgradesRemovesAndPinsCatalogReleases(stageServer, blenderAr
     blenderAction("removed", "0.0.1"),
     extensionAction("installed", "zonewrightProbe", "1.0.0"),
   ]
-  profiled = result["actions"][3]
-  assert len(result["actions"]) == 4
+  fetched, built, profiled = result["actions"][3:]
+  assert fetched == {"tool": "recast", "action": "fetched", "commit": pinnedRecast["commit"]}
+  assert (built["tool"], built["action"], built["fingerprint"]) == ("recastHelper", "built", result["status"]["recastHelper"]["fingerprint"])
+  assert result["status"]["recastHelper"]["state"] == "built"
   assert (profiled["tool"], profiled["action"], profiled["reasons"]) == ("machineProfile", "profiled", ["no machine profile"])
   assert profiled["gpuBackend"] in ("vulkan", "opengl")
   assert f"downloading Blender {version}" in progressMessages
@@ -49,7 +51,7 @@ def testSyncInstallsUpgradesRemovesAndPinsCatalogReleases(stageServer, blenderAr
   assert result["status"]["blender"]["state"] == "installed"
   assert result["status"]["blender"]["installedVersions"] == [version]
   assert result["status"]["extensions"] == {"pinned": {"zonewrightProbe": {"pinnedVersion": "1.0.0", "state": "installed"}}, "unpinned": {}}
-  assert sorted(entry.name for entry in server.toolingRoot.iterdir()) == ["blender", "logs", "machineProfile.json"]
+  assert sorted(entry.name for entry in server.toolingRoot.iterdir()) == ["blender", "logs", "machineProfile.json", "recast", "recastHelper"]
 
   result, progressMessages = server.callToolExpectingSuccess("syncTooling")
   assert result["actions"] == []
