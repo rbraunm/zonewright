@@ -318,9 +318,10 @@ def placeCollection(collection, collectionName):
 
 def removeUnusedShearMeshes():
   unused = [mesh for mesh in bpy.data.meshes if bridgeStructureData.shearProperty in mesh and mesh.users == 0]
+  names = sorted(mesh.name for mesh in unused)
   if unused:
     bpy.data.batch_remove(unused)
-  return [mesh.name for mesh in unused]
+  return names
 
 
 def removeParts(parts):

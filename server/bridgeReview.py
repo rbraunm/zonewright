@@ -335,12 +335,7 @@ def givenPath(path, route):
   if path is not None:
     return path
   structure = bridgeStructureData.findStructure(route)
-  if structure is not None:
-    saved = bpy.data.objects.get(route)
-    if saved is not None and bridgeReviewGuides.reviewRouteProperty in saved:
-      raise ValueError(f"'{route}' names both a saved review route and a structure; rename the route (deleteReviewRoutes, saveReviewRoute) to walk either")
-    return bridgeStructures.walkLine(structure)
-  return bridgeReviewGuides.routePath(route)
+  return bridgeStructures.walkLine(structure) if structure is not None else bridgeReviewGuides.routePath(route)
 
 
 def walkGivenRoute(path, route, sampleSpacing):

@@ -75,6 +75,17 @@ def gorgeHeight(x):
   return 0.0 if inside <= 0 else max(-gorgeDepth, -2 * inside)
 
 
+def plotGround(x, y):
+  """The test plot's ground at a point away from the cliff's west end: the gorge, the cliff, the slope, or flat."""
+  if gorgeRims[0] < x < gorgeRims[1]:
+    return gorgeHeight(x)
+  if x >= 0 and y >= cliffFoot:
+    return min(cliffHeight, (y - cliffFoot) * cliffHeight / (cliffBrow - cliffFoot))
+  if slopeSpan[0] <= x <= slopeSpan[1] and y < slopeStart:
+    return slopeHeight(y)
+  return 0.0
+
+
 def cliffFaceY(z):
   """Where the test plot's cliff face stands at a height."""
   return cliffFoot + (cliffBrow - cliffFoot) * z / cliffHeight
@@ -102,6 +113,31 @@ result = found
 async def faces(session, *names):
   """Every face of the named meshes in the world: its material, whether it is flagged passable, and its corners."""
   return (await session.expectSuccess("runPython", {"code": f"names = {list(names)!r}\n" + readFaces}))["result"]
+
+
+readParts = """
+import bpy, numpy
+import bridgeMeshAccess
+found = {}
+for name in names:
+  sceneObject = bpy.data.objects[name]
+  points = []
+  for part, matrix in bridgeMeshAccess.objectParts(sceneObject):
+    world = numpy.array(matrix)
+    points += (numpy.array([list(vertex.co) for vertex in part.data.vertices]).reshape(-1, 3) @ world[:3, :3].T + world[:3, 3]).round(6).tolist()
+  found[name] = {
+    'type': sceneObject.type, 'instance': sceneObject.instance_collection.name if sceneObject.instance_collection is not None else None,
+    'mesh': sceneObject.data.name if sceneObject.type == 'MESH' else None, 'points': points,
+    'local': numpy.array([list(vertex.co) for vertex in sceneObject.data.vertices]).round(6).tolist() if sceneObject.type == 'MESH' else None,
+    'matrix': [list(row) for row in sceneObject.matrix_world],
+  }
+result = found
+"""
+
+
+async def parts(session, names):
+  """Each named object's type, the collection it instances or its mesh, its vertices in the world, and its own mesh's vertices."""
+  return (await session.expectSuccess("runPython", {"code": f"names = {list(names)!r}\n" + readParts}))["result"]
 
 
 def pointsNear(faceList, x, y, radius):
