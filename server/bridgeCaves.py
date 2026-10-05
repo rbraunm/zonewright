@@ -141,7 +141,7 @@ def branchDefinitions(branches):
   if branches is None:
     return []
   if not isinstance(branches, list):
-    raise ValueError(f"branches is a list of {{name, from, path, widths, heights, grades?, landings?, daylight?, overlook?}}, got {branches!r}")
+    raise ValueError(f"branches is a list of {{name, from, path, widths, heights, grades?, landings?, daylight?, overlook?, into?}}, got {branches!r}")
   required, optional = bridgeCaveRuns.branchKeys
   defined, known = [], [bridgeCaveRuns.mainRun]
   for index, branch in enumerate(branches):
@@ -159,12 +159,15 @@ def branchDefinitions(branches):
       raise ValueError(f"Branch '{name}' leaves {branch['from']!r}, which is not the main run or a branch named before it ({known})")
     defined.append(bridgeCaveRuns.runDefinition(branch, f"Branch '{name}'", True))
     known.append(name)
+  for branch in defined:
+    if branch["into"] is not None and branch["into"] not in known:
+      raise ValueError(f"Branch '{branch['name']}' opens into {branch['into']!r}, which is not a run of the cave ({known})")
   return defined
 
 
 def runSpecs(definition):
   """Each run of a cave as (name, run, the run it leaves): the main path first, then the branches in order."""
-  main = {key: definition[key] for key in ("path", "widths", "heights", "grades", "landings", "daylight")} | {"overlook": False}
+  main = {key: definition[key] for key in ("path", "widths", "heights", "grades", "landings", "daylight")} | {"overlook": False, "into": None}
   return [(bridgeCaveRuns.mainRun, main, None)] + [(branch["name"], branch, branch["from"]) for branch in definition["branches"]]
 
 
@@ -404,6 +407,10 @@ def workedRuns(definition, surface):
       return float(relievedFloorsAt(worked[parent], numpy.array([run["path"][0][:2]]))[0][0])
 
     def endHeight(run=run, owner=owner, tookGround=tookGround):
+      if run["into"] is not None:
+        raise ValueError(
+          f"{bridgeCaveRuns.capitalized(owner)} opens into '{run['into']}' at its end, which has no height: give its end a height, or grade its last segment"
+        )
       tookGround["end"] = surface.groundHeight(run["path"][-1], f"{bridgeCaveRuns.capitalized(owner)}'s end")
       return tookGround["end"]
 
@@ -543,7 +550,7 @@ def tubeRows(definition, worked, surface, shape):
   requireFloorOnRock(surface, floors, owner)
   ends, rounded = {}, {}
   for end, row in (("start", 0), ("end", -1)):
-    if end == "start" and worked["parent"] is not None:
+    if end == "start" and worked["parent"] is not None or end == "end" and worked["run"]["into"] is not None:
       ends[end], rounded[end] = "junction", False
       continue
     ends[end], rounded[end] = endKind(definition, shape, surface, floors[row], directions[row], widths[row], heights[row], end, owner)
@@ -842,13 +849,68 @@ def caveTubes(definition, worked, surface):
   if not opens:
     raise ValueError("Every end of the cave lies wholly inside the rock, so nothing would open into it; start or end it on open ground in front of its mouth")
   junctions = [junctionOf(worked[name], worked[run["parent"]], rowsOf[name], unbroken[name], trees[run["parent"]]) for name, run in worked.items() if run["parent"] is not None]
+  openings = [intoJunctionOf(worked[name], worked[run["run"]["into"]], rowsOf[name], unbroken[name], trees[run["run"]["into"]]) for name, run in worked.items() if run["run"]["into"] is not None]
   tubes = {}
   for name in worked:
-    related = [trees[worked[name]["parent"]]] if worked[name]["parent"] is not None else []
-    related += [trees[child] for child, run in worked.items() if run["parent"] == name]
+    related = [trees[other] for other in sorted(meetings(worked, name))]
     tubes[name] = brokenTube(definition, worked[name], rowsOf[name], unbroken[name], surface, related) | {"rows": rowsOf[name]}
-  requireRockBetweenRuns(definition, worked, tubes, trees, junctions)
-  return tubes, junctions
+  requireRockBetweenRuns(definition, worked, tubes, trees, junctions, openings)
+  return tubes, junctions + openings
+
+
+def meetings(worked, name):
+  """The runs a run meets at a junction: its parent, its branches, the run its far end opens into, and the runs opening into it."""
+  run = worked[name]
+  met = {run["parent"], run["run"]["into"]} | {other for other, entry in worked.items() if entry["parent"] == name or entry["run"]["into"] == name}
+  return met - {None}
+
+
+def intoJunctionOf(branch, target, rows, unbroken, targetTree):
+  """Where a branch's far end opens into another run (into): its last section must stand wholly inside that run's walls, its floor not
+  under the run's floor as its strokes leave it (a hole); the place it passes in through the run's walls is its opening, framed for a
+  portal piece {center (the floor's middle), facingDegrees (into the run it opens into), width, height}, with how far its floor stands over
+  the run's there (a window or balcony high in its wall, or a second way in on its floor)."""
+  line, owner = branch["line"], bridgeCaveRuns.capitalized(branch["owner"])
+  own = numpy.flatnonzero(rows["scales"] == 1.0)
+  last = unbroken["sections"][own[-1]]
+  end = line.at(numpy.array([line.length]))[0][0]
+  reach = signedDistances(targetTree, last)
+  if reach.max() > junctionTolerance:
+    raise ValueError(
+      f"{owner} opens into '{target['name']}' at its end {roundedPoint(end)} with its last section reaching {reach.max():.1f} out of that run's walls (at"
+      f" {roundedPoint(last[int(reach.argmax())])}); end it inside the run it opens into, its whole width and height within that run's"
+    )
+  floorPoints = last[:rows["shape"]["floorCount"] + 1]
+  targetFloors = relievedFloorsAt(target, floorPoints)[0]
+  drop = targetFloors - floorPoints[:, 2]
+  if drop.max() > bridgeCaveRuns.levelTolerance:
+    raise ValueError(
+      f"{owner}'s floor where it ends, at {roundedPoint(floorPoints[int(drop.argmax())])}, lies {drop.max():.2f} under the floor of '{target['name']}', which it"
+      " opens into: it would leave a hole in that floor. End it on that floor or above it"
+    )
+  alongs = line.samples(1.0)[::-1]
+  floors, _, _, heights = line.at(alongs)
+  lifted = floors + numpy.column_stack([numpy.zeros((len(floors), 2)), numpy.minimum(playerScale.stepHeight, heights / 2)])
+  outside = signedDistances(targetTree, lifted) > 0
+  if not outside.any():
+    raise ValueError(f"{owner} lies wholly inside '{target['name']}', which it opens into: start it outside that run")
+  index = int(numpy.argmax(outside))
+  low, high = float(alongs[index]), float(alongs[max(index - 1, 0)])
+  for _ in range(20):
+    middle = (low + high) / 2
+    floor, _, _, height = line.at(numpy.array([middle]))
+    if signedDistances(targetTree, floor + [0.0, 0.0, min(playerScale.stepHeight, height[0] / 2)])[0] > 0:
+      low = middle
+    else:
+      high = middle
+  entryFloor, entryDirection, entryWidth, entryHeight = (part[0] for part in line.at(numpy.array([low])))
+  return {
+    "branch": branch["name"], "into": target["name"], "end": roundedPoint(end), "rise": round(float(end[2] - relievedFloorsAt(target, end[None])[0][0]), 2),
+    "entryAlong": low, "frame": {
+      "center": roundedPoint(entryFloor), "facingDegrees": round(math.degrees(math.atan2(entryDirection[0], entryDirection[1])) % 360.0, 1),
+      "width": round(float(entryWidth), 1), "height": round(float(entryHeight), 1),
+    },
+  }
 
 
 def junctionOf(branch, parent, rows, unbroken, parentTree):
@@ -964,19 +1026,28 @@ def tubeSamples(tube):
   return numpy.vstack([vertices, middles]), numpy.concatenate([tube["vertexRows"], faceRows])
 
 
-def requireRockBetweenRuns(definition, worked, tubes, trees, junctions):
+def requireRockBetweenRuns(definition, worked, tubes, trees, junctions, openings):
   """Refuse two runs of the cave coming closer than minimumRock anywhere but at their own junction: a branch measured from where it is
-  clear of its parent (its section's length plus the rock past where it leaves the parent's walls); a run's parts that lie inside a
-  third run (two branches leaving one room) left out; and a run against itself, measured between parts far apart along it (a spiral)."""
+  clear of its parent (its section's length plus the rock past where it leaves the parent's walls), and up to where it comes near the
+  run its far end opens into (as far short of where it passes into that run's walls); a run's parts that lie inside a third run (two
+  branches leaving one room) left out; and a run against itself, measured between parts far apart along it (a spiral)."""
   minimumRock = definition["minimumRock"]
   exits = {junction["branch"]: junction["exitAlong"] for junction in junctions}
+  entries = {opening["branch"]: opening["entryAlong"] for opening in openings}
   names = list(worked)
   samples = {name: tubeSamples(tubes[name]) for name in names}
   brokenTrees = {name: surfaceTree(tubes[name]["vertices"], tubes[name]["faces"]) for name in names}
 
-  def clearAlong(name):
+  def atJunction(name, other, alongs):
+    """Which of a run's places (distances along it) lie at its junction with another run, left out of the rock between the two."""
     run = worked[name]["run"]
-    return exits[name] + junctionReachShare * max(max(run["widths"]), max(run["heights"])) + minimumRock
+    reach = junctionReachShare * max(max(run["widths"]), max(run["heights"])) + minimumRock
+    near = numpy.zeros(len(alongs), dtype=bool)
+    if worked[name]["parent"] == other:
+      near |= alongs <= exits[name] + reach
+    if run["into"] == other:
+      near |= alongs >= entries[name] - reach
+    return near
 
   for name in names:
     points, rowIndices = samples[name]
@@ -984,18 +1055,15 @@ def requireRockBetweenRuns(definition, worked, tubes, trees, junctions):
     for other in names:
       if other == name:
         continue
-      keep = numpy.ones(len(points), dtype=bool)
-      if worked[name]["parent"] == other:
-        keep &= alongs > clearAlong(name)
+      keep = ~atJunction(name, other, alongs)
       for third in names:
         if third not in (name, other):
           keep &= signedDistances(trees[third], points) > 0 if keep.any() else keep
-      if worked[other]["parent"] == name:
-        otherAlongs = tubes[other]["rows"]["alongs"]
-        clear = numpy.flatnonzero(otherAlongs > clearAlong(other))
-        if not len(clear):
+      nearRows = atJunction(other, name, tubes[other]["rows"]["alongs"])
+      if nearRows.any():
+        faces = [face for face, span in zip(tubes[other]["faces"], tubes[other]["spans"]) if not nearRows[list(span)].any()]
+        if not faces:
           continue
-        faces = [face for face, span in zip(tubes[other]["faces"], tubes[other]["spans"]) if min(span) >= clear[0]]
         target = surfaceTree(tubes[other]["vertices"], faces)
         distances = nearestDistances(target, points[keep]) if keep.any() else numpy.zeros(0)
       else:
@@ -1665,7 +1733,7 @@ def splice(sceneObject, name, definition, strokes):
   stretches = [stretch | {"run": runName} for runName, run in worked.items() for stretch in run["line"].levelStretches()]
   return report | {
     "ends": ends, "levelStretches": stretches, "runs": {runName: run["line"].grading() for runName, run in worked.items()},
-    "junctions": [{key: value for key, value in junction.items() if key != "exitAlong"} for junction in junctions],
+    "junctions": [{key: value for key, value in junction.items() if key not in ("exitAlong", "entryAlong")} for junction in junctions],
     "floorStrokes": strokeReport(definition, worked, tubes), "anchoredLights": anchored,
   }
 
@@ -2205,7 +2273,7 @@ def caveGuides(sceneObject=None, caveName=None):
           "run": runName, "from": parent, "samples": numpy.column_stack([floors, widths, heights, alongs]).round(3).tolist(),
           "polyline": polyline.round(3).tolist(), "polylineAlongs": polylineAlongs.round(3).tolist(),
           "stations": [round(float(value), 3) for value in line.stations], "landings": [{"point": index, "arc": [round(span, 3) for span in line.turns[index]]} for index in line.landings],
-          "daylight": run["daylight"], "strokes": strokes, "overlook": run["overlook"],
+          "daylight": run["daylight"], "strokes": strokes, "overlook": run["overlook"], "into": run["into"],
           "segments": [
             {"from": index, "degrees": round(math.degrees(math.atan2(float(line.floors[index + 1] - line.floors[index]), line.segmentRun(index))), 2), "middle": (line.exit(index) + line.entry(index + 1)) / 2}
             for index in range(len(line.floors) - 1)

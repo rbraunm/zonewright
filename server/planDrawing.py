@@ -309,9 +309,10 @@ def drawCaves(draw, frame, caves):
     for side in ("left", "right"):
       draw.line([frame.pixel(point) for point in cave[side]], fill=(*caveColor, 255), width=2)
     dashedLine(draw, [frame.pixel(point) for point in cave["middle"]], (*caveColor, 150), 1)
-    if cave["junction"] is not None:
-      x, y = frame.pixel(cave["junction"])
-      draw.ellipse([x - 5, y - 5, x + 5, y + 5], fill=(255, 255, 255, 255), outline=(*caveColor, 255), width=2)
+    for meeting in (cave["junction"], cave["opening"]):
+      if meeting is not None:
+        x, y = frame.pixel(meeting)
+        draw.ellipse([x - 5, y - 5, x + 5, y + 5], fill=(255, 255, 255, 255), outline=(*caveColor, 255), width=2)
 
 
 def labelCaves(board, frame, caves):

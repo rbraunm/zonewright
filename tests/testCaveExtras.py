@@ -854,6 +854,41 @@ def testARefusedEditLeavesTheLightsAnchoredOnTheCaveWhereTheyStood(stageBlenderS
   assert before == [30.0, 110.0, 8.0] and after == before
 
 
+def testAGalleryOpensIntoTheRoomHighInItsWall(stageBlenderServer, tmp_path):
+  # A gallery leaving the room's west wall, climbing north beside it outside to 30, and turning back east to open into the room high
+  # in its west wall at y 230, 28 over its floor.
+  gallery = {"name": "gallery", "from": "main", "path": [[-40, 130, 2], [-100, 130, 2], [-100, 230, 30], [-30, 230, 30]], "widths": [24] * 4, "heights": [20] * 4, "into": "main"}
+  lookingIn = r"""
+import mathutils
+depsgraph = bpy.context.evaluated_depsgraph_get()
+hit, location, _, _, _, _ = bpy.context.scene.ray_cast(depsgraph, mathutils.Vector((-80, 230, 38)), mathutils.Vector((1, 0, 0)))
+result = [round(location.x, 2), round(location.z, 2)] if hit else None
+"""
+
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    cut = await session.expectSuccess("cutCave", room | {"name": "galleried", "breakup": None, "branches": [gallery]})
+    checked = (await session.expectSuccess("runPython", {"code": checkCaveNamed("galleried")}))["result"]
+    seen = (await session.expectSuccess("runPython", {"code": lookingIn}))["result"]
+    await session.expectSuccess("removeCave", {"objectName": "ground", "name": "galleried"})
+    outside = await session.expectError("cutCave", room | {"name": "galleried", "breakup": None, "branches": [gallery | {"path": gallery["path"][:3] + [[-66, 230, 30]]}]})
+    unknown = await session.expectError("cutCave", room | {"name": "galleried", "breakup": None, "branches": [gallery | {"into": "nowhere"}]})
+    noHeight = await session.expectError("cutCave", room | {"name": "galleried", "breakup": None, "branches": [gallery | {"path": gallery["path"][:3] + [[-30, 230]]}]})
+    return cut, checked, seen, outside, unknown, noHeight
+
+  cut, checked, seen, outside, unknown, noHeight = stageBlenderServer.session(steps)
+  opening = next(junction for junction in cut["junctions"] if junction.get("into") == "main")
+  # Its opening is framed where it passes into the room's wall, where the vault already leans in from the wall's line at x -60.
+  assert opening["branch"] == "gallery" and opening["rise"] == 28.0 and -60 < opening["frame"]["center"][0] < -57 and opening["frame"]["facingDegrees"] == 90.0
+  assert [(end["run"], end["end"], end["kind"]) for end in cut["ends"] if end["run"] == "gallery"] == [("gallery", "start", "junction"), ("gallery", "end", "junction")]
+  assert checked["edgesOnThreeOrMoreFaces"] == 0 and checked["openEdges"] == borderEdges
+  # From inside the gallery, looking east through its opening, the first rock met is the room's far wall.
+  assert seen is not None and seen[0] > 50
+  assert "Branch 'gallery' opens into 'main' at its end [-66.0, 230.0, 30.0] with its last section reaching" in outside
+  assert "Branch 'gallery' opens into 'nowhere', which is not a run of the cave" in unknown
+  assert "Branch 'gallery' opens into 'main' at its end, which has no height" in noHeight
+
+
 def testRunsKeepTheirRockFromThemselvesAndFromOtherCaves(stageBlenderServer, tmp_path):
   # The tunnel turning back on itself: east at its end, then south again 46 east of its way in, 6 of rock between the two legs.
   turnedBack = {"objectName": "ground", "name": "hairpin", "path": [[0, -60, 2], [0, 10, 2], [0, 150, 2], [46, 150, 2], [46, 40, 2]], "widths": [40] * 5, "heights": [45] * 5, "breakup": None} | caveMaterials

@@ -18,7 +18,7 @@ strokeKeys = {
   "rough": ({"kind", "name", "run", "outline", "rise", "edge", "breakup"}, {"material", "bank"}),
 }
 runKeys = ({"path", "widths", "heights"}, {"grades", "landings", "daylight"})
-branchKeys = ({"name", "from", "path", "widths", "heights"}, {"grades", "landings", "daylight", "overlook"})
+branchKeys = ({"name", "from", "path", "widths", "heights"}, {"grades", "landings", "daylight", "overlook", "into"})
 roughOctaves = 3
 roughRoughness = 0.5
 # Where a rough stroke's edge wanders is read from its noise this far off (in noise units) from where its lumps are, so the two are
@@ -240,7 +240,8 @@ def requireNumbers(values, count, what, low=None, high=None):
 
 def runDefinition(run, label, isBranch):
   """A run as a definition keeps it: points [x, y] or [x, y, z], a positive width and height per point, an optional grade per segment
-  (signed degrees, or null), landing point indices, an optional daylight share per point, and for a branch whether it is an overlook."""
+  (signed degrees, or null), landing point indices, an optional daylight share per point, and for a branch whether it is an overlook and
+  the run its far end opens into, if any (a window or balcony high in another room's wall, a second way into it)."""
   required, optional = branchKeys if isBranch else runKeys
   path = run["path"]
   if not isinstance(path, list) or len(path) < 2 or any(not isinstance(point, list) or len(point) not in (2, 3) or not all(isNumber(value) for value in point) for point in path):
@@ -268,7 +269,10 @@ def runDefinition(run, label, isBranch):
     overlook = run.get("overlook", False)
     if not isinstance(overlook, bool):
       raise ValueError(f"{label}'s overlook is true or false, got {overlook!r}")
-    definition = {"name": run["name"], "from": run["from"]} | definition | {"overlook": overlook}
+    into = run.get("into")
+    if into is not None and (not isinstance(into, str) or into == run["name"]):
+      raise ValueError(f"{label}'s into is the name of another run of the cave its far end opens into, got {into!r}")
+    definition = {"name": run["name"], "from": run["from"]} | definition | {"overlook": overlook, "into": into}
   return definition
 
 

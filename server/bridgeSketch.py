@@ -559,7 +559,7 @@ def planCaves():
         "cave": guide["cave"], "run": run["run"], "label": guide["cave"] + ("" if run["run"] == bridgeCaveRuns.mainRun else f" {run['run']}"),
         "left": numpy.round(offsetLine(samples, -halves), 2).tolist(), "right": numpy.round(offsetLine(samples, halves), 2).tolist(),
         "middle": numpy.round(samples[:, :2], 2).tolist(), "floors": [{"at": roundPoint(spot[:2]), "floor": rounded(spot[2], 1)} for spot in spots],
-        "junction": roundPoint(samples[0, :2]) if run["from"] is not None else None, "strokes": strokes, "meanFloor": rounded(float(samples[:, 2].mean()), 2),
+        "junction": roundPoint(samples[0, :2]) if run["from"] is not None else None, "opening": roundPoint(samples[-1, :2]) if run["into"] is not None else None, "strokes": strokes, "meanFloor": rounded(float(samples[:, 2].mean()), 2),
       })
   return drawn
 

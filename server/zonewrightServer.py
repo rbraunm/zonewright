@@ -1711,13 +1711,15 @@ async def cutCave(
   hall. `material` gives a level way or a pad's top its own material, its border on the stroke's exact edges, and rubble its own where
   it stands at least half in its ground (rock or scree, so it reads as rock beside a paved way). Rubble wants a finer floor: its
   featureSize at least twice edgeLength (a cave with rubble at 8).
-  `branches` [{name, from, path, widths, heights, grades?, landings?, daylight?, overlook?}] are runs of their own leaving the main run
+  `branches` [{name, from, path, widths, heights, grades?, landings?, daylight?, overlook?, into?}] are runs of their own leaving the main run
   ("main") or a branch named before: a side passage, a side room, a fork, a second mouth. A branch's first point stands inside its parent
   (its whole first section within the parent's walls), on its parent's floor as its strokes leave it (its height may be left out to
   take that floor there: a pad's top where it starts on a pad) unless it is an `overlook` (a balcony or window high in the parent's wall
   that nobody walks through), where the parent's floor is level across the branch's width (off a ramp, a stretch graded 0 or a
   landing), and leaving through no rubble or pad standing over its floor (a threshold, a level way, cleared to where it leaves); it takes the cave's
-  section, breakup, materials, and edgeLength, and its far end is open, a ledge, or blind as any end. Every run is cut at once, the
+  section, breakup, materials, and edgeLength, and its far end is open, a ledge, or blind as any end, or opens into another run of the
+  cave (`into`: its end, given a height, wholly inside that run, never under its floor; a window or balcony high in a room's wall, a
+  gallery looking down into a cavern below, a second way in), its opening framed as a junction's. Every run is cut at once, the
   tubes united by the exact boolean, so a junction is one opening where the branch leaves its parent's wall; the breakup is left out
   within half of mouthFade of the tube each run meets there and eases in over the rest, so the opening is the meeting of two clean
   sections, a clean arch. Runs of one cave may pass over or under each other (a passage over a room, a spiral round a shaft) with at
@@ -1758,7 +1760,9 @@ async def cutCave(
   where); a pad sunk where no rock lies under it; a branch whose first section reaches out of its parent (naming how far and where),
   whose floor where it starts lies under its parent's (a hole; off a slope, naming the climb across its width; under a stroke, naming
   it) or more than a step over it without overlook, that would cut a trench through its parent's rubble or pad (naming it), that never leaves its
-  parent, named twice or "main", or leaving an unknown run; two runs closer than minimumRock away from their junction, or a run passing
+  parent, named twice or "main", or leaving an unknown run; a branch opening into an unknown run, its last section reaching out of the
+  run it opens into (naming how far), its floor there under that run's, or its end there with no height; two runs closer than
+  minimumRock away from their junctions, or a run passing
   that close to itself (naming the runs, the place, and the rock); another cave's lining within minimumRock of the tubes, or crossed by
   them (naming the cave and the place); another cave's mouth within reach; daylight not one value from 0 to 1 per point; a cut that
   would leave a light anchored on the cave in rock (naming the light); a bend tighter than half the width, an end part in the rock with its floor buried more than a step under the ground (for a hall, any end part in the rock
