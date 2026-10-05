@@ -1575,9 +1575,6 @@ async def measure(context: Context, points: list[list[float]], snapToSurface: bo
   return await callBridge(context, "measure", {"points": points, "snapToSurface": snapToSurface})
 
 
-steepestWalkableDegrees = math.degrees(math.acos(playerScale.walkableNormalZ))
-
-
 @guardedTool(description=(
   "Walk a route as a player would, over what the client collides with (rendered meshes and collection instances, and the"
   " boundaries, never drawn; not water, which is waded or swum, nor faces players pass through: liquid and cutout materials, objects"
@@ -1586,7 +1583,7 @@ steepestWalkableDegrees = math.degrees(math.acos(playerScale.walkableNormalZ))
   " past each point of `path` [[x, y, z], ...], of the saved review route named `route` (saveReviewRoute), or of the walk line of the"
   " bridge, flight, or walkway named `route` (its centerline at deck height, run on 5 past each end that stands on footing), whose"
   " heights only need to be within a step of the footing (so a route can run over an arch or under it). Judged for the player of"
-  f" playerScale, {playerScale.playerHeight:g} units tall, who walks faces up to {steepestWalkableDegrees:.1f} degrees and steps up"
+  f" playerScale, {playerScale.playerHeight:g} units tall, who walks faces up to {playerScale.steepestWalkableDegrees:.1f} degrees and steps up"
   f" {playerScale.stepHeight:g} (the steepest face and the highest riser a player was seen to climb in the RoF2 client, so the"
   " client's own limits lie at or past them; playerScale.sources), in half-unit strides whatever `sampleSpacing`, which sets only the"
   " profile's rows (give `path` or `route`, not both; renderRouteStrip shows the walk in pictures). Returns the length walked, the"
@@ -1595,10 +1592,10 @@ steepestWalkableDegrees = math.degrees(math.acos(playerScale.walkableNormalZ))
   " height, a wall, a step too high, or a face too steep; null beyond 60), the lowest headroom, the deepest water over the footing;"
   " `problems`, everything that stops a player, each once over the stretch it covers: blocked (a boundary across the way at half a"
   f" player's height, where it stands), rise (a wall or step over {playerScale.stepHeight:g} in the way, its height, how far up its face"
-  f" stays steeper than {steepestWalkableDegrees:.1f}, a plane's as much as a block's; null past 60), drop (no footing within 60 below), steep (a"
-  f" face over {steepestWalkableDegrees:.1f} climbed, its steepest), headroom (under {playerScale.playerHeight:g}, its lowest); after a boundary, a"
+  f" stays steeper than {playerScale.steepestWalkableDegrees:.1f}, a plane's as much as a block's; null past 60), drop (no footing within 60 below), steep (a"
+  f" face over {playerScale.steepestWalkableDegrees:.1f} climbed, its steepest), headroom (under {playerScale.playerHeight:g}, its lowest); after a boundary, a"
   " rise, or a drop the walk takes up again where the route's own heights find footing (resumesAt, null if never); `oneWay`, ways down a"
-  f" player cannot climb back: ledge (a drop over a step, its height) and steep (a face over {steepestWalkableDegrees:.1f} descended); walkable when"
+  f" player cannot climb back: ledge (a drop over a step, its height) and steep (a face over {playerScale.steepestWalkableDegrees:.1f} descended); walkable when"
   " there are no problems; and a profile along the way (each row with the water depth over its footing, or null). Use it on decks,"
   " ramps, ledges, and the ways into an area."
 ))

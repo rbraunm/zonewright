@@ -19,7 +19,7 @@ import bridgeObjects
 import bridgeSwim
 import bridgeViews
 import eqgFiles
-from playerScale import playerHeight, walkableNormalZ
+from playerScale import playerHeight, steepestWalkableDegrees, walkableNormalZ
 
 entryCollectionName = "entries"
 entryKinds = ("zoneIn", "landing")
@@ -113,7 +113,7 @@ def footingProblem(footing, at):
   point = roundPoint(footing.point)
   slope = math.degrees(math.acos(max(-1.0, min(1.0, footing.normal.z))))
   if footing.normal.z < walkableNormalZ:
-    return f"The footing at {point} slopes {slope:.1f} degrees, steeper than players walk ({math.degrees(math.acos(walkableNormalZ)):.1f}, playerScale)"
+    return f"The footing at {point} slopes {slope:.1f} degrees, steeper than players walk ({steepestWalkableDegrees:.1f}, playerScale)"
   if footing.overhead is not None and footing.overhead[0].z - footing.point.z < playerHeight:
     return f"The footing at {point} has {footing.overhead[0].z - footing.point.z:.2f} of headroom, under a player's height ({playerHeight:g}, playerScale)"
   for line in bridgeBoundaries.zoneLineObjects():

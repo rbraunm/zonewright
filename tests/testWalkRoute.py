@@ -7,7 +7,7 @@ from testModelsAndDressing import freshScene
 from testWater import basin, liquidMaterials
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
-from playerScale import eyeHeight, playerHeight, stepHeight, walkableNormalZ
+from playerScale import eyeHeight, playerHeight, stepHeight, steepestWalkableDegrees
 
 
 def near(point, x, tolerance=0.6):
@@ -102,15 +102,13 @@ def rampArguments(name, degrees, y, run=8.0):
 
 
 def testWalkRouteClimbsWhatTheRoF2ClientClimbs(stageBlenderServer):
-  steepestWalkable = math.degrees(math.acos(walkableNormalZ))
-
   async def steps(session):
     await freshScene(session)
     await session.expectSuccess("createTerrainGrid", {"name": "course", "size": [200, 120], "spacing": 4, "location": [0, 0, 0], "collection": "terrain"})
     await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "lowRiser", "size": [20, 20, stepHeight - 0.5], "location": [-60, 0, 0]})
     await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "highRiser", "size": [20, 20, stepHeight + 0.5], "location": [-60, 40, 0]})
-    await session.expectSuccess("createPrimitive", rampArguments("climbable", steepestWalkable - 2, 0))
-    await session.expectSuccess("createPrimitive", rampArguments("tooSteep", steepestWalkable + 5, 40))
+    await session.expectSuccess("createPrimitive", rampArguments("climbable", steepestWalkableDegrees - 2, 0))
+    await session.expectSuccess("createPrimitive", rampArguments("tooSteep", steepestWalkableDegrees + 5, 40))
     walks = {}
     for name, y in (("lowRiser", 0), ("highRiser", 40)):
       walks[name] = await session.expectSuccess("walkRoute", {"path": [[-90, y, 0], [-30, y, 0]]})
@@ -125,9 +123,9 @@ def testWalkRouteClimbsWhatTheRoF2ClientClimbs(stageBlenderServer):
   assert [(problem["kind"], problem["height"]) for problem in walks["highRiser"]["problems"]] == [("rise", round(stepHeight + 0.5, 1))]
   # A face two degrees under the steepest players walk is climbed; one five degrees over it is too steep.
   assert walks["climbable"]["walkable"] and walks["climbable"]["problems"] == []
-  assert abs(walks["climbable"]["steepest"]["slopeDegrees"] - (steepestWalkable - 2)) <= 0.2
+  assert abs(walks["climbable"]["steepest"]["slopeDegrees"] - (steepestWalkableDegrees - 2)) <= 0.2
   assert [problem["kind"] for problem in walks["tooSteep"]["problems"]] == ["steep"]
-  assert abs(walks["tooSteep"]["problems"][0]["steepestDegrees"] - (steepestWalkable + 5)) <= 0.2
+  assert abs(walks["tooSteep"]["problems"][0]["steepestDegrees"] - (steepestWalkableDegrees + 5)) <= 0.2
 
 
 houseWalls = [

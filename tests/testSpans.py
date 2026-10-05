@@ -5,7 +5,7 @@ from pathlib import Path
 import structurePlots
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
-from playerScale import eyeHeight, stepHeight, walkableNormalZ
+from playerScale import eyeHeight, stepHeight, steepestWalkableDegrees
 
 # Anchors on the gorge's lips: a deck sagging from an anchor back on the rim would dip into the rim's flat ground, and one from the wall
 # below the lip leaves a notch to step into.
@@ -117,7 +117,7 @@ def testBridgeRefusals(stageBlenderServer, tmp_path):
   fits = (bridgeSpan * math.tan(math.radians(30))) / 4
   assert "the largest sag that fits is" in refusals["tooSteep"] and f"{fits:.2f}" in refusals["tooSteep"]
   # A deck is walked, so its grade limit runs up to the steepest face players walk (playerScale).
-  assert f"maximumDeckDegrees runs over 0 up to {math.degrees(math.acos(walkableNormalZ)):.1f} (the steepest face players walk, playerScale), got 75" in refusals["overWalkable"]
+  assert f"maximumDeckDegrees runs over 0 up to {steepestWalkableDegrees:.1f} (the steepest face players walk, playerScale), got 75" in refusals["overWalkable"]
   assert "Rails run from post to post" in refusals["railsWithoutPosts"]
   assert "Bent station 100" in refusals["stationPast"]
   assert "deck 'testKitBeam' is a beam piece; deck takes a plank or floor piece" in refusals["wrongKind"]

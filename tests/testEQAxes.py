@@ -1,3 +1,4 @@
+import math
 import sys
 from pathlib import Path
 
@@ -50,10 +51,13 @@ def testFrameConvertersKeepFloat32():
 
 def testPlayerScaleNamesASourceForEveryConstant():
   constants = {name for name, value in vars(playerScale).items() if not name.startswith("_") and isinstance(value, float)}
-  assert {"playerHeight", "walkableNormalZ", "stepHeight", "eyeHeight", "swimEyeAboveSurface"} <= constants
+  assert {"playerHeight", "walkableNormalZ", "steepestWalkableDegrees", "stepHeight", "eyeHeight", "swimEyeAboveSurface"} <= constants
   assert set(playerScale.sources) == constants
   for name, source in playerScale.sources.items():
-    assert source.startswith(("measured: ", "unmeasured: ")), name
+    assert source.startswith(("measured: ", "unmeasured: ", "derived: ")), name
+  # The steepest walkable angle is walkableNormalZ's, not a second value to keep in step with it.
+  assert playerScale.sources["steepestWalkableDegrees"].startswith("derived: walkableNormalZ")
+  assert abs(math.cos(math.radians(playerScale.steepestWalkableDegrees)) - playerScale.walkableNormalZ) < 1e-12
   # A measured limit's source states the value taken from it.
   assert f"(normal z {playerScale.walkableNormalZ:g})" in playerScale.sources["walkableNormalZ"]
   assert f"to {playerScale.stepHeight:.2f}" in playerScale.sources["stepHeight"]

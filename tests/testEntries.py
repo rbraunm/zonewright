@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
 import eqArchive
 import eqgFiles
 import planDrawing
-from playerScale import eyeHeight, playerHeight, walkableNormalZ
+from playerScale import eyeHeight, playerHeight, steepestWalkableDegrees
 from conftest import writePNG
 from testBoundaries import boundedPlot
 from testHousing import decision, flatGround
@@ -18,7 +18,7 @@ from testModelsAndDressing import freshScene
 from testWater import environment, liquidMaterials
 
 # A ramp this much steeper than players walk (playerScale).
-steepDegrees = math.degrees(math.acos(walkableNormalZ)) + 5
+steepDegrees = steepestWalkableDegrees + 5
 otherZone = {"zone": "qeynos2", "x": 0, "y": 0, "z": 0, "headingDegrees": 0}
 
 
@@ -107,7 +107,7 @@ def testPlaceEntryStandsOnShippedFooting(stageBlenderServer, tmp_path):
   assert again["replaced"] is True and again["at"] == [10.0, 0.0, 0.0] and again["fromNumber"] is None
   assert [entry["name"] for entry in listed["entries"]] == ["daisTop", "fromQeynos", "underSkyPool", "underTerrace"]
   assert "No ground the zone ships lies at [500.0, 500.0]" in refusals["noFooting"]
-  assert f"slopes {steepDegrees:.1f} degrees, steeper than players walk ({math.degrees(math.acos(walkableNormalZ)):.1f}" in refusals["steep"]
+  assert f"slopes {steepDegrees:.1f} degrees, steeper than players walk ({steepestWalkableDegrees:.1f}" in refusals["steep"]
   assert f"has {playerHeight - 1:.2f} of headroom, under a player's height ({playerHeight:g}" in refusals["headroom"]
   assert "under the surface of 'pond', whose swimming is undecided" in refusals["undecided"]
   # A box reaching into the player's height over the footing refuses it, whether it holds the footing or starts over it: the client

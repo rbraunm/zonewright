@@ -9,7 +9,7 @@ from conftest import writePNG
 from testModelsAndDressing import readShapedMesh
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
-from playerScale import walkableNormalZ
+from playerScale import steepestWalkableDegrees
 
 # A three-leg switchback climbing 100 up caveCanyon's 45-degree hillside to the entrance of a plot on the rim: legs 24 degrees off the
 # contour, two hairpins, its ends fixed (an end left free takes the ground there each time it is graded, and moves with it).
@@ -102,7 +102,7 @@ def testRefusalsNameTheRunTheClashAndTheLedgeSpan(stageBlenderServer, tmp_path):
   assert "rises 70.0 from point 0 to point 1 over a run of 100.0, 35.0 degrees, steeper than 26" in steep
   assert f"needs a run of {70 / math.tan(math.radians(26)):.1f}" in steep
   # A route is walked, so its grade limit runs up to the steepest face players walk (playerScale).
-  assert f"maximumGradeDegrees is above 0 and at most {math.degrees(math.acos(walkableNormalZ)):.1f} (the steepest face players walk, playerScale), got 75" in overWalkable
+  assert f"maximumGradeDegrees is above 0 and at most {steepestWalkableDegrees:.1f} (the steepest face players walk, playerScale), got 75" in overWalkable
   found = re.search(r"stands (-?[\d.]+) high and at \[[^\]]*\], ([\d.]+) away in plan, (-?[\d.]+);.*need ([\d.]+) between them", clash)
   assert "clashes with itself" in clash and found is not None
   first, apart, second, needed = (float(value) for value in found.groups())

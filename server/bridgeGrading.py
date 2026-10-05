@@ -23,7 +23,7 @@ import bridgeReview
 import bridgeShaping
 import bridgeStructures
 import bridgeSurfacing
-from playerScale import stepHeight, walkableNormalZ
+from playerScale import stepHeight, steepestWalkableDegrees
 
 routePassPrefix = "route "
 routeKind = "route"
@@ -241,9 +241,8 @@ def routeDefinition(points, width, widths, maximumGradeDegrees, cutBatterDegrees
   widths = [width] * len(points) if widths is None else widths
   if len(widths) != len(points) or min(widths) <= 0:
     raise ValueError(f"widths are one positive width per point ({len(points)}), got {widths!r}")
-  steepestWalkable = math.degrees(math.acos(walkableNormalZ))
-  if not 0 < maximumGradeDegrees <= steepestWalkable:
-    raise ValueError(f"maximumGradeDegrees is above 0 and at most {steepestWalkable:.1f} (the steepest face players walk, playerScale), got {maximumGradeDegrees}")
+  if not 0 < maximumGradeDegrees <= steepestWalkableDegrees:
+    raise ValueError(f"maximumGradeDegrees is above 0 and at most {steepestWalkableDegrees:.1f} (the steepest face players walk, playerScale), got {maximumGradeDegrees}")
   if not 5 <= cutBatterDegrees <= 85 or (fillBatterDegrees is not None and not 5 <= fillBatterDegrees <= 85):
     raise ValueError(f"cutBatterDegrees and fillBatterDegrees are from 5 to 85 (fillBatterDegrees null for a ledge), got {cutBatterDegrees} and {fillBatterDegrees}")
   if landingLength is not None and landingLength <= 0:

@@ -16,7 +16,7 @@ import bridgeMeshAccess
 import bridgeReviewGuides
 import bridgeStructureData
 import bridgeStructures
-from playerScale import eyeHeight, playerHeight, stepHeight, walkableNormalZ
+from playerScale import eyeHeight, playerHeight, stepHeight, steepestWalkableDegrees
 
 # How far a route looks to each side for a drop or a wall, and how finely; how far above for a ceiling; and how far below it still
 # finds footing.
@@ -34,7 +34,6 @@ castNudge = bridgeMeshAccess.castNudge
 # What blocks a step is climbed in rises this tall, then its top found within a thirty-second of one.
 obstacleClimb = 1.0
 obstacleRefinements = 5
-steepestWalkableDegrees = math.degrees(math.acos(walkableNormalZ))
 up = bridgeMeshAccess.up
 down = bridgeMeshAccess.down
 # A route strip's frame looks toward the route this far on from where it stands, so the way ahead shows.

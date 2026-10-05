@@ -1,5 +1,4 @@
 import json
-import math
 import re
 import sys
 from pathlib import Path
@@ -9,7 +8,7 @@ import numpy
 from conftest import writePNG
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
-from playerScale import walkableNormalZ
+from playerScale import steepestWalkableDegrees
 
 # A tunnel 40 wide and 45 tall from the cliff foot, rising to a room 120 wide and 70 tall that ends blind.
 hall = {
@@ -286,7 +285,7 @@ def testCaveRefusals(stageBlenderServer, tmp_path):
   assert "tighter than half its width" in tight
   assert "reaches the edge of 'ground'" in border
   # A cave's floor is walked, so its grade limit runs up to the steepest face players walk (playerScale).
-  assert f"maximumFloorDegrees is above 0 and at most {math.degrees(math.acos(walkableNormalZ)):.1f} (the steepest face players walk, playerScale), got 75" in overWalkable
+  assert f"maximumFloorDegrees is above 0 and at most {steepestWalkableDegrees:.1f} (the steepest face players walk, playerScale), got 75" in overWalkable
   assert "would overlap cave(s) ['hall']" in overlap
   # A refused edit leaves the cave as it was.
   assert "rises 58.0" in edited and after == before and detail["caves"][0]["from"] == hall["path"][0]
