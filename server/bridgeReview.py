@@ -283,7 +283,7 @@ class RouteWalk:
     if self.footing is None:
       return
     side = mathutils.Vector((-direction.y, direction.x, 0.0))
-    waterDepth = bridgeMeshAccess.waterDepthAt(self.water, self.footing)
+    waterDepth = bridgeMeshAccess.waterDepthAt(self.water, self.surfaces, self.footing)
     self.rows.append({
       "distance": round(self.travelled, 1), "at": roundVector(self.footing), "slopeDegrees": round(self.slope, 1),
       "headroom": None if self.headroom is None else round(self.headroom, 1),

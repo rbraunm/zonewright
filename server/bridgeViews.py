@@ -376,7 +376,7 @@ def placeCamera(preview, view, figureModel):
     surfaces = bridgeMeshAccess.PlayerSurfaces()
     ground = standingGround(preview, surfaces, view["standAt"], "standAt") if "standAt" in view else footingPoint(view["standOn"])
     # Where the water stands over the eye, the player swims, eye at the surface.
-    waterDepth = bridgeMeshAccess.waterDepthAt(bridgeMeshAccess.swimSurfaces(), ground)
+    waterDepth = bridgeMeshAccess.waterDepthAt(bridgeMeshAccess.swimSurfaces(), surfaces, ground)
     swimming = waterDepth is not None and waterDepth > eyeHeight - swimEyeAboveSurface
     eye = ground + mathutils.Vector((0, 0, waterDepth + swimEyeAboveSurface if swimming else eyeHeight))
     forward = headingPitchForward(view["headingDegrees"], view["pitchDegrees"])

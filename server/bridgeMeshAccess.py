@@ -439,12 +439,17 @@ def swimSurfaces(leftOut=(), added=None):
   return mathutils.bvhtree.BVHTree.FromPolygons(positions, polygons) if polygons else None
 
 
-def waterDepthAt(surfaces, point):
-  """How far a pool or river's surface stands above a point (surfaces from swimSurfaces), or None where no water lies above it."""
-  if surfaces is None:
+def waterDepthAt(water, ground, point):
+  """How far a pool or river's surface (water, from swimSurfaces) stands above a point with nothing players stand on (ground,
+  PlayerSurfaces) between, or None where no water lies above it or something covers the point first, as a floating pool's basin does."""
+  if water is None:
     return None
-  location, _, _, _ = surfaces.ray_cast(mathutils.Vector(point), mathutils.Vector((0.0, 0.0, 1.0)), waterReach)
-  return None if location is None else location.z - point[2]
+  origin = mathutils.Vector(point)
+  location, _, _, _ = water.ray_cast(origin, up, waterReach)
+  if location is None:
+    return None
+  depth = location.z - origin.z
+  return None if ground.cast(origin + up * castNudge, up, depth) is not None else depth
 
 
 def partTriangles(parts):

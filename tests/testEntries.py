@@ -101,6 +101,8 @@ def testPlaceEntryStandsOnShippedFooting(stageBlenderServer, tmp_path):
   assert underPool["at"] == [70.0, -70.0, 0.0]
   # Under the floating terrace's pool, its basin between, players arrive on the ground; in the basin they would arrive in its water.
   assert underTerrace["at"] == [0.0, 70.0, 0.0] and underTerrace["state"] == "onFooting"
+  # Its arrival view stands there at a player's eye, not swimming in the pool over the basin.
+  assert underTerrace["arrivalView"]["eye"] == [0.0, 70.0, eyeHeight]
   assert "The footing at [0.0, 70.0, 12.0] lies under the surface of 'terracePool', whose swimming is undecided" in refusals["terracePool"]
   assert again["replaced"] is True and again["at"] == [10.0, 0.0, 0.0] and again["fromNumber"] is None
   assert [entry["name"] for entry in listed["entries"]] == ["daisTop", "fromQeynos", "underSkyPool", "underTerrace"]

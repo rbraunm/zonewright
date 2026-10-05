@@ -166,7 +166,7 @@ class GroundProbe:
     return None if hit is None else hit.z
 
   def waterDepth(self, x, y, z):
-    return bridgeMeshAccess.waterDepthAt(self.water, (x, y, z))
+    return bridgeMeshAccess.waterDepthAt(self.water, self.surfaces, (x, y, z))
 
 
 def insidePolygon(points, outline):
