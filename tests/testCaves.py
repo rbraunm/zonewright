@@ -259,9 +259,8 @@ def testCaveRefusals(stageBlenderServer, tmp_path):
     border = await session.expectError("cutCave", hall | {"name": "border", "path": [[0, -60, 2], [0, 30, 6], [0, 370, 6]], "widths": [40] * 3, "heights": [45] * 3})
     await session.expectSuccess("cutCave", hall)
     before = (await session.expectSuccess("runPython", {"code": checkCave}))["result"]
-    # A tunnel 110 east of the hall, whose reach takes in the hall room's wall.
-    await session.expectSuccess("gradeRoute", {"objectName": "ground", "name": "besideApproach", "points": [[110, -140, 2], [110, -50, 2]], "width": 56})
-    overlap = await session.expectError("cutCave", hall | {"name": "beside", "path": [[110, -60, 2], [110, 30, 6], [110, 150, 8]], "widths": [40] * 3, "heights": [45] * 3})
+    # A tunnel 45 east of the hall, whose reach takes in the hall's mouth.
+    overlap = await session.expectError("cutCave", hall | {"name": "beside", "path": [[45, -60, 2], [45, 30, 6], [45, 150, 8]], "widths": [40] * 3, "heights": [45] * 3})
     edited = await session.expectError("editCave", {"objectName": "ground", "name": "hall", "changes": {"path": [[0, -60, 2], [0, 0, 60], [0, 90, 8], [0, 130, 8], [0, 250, 8]]}})
     after = (await session.expectSuccess("runPython", {"code": checkCave}))["result"]
     detail = await session.expectSuccess("getObjectDetail", {"name": "ground"})
@@ -273,7 +272,7 @@ def testCaveRefusals(stageBlenderServer, tmp_path):
   assert "rises 58.0 from point 0 to point 1 over a run of 60.0" in steep and "needs a run of 100.5" in steep
   assert "tighter than half its width" in tight
   assert "reaches the edge of 'ground'" in border
-  assert "would overlap cave(s) ['hall']" in overlap
+  assert "Cave 'beside' would reach the mouth of cave(s) ['hall']" in overlap
   # A refused edit leaves the cave as it was.
   assert "rises 58.0" in edited and after == before and detail["caves"][0]["from"] == hall["path"][0]
 

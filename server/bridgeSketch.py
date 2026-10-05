@@ -11,6 +11,8 @@ import numpy
 
 import bridgeAuthoring
 import bridgeBoundaries
+import bridgeCaveRuns
+import bridgeCaves
 import bridgeHousing
 import bridgeMeshAccess
 import bridgeObjects
@@ -30,7 +32,7 @@ massingColor = (0.82, 0.8, 0.76)
 massingShade = {"base": 0.45, "up": 0.4, "northSouth": 0.25, "eastWest": 0.1}
 # A boundary face whose plan covers less than this share of its own area stands upright: a wall, drawn in plan as a line.
 uprightPlanShare = 0.01
-planLayers = ("regions", "plots", "water", "swim", "boundaries", "zoneLines")
+planLayers = ("regions", "plots", "water", "swim", "boundaries", "zoneLines", "caves")
 # Ground under a shape is sampled on a grid at least this fine, and no finer than this many samples.
 groundSampleSpacing = 4.0
 groundSampleLimit = 2500
@@ -480,7 +482,7 @@ def planOverlays(sheets, layers, spots):
   if unknownLayers:
     raise ValueError(f"layers are {list(planLayers)}; got {unknownLayers}")
   bpy.context.view_layer.update()
-  overlays = {"sheets": [], "regions": [], "plots": [], "water": [], "swim": [], "boundaries": [], "zoneLines": [], "spots": []}
+  overlays = {"sheets": [], "regions": [], "plots": [], "water": [], "swim": [], "boundaries": [], "zoneLines": [], "caves": [], "spots": []}
   if spots:
     probe = GroundProbe()
     for x, y in spots:
@@ -493,8 +495,10 @@ def planOverlays(sheets, layers, spots):
       spec = readSpec(shape)
       shapes.append({key: value for key, value in spec.items() if key not in ("sheet", "count")} | {"plan": [roundPoint(point[:2]) for point in worldGeometry(shape)]})
     overlays["sheets"].append({"sheet": sheet, "shapes": shapes})
+  if "caves" in layers:
+    overlays["caves"] = planCaves()
   if "regions" in layers:
-    overlays["regions"] = [{"name": region["name"], "outline": region["outline"]} for region in bridgeAuthoring.getRegions()["regions"]]
+    overlays["regions"] =[{"name": region["name"], "outline": region["outline"]} for region in bridgeAuthoring.getRegions()["regions"]]
   if "plots" in layers:
     overlays["plots"] = [
       {"address": plot.name, "corners": [roundPoint(corner) for corner in bridgeHousing.footprint(plot)], "facingDegrees": round(bridgeHousing.facingOf(plot), 1)}
@@ -520,6 +524,46 @@ def planOverlays(sheets, layers, spots):
   return overlays
 
 
+def offsetLine(samples, offsets):
+  """A run's centerline samples ([x, y, floor, width, height, along] rows) moved across it by offsets (one per sample, negative to the
+  left looking along it), in plan."""
+  points = samples[:, :2]
+  directions = numpy.gradient(points, axis=0)
+  directions /= numpy.maximum(numpy.linalg.norm(directions, axis=1, keepdims=True), 1e-9)
+  right = numpy.column_stack([directions[:, 1], -directions[:, 0]])
+  return points + right * numpy.asarray(offsets)[:, None]
+
+
+def planCaves():
+  """The caves' runs in plan (bridgeCaves.caveGuides): each run's walls at floor height, its floor height at each path point, its
+  junctions, the outlines of its floor strokes, and its name."""
+  drawn = []
+  for guide in bridgeCaves.caveGuides():
+    for run in guide["runs"]:
+      samples = numpy.array(run["samples"])
+      halves = samples[:, 3] / 2
+      stations = numpy.array(run["stations"])
+      spots = samples[numpy.abs(samples[:, 5][None, :] - stations[:, None]).argmin(axis=1)]
+      strokes = []
+      for stroke in run["strokes"]:
+        if stroke["kind"] == "rough":
+          strokes.append({"name": stroke["name"], "kind": "rough", "outline": stroke["outline"]})
+          continue
+        inside = samples[(samples[:, 5] >= stroke["from"] - 1e-6) & (samples[:, 5] <= stroke["to"] + 1e-6)]
+        if len(inside) < 2:
+          continue
+        left = offsetLine(inside, numpy.full(len(inside), stroke["across"][0]))
+        right = offsetLine(inside, numpy.full(len(inside), stroke["across"][1]))
+        strokes.append({"name": stroke["name"], "kind": stroke["kind"], "outline": numpy.round(numpy.vstack([left, right[::-1]]), 2).tolist()})
+      drawn.append({
+        "cave": guide["cave"], "run": run["run"], "label": guide["cave"] + ("" if run["run"] == bridgeCaveRuns.mainRun else f" {run['run']}"),
+        "left": numpy.round(offsetLine(samples, -halves), 2).tolist(), "right": numpy.round(offsetLine(samples, halves), 2).tolist(),
+        "middle": numpy.round(samples[:, :2], 2).tolist(), "floors": [{"at": roundPoint(spot[:2]), "floor": rounded(spot[2], 1)} for spot in spots],
+        "junction": roundPoint(samples[0, :2]) if run["from"] is not None else None, "strokes": strokes,
+      })
+  return drawn
+
+
 def boundaryPlan(boundary):
   """A boundary in plan: the faces seen from above as areas (a lid, a floor) and the upright ones as lines along their foot (a wall)."""
   positions, triangles = bridgeMeshAccess.worldTriangles([boundary])
@@ -540,7 +584,13 @@ def renderedWater():
   return [body for body in bpy.context.scene.objects if bridgeMeshAccess.waterProperty in body and not body.hide_render]
 
 
-sectionLayers = ("ground", "water", "swim", "massing", "sketch", "plots", "boundaries", "zoneLines")
+sectionLayers = ("ground", "water", "swim", "massing", "sketch", "plots", "boundaries", "zoneLines", "caves")
+# A cave run's section runs on past each end by at least this, so the ground in front of a mouth shows.
+caveSectionLead = 30.0
+# A run goes along a section where its middle stays within this, or a quarter of its width, of the section's line.
+sectionAlongLateral = 2.0
+# A section fitted to the ground it cuts reaches past it by at least this above and below.
+sectionFitMargin = 10.0
 # Cuts reaching past the drawing by this share of its size are dropped; the drawing clips the rest.
 sectionMargin = 0.1
 waterSectionStep = 0.5
@@ -697,60 +747,274 @@ def planTurned(vector, angle):
   return numpy.array([vector[0] * math.cos(angle) - vector[1] * math.sin(angle), vector[0] * math.sin(angle) + vector[1] * math.cos(angle)])
 
 
-def sectionCuts(start, end, bottom, top, layers):
-  """What the zone holds where the vertical plane through the line from start to end cuts it, in the plane's own terms (s along the line
-  from start, z height): the ground players stand on, water surfaces, swim volumes, sketch massing, sketch area floors and paths, plot
-  pads, boundaries, and zone lines."""
+def sectionLine(start, end, path, cave):
+  """A section's line in plan as a polyline, its bends' marks (each with its distance along and a label), and what it follows: start to
+  end, a path [[x, y], ...] (its points marked by index), or a cave run's centerline (cave {objectName, name, run}, arcs in short
+  chords), run on straight past each end by a lead so the ground in front of a mouth shows, its stations marked by point index."""
+  given = [start is not None or end is not None, path is not None, cave is not None]
+  if sum(given) != 1:
+    raise ValueError("A section runs from start to end, along a path [[x, y], ...], or along a cave's run (cave {objectName, name, run}): give one of them")
+  if cave is not None:
+    if not isinstance(cave, dict) or set(cave) - {"objectName", "name", "run"} or not {"objectName", "name"} <= set(cave):
+      raise ValueError(f"cave is {{objectName, name, run}} (run 'main' unless a branch is named), got {cave!r}")
+    run = cave.get("run", bridgeCaveRuns.mainRun)
+    guide = bridgeCaves.guideRun(cave["objectName"], cave["name"], run)
+    polyline = numpy.array(guide["polyline"])[:, :2]
+    starting, ending = polyline[1] - polyline[0], polyline[-1] - polyline[-2]
+    leads = [max(caveSectionLead, guide["samples"][row][3]) for row in (0, -1)]
+    points = numpy.vstack([polyline[0] - leads[0] * starting / numpy.linalg.norm(starting), polyline, polyline[-1] + leads[1] * ending / numpy.linalg.norm(ending)])
+    marks = [(1 + guide["polylineAlongs"].index(station), str(index)) for index, station in enumerate(guide["stations"])]
+    return points, marks, {"cave": cave["name"], "run": run, "object": cave["objectName"]}
+  if path is not None:
+    if not isinstance(path, list) or len(path) < 2 or any(not isinstance(point, list) or len(point) != 2 for point in path):
+      raise ValueError(f"A section's path is at least two [x, y] points, got {path!r}")
+    points = numpy.array(path, dtype=numpy.float64)
+    return points, [(index, str(index)) for index in range(len(points))], None
+  if start is None or end is None or len(start) != 2 or len(end) != 2:
+    raise ValueError(f"A section runs from start [x, y] to end [x, y], got {start} and {end}")
+  return numpy.array([start, end], dtype=numpy.float64), [], None
+
+
+def clippedToLeg(segments, length):
+  """Segments [s0, z0, s1, z1] cut to the part between 0 and length along a leg."""
+  kept = []
+  for s0, z0, s1, z1 in numpy.asarray(segments).reshape(-1, 4).tolist():
+    if s0 == s1:
+      if -1e-9 <= s0 <= length + 1e-9:
+        kept.append([s0, z0, s1, z1])
+      continue
+    low, high = sorted(((0.0 - s0) / (s1 - s0), (length - s0) / (s1 - s0)))
+    low, high = max(low, 0.0), min(high, 1.0)
+    if high > low:
+      kept.append([s0 + low * (s1 - s0), z0 + low * (z1 - z0), s0 + high * (s1 - s0), z0 + high * (z1 - z0)])
+  return numpy.array(kept).reshape(-1, 4)
+
+
+def clippedSpan(span, length):
+  """A span [enter, leave] cut to 0 to length, or None."""
+  low, high = max(span[0], 0.0), min(span[1], length)
+  return [low, high] if high > low else None
+
+
+class SectionLeg:
+  """One straight leg of a section's line: where it starts, its direction and the normal to its left, its length, and how far along the
+  whole line it starts."""
+
+  def __init__(self, start, end, offset):
+    self.start = start
+    self.length = float(numpy.linalg.norm(end - start))
+    self.along = (end - start) / self.length
+    self.normal = numpy.array([-self.along[1], self.along[0]])
+    self.offset = offset
+    self.low, self.high = numpy.minimum(start, end), numpy.maximum(start, end)
+
+  def nearTriangles(self, planLow, planHigh):
+    """Which triangles (their plan boxes) the leg's plane can cut."""
+    return ((planLow <= self.high + 1e-6) & (planHigh >= self.low - 1e-6)).all(axis=1)
+
+  def shifted(self, segments):
+    segments = clippedToLeg(segments, self.length)
+    if len(segments):
+      segments[:, [0, 2]] += self.offset
+    return segments
+
+
+def legsOf(points):
+  lengths = numpy.linalg.norm(numpy.diff(points, axis=0), axis=1)
+  for index in numpy.flatnonzero(lengths < 1e-6):
+    raise ValueError(f"The section's points {index} and {index + 1} stand at one place")
+  offsets = numpy.concatenate([[0.0], numpy.cumsum(lengths)])
+  return [SectionLeg(points[index], points[index + 1], float(offsets[index])) for index in range(len(points) - 1)], float(offsets[-1]), offsets
+
+
+def legCuts(legs, positions, triangles):
+  """Where each of a section's legs cuts triangles, as segments [s, z, s, z] along the whole line, leg by leg."""
+  if not len(triangles):
+    return [numpy.zeros((0, 4)) for _ in legs]
+  corners = positions[triangles][:, :, :2]
+  planLow, planHigh = corners.min(axis=1), corners.max(axis=1)
+  return [leg.shifted(planeSegments(positions, triangles[leg.nearTriangles(planLow, planHigh)], leg.start, leg.along, leg.normal)) for leg in legs]
+
+
+def triangleCuts(legs, positions, triangles):
+  return numpy.vstack(legCuts(legs, positions, triangles))
+
+
+def heightsAt(segments, s):
+  """The heights of segments' ends standing at s along the line."""
+  ends = numpy.vstack([segments[:, :2], segments[:, 2:]]) if len(segments) else numpy.zeros((0, 2))
+  return sorted(round(float(z), 3) for z in ends[numpy.abs(ends[:, 0] - s) <= 1e-6, 1])
+
+
+def fittedRange(ground, bottom, top):
+  """The section's bottom and top: as given, or fitted round the ground the section cuts, with a margin."""
+  if bottom is not None and top is not None:
+    return bottom, top
+  if not len(ground):
+    raise ValueError("The section cuts no ground, so there is nothing to fit its bottom and top to; give bottom and top")
+  low, high = float(ground[:, [1, 3]].min()), float(ground[:, [1, 3]].max())
+  margin = max(sectionFitMargin, 0.08 * (high - low))
+  return (low - margin if bottom is None else bottom), (high + margin if top is None else top)
+
+
+def caveCuts(legs, followed):
+  """Where a section meets every cave's runs (bridgeCaves.caveGuides): a run going along it (within alongDegrees, its middle within a
+  quarter of its width of the line) as its floor and vault at their heights, its floor strokes (level ways at the floor, pads at their
+  tops, rough ground at its rise), landings, and junctions; a run crossing it as a box from its floor to its vault, as long as its width
+  crosses the line."""
+  entries = []
+  for guide in bridgeCaves.caveGuides():
+    junctions = {}
+    for run in guide["runs"]:
+      if run["from"] is not None:
+        junctions.setdefault(run["from"], []).append((run["run"], run["samples"][0]))
+    for run in guide["runs"]:
+      samples = numpy.array(run["samples"])
+      isFollowed = followed is not None and followed["object"] == guide["object"] and followed["cave"] == guide["cave"] and followed["run"] == run["run"]
+      label = f"{guide['cave']}" + ("" if run["run"] == bridgeCaveRuns.mainRun else f" {run['run']}")
+      floor, vault, strokes, marks, boxes = [], [], [], [], []
+      for leg in legs:
+        offsets = samples[:, :2] - leg.start
+        sides, distances = offsets @ leg.normal, offsets @ leg.along
+        steps = numpy.linalg.norm(numpy.diff(samples[:, :2], axis=0), axis=1)
+        sines = numpy.abs(numpy.diff(sides)) / numpy.maximum(steps, 1e-9)
+        lateral = numpy.maximum(sectionAlongLateral, samples[:, 3] / 4)
+        alongLeg = (numpy.abs(sides[:-1]) <= lateral[:-1]) & (numpy.abs(sides[1:]) <= lateral[1:]) & (sines < math.sin(math.radians(alongDegrees)))
+        alongLeg &= (numpy.minimum(distances[:-1], distances[1:]) >= -1e-6) & (numpy.maximum(distances[:-1], distances[1:]) <= leg.length + 1e-6)
+        for index in numpy.flatnonzero(alongLeg):
+          s0, s1 = distances[index] + leg.offset, distances[index + 1] + leg.offset
+          z0, z1 = samples[index, 2], samples[index + 1, 2]
+          floor.append([s0, z0, s1, z1])
+          vault.append([s0, z0 + samples[index, 4], s1, z1 + samples[index + 1, 4]])
+          along0, along1 = samples[index, 5], samples[index + 1, 5]
+          for stroke in run["strokes"]:
+            if stroke["kind"] in ("level", "pad") and along0 >= stroke["from"] - 1e-6 and along1 <= stroke["to"] + 1e-6:
+              height = (z0, z1) if stroke["kind"] == "level" else (stroke["top"], stroke["top"])
+              strokes.append({"name": stroke["name"], "kind": stroke["kind"], "segment": [s0, height[0], s1, height[1]]})
+            elif stroke["kind"] == "rough":
+              inside = bridgeCaveRuns.pointsInPolygon(samples[[index, index + 1], :2], numpy.array(stroke["outline"]))
+              if inside.all():
+                strokes.append({"name": stroke["name"], "kind": "rough", "segment": [s0, z0 + stroke["rise"], s1, z1 + stroke["rise"]]})
+          for landing in run["landings"]:
+            middle = sum(landing["arc"]) / 2
+            if along0 <= middle < along1:
+              marks.append({"s": s0, "z": z0, "label": f"landing {landing['point']}"})
+          for branch, start in junctions.get(run["run"], []):
+            nearest = int(numpy.argmin(numpy.linalg.norm(samples[:, :2] - numpy.array(start[:2]), axis=1)))
+            if nearest == index:
+              marks.append({"s": s0, "z": start[2], "label": f"{branch} leaves"})
+        crossing = ~alongLeg & (sides[:-1] * sides[1:] < 0) & (sines >= math.sin(math.radians(alongDegrees)))
+        for index in numpy.flatnonzero(crossing):
+          share = sides[index] / (sides[index] - sides[index + 1])
+          s = distances[index] + share * (distances[index + 1] - distances[index])
+          if not -1e-6 <= s <= leg.length + 1e-6:
+            continue
+          width, height = samples[index, 3], samples[index, 4]
+          base = samples[index, 2] + share * (samples[index + 1, 2] - samples[index, 2])
+          half = min(width / 2 / sines[index], 3 * width)
+          boxes.append({"s": [s + leg.offset - half, s + leg.offset + half], "z": [base, base + height]})
+      if isFollowed and floor:
+        marks += followedGrades(run, legs)
+      if floor or boxes:
+        entries.append({
+          "object": guide["object"], "cave": guide["cave"], "run": run["run"], "label": label, "followed": isFollowed,
+          "floor": numpy.round(floor, 2).tolist(), "vault": numpy.round(vault, 2).tolist(),
+          "strokes": [stroke | {"segment": [round(value, 2) for value in stroke["segment"]]} for stroke in strokes],
+          "marks": [{key: round(value, 2) if isinstance(value, float) else value for key, value in mark.items()} for mark in marks],
+          "crossings": [{key: [round(float(value), 2) for value in values] for key, values in box.items()} for box in boxes],
+        })
+  return entries
+
+
+def followedGrades(run, legs):
+  """The grade of each segment of the run a section follows, written over the middle of the segment's floor (none on a level one)."""
+  samples = numpy.array(run["samples"])
+  polyline, polylineAlongs = numpy.array(run["polyline"]), numpy.array(run["polylineAlongs"])
+  lengths = numpy.concatenate([[0.0], numpy.cumsum(numpy.linalg.norm(numpy.diff(polyline[:, :2], axis=0), axis=1))])
+  lead = legs[0].length
+  marks = []
+  for segment in run["segments"]:
+    if abs(segment["degrees"]) < 0.05:
+      continue
+    middle = segment["middle"]
+    marks.append({"s": lead + float(numpy.interp(middle, polylineAlongs, lengths)), "z": float(numpy.interp(middle, samples[:, 5], samples[:, 2])), "label": f"{segment['degrees']:.1f}°"})
+  return marks
+
+
+def sectionCuts(start, end, path, cave, bottom, top, layers):
+  """What the zone holds where the vertical planes along a section's line (sectionLine) cut it, its legs laid out end to end (s along
+  the line from its start, z height): the ground players stand on, water surfaces, swim volumes, sketch massing, sketch area floors and
+  paths, plot pads, boundaries, zone lines, and the caves' runs (caveCuts); with the line's bends marked and its bottom and top (fitted
+  round the ground when not given)."""
   unknown = sorted(set(layers) - set(sectionLayers))
   if unknown:
     raise ValueError(f"Section layers are {list(sectionLayers)}; got {unknown}")
-  if len(start) != 2 or len(end) != 2 or top <= bottom:
-    raise ValueError(f"A section runs from [x, y] to [x, y] between a bottom and a higher top, got {start}, {end}, {bottom}, {top}")
-  start, end = numpy.array(start, dtype=numpy.float64), numpy.array(end, dtype=numpy.float64)
-  length = float(numpy.linalg.norm(end - start))
-  if length < 1e-6:
-    raise ValueError("A section's two points must differ")
-  along = (end - start) / length
-  normal = numpy.array([-along[1], along[0]])
+  if bottom is not None and top is not None and top <= bottom:
+    raise ValueError(f"A section's top is above its bottom, got {bottom} and {top}")
+  points, bends, followed = sectionLine(start, end, path, cave)
+  legs, length, offsets = legsOf(points)
   bpy.context.view_layer.update()
+  positions, triangles = bridgeMeshAccess.playerSolidTriangles()
+  groundByLeg = legCuts(legs, positions, triangles)
+  ground = numpy.vstack(groundByLeg)
+  bottom, top = fittedRange(ground, bottom, top)
+  # Where two legs meet, the ground each cuts ends at the heights the other's begins at.
+  joins = [
+    {"s": round(float(offsets[index]), 2), "before": heightsAt(groundByLeg[index - 1], offsets[index]), "after": heightsAt(groundByLeg[index], offsets[index])}
+    for index in range(1, len(legs))
+  ]
   cuts = {
-    "length": round(length, 2), "ground": [], "water": [], "swim": [], "massing": [], "sketch": [], "plots": [], "boundaries": [], "zoneLines": [],
-    "sheets": sorted({readSpec(shape)["sheet"] for shape in sketchObjects()}),
+    "length": round(length, 2), "bottom": round(bottom, 2), "top": round(top, 2), "ground": [], "water": [], "swim": [], "massing": [], "sketch": [],
+    "plots": [], "boundaries": [], "zoneLines": [], "caves": [], "sheets": sorted({readSpec(shape)["sheet"] for shape in sketchObjects()}),
+    "points": numpy.round(points, 2).tolist(), "bends": [{"s": round(float(offsets[index]), 2), "label": label} for index, label in bends], "followed": followed,
+    "groundAtJoins": joins,
   }
 
   def cutObjects(sceneObjects):
     found = []
     for sceneObject in sceneObjects:
-      positions, triangles = bridgeMeshAccess.worldTriangles([sceneObject])
-      segments = keptSegments(planeSegments(positions, triangles, start, along, normal), length, bottom, top)
+      objectPositions, objectTriangles = bridgeMeshAccess.worldTriangles([sceneObject])
+      segments = keptSegments(triangleCuts(legs, objectPositions, objectTriangles), length, bottom, top)
       if segments:
         found.append({"name": sceneObject.name, "segments": segments})
     return found
 
   if "ground" in layers:
-    positions, triangles = bridgeMeshAccess.playerSolidTriangles()
-    cuts["ground"] = keptSegments(planeSegments(positions, triangles, start, along, normal), length, bottom, top)
+    cuts["ground"] = keptSegments(ground, length, bottom, top)
   if "water" in layers:
     bodies = renderedWater()
-    ground = bridgeWater.Ground() if bodies else None
+    waterGround = bridgeWater.Ground() if bodies else None
     for body in bodies:
-      positions, triangles = bridgeMeshAccess.worldTriangles([body])
-      shown = shownWater(planeSegments(positions, triangles, start, along, normal), start, along, ground)
-      segments = keptSegments(shown, length, bottom, top)
+      bodyPositions, bodyTriangles = bridgeMeshAccess.worldTriangles([body])
+      shown = [leg.shifted(shownWater(planeSegments(bodyPositions, bodyTriangles, leg.start, leg.along, leg.normal), leg.start, leg.along, waterGround)) for leg in legs]
+      segments = keptSegments(numpy.vstack(shown), length, bottom, top)
       if segments:
         cuts["water"].append({"name": body.name, "segments": segments})
   if "massing" in layers:
     cuts["massing"] = [entry | {"label": readSpec(bpy.data.objects[entry["name"]]).get("label") or readSpec(bpy.data.objects[entry["name"]])["name"]} for entry in cutObjects([shape for shape in sketchObjects() if len(shape.data.polygons)])]
   if "sketch" in layers:
-    cuts["sketch"] = sketchCuts(start, along, normal, length)
+    merged = {}
+    for leg in legs:
+      for entry in sketchCuts(leg.start, leg.along, leg.normal, leg.length):
+        pieces = leg.shifted(entry["pieces"]).round(2).tolist()
+        if pieces:
+          merged.setdefault((entry["sheet"], entry["shape"]), entry | {"pieces": []})["pieces"] += pieces
+    cuts["sketch"] = list(merged.values())
   if "plots" in layers:
-    cuts["plots"] = [cut for plot in bridgeHousing.plotObjects() if (cut := plotCut(plot, start, along, normal, length)) is not None]
+    for plot in bridgeHousing.plotObjects():
+      for leg in legs:
+        cut = plotCut(plot, leg.start, leg.along, leg.normal, leg.length)
+        if cut is not None:
+          entrance = None if cut["entrance"] is None or not 0 <= cut["entrance"] <= leg.length else rounded(cut["entrance"] + leg.offset, 2)
+          cuts["plots"].append(cut | {"s": [rounded(value + leg.offset, 2) for value in cut["s"]], "entrance": entrance})
   if "swim" in layers:
     for box in bridgeSwim.swimBoxes():
       (low, high) = bridgeSwim.boxCorners(box)
-      crossing = boxCrossing(low, high, start, along)
-      if crossing is not None:
-        cuts["swim"].append({"name": box.name, "liquid": bridgeSwim.readBox(box)["liquid"], "s": crossing, "z": [low[2], high[2]]})
+      for leg in legs:
+        crossing = boxCrossing(low, high, leg.start, leg.along)
+        span = None if crossing is None else clippedSpan(crossing, leg.length)
+        if span is not None:
+          cuts["swim"].append({"name": box.name, "liquid": bridgeSwim.readBox(box)["liquid"], "s": [rounded(value + leg.offset, 2) for value in span], "z": [low[2], high[2]]})
   if "boundaries" in layers:
     boundaries = [boundary for boundary in bridgeBoundaries.boundaryObjects() if boundary.type == "MESH"]
     cuts["boundaries"] = [entry | {"kind": bridgeBoundaries.readSpec(bpy.data.objects[entry["name"]], bridgeMeshAccess.boundaryProperty)["kind"]} for entry in cutObjects(boundaries)]
@@ -758,9 +1022,13 @@ def sectionCuts(start, end, bottom, top, layers):
     for line in bridgeBoundaries.zoneLineObjects():
       center, half = bridgeBoundaries.boxBounds(line)
       heading = bridgeBoundaries.boxHeading(line)
-      crossing = boxCrossing([-extent for extent in half], half, planTurned(start - center[:2], -heading), planTurned(along, -heading))
-      if crossing is not None:
-        cuts["zoneLines"].append({"name": line.name, "s": crossing, "z": [round(center[2] - half[2], 2), round(center[2] + half[2], 2)]})
+      for leg in legs:
+        crossing = boxCrossing([-extent for extent in half], half, planTurned(leg.start - center[:2], -heading), planTurned(leg.along, -heading))
+        span = None if crossing is None else clippedSpan(crossing, leg.length)
+        if span is not None:
+          cuts["zoneLines"].append({"name": line.name, "s": [rounded(value + leg.offset, 2) for value in span], "z": [round(center[2] - half[2], 2), round(center[2] + half[2], 2)]})
+  if "caves" in layers:
+    cuts["caves"] = caveCuts(legs, followed)
   return cuts
 
 

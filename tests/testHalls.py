@@ -373,7 +373,7 @@ def testTwoHallsStayFreshThroughEachOthersCutsAndRegrades(stageBlenderServer, tm
   assert [(cave["name"], cave["stale"], cave["groundMoved"]["largest"]) for cave in cut["caves"]] == [("hallP", False, 0.0), ("hallQ", False, 0.0)]
   assert [regraded["refittedCaves"] for regraded in regrades] == [[], []]
   assert not [failure for failure in game["failures"] if failure["failure"] == "stale"]
-  assert "Cave 'hallOver' would overlap cave(s) ['hallP'] in plan" in overlap
+  assert "Cave 'hallOver' would reach the mouth of cave(s) ['hallP']" in overlap
   # In front of the cliff the hall's floor runs level with the open ground there, which stays ground.
   assert floor["notLining"] == 0 and floor["nearestLiningFloor"] >= 88 - 4
 

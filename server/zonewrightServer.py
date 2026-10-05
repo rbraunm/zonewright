@@ -1521,16 +1521,20 @@ async def measure(context: Context, points: list[list[float]], snapToSurface: bo
 
 
 @guardedTool()
-async def walkRoute(context: Context, path: list[list[float]] | None = None, route: str | None = None, sampleSpacing: float = 4.0):
+async def walkRoute(
+  context: Context, path: list[list[float]] | None = None, route: str | None = None, cave: dict | None = None, sampleSpacing: float = 4.0,
+):
   """Walk a route as a player would, over what the client collides with (rendered meshes and collection instances, and the
   boundaries, never drawn; not water, which is waded or swum, nor faces players pass through: liquid and cutout materials, objects
   marked passable, faces an imported zone file flags passable; nor guides, regions, spawns, or doors, taken as open; ground inside a
   solid is no footing, ground under one-sided cover such as a roof plane is): from its first point, following the footing underfoot
-  past each point of `path` [[x, y, z], ...], of the saved review route named `route` (saveReviewRoute), or of the walk line of the
-  bridge, flight, or walkway named `route` (its centerline at deck height, run on 5 past each end that stands on footing), whose heights only need to
-  be within a step of the footing (so a route can run over an arch or under it). Judged for a player 6 units tall who walks slopes up
-  to 60 degrees and steps up 2, in half-unit strides whatever `sampleSpacing`, which sets only the profile's rows (give `path` or
-  `route`, not both; renderRouteStrip shows the walk in pictures). Returns the length walked, the steepest face stood on, the steepest
+  past each point of `path` [[x, y, z], ...], of the saved review route named `route` (saveReviewRoute), of the walk line of the
+  bridge, flight, or walkway named `route` (its centerline at deck height, run on 5 past each end that stands on footing), or along a
+  cave's run (`cave` {objectName, name, run}, run "main" unless a branch is named): its centerline at its floor from its first point
+  to its last, arcs included, a branch's walk starting at the cave's own start and following each run it leaves to its junction; whose
+  heights only need to be within a step of the footing (so a route can run over an arch or under it). Judged for a player 6 units tall
+  who walks slopes up to 60 degrees and steps up 2, in half-unit strides whatever `sampleSpacing`, which sets only the profile's rows
+  (give one of `path`, `route`, and `cave`; renderRouteStrip shows the walk in pictures). Returns the length walked, the steepest face stood on, the steepest
   grade climbed or descended between two profile rows (steepestGrade: a stair's level treads stand at 0 but climb at its pitch), the narrowest footing
   (how far it runs to each side before a drop of more than a player's height, a wall, a step too high, or a face too steep; null
   beyond 60), the lowest headroom, the deepest water over the footing; `problems`, everything that stops a player, each once over the
@@ -1541,7 +1545,7 @@ async def walkRoute(context: Context, path: list[list[float]] | None = None, rou
   climb back: ledge (a drop over a step, its height) and steep (a face over 60 descended); walkable when there are no problems; and a
   profile along the way (each row with the water depth over its footing, or null). Use it on decks, ramps, ledges, and the ways into
   an area."""
-  return await callBridge(context, "walkRoute", {"path": path, "route": route, "sampleSpacing": sampleSpacing})
+  return await callBridge(context, "walkRoute", {"path": path, "route": route, "cave": cave, "sampleSpacing": sampleSpacing})
 
 
 @guardedTool(description="Move the selected vertices of a mesh by `offset` [x, y, z] world units. With `falloff` {center, radius, curve: constant|linear|smooth|sharp} the move fades with distance from the center; this is the precise, fine-detail edit. With shaping passes, the move goes into the active pass." + caveShapingHelp + selectorHelp)
@@ -1667,7 +1671,9 @@ async def regradeTerrain(context: Context, objectName: str):
 async def cutCave(
   context: Context, objectName: str, name: str, path: list[list[float]], widths: list[float], heights: list[float], wallMaterial: str,
   floorMaterial: str, worldUnitsPerRepeat: float, edgeLength: float = 16.0, wallShare: float = 0.35, breakup: dict | None = None,
-  mouthFade: float | None = None, maximumFloorDegrees: float = 30.0, trimBands: list[dict] | None = None,
+  mouthFade: float | None = None, maximumFloorDegrees: float = 30.0, trimBands: list[dict] | None = None, grades: list[float | None] | None = None,
+  landings: list[int] | None = None, daylight: list[float] | None = None, branches: list[dict] | None = None, floor: list[dict] | None = None,
+  minimumRock: float = 8.0,
 ):
   """Cut a cave into a terrain mesh (objectName) as the client's own caves are built, one terrain holding the hill and the room under
   it: a closed tube swept along the floor `path` [[x, y, z], ...] with one width and height per point, its floor flat across, its walls
@@ -1678,7 +1684,12 @@ async def cutCave(
   row (a dado, a frieze: Crescent's cr_tile_trim_marble_dark), the walls cut exactly along their edges, in their own createMaterial
   material mapped along the band, a strip texture running once up it (v from the band's bottom at its repeat); set again on every cut,
   before the strokes kept with the lining. Breakup stays the artist's choice (none for a dressed hall). Widths and heights ease from point to point and the floor grades evenly
-  between their heights; a room is a wide stretch of the path. A bend turns on an arc the width in radius (less where the points are
+  between their heights; a room is a wide stretch of the path. A point may be [x, y] without a height: it takes the even grade, by plan
+  length along the path, between the nearest points whose heights are set, and an end without one takes the ground there (a mouth on
+  open ground). `grades` (one per segment: signed degrees, or null where the points' heights decide) set a segment's end's height from
+  its start's at that grade. `landings` (path point indices, each a bend) turn that bend on a level arc at its point's height, the
+  grade taken up on the straights either side, as a builder lands a switchback. Every slope and level is the author's: a climb because
+  it leads up to a room, a landing where it turns. A bend turns on an arc the width in radius (less where the points are
   close). `breakup` {featureSize, amplitude, seed} moves the walls and vault along their outward directions by noise, the floor kept
   flat, fading out within `mouthFade` (default twice edgeLength) of wherever the tube lies in the open, so the lip stays a clean arch.
   Each end is open, some of its floor within a step of walkable ground (a mouth, its section in the open but for a sill a step deep;
@@ -1694,26 +1705,32 @@ async def cutCave(
   welded down to a third of `edgeLength`. Lining faces facing up get `floorMaterial`, the rest `wallMaterial`, with every surfacing
   layer uncovered on them, box-mapped at `worldUnitsPerRepeat` and smooth shaded; ground faces the cut split keep their materials,
   paint, and mapping.
-  Refused, changing nothing: a stretch of floor steeper than `maximumFloorDegrees` (naming it and the run it needs), a bend tighter than
-  half the width, an end part in the rock with its floor buried more than a step under the ground (for a hall, any end part in the rock
+  Refused, changing nothing: a stretch of floor steeper than `maximumFloorDegrees` (naming it and the run it needs; a graded segment's
+  own grade included), a point whose height is set two ways (given, and by a graded segment into it), a graded segment whose start has
+  no height, a landing at an end or at a point where the path does not bend, a bend tighter than half the width, an end part in the rock with its floor buried more than a step under the ground (for a hall, any end part in the rock
   and part in the open, or a ledge), a floor hanging in the air, both
   ends wholly inside the rock, the tube reaching the terrain's border or another cave's reach, a mesh with modifiers or shared with another object, and caves that fail their integrity checks;
   `wallShare` outside (0, 1]; a band reaching above the walls' straight part (wallShare of the height) at any path point (naming it),
   bands overlapping, a band below the floor or not tall, a band material createMaterial did not make, a repeat not positive.
-  Returns the faces and vertices it made, the shortest edges of the lining, the pieces of ground at the mouth, and the seam, each end's
-  kind, each trim band's faces, and the floor's level stretches (start, end, length, height, narrowest width: a stretch about 220 wide and long holds a stock
-  player plot). The cave is kept with its definition: the ground within its reach is fingerprinted, getObjectDetail and exports flag it
+  Returns its profile, a picture: the section along its run's centerline, unrolled, as renderSection draws it with a cave (ground,
+  floor, vault, grades, landings); the faces and vertices it made, the shortest edges of the lining, the pieces of ground at the mouth,
+  and the seam, each end's kind, each trim band's faces, each run's worked-out floor heights, stations (distance along at each point),
+  segment grades and runs, and landings, and the floor's level stretches (start, end, length, height, narrowest width: a stretch about
+  220 wide and long holds a stock player plot). The cave is kept with its definition: the ground within its reach is fingerprinted, getObjectDetail and exports flag it
   stale once that ground moves, and editCave or regradeTerrain cuts it again to fit. Around a cave, shaping leaves its lining where it
   is (results count caveLiningLeft) and keeps its ring on the ground; strokes never slide its vertices sideways; contour cuts, turned
   diagonals, and face edits refuse or keep clear of it (removeCave, change, cutCave with the definition it returned); surface tools
   leave its lining out unless their selector names it ({"cave": name}), and paint that reaches its lining is kept with it and painted
   again on every cut. Look at it from outside the mouth, close on the throat, from inside looking out, in the room with the figure,
   from the hill above, and in sections across and along."""
-  return await callBridge(context, "cutCave", {
+  cut = await callBridge(context, "cutCave", {
     "objectName": objectName, "name": name, "path": path, "widths": widths, "heights": heights, "wallMaterial": wallMaterial,
     "floorMaterial": floorMaterial, "worldUnitsPerRepeat": worldUnitsPerRepeat, "edgeLength": edgeLength, "wallShare": wallShare,
-    "breakup": breakup, "mouthFade": mouthFade, "maximumFloorDegrees": maximumFloorDegrees, "trimBands": trimBands,
+    "breakup": breakup, "mouthFade": mouthFade, "maximumFloorDegrees": maximumFloorDegrees, "trimBands": trimBands, "grades": grades,
+    "landings": landings, "daylight": daylight, "branches": branches, "floor": floor, "minimumRock": minimumRock,
   })
+  image, profile = await caveProfile(context, objectName, name, list(cut["runs"]))
+  return [image, cut | {"profile": profile}]
 
 
 @guardedTool()
@@ -1725,8 +1742,15 @@ async def editCave(context: Context, objectName: str, name: str, changes: dict |
   facade dressed at its mouth (dressFacade) follows it: made again from what it was given (faceAt, width, height, apron, blend,
   turnDegrees) on the changed cave, dressed again where its face moved (refitFacades), and refused when it would no longer frame the
   cave (narrower than the cave plus 2, lower than it plus 1), naming the facade to dress again or take back. If the new cut or a facade
-  is refused, the cave and the ground stay exactly as they were. Returns what taking it back restored and what the new cut made."""
-  return await callBridge(context, "editCave", {"objectName": objectName, "name": name, "changes": changes})
+  is refused, the cave and the ground stay exactly as they were. Returns the profile of the runs it changed (a picture, as cutCave's),
+  what taking it back restored, and what the new cut made."""
+  edited = await callBridge(context, "editCave", {"objectName": objectName, "name": name, "changes": changes})
+  runs = list(edited["cut"]["runs"])
+  touched = {branch for branch, change in ((changes or {}).get("branches") or {}).items() if change is not None}
+  touched |= {stroke.get("run") for stroke in ((changes or {}).get("floor") or {}).values() if isinstance(stroke, dict)}
+  shown = runs if not changes else [run for run in runs if run == "main" or run in touched]
+  image, profile = await caveProfile(context, objectName, name, shown)
+  return [image, edited | {"profile": profile}]
 
 
 @guardedTool()
@@ -1987,7 +2011,7 @@ async def getSketch(context: Context, sheet: str | None = None):
 
 @guardedTool()
 async def renderSketch(
-  context: Context, center: list[float], width: float, sheets: list[str] | None = None, layers: list[str] = ["regions", "plots", "water", "boundaries", "zoneLines"],
+  context: Context, center: list[float], width: float, sheets: list[str] | None = None, layers: list[str] = ["regions", "plots", "water", "boundaries", "zoneLines", "caves"],
   bandHeight: float = 25.0, spotHeights: bool = True,
 ):
   """Draw a plan: the zone from straight above in quiet grey relief (lighter higher, a step every bandHeight units, slopes shaded
@@ -1996,7 +2020,9 @@ async def renderSketch(
   crossing unless spotHeights is false, giving way wherever a label must stand on it), a scale bar, the sketch sheets (all, or
   those named) in their own colors (areas dashed and faintly filled, footprints filled with their facing arrows and heights, paths at
   their widths, points, notes; every shape shows, inside an area or under another sheet's), and the plan's own layers: regions
-  (dashed, named), plots (outlined, by address, with a mark pointing out of the entrance side), water (as players see it, not where a
+  (dashed, named), plots (outlined, by address, with a mark pointing out of the entrance side), caves (purple: each run's walls at its
+  floor's height, its middle dotted, its floor height written at each path point, its name, a ring where a branch leaves its parent,
+  and its floor strokes' outlines: level ways green, pads orange, rough ground brown dashed), water (as players see it, not where a
   surface runs on tucked under its banks: blue, lava orange), swim (the swim volumes, dashed, cyan water and magenta lava, each
   named inside itself where its name fits clear of the other labels, else by its number; `unnamedSwimVolumes` lists those in the
   drawing left unnamed, to see closer), boundaries (red, named: walls as lines along their foot, lids and floors faintly filled), and
@@ -2233,9 +2259,9 @@ def problemText(problem):
 
 
 @guardedTool()
-async def renderRouteStrip(context: Context, spacing: float, route: str | None = None, path: list[list[float]] | None = None):
-  """walkRoute as a strip of eye-level frames: walks a saved review route or a bridge's, flight's, or walkway's walk line (route) or a
-  path [[x, y, z], ...] as walkRoute does, and
+async def renderRouteStrip(context: Context, spacing: float, route: str | None = None, path: list[list[float]] | None = None, cave: dict | None = None):
+  """walkRoute as a strip of eye-level frames: walks a saved review route or a bridge's, flight's, or walkway's walk line (route), a
+  path [[x, y, z], ...], or a cave's run (cave {objectName, name, run}) as walkRoute does, and
   renders a frame every `spacing` along it in plan (from its start) and one where each problem the walk meets starts, each standing
   where the walk stands there (eye 5.5 over the footing; no scale figure), heading along the route and pitched toward where the walk
   stands 30 further on, or toward the brink where it stops if sooner (a problem's frame looks past the problem: down past the brink of a
@@ -2243,7 +2269,7 @@ async def renderRouteStrip(context: Context, spacing: float, route: str | None =
   walk cannot reach, between a stop and where it walks on, get no frame (stationsNotStoodOn); the problem's frame shows why. The result
   gives the walk (length in plan, walkable, problems, oneWay) and each frame's distance, view (renderView renders it, adding the scale
   figure), problem, and render path."""
-  planned = await callBridge(context, "planRouteStrip", {"path": path, "route": route, "spacing": spacing})
+  planned = await callBridge(context, "planRouteStrip", {"path": path, "route": route, "cave": cave, "spacing": spacing})
   frames, problems, length = planned["frames"], len(planned["problems"]), planned["length"]
   if len(frames) > sheetViews:
     room = sheetViews - problems
@@ -2257,29 +2283,38 @@ async def renderRouteStrip(context: Context, spacing: float, route: str | None =
   }]
 
 
+sectionLayersDefault = ["ground", "water", "swim", "massing", "sketch", "plots", "boundaries", "zoneLines", "caves"]
+
+
 @guardedTool()
 async def renderSection(
-  context: Context, start: list[float], end: list[float], bottom: float, top: float,
-  layers: list[str] = ["ground", "water", "swim", "massing", "sketch", "plots", "boundaries", "zoneLines"],
+  context: Context, start: list[float] | None = None, end: list[float] | None = None, path: list[list[float]] | None = None, cave: dict | None = None,
+  bottom: float | None = None, top: float | None = None, layers: list[str] = sectionLayersDefault,
 ):
   """Draw a section: where the vertical plane through the line from start [x, y] to end [x, y] cuts the zone, seen from the line's right
-  so start is on the left, from bottom to top at one scale across and up, clipped to that frame: the ground players stand on (brown;
-  caves, overhangs, and arches show as the shapes they are), water surfaces where players see them (blue; not where they run on
-  tucked under the banks), swim volumes (dashed boxes, cyan water and magenta lava), sketch massing (grey), sketch areas' floors
-  (dashed) and paths in their sheets' colors (a path's rise and fall where it runs along the line, level across its width where it
-  crosses it), plot pads (orange, level at the plot's height across its footprint, with a mark on its entrance side pointing out),
-  boundaries (red: a wall from under the ground to its top, a lid or a floor at its height), and zone lines (green boxes), each named
-  just above, with a height grid and the distance along the line. For judging what plans cannot show: swim volumes against the
-  surface and the bed, a cave's headroom, a plot's pad against the slope, stacked floors and the stairs between them, an arch's span,
-  a wall's height over the ground and a lid's over a path. The result also gives the cuts as numbers (s along the line, z height)."""
-  if len(start) != 2 or len(end) != 2:
-    raise ToolError(f"start and end are [x, y], got {start} and {end}")
-  cuts = await callBridge(context, "sectionCuts", {"start": start, "end": end, "bottom": bottom, "top": top, "layers": layers})
+  so start is on the left; or along a `path` [[x, y], ...], each leg's plane cut and the legs laid out end to end, each bend marked
+  with its point's number; or along a cave's run (`cave` {objectName, name, run}, run "main" unless a branch is named): its centerline,
+  arcs included, run on straight past each end so the ground in front of a mouth shows, its path points marked by number: the run's
+  profile, unrolled. From bottom to top (fitted round the ground the section cuts when not given) at one scale across and up, clipped
+  to that frame: the ground players stand on (brown; caves, overhangs, and arches show as the shapes they are), water surfaces where
+  players see them (blue; not where they run on tucked under the banks), swim volumes (dashed boxes, cyan water and magenta lava),
+  sketch massing (grey), sketch areas' floors (dashed) and paths in their sheets' colors (a path's rise and fall where it runs along the
+  line, level across its width where it crosses it), plot pads (orange, level at the plot's height across its footprint, with a mark on
+  its entrance side pointing out), boundaries (red: a wall from under the ground to its top, a lid or a floor at its height), zone lines
+  (green boxes), and caves (purple): a run going along the line as its floor (solid) and vault (dashed) as designed, its floor strokes
+  as bars (level ways green at the floor, pads orange at their tops, rough ground brown dashed at its rise where the line passes over
+  it), its landings and the junctions where branches leave it marked; a run crossing the line as a dashed box from its floor to its
+  vault, as long as its width crosses the line; each named just above, with a height grid and the distance along the line. For judging
+  what plans cannot show: a cave's climb, landings, and headroom, one passage over another and the rock between, swim volumes against
+  the surface and the bed, a plot's pad against the slope, stacked floors and the stairs between them, an arch's span, a wall's height
+  over the ground and a lid's over a path. Refused: no line, or more than one; a path under two points or with two in one place; an
+  unknown cave or run. The result also gives the cuts as numbers (s along the line, z height)."""
+  cuts = await callBridge(context, "sectionCuts", {"start": start, "end": end, "path": path, "cave": cave, "bottom": bottom, "top": top, "layers": layers})
   outputPath = newRenderPath()
-  drawn = await anyio.to_thread.run_sync(planDrawing.drawSection, outputPath, cuts, start, end, bottom, top)
+  drawn = await anyio.to_thread.run_sync(planDrawing.drawSection, outputPath, cuts)
   summary = {
-    "outputPath": str(outputPath), "length": cuts["length"], "gridStep": drawn["gridStep"], "unitsPerPixel": drawn["unitsPerPixel"],
-    "groundSegments": len(cuts["ground"]),
+    "outputPath": str(outputPath), "length": cuts["length"], "bottom": cuts["bottom"], "top": cuts["top"], "bends": cuts["bends"],
+    "gridStep": drawn["gridStep"], "unitsPerPixel": drawn["unitsPerPixel"], "groundSegments": len(cuts["ground"]), "groundAtJoins": cuts["groundAtJoins"],
     "water": [{"name": entry["name"], "levels": [min(min(z0, z1) for _, z0, _, z1 in entry["segments"]), max(max(z0, z1) for _, z0, _, z1 in entry["segments"])]} for entry in cuts["water"]],
     "swim": cuts["swim"],
     "massing": [{"name": entry["name"], "label": entry["label"]} for entry in cuts["massing"]],
@@ -2287,8 +2322,21 @@ async def renderSection(
     "plots": [{key: entry[key] for key in ("name", "s", "z", "entrance")} for entry in cuts["plots"]],
     "boundaries": [{"name": entry["name"], "kind": entry["kind"], "segments": entry["segments"]} for entry in cuts["boundaries"]],
     "zoneLines": cuts["zoneLines"],
+    "caves": [{key: entry[key] for key in ("cave", "run", "floor", "strokes", "marks", "crossings")} for entry in cuts["caves"]],
   }
   return [Image(data=outputPath.read_bytes(), format="png"), summary]
+
+
+async def caveProfile(context, objectName, cave, runs):
+  """A cave's profile: each named run's section along its centerline (renderSection cave), one under another at one scale, with the
+  ground and the caves only."""
+  panels = []
+  for run in runs:
+    cuts = await callBridge(context, "sectionCuts", {"start": None, "end": None, "path": None, "cave": {"objectName": objectName, "name": cave, "run": run}, "bottom": None, "top": None, "layers": ["ground", "caves"]})
+    panels.append((f"{cave}: {run}", cuts))
+  outputPath = newRenderPath()
+  drawn = await anyio.to_thread.run_sync(planDrawing.drawProfiles, outputPath, panels)
+  return Image(data=outputPath.read_bytes(), format="png"), {"outputPath": str(outputPath)} | drawn
 
 
 @guardedTool()
