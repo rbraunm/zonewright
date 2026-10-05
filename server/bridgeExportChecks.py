@@ -641,23 +641,26 @@ def structureReport(shipped, placed):
   return structures, placedTriangles
 
 
-def structureFailures(stale, purpose):
-  """Structures whose kit is missing, for both purposes; for a game export, structures laid on ground or a kit that changed since."""
-  failures = [
+def missingKitStructures(stale):
+  """Structures whose kit is missing, which refuse both purposes."""
+  return [
     {"failure": "kit missing", "structure": entry["structure"], "missing": entry["missing"], "message": f"Structure '{entry['structure']}' was laid from a kit that cannot be found: {entry['missing']}; put the kit back, or take it back (removeStructure)"}
     for entry in stale if "missing" in entry["why"]
   ]
-  if purpose == "game":
-    failures += [
-      {"failure": "stale structure", "structure": entry["structure"], "why": entry["why"], "message": f"Structure '{entry['structure']}' was laid on ground or a kit that has changed since ({', '.join(entry['why'])}): editStructure lays it again"}
-      for entry in stale if set(entry["why"]) & {"ground", "kit"}
-    ]
-  return failures
+
+
+def staleStructures(stale):
+  """Structures laid on ground or a kit that changed since, which refuse a game export."""
+  return [
+    {"failure": "stale structure", "structure": entry["structure"], "why": entry["why"], "message": f"Structure '{entry['structure']}' was laid on ground or a kit that has changed since ({', '.join(entry['why'])}): editStructure lays it again"}
+    for entry in stale if set(entry["why"]) & {"ground", "kit"}
+  ]
 
 
 def checkZoneExport(purpose):
   """Every failure that stops an export for its purpose and every finding to look at, each with where it is; plus what the export leaves
-  out, the decisions it leaves to confirm, and the zone's faces by coverage status."""
+  out, the decisions it leaves to confirm, and the zone's faces by coverage status. hardFailures are those that refuse both purposes:
+  an unsaved file and what no zone file can hold."""
   requirePurpose(purpose)
   bpy.context.view_layer.update()
   failures, findings = [], []
@@ -676,7 +679,7 @@ def checkZoneExport(purpose):
   findings += faceFindings
   structures, placedTriangles = structureReport(shipped, placed)
   stale = bridgeStructures.staleStructures()
-  failures += structureFailures(stale, purpose)
+  failures += missingKitStructures(stale)
   for label, errors in (("swim volume", bridgeSwim.structuralErrors()), ("boundary", bridgeBoundaries.boundaryErrors()), ("zone line", bridgeBoundaries.zoneLineErrors())):
     failures += [{"failure": label} | error for error in errors]
   decisions = bridgeSwim.swimDecisions()
@@ -684,13 +687,14 @@ def checkZoneExport(purpose):
     bridgeHousing.collectHousing()
   except ValueError as error:
     failures.append({"failure": "housing", "message": str(error)})
+  hardFailures = list(failures)
   gapKey = "failure" if purpose == "game" else "finding"
   gaps = blockouts.listed(gapKey) + [{gapKey: f"swim {swimState}", "body": body.name, "at": bodyCenter(body)} for swimState, bodies in decisions.items() for body in bodies]
   gaps += [{gapKey: gap["gap"]} | {key: value for key, value in gap.items() if key != "gap"} for gap in zoneRowGaps() + bridgeBoundaries.zoneLineGaps() + playerSpaceGaps()]
   objectDecisions = bridgeExport.decisionsToConfirm(shipped)
   toConfirm = objectDecisions + [{"structure": entry["structure"], "why": entry["why"]} for entry in stale]
   if purpose == "game":
-    failures += [
+    failures += staleStructures(stale) + [
       {
         "failure": "stale", "object": decision["object"], "staleCaves": decision["staleCaves"], "staleDefinedPasses": decision["staleDefinedPasses"],
         "message": f"The ground under caves {decision['staleCaves']} and defined passes {decision['staleDefinedPasses']} of '{decision['object']}' moved since they were made; regradeTerrain (or editCave) fits them to it",
@@ -701,7 +705,7 @@ def checkZoneExport(purpose):
   else:
     findings += gaps
   return {
-    "purpose": purpose, "failures": failures, "findings": findings, "coverage": coverage, "excluded": excluded,
+    "purpose": purpose, "failures": failures, "hardFailures": hardFailures, "findings": findings, "coverage": coverage, "excluded": excluded,
     "toConfirm": toConfirm, "swim": {swimState: [body.name for body in bodies] for swimState, bodies in decisions.items()},
     "boundaries": sorted(sceneObject.name for sceneObject, role in shipped if role == "boundary"), "zoneLines": [region["name"] for region in bridgeBoundaries.zoneLineRegions()],
     "structures": structures, "placedTriangles": placedTriangles,
@@ -751,9 +755,10 @@ def playerSpaceGaps():
 
 
 def collectZoneExport(outputFolder, zoneName, purpose):
-  """The checks, then, only when nothing fails, what the export writes (bridgeExport.collectZoneExport)."""
+  """The checks, then, when none of their failures is a hard one, what the export writes (bridgeExport.collectZoneExport): a game
+  export's server files are built from it beside its gaps."""
   report = checkZoneExport(purpose)
-  return {"report": report, "collected": None if report["failures"] else bridgeExport.collectZoneExport(outputFolder, zoneName)}
+  return {"report": report, "collected": None if report["hardFailures"] else bridgeExport.collectZoneExport(outputFolder, zoneName)}
 
 
 def meshFromData(data, name):

@@ -1,8 +1,9 @@
 """Plans of the server's map files, north up as planDrawing draws them: the collision a .map gives the server seen from above, shaded
 by height and slope (faces seen edge-on from above, such as upright walls, show only as the edges between heights), with the .wtr's
-region boxes outlined and numbered; two collisions side by side with the triangles that differ between them; and a nav mesh's polygons
+region boxes outlined and numbered; two collisions side by side with the triangles that differ between them; a nav mesh's polygons
 (serverNav.inspectNav's) filled by nav area, by NPC component with the islands numbered, or as a difference against another nav, in
-panels side by side on one frame, each titled and with its legend."""
+panels side by side on one frame, each titled and with its legend; and the server's view of a zone, its collision (what stands upright
+drawn as lines, so a thin wall shows), region boxes, NPC nav, and marked points in one plan."""
 import collections
 import math
 
@@ -41,6 +42,16 @@ islandLabelColor = (120, 50, 0)
 islandLabelSize = 11
 legendRowHeight = 22
 swatchSize = 14
+serverGroundStops = ((0.0, (140, 140, 140)), (1.0, (240, 240, 240)))
+passableColor = (40, 110, 230)
+passableAlpha = 115
+navFillAlpha = 120
+unreachedIslandColor = (150, 150, 150)
+markerRadius = 6
+markerLabelSize = 14
+uprightColor = (150, 20, 20)
+uprightDegrees = 5
+uprightLineWidth = 2
 
 
 def collisionFrame(serverTriangles, longSide):
@@ -107,9 +118,9 @@ def topSurface(zoneTriangles, frame):
   return heights.reshape(rows, columns), owners.reshape(rows, columns)
 
 
-def shadedCollision(zoneTriangles, frame):
-  """The top surface as RGB: a color by height (between the 1st and 99th percentile of what it covers) darkened by slope away from a
-  light in the north-west, the background where nothing is."""
+def shadedCollision(zoneTriangles, frame, stops=heightStops):
+  """The top surface as RGB: a color by height (stops, between the 1st and 99th percentile of what it covers) darkened by slope away
+  from a light in the north-west, the background where nothing is."""
   heights, owners = topSurface(zoneTriangles, frame)
   image = numpy.empty((*heights.shape, 3), dtype=numpy.float64)
   image[:] = backgroundColor
@@ -122,9 +133,9 @@ def shadedCollision(zoneTriangles, frame):
     shade = 0.5 + 0.5 * numpy.clip(normals @ lightDirection, 0, 1)
     low, high = numpy.percentile(heights[covered], (1, 99))
     share = numpy.clip((heights[covered] - low) / max(high - low, 1e-9), 0, 1)
-    stops = numpy.array([stop for stop, _ in heightStops])
-    colors = numpy.array([color for _, color in heightStops], dtype=numpy.float64)
-    ramp = numpy.stack([numpy.interp(share, stops, colors[:, channel]) for channel in range(3)], axis=1)
+    places = numpy.array([place for place, _ in stops])
+    colors = numpy.array([color for _, color in stops], dtype=numpy.float64)
+    ramp = numpy.stack([numpy.interp(share, places, colors[:, channel]) for channel in range(3)], axis=1)
     image[covered] = ramp * shade[:, None]
   return Image.fromarray(numpy.round(image).astype(numpy.uint8), "RGB")
 
@@ -347,4 +358,119 @@ def drawNav(outputPath, panels, panelWidth=760):
     "width": sheet.width, "height": sheet.height,
     "frame": {"center": list(frame.center), "width": frame.width, "size": list(frame.size)},
     "panelOrigins": origins, "labelsWritten": labelCounts, "legends": [[text for _, text in panel["legend"]] for panel in panels],
+  }
+
+
+def serverPolygonColor(component, islandReach):
+  if component < 0:
+    return excludedColor
+  if component == 0:
+    return mainPieceColor
+  return islandColor if islandReach is None or islandReach[component - 1] else unreachedIslandColor
+
+
+def uprightSegments(zoneTriangles, frame):
+  """The triangles standing within uprightDegrees of vertical, which the top surface shows little or nothing of (a thin wall, nothing),
+  each as its longest span in plan: rows of (x0, y0, x1, y1) in the frame's pixels."""
+  corners = zoneTriangles.astype(numpy.float64)
+  normals = numpy.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0])
+  lengths = numpy.linalg.norm(normals, axis=1)
+  upright = (lengths > 0) & (numpy.abs(normals[:, 2]) <= math.sin(math.radians(uprightDegrees)) * lengths)
+  x, y = frame.pixel((corners[upright, :, 0], corners[upright, :, 1]))
+  pairs = numpy.array([[0, 1], [1, 2], [2, 0]])
+  spans = numpy.hypot(x[:, pairs[:, 0]] - x[:, pairs[:, 1]], y[:, pairs[:, 0]] - y[:, pairs[:, 1]])
+  longest = pairs[spans.argmax(axis=1)]
+  rows = numpy.arange(len(longest))
+  return numpy.stack([x[rows, longest[:, 0]], y[rows, longest[:, 0]], x[rows, longest[:, 1]], y[rows, longest[:, 1]]], axis=1)
+
+
+def islandLegend(islands, islandReach):
+  atRisk = sum(island["snapRisk"] for island in islands)
+  if islandReach is None:
+    return [(islandColor, f"{len(islands):,} NPC islands, {atRisk} at snap risk; players' reach not checked")]
+  reached = sum(islandReach)
+  return [
+    (islandColor, f"{reached:,} NPC islands players reach"),
+    (unreachedIslandColor, f"{len(islands) - reached:,} NPC islands players do not reach ({atRisk} of all at snap risk)"),
+  ]
+
+
+def drawServerPlan(outputPath, mapContent, waterRecords, regionLabels, inspection, markers, islandReach=None, longSide=1000):
+  """The server's view of a zone from its files alone, north up: the .map's collision in grey relief, what of it stands upright (walls,
+  the sides of blocks) as dark red lines along it, and what it holds that the server never collides with tinted blue; the nav's
+  polygons over them (serverNav.inspectNav's), the main piece green, islands orange where players reach them and grey where they do not
+  (islandReach, by island number; None draws every island orange and the legend says players' reach was not checked), numbered, and
+  what the server's ground filter never walks (Disabled, zone line) dark; the .wtr's boxes outlined in their type's color (water cyan,
+  lava magenta, zone lines green), each with its label (regionLabels, in .wtr order); and markers ({at: zone [x, y], label}), such as
+  the safe point. Written as PNG with its legend below; returns the sheet's size, the plan's frame (its center and width in zone units,
+  its size in pixels, at the sheet's top left), the legend, and how many island numbers found room."""
+  islands = inspection["islands"]
+  if islandReach is not None and len(islandReach) != len(islands):
+    raise ValueError(f"islandReach holds {len(islandReach)} flags for {len(islands)} islands")
+  if len(regionLabels) != len(waterRecords):
+    raise ValueError(f"{len(regionLabels)} region labels for {len(waterRecords)} .wtr records")
+  collision = serverMapFiles.collisionTriangles(mapContent)
+  passable = serverMapFiles.passableTriangles(mapContent)
+  frame = collisionFrame(collision, longSide)
+  image = shadedCollision(eqAxes.zoneFromServer(collision), frame, serverGroundStops).convert("RGBA")
+  if len(passable):
+    _, owners = topSurface(eqAxes.zoneFromServer(passable), frame)
+    tint = numpy.zeros((*owners.shape, 4), dtype=numpy.uint8)
+    tint[owners >= 0] = (*passableColor, passableAlpha)
+    image = Image.alpha_composite(image, Image.fromarray(tint, "RGBA"))
+  fills = Image.new("RGBA", frame.size, (0, 0, 0, 0))
+  fillDraw = ImageDraw.Draw(fills)
+  for polygon in polygonsOf(inspection):
+    color = serverPolygonColor(polygon["component"], islandReach)
+    fillDraw.polygon([frame.pixel(point) for point in polygon["outline"]], fill=(*color, navFillAlpha), outline=(*darker(color), 255))
+  image = Image.alpha_composite(image, fills)
+  layer = Image.new("RGBA", frame.size, (0, 0, 0, 0))
+  draw = ImageDraw.Draw(layer)
+  planDrawing.drawGrid(draw, frame)
+  upright = uprightSegments(eqAxes.zoneFromServer(collision), frame)
+  for segment in upright:
+    draw.line(segment.tolist(), fill=(*uprightColor, 255), width=uprightLineWidth)
+  outlines = [[frame.pixel(point) for point in regionOutline(record)] for record in waterRecords]
+  for record, outline in zip(waterRecords, outlines):
+    draw.polygon(outline, outline=(*regionColor(record), 255), width=3)
+  board = planDrawing.LabelBoard(draw, frame.size)
+  planDrawing.labelGrid(board, frame)
+  planDrawing.drawScale(board, frame, planDrawing.gridStepFor(frame.width))
+  spots = [frame.pixel(marker["at"][:2]) for marker in markers]
+  for x, y in spots:
+    draw.ellipse([x - markerRadius, y - markerRadius, x + markerRadius, y + markerRadius], fill=(255, 255, 255, 255), outline=(0, 0, 0, 255), width=3)
+    board.reserve([x - markerRadius, y - markerRadius, x + markerRadius, y + markerRadius])
+  for marker, (x, y) in zip(markers, spots):
+    board.place((x + markerRadius + 4, y), marker["label"], (0, 0, 0), markerLabelSize, "lm")
+  for record, outline, label in zip(waterRecords, outlines, regionLabels):
+    board.place((planDrawing.centroidOf(outline)[0], min(y for _, y in outline) - regionLabelLift), label, regionColor(record), 13)
+  written = 0
+  for island in islands:
+    x, y = frame.pixel(island["center"][:2])
+    draw.ellipse([x - 2, y - 2, x + 2, y + 2], fill=(*islandLabelColor, 255))
+    spot = board.clearSpot((x, y - 9), str(island["number"]), islandLabelSize)
+    if spot is not None:
+      board.write(spot, str(island["number"]), islandLabelColor, islandLabelSize)
+      written += 1
+  plan = Image.alpha_composite(image, layer).convert("RGB")
+  typeCounts = collections.Counter(record["type"] for record in waterRecords)
+  main = inspection["mainPiece"]
+  legend = [((150, 150, 150), f"collision (.map): {len(collision):,} triangles, lighter higher")]
+  legend += [(uprightColor, f"upright collision (.map): {len(upright):,} triangles, as lines")] if len(upright) else []
+  legend += [(passableColor, f"never collided with (.map): {len(passable):,} triangles")] if len(passable) else []
+  legend += [(regionColor({"type": kind}), f"{serverMapFiles.waterRegionTypeNames.get(kind, kind)} boxes (.wtr): {count}") for kind, count in sorted(typeCounts.items())]
+  legend += [(mainPieceColor, f"NPC main piece{' (stand-in: largest)' if main['standIn'] else ''}: {main['polygons']:,} polygons")]
+  legend += islandLegend(islands, islandReach)
+  legend += [(excludedColor, f"Disabled and zone line: {inspection['excludedPolygons']:,} polygons")]
+  sheet = Image.new("RGB", (plan.width, plan.height + 2 * panelGap + legendRowHeight * len(legend)), (255, 255, 255))
+  sheet.paste(plan, (0, 0))
+  sheetDraw = ImageDraw.Draw(sheet)
+  for row, (color, text) in enumerate(legend):
+    top = plan.height + panelGap + row * legendRowHeight
+    sheetDraw.rectangle([panelGap, top, panelGap + swatchSize, top + swatchSize], fill=color, outline=darker(color))
+    sheetDraw.text((panelGap + swatchSize + 8, top - 1), text, fill=titleColor, font=planDrawing.fontOf(15))
+  sheet.save(outputPath, "PNG")
+  return {
+    "width": sheet.width, "height": sheet.height, "frame": {"center": list(frame.center), "width": frame.width, "size": list(frame.size)},
+    "legend": [text for _, text in legend], "islandNumbersWritten": written,
   }

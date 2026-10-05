@@ -408,7 +408,7 @@ bpy.data.objects['campfire01'].location = (-30, 40, 1)
 
 def testAFailedExportPutsBackTheLastArchiveAndItsSideFiles(stageBlenderServer, tmp_path):
   archivePath = tmp_path / "teststreet.eqg"
-  sideFiles = [tmp_path / f"teststreet{suffix}" for suffix in ("_EnvironmentEmitters.txt", "_housing.json", "_assets.txt")]
+  sideFiles = [tmp_path / f"teststreet{suffix}" for suffix in ("_EnvironmentEmitters.txt", "_housing.json", "_assets.txt", "_export.json")]
 
   def files():
     return {path.name: path.read_bytes() for path in [archivePath, *sideFiles]}
@@ -434,10 +434,11 @@ def testAFailedExportPutsBackTheLastArchiveAndItsSideFiles(stageBlenderServer, t
     return before, held, after, left, files()
 
   before, held, after, left, released = stageBlenderServer.session(steps)
-  # The archive is replaced last, after every side file took its new place: held open, it fails there, and every file goes back.
+  # The archive is replaced last, after every side file and the manifest took their new places: held open, it fails there, and every
+  # file goes back.
   assert "PermissionError" in held
   assert after == before and left == []
-  assert all(released[name] != before[name] for name in ("teststreet.eqg", "teststreet_EnvironmentEmitters.txt", "teststreet_housing.json"))
+  assert all(released[name] != before[name] for name in ("teststreet.eqg", "teststreet_EnvironmentEmitters.txt", "teststreet_housing.json", "teststreet_export.json"))
 
 
 def testExportLeavesOutWhatIsNotTheZonesOwnAndSaysWhy(stageBlenderServer, tmp_path):

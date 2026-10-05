@@ -7,6 +7,7 @@ import io
 import json
 import math
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -39,10 +40,12 @@ import eqRecording
 import eqSky
 import eqTextures
 import eqZones
+import exportPipeline
 import extensionCatalog
 import machineProfile
 import planDrawing
 import playerScale
+import recastHelper
 import skyDrawing
 import toolingLog
 import viewSheets
@@ -1133,7 +1136,8 @@ exportChecksHelp = (
   " since their boxes were accepted, missing view values (fogOn, minClip, maxClip, sky or sky \"none\" stated, and the fog's start, end, and density"
   " when it is on), a missing safe point or underworld, a safe point over no ground the zone ships above the underworld (an imported"
   " reference zone under it is none), zone lines without a target or sharing a number, a zone without regions, regions whose access is"
-  " undecided (getRegions), a stored entry off its footing (getEntries), structures laid on ground or a kit that has changed since (stale: editStructure lays them again), and, until reach mapping"
+  " undecided (getRegions), a stored entry off its footing (getEntries), structures laid on ground or a kit that has changed since (stale: editStructure lays them again), a nav mesh the Recast"
+  " helper refuses to build (it names why), and, until reach mapping"
   " exists, any zone: containment cannot be checked yet. A test export lists all of these but"
   " containment as findings. Findings, never refusals, for both: texture coverage, each with where it lies: the base material showing where no unmuted"
   f" surfacing layer covers a face (a cave's lining, in its own materials, is not ground under the base); ground borders on the terrain where two ground materials meet, ground no steeper than {math.degrees(math.acos(buildTolerances.transitionGroundNormalZ)):g} degrees on at least one side,"
@@ -1154,6 +1158,13 @@ exportChecksHelp = (
 )
 
 
+def isWithin(path, folder):
+  """Whether path lies inside folder: some folder holding it, once resolved (links and junctions followed, '..' taken), is folder by
+  file identity, so every spelling of folder counts (case, a short name, an extended-length or UNC loopback prefix, a mapped drive)."""
+  resolved = path.resolve()
+  return any(ancestor.exists() and os.path.samefile(ancestor, folder) for ancestor in (resolved, *resolved.parents))
+
+
 def exportTarget(path):
   archivePath = Path(path)
   if not archivePath.is_absolute() or archivePath.suffix != ".eqg" or not archivePath.parent.is_dir():
@@ -1161,38 +1172,18 @@ def exportTarget(path):
   zone = archivePath.stem
   if not eqgFiles.zoneNamePattern.match(zone):
     raise ToolError(f"Zone name '{zone}' is not a zone short name: {eqgFiles.zoneNameRule}")
-  return archivePath, zone
-
-
-def replaceExportFiles(archivePath, archiveBytes, sideContents):
-  """Put an export's files in the last export's places: each written whole under a temporary name, then the side files (removed where
-  the content is None) and the archive last. A failure at any point puts every file back as it was and leaves no temporary one."""
-  contents = sideContents | {archivePath: archiveBytes}
-  temporaries = {target: target.with_name(target.name + ".partial") for target, content in contents.items() if content is not None}
-  previous, placed = {}, []
+  clientFolder = zoneSources.resolveClientRoot()
   try:
-    for target, temporary in temporaries.items():
-      temporary.write_bytes(contents[target])
-    for target in sideContents:
-      if target.exists():
-        previous[target] = target.with_name(target.name + ".previous")
-        target.replace(previous[target])
-    for target in sideContents:
-      if target in temporaries:
-        temporaries[target].replace(target)
-        placed.append(target)
-    temporaries[archivePath].replace(archivePath)
-  except OSError:
-    for target in placed:
-      target.unlink()
-    for target, kept in previous.items():
-      kept.replace(target)
-    raise
-  finally:
-    for temporary in temporaries.values():
-      temporary.unlink(missing_ok=True)
-  for kept in previous.values():
-    kept.unlink()
+    inside = [target for target in exportPipeline.exportFilePaths(archivePath.parent, zone) if isWithin(target, clientFolder)]
+  except OSError as error:
+    raise ToolError(f"Whether an export to '{path}' stays out of the EverQuest client folder cannot be told: {type(error).__name__}: {error}") from error
+  if inside:
+    raise ToolError(
+      f"An export to '{path}' writes or removes '{inside[0]}', which lies inside the EverQuest client folder ({clientFolder}): an export"
+      " writes and removes files beside its archive and under its server folder, and would remove the client's own (such as"
+      " neighborhood_assets.txt); export to a staging folder and copy the client's files from there"
+    )
+  return archivePath, zone
 
 
 def exportReport(report):
@@ -1202,23 +1193,73 @@ def exportReport(report):
   }
 
 
+async def buildExport(context, zone, purpose):
+  """The export pipeline's checks and builds (exportPipeline.build) on the open scene, with the .blend it was saved as. A game export
+  needs the Recast helper built."""
+  if purpose == "game":
+    recastHelper.requireHelper(toolingRoot)
+  status = await callBridge(context, "getStatus", {})
+  zoneProperties = await callBridge(context, "getZoneProperties", {})
+  checked = await callBridge(context, "collectZoneExport", {"outputFolder": str(toolingRoot / "exports" / zone), "zoneName": zone, "purpose": purpose})
+  built = await anyio.to_thread.run_sync(exportPipeline.build, checked, zone, zoneProperties, toolingRoot, progressReporter(context))
+  return built, status["filePath"]
+
+
+async def writeExport(folder, built, blendPath):
+  try:
+    return await anyio.to_thread.run_sync(exportPipeline.writeExport, folder, built, blendPath)
+  except OSError as error:
+    raise ToolError("\n".join([f"{type(error).__name__}: {error}", *getattr(error, "__notes__", [])])) from error
+
+
+def clearCheckFolder(zone):
+  """The tooling root's exports\\<zone>\\check folder, emptied of the last game check's files."""
+  folder = toolingRoot / "exports" / zone / "check"
+  try:
+    if folder.exists():
+      shutil.rmtree(folder)
+  except OSError as error:
+    raise ToolError(f"The last check's files in {folder} cannot be removed: {type(error).__name__}: {error}") from error
+  return folder
+
+
 @guardedTool(description=(
-  "Run every check exportZone runs for a purpose on the open scene, writing nothing, and list every failure (what would stop the export)"
-  " and every finding at once. `path` is where the archive would go (an absolute <zone>.eqg path, the zone's short name in lowercase"
-  " letters and digits)." + exportChecksHelp
+  "Run every check exportZone runs for a purpose on the open scene, writing nothing at `path`, and list every failure (what would stop"
+  " the export) and every finding at once. `path` is where the archive would go (an absolute <zone>.eqg path outside the EverQuest client"
+  " folder, the zone's short name in lowercase letters and digits, at most 31 of them). A game check also builds what a game export"
+  " writes, once the checks find nothing no zone file can hold and the file is saved: the archive, its side files, the manifest, and the"
+  " server's map files (.map, .wtr, and .nav, built by the Recast helper, which syncTooling builds), into the tooling root's"
+  " exports\\<zone>\\check folder, replacing the last check's; `serverFiles` gives where they went and the NPC nav's inspection (its main"
+  " piece around the safe point, islands, the largest listed, and paths probed from the safe point to each zone line within Peridot's 1,024"
+  " search nodes), or says \"server files not built\" and names the failures why. Islands and probe failures are findings; a nav the"
+  " helper refuses is a failure." + exportChecksHelp
 ))
 async def checkExport(context: Context, path: str, purpose: str):
   archivePath, zone = exportTarget(path)
-  report = await callBridge(context, "checkZoneExport", {"purpose": purpose})
-  return {"path": str(archivePath), "zone": zone} | exportReport(report)
+  if purpose != "game":
+    report = await callBridge(context, "checkZoneExport", {"purpose": purpose})
+    return {"path": str(archivePath), "zone": zone} | exportReport(report)
+  built, blendPath = await buildExport(context, zone, purpose)
+  folder = await anyio.to_thread.run_sync(clearCheckFolder, zone)
+  if built["archive"] is not None:
+    await writeExport(folder, built, blendPath)
+  return {"path": str(archivePath), "zone": zone} | exportReport(built["report"]) | {"checkFolder": str(folder), "serverFiles": exportPipeline.serverFilesReport(built, folder)}
 
 
 @guardedTool(description=(
   "Write the saved scene as an EQG zone archive at `path`, an absolute path ending in <zone>.eqg, the zone's short name in lowercase"
-  " letters and digits, after the checks for its purpose (checkExport): any failure refuses the export and lists them all, and nothing is"
-  " written. Every file is written whole under a temporary name first; then the side files take the last export's places and the"
-  " archive goes in last, and a failure at any point puts every file back as it was, so a refused or failed export never replaces the"
-  " last good archive or its side files and leaves no partial file. The `terrain` collection's meshes become the zone's terrain;"
+  " letters and digits (at most 31), outside the EverQuest client folder however the path spells it (an export writes and removes files"
+  " beside its archive and under its server folder, and none of them may lie in the client folder, a linked server folder included), after"
+  " the checks for its purpose (checkExport): any failure refuses the export and lists them all, and nothing is written. Beside the"
+  " archive goes <zone>_export.json, the manifest: the purpose, the short name, the .blend, every file written with its size and SHA-256,"
+  " and the failure and finding counts. A game export also writes the server's map files built from the archive's bytes under"
+  " server\\maps, laid out as the server's maps folder (base\\<zone>.map, water\\<zone>.wtr, nav\\<zone>.nav), and records the nav"
+  " settings, the Recast helper, and the nav's islands and probes in the manifest; a test export removes this zone's files under server\\"
+  " (they would no longer match its archive) and lists them in `serverFilesRemoved`. A target that is a folder or read-only, a file"
+  " where a folder must be, or a <file>.previous an export that did not finish left refuses before anything is written. Every file is"
+  " written whole under a temporary name first (making the folders it needs); then the other files take the last export's places and"
+  " the archive goes in last, and a failure before the archive is in place puts every file back as it was, so a refused or failed export"
+  " never replaces the last good archive or its other files and leaves no partial file. The `terrain` collection's meshes become the zone's terrain;"
   " every other rendered mesh becomes a model placed at its object's transform (copies sharing a mesh and without modifiers share one"
   " model) and every collection instance a model of its collection's meshes and, to any depth, of the collections its members instance."
   " So a kit piece is one model however often placed, a placed building one model per part shared by its placements and its plinth one"
@@ -1241,37 +1282,26 @@ async def checkExport(context: Context, path: str, purpose: str):
 ))
 async def exportZone(context: Context, path: str, purpose: str):
   archivePath, zone = exportTarget(path)
-  checked = await callBridge(context, "collectZoneExport", {"outputFolder": str(toolingRoot / "exports" / zone), "zoneName": zone, "purpose": purpose})
-  report = checked["report"]
+  built, blendPath = await buildExport(context, zone, purpose)
+  report = built["report"]
   if report["failures"]:
     raise ToolError(
       f"exportZone ({purpose}) refused, nothing written: {len(report['failures'])} failure(s); checkExport lists the findings too\n"
       + json.dumps(report["failures"], indent=1)
     )
-  collected = checked["collected"]
-  try:
-    data, summary = await anyio.to_thread.run_sync(eqgExport.zoneArchive, collected)
-  except (OSError, ValueError) as error:
-    raise ToolError(f"{type(error).__name__}: {error}") from error
-  housing = collected["housing"]
-  hasPlots = housing is not None and bool(housing["plots"])
-  emitterListPath = archivePath.parent / f"{zone}_EnvironmentEmitters.txt"
-  housingPath = archivePath.parent / f"{zone}_housing.json"
-  assetListPath = archivePath.parent / f"{zone}_assets.txt"
-  # A list left from an earlier export would place emitters or plots this scene no longer has, so a list with nothing to say is removed.
-  sideContents = {
-    emitterListPath: eqEmitters.emitterListText(collected["emitters"]).encode("latin1") if collected["emitters"] else None,
-    housingPath: json.dumps({"zone": zone} | housing, indent=1).encode("ascii") if hasPlots else None,
-    assetListPath: "".join(f"{archive}\r\n" for archive in housing["assets"]).encode("latin1") if hasPlots else None,
+  folder = archivePath.parent
+  written = await writeExport(folder, built, blendPath)
+  sides = exportPipeline.sideFilePaths(folder, zone)
+  housing = built["housing"]
+  hasPlots = built["sides"]["housing"] is not None
+  result = built["summary"] | {"path": str(archivePath)} | exportReport(report) | {
+    "manifest": written["path"],
+    "emitterList": str(sides["emitterList"]) if built["sides"]["emitterList"] is not None else None,
+    "housing": None if housing is None else {"role": housing["housing"]["role"], "plots": len(housing["plots"]), "file": str(sides["housing"]) if hasPlots else None, "assetList": str(sides["assetList"]) if hasPlots else None},
   }
-  try:
-    await anyio.to_thread.run_sync(replaceExportFiles, archivePath, data, sideContents)
-  except OSError as error:
-    raise ToolError(f"{type(error).__name__}: {error}") from error
-  return summary | {"path": str(archivePath)} | exportReport(report) | {
-    "emitterList": str(emitterListPath) if sideContents[emitterListPath] is not None else None,
-    "housing": None if housing is None else {"role": housing["housing"]["role"], "plots": len(housing["plots"]), "file": str(housingPath) if hasPlots else None, "assetList": str(assetListPath) if hasPlots else None},
-  }
+  if purpose == "game":
+    return result | {"serverFiles": exportPipeline.serverFilesReport(built, folder)}
+  return result | {"serverFilesRemoved": written["removedServerFiles"]}
 
 
 def passArrays(passes):
