@@ -947,7 +947,7 @@ def followedGrades(run, legs):
     if abs(segment["degrees"]) < 0.05:
       continue
     middle = segment["middle"]
-    marks.append({"s": lead + float(numpy.interp(middle, polylineAlongs, lengths)), "z": float(numpy.interp(middle, samples[:, 5], samples[:, 2])), "label": f"{segment['degrees']:.1f}°"})
+    marks.append({"s": lead + float(numpy.interp(middle, polylineAlongs, lengths)), "z": float(numpy.interp(middle, samples[:, 5], samples[:, 2])), "label": f"{segment['degrees']:.1f}\N{DEGREE SIGN}"})
   return marks
 
 
