@@ -173,6 +173,7 @@ def testGameExportNeedsTheZoneRowAndZoneLineTargets(stageBlenderServer, tmp_path
   async def steps(session):
     await groundedBasin(session, tmp_path)
     await session.expectSuccess("buildSwimVolumes", {"body": "pool"})
+    await session.expectSuccess("createRegion", {"name": "basin", "outline": [[-200, -200], [200, -200], [200, 200], [-200, 200]], "bottom": -50, "top": 100, "intent": "the basin and its banks", "access": "play"})
     await session.expectSuccess("setZoneProperties", environment)
     refusals = [
       await session.expectError("setZoneProperties", {"safePoint": [0, 150, 2, 0], "underworld": 10}),

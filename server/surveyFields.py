@@ -286,10 +286,11 @@ def measureConstruction(geometry, frames):
 
 
 # Bump a group's version when its method or output changes; only that group is recomputed.
+# A group measured by the player's limits (playerScale) names them in its version, so a cached value is measured again once they change.
 measuredGroups = {
   "dimensions": (1, measureDimensions),
-  "surfaces": (2, measureSurfaces),
-  "verticality": (2, measureVerticality),
+  "surfaces": (f"2 walkableNormalZ {walkableNormalZ:g}", measureSurfaces),
+  "verticality": (f"2 walkableNormalZ {walkableNormalZ:g} playerHeight {playerHeight:g}", measureVerticality),
   "content": (2, measureContent),
   "regions": (2, measureRegions),
   "construction": (2, measureConstruction),

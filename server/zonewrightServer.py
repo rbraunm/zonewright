@@ -25,11 +25,13 @@ import blenderBridge
 import checkpoints
 import conceptComparison
 import emitterAssets
+import eqAxes
 import eqCalibration
 import eqCubeMaps
 import eqEmitterDefinitions
 import eqEmitters
 import eqgExport
+import eqgFiles
 import eqModels
 import eqRaces
 import eqRecording
@@ -39,6 +41,7 @@ import eqZones
 import extensionCatalog
 import machineProfile
 import planDrawing
+import playerScale
 import skyDrawing
 import toolingLog
 import viewSheets
@@ -136,10 +139,6 @@ async def callBridge(context, command, arguments):
 # The live dumps record dark elf females at height 5, the race default.
 figureModelCode = "DAF"
 figureHeight = 5.0
-# The server and the live dumps give positions as (x, y, z); the zone files, and so Blender, hold them as (y, x, z): measured, every
-# kind of placement lands on the zone geometry only that way. Headings run 512 to a turn; eqgame.exe's heading toward a point
-# (0x4ef250) is 0 toward +y and 128 toward +x, which through the axis swap is a turn of +heading about Z for a model whose front is +X.
-eqHeadingUnits = 512
 standPose = {"animation": None, "variant": None, "frame": 0}
 
 
@@ -180,10 +179,12 @@ def placementFrame(location, headingDegrees, x, y, z, heading):
   if blenderGiven:
     if location is None or headingDegrees is None or len(location) != 3:
       raise ToolError("location [x, y, z] and headingDegrees go together")
-    return list(location), 90 - headingDegrees
+    return list(location), eqAxes.turnFromHeading(headingDegrees)
   if None in (x, y, z, heading):
     raise ToolError("x, y, z, and heading go together")
-  return [y, x, z], heading * 360 / eqHeadingUnits
+  # The server and the live dumps give positions in the server's axes: measured, every kind of placement lands on the zone geometry
+  # only through eqAxes' swap.
+  return eqAxes.zoneFromServer([x, y, z]), eqAxes.turnFromEQHeading(heading)
 
 
 def modelSummary(details):
@@ -766,6 +767,7 @@ async def setZoneProperties(
   sky: dict | str | None = None,
   safePoint: list[float] | None = None,
   underworld: float | None = None,
+  shortName: str | None = None,
 ):
   """Set the zone's EQ properties stored in the .blend, in the client's lighting terms (docs/clientRendering.md): ambient, special
   ambient, bounce, and sun colors (0-1, raw as the client uses them); the direction toward the sun (azimuth 0 = +Y, clockwise;
@@ -782,13 +784,14 @@ async def setZoneProperties(
   drops any set before; sky "none" states that the zone draws no sky (its zone row's sky 0, as about a third of the client's EQG
   zones have), so previews show the fog color where nothing is drawn and the light and fog color are set by hand. safePoint [x, y, z, headingDegrees] is where players arrive in the zone (the zone
   row's safe point; heading 0 = +Y, clockwise) and underworld the height below it under which the client puts a falling player back;
-  a game export needs both, with ground under the safe point above the underworld. The result gives how the client resolves the sky
-  and the light it supplies."""
+  a game export needs both, with ground the zone ships under the safe point above the underworld. shortName is the zone's short name
+  (1 to 31 lowercase letters and digits): a zone line whose target is it leads back into this zone, a teleport whose landing
+  getEntries lists. The result gives how the client resolves the sky and the light it supplies."""
   updates = {
     "ambientColor": ambientColor, "specialAmbientColor": specialAmbientColor, "bounceColor": bounceColor, "sunColor": sunColor,
     "sunAzimuthDegrees": sunAzimuthDegrees, "sunElevationDegrees": sunElevationDegrees, "fogColor": fogColor, "fogStart": fogStart,
     "fogEnd": fogEnd, "fogDensity": fogDensity, "fogOn": fogOn, "minClip": minClip, "maxClip": maxClip, "newEngineZone": newEngineZone, "sky": sky,
-    "safePoint": safePoint, "underworld": underworld,
+    "safePoint": safePoint, "underworld": underworld, "shortName": shortName,
   }
   given = {key: value for key, value in updates.items() if value is not None}
   if not given:
@@ -810,16 +813,66 @@ async def zoneFigureModel(zone):
 
 
 async def scaleFigureModel(zone, view):
-  """The scale figure's model for a view that may stand her (standAt, or a review camera saved from such a view), else None."""
-  return await zoneFigureModel(zone) if {"standAt", "camera"} & set(view) else None
+  """The scale figure's model for a view that may stand her (standAt, standOn, or a review camera saved from a standAt view), else None."""
+  return await zoneFigureModel(zone) if {"standAt", "standOn", "camera"} & set(view) else None
 
 
-@guardedTool()
+@guardedTool(description=(
+  "Render the EQ preview of a view: {\"camera\": name} (a review camera saved from a standAt view stands the scale figure again where"
+  " she stood, her ground found as figureAt's is; one matched to concept art renders at the art's aspect and its own field of view),"
+  " {\"eye\": [x,y,z], \"target\": [x,y,z]}, or {\"standAt\": [x,y] or [x,y,z], \"headingDegrees\": h, \"pitchDegrees\": p} (on the"
+  " highest ground players stand on at [x,y], never what they pass through (as walkRoute), or with z on the ground found from 3 above"
+  " z down to 50 below it, for caves, under overhangs, and on ledges; heading 0 = +Y, clockwise;"
+  f" eye {playerScale.eyeHeight:g} above the ground"
+  ", or, where water stands over that with nothing players stand on between (not under a floating pool's basin), a unit over the"
+  " water's surface, swimming; adds a dark elf female of height 5, the race"
+  " default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera, or stood"
+  " by hand facing the camera with \"figureAt\": [x,y] or [x,y,z] in the view, its ground found as standAt's is, on a ledge or ramp"
+  " too narrow to walk her ahead on); {\"standOn\": [x,y,z], \"headingDegrees\": h, \"pitchDegrees\": p} stands so exactly on [x,y,z],"
+  " no ground looked for (a footing another tool found on what the zone ships, as placeEntry's arrival view stands on its entry's);"
+  " or {\"map\": {\"center\": [x,y], \"width\": w}}: the layout from straight above, orthographic,"
+  " the game's north (+X) up and east (-Y) right as the in-game map draws, `width` units across (along y), without fog. {\"frame\":"
+  " {\"objects\": [names], \"headingDegrees\": h, \"pitchDegrees\": p}} looks at the named meshes, collection instances, or"
+  " structures (all their parts) from that heading and pitch, standing back so they fit (its result's eye and target reproduce that"
+  " camera). shading \"client\" draws the zone as the client does, its point lights and particle emitters with it (the result's"
+  " pointLights counts the lights and the objects they light, and emitters the emitters drawn, their particles, and those not drawn,"
+  " grouped by why); \"relief\" is layout's drawing in quiet greys (the base renderSketch draws plans over); \"layout\" draws every"
+  " surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in"
+  " the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest,"
+  " without fog and out to the whole scene: for judging shape and layout; \"coverage\" draws only what exportZone would export, each"
+  " face in the color of its export check status (checkExport): black where it cannot export, red for zero texture area, brown for a"
+  " blockout material, yellow for texture stretched or squeezed, orange where the base material shows, magenta along a ground border"
+  " without a transition strip, grey when fine, and blue wherever a face is seen from its back, lit from the northwest as layout is,"
+  " softer so no shaded face reads as black, and without fog; the result counts the exported faces by status. The value shadings draw"
+  " every mesh (each part of a collection instance as placed, and the scale figure) from a value of its own, lit softly from the"
+  " northwest, without fog, the result giving the scale: \"objects\" draws each object in its own flat color, the ones the view shows"
+  " most of first (blue, orange, green, red, purple, yellow, cyan, magenta, lime, pink, teal, lavender, brown, olive, then grey for"
+  " the rest), with a legend of the objects the view shows, each with its color and share of the view; \"curvature\" draws convex"
+  " forms warm (orange), concave cool (blue), and flat neutral grey, a ridge or trough curved to a radius of 16 at half color and"
+  " sharper ones fuller, from the bend of the edges around each vertex (so where two meshes meet without sharing edges, as a rock"
+  " sunk into the ground, there is none); \"triangleDensity\" draws each face's triangles per 10,000 square units of its own area"
+  " over fixed decades, blue 1, cyan 10, green 100, yellow 1,000, red 10,000 (the client's EQG terrains run from 8 to 5,083, 244 at"
+  " the median), with the range the view shows; \"texelDensity\" draws each face's texture pixels per world unit (its diffuse"
+  " texture's pixels over the area its texture coordinates spread them across) blue lowest through cyan, green, and yellow to red"
+  " highest across the range the view shows (the result gives it and each color's value), dark grey where a face has no diffuse"
+  " texture or texture coordinates: coverage's stretch check compares a face with its own material's usual scale, texelDensity"
+  " compares materials with each other. labels [names] writes each named object's (or structure's, all its parts together) name on"
+  " the view by its place (where its middle projects when the object shows there, else the middle of what shows of it), marked with a"
+  " white dot, but only for the objects the view shows; the result lists the places and the named objects it does not show (an object"
+  " hidden from renders, a guide with guides off, or one that is not a mesh or collection instance is refused). Guides (plot"
+  " outlines, sketch massing) draw unless guides is false, and with them, in every shading, the view is tinted red where the"
+  " boundaries (walls, lids, floors) stand, which the client never draws, a wall as a slab thick enough to show from above, and green"
+  " where the zone lines stand, seen through the water but hidden behind and under the ground; with swimVolumes, the view is tinted"
+  " where the swim volumes stand (cyan water, magenta lava), each box seen through the water, so its top shows evenly under a surface"
+  " it meets or lies just below, but hidden behind and under the ground. Liquids draw as they stand at effect time 0, or at"
+  " `liquidTime` seconds on the client's effect clock, each layer scrolled by its slides as the client's effects scroll it (time"
+  " modulo 100): two views a second or two apart show which way and how fast a fall or river moves (liquid materials made before"
+  " previews scrolled are refused, to be made again); emitters draw at the same moment of their steady state either way."
+))
 async def renderView(
   context: Context, view: dict, shading: str = "client", bandHeight: float = 50.0, guides: bool = True, swimVolumes: bool = False, labels: list[str] | None = None,
   liquidTime: float | None = None,
 ):
-  """Render the EQ preview of a view: {"camera": name} (a review camera saved from a standAt view stands the scale figure again where she stood, her ground found as figureAt's is; one matched to concept art renders at the art's aspect and its own field of view), {"eye": [x,y,z], "target": [x,y,z]}, or {"standAt": [x,y] or [x,y,z], "headingDegrees": h, "pitchDegrees": p} (on the highest ground players stand on at [x,y], never what they pass through (as walkRoute), or with z on the ground found from 3 above z down to 50 below it, for caves, under overhangs, and on ledges; heading 0 = +Y, clockwise; eye 5.5 above the ground, or, where water stands over that, a unit over the water's surface, swimming; adds a dark elf female of height 5, the race default, drawn as the client draws her in the zone (newEngineZone), walked ahead along the ground and facing the camera, or stood by hand facing the camera with "figureAt": [x,y] or [x,y,z] in the view, its ground found as standAt's is, on a ledge or ramp too narrow to walk her ahead on), or {"map": {"center": [x,y], "width": w}}: the layout from straight above, orthographic, the game's north (+X) up and east (-Y) right as the in-game map draws, `width` units across (along y), without fog. {"frame": {"objects": [names], "headingDegrees": h, "pitchDegrees": p}} looks at the named meshes, collection instances, or structures (all their parts) from that heading and pitch, standing back so they fit (its result's eye and target reproduce that camera). shading "client" draws the zone as the client does, its point lights and particle emitters with it (the result's pointLights counts the lights and the objects they light, and emitters the emitters drawn, their particles, and those not drawn, grouped by why); "relief" is layout's drawing in quiet greys (the base renderSketch draws plans over); "layout" draws every surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in the result) in bands `bandHeight` units tall whose edges read as contours, darker facing away from a light in the northwest, without fog and out to the whole scene: for judging shape and layout; "coverage" draws only what exportZone would export, each face in the color of its export check status (checkExport): black where it cannot export, red for zero texture area, brown for a blockout material, yellow for texture stretched or squeezed, orange where the base material shows, magenta along a ground border without a transition strip, grey when fine, and blue wherever a face is seen from its back, lit from the northwest as layout is, softer so no shaded face reads as black, and without fog; the result counts the exported faces by status. The value shadings draw every mesh (each part of a collection instance as placed, and the scale figure) from a value of its own, lit softly from the northwest, without fog, the result giving the scale: "objects" draws each object in its own flat color, the ones the view shows most of first (blue, orange, green, red, purple, yellow, cyan, magenta, lime, pink, teal, lavender, brown, olive, then grey for the rest), with a legend of the objects the view shows, each with its color and share of the view; "curvature" draws convex forms warm (orange), concave cool (blue), and flat neutral grey, a ridge or trough curved to a radius of 16 at half color and sharper ones fuller, from the bend of the edges around each vertex (so where two meshes meet without sharing edges, as a rock sunk into the ground, there is none); "triangleDensity" draws each face's triangles per 10,000 square units of its own area over fixed decades, blue 1, cyan 10, green 100, yellow 1,000, red 10,000 (the client's EQG terrains run from 8 to 5,083, 244 at the median), with the range the view shows; "texelDensity" draws each face's texture pixels per world unit (its diffuse texture's pixels over the area its texture coordinates spread them across) blue lowest through cyan, green, and yellow to red highest across the range the view shows (the result gives it and each color's value), dark grey where a face has no diffuse texture or texture coordinates: coverage's stretch check compares a face with its own material's usual scale, texelDensity compares materials with each other. labels [names] writes each named object's (or structure's, all its parts together) name on the view by its place (where its middle projects when the object shows there, else the middle of what shows of it), marked with a white dot, but only for the objects the view shows; the result lists the places and the named objects it does not show (an object hidden from renders, a guide with guides off, or one that is not a mesh or collection instance is refused). Guides (plot outlines, sketch massing) draw unless guides is false, and with them, in every shading, the view is tinted red where the boundaries (walls, lids, floors) stand, which the client never draws, a wall as a slab thick enough to show from above, and green where the zone lines stand, seen through the water but hidden behind and under the ground; with swimVolumes, the view is tinted where the swim volumes stand (cyan water, magenta lava), each box seen through the water, so its top shows evenly under a surface it meets or lies just below, but hidden behind and under the ground. Liquids draw as they stand at effect time 0, or at `liquidTime` seconds on the client's effect clock, each layer scrolled by its slides as the client's effects scroll it (time modulo 100): two views a second or two apart show which way and how fast a fall or river moves (liquid materials made before previews scrolled are refused, to be made again); emitters draw at the same moment of their steady state either way."""
   outputPath = newRenderPath()
   zone = await callBridge(context, "getZoneProperties", {})
   description = await callBridge(context, "renderView", {
@@ -1077,8 +1130,9 @@ exportChecksHelp = (
   " a turned box, a box without size, region names that clash once lowercased); housing the server would refuse. A game export also"
   " refuses blockout materials (createMaterial blockout) on exported faces, pools and rivers whose swimming is undecided or changed"
   " since their boxes were accepted, missing view values (fogOn, minClip, maxClip, sky or sky \"none\" stated, and the fog's start, end, and density"
-  " when it is on), a missing safe point or underworld, a safe point over no ground above the underworld, zone lines without a target or sharing a"
-  " number, structures laid on ground or a kit that has changed since (stale: editStructure lays them again), and, until reach mapping"
+  " when it is on), a missing safe point or underworld, a safe point over no ground the zone ships above the underworld (an imported"
+  " reference zone under it is none), zone lines without a target or sharing a number, a zone without regions, regions whose access is"
+  " undecided (getRegions), a stored entry off its footing (getEntries), structures laid on ground or a kit that has changed since (stale: editStructure lays them again), and, until reach mapping"
   " exists, any zone: containment cannot be checked yet. A test export lists all of these but"
   " containment as findings. Findings, never refusals, for both: texture coverage, each with where it lies: the base material showing where no unmuted"
   " surfacing layer covers a face (a cave's lining, in its own materials, is not ground under the base); ground borders on the terrain where two ground materials meet, walkable ground on at least one side,"
@@ -1089,7 +1143,7 @@ exportChecksHelp = (
   " Each failure and finding names the object (and the placed objects that place it), the material, the image, and the face count, with"
   " the faces' connected pieces (center and face count, largest first); renderView shading \"coverage\" draws the same statuses."
   " `coverage` counts the exported faces by status; `excluded` lists what is not the zone's own geometry by reason (guides, plot borders,"
-  " regions, anything hidden from renders, placed client content); `toConfirm` lists shipped meshes with shaping passes off or surfacing"
+  " regions, entries, anything hidden from renders, placed client content); `toConfirm` lists shipped meshes with shaping passes off or surfacing"
   " layers muted, which leave the zone as if never made, and caves and defined passes whose ground moved since they were made"
   " (stale; a game export refuses them, and caves broken by a change outside their guards refuse both), and stale structures with why"
   " (ground, kit, missing); `swim` the undecided and changed pools and rivers; `boundaries` and `zoneLines`"
@@ -1104,8 +1158,8 @@ def exportTarget(path):
   if not archivePath.is_absolute() or archivePath.suffix != ".eqg" or not archivePath.parent.is_dir():
     raise ToolError(f"'{path}' is not an absolute .eqg path in an existing folder")
   zone = archivePath.stem
-  if not eqgExport.zoneNamePattern.match(zone):
-    raise ToolError(f"Zone name '{zone}' must be lowercase letters and digits, as the client's zone short names are")
+  if not eqgFiles.zoneNamePattern.match(zone):
+    raise ToolError(f"Zone name '{zone}' is not a zone short name: {eqgFiles.zoneNameRule}")
   return archivePath, zone
 
 
@@ -1520,27 +1574,34 @@ async def measure(context: Context, points: list[list[float]], snapToSurface: bo
   return await callBridge(context, "measure", {"points": points, "snapToSurface": snapToSurface})
 
 
-@guardedTool()
+steepestWalkableDegrees = math.degrees(math.acos(playerScale.walkableNormalZ))
+
+
+@guardedTool(description=(
+  "Walk a route as a player would, over what the client collides with (rendered meshes and collection instances, and the"
+  " boundaries, never drawn; not water, which is waded or swum, nor faces players pass through: liquid and cutout materials, objects"
+  " marked passable, faces an imported zone file flags passable; nor guides, regions, spawns, or doors, taken as open; ground inside a"
+  " solid is no footing, ground under one-sided cover such as a roof plane is): from its first point, following the footing underfoot"
+  " past each point of `path` [[x, y, z], ...], of the saved review route named `route` (saveReviewRoute), or of the walk line of the"
+  " bridge, flight, or walkway named `route` (its centerline at deck height, run on 5 past each end that stands on footing), whose"
+  " heights only need to be within a step of the footing (so a route can run over an arch or under it). Judged for the player of"
+  f" playerScale, {playerScale.playerHeight:g} units tall, who walks faces up to {steepestWalkableDegrees:.1f} degrees and steps up"
+  f" {playerScale.stepHeight:g} (the steepest face and the highest riser a player was seen to climb in the RoF2 client, so the"
+  " client's own limits lie at or past them; playerScale.sources), in half-unit strides whatever `sampleSpacing`, which sets only the"
+  " profile's rows (give `path` or `route`, not both; renderRouteStrip shows the walk in pictures). Returns the length walked, the"
+  " steepest face stood on, the steepest grade climbed or descended between two profile rows (steepestGrade: a stair's level treads"
+  " stand at 0 but climb at its pitch), the narrowest footing (how far it runs to each side before a drop of more than a player's"
+  " height, a wall, a step too high, or a face too steep; null beyond 60), the lowest headroom, the deepest water over the footing;"
+  " `problems`, everything that stops a player, each once over the stretch it covers: blocked (a boundary across the way at half a"
+  f" player's height, where it stands), rise (a wall or step over {playerScale.stepHeight:g} in the way, its height, how far up its face"
+  f" stays steeper than {steepestWalkableDegrees:.1f}, a plane's as much as a block's; null past 60), drop (no footing within 60 below), steep (a"
+  f" face over {steepestWalkableDegrees:.1f} climbed, its steepest), headroom (under {playerScale.playerHeight:g}, its lowest); after a boundary, a"
+  " rise, or a drop the walk takes up again where the route's own heights find footing (resumesAt, null if never); `oneWay`, ways down a"
+  f" player cannot climb back: ledge (a drop over a step, its height) and steep (a face over {steepestWalkableDegrees:.1f} descended); walkable when"
+  " there are no problems; and a profile along the way (each row with the water depth over its footing, or null). Use it on decks,"
+  " ramps, ledges, and the ways into an area."
+))
 async def walkRoute(context: Context, path: list[list[float]] | None = None, route: str | None = None, sampleSpacing: float = 4.0):
-  """Walk a route as a player would, over what the client collides with (rendered meshes and collection instances, and the
-  boundaries, never drawn; not water, which is waded or swum, nor faces players pass through: liquid and cutout materials, objects
-  marked passable, faces an imported zone file flags passable; nor guides, regions, spawns, or doors, taken as open; ground inside a
-  solid is no footing, ground under one-sided cover such as a roof plane is): from its first point, following the footing underfoot
-  past each point of `path` [[x, y, z], ...], of the saved review route named `route` (saveReviewRoute), or of the walk line of the
-  bridge, flight, or walkway named `route` (its centerline at deck height, run on 5 past each end that stands on footing), whose heights only need to
-  be within a step of the footing (so a route can run over an arch or under it). Judged for a player 6 units tall who walks slopes up
-  to 60 degrees and steps up 2, in half-unit strides whatever `sampleSpacing`, which sets only the profile's rows (give `path` or
-  `route`, not both; renderRouteStrip shows the walk in pictures). Returns the length walked, the steepest face stood on, the steepest
-  grade climbed or descended between two profile rows (steepestGrade: a stair's level treads stand at 0 but climb at its pitch), the narrowest footing
-  (how far it runs to each side before a drop of more than a player's height, a wall, a step too high, or a face too steep; null
-  beyond 60), the lowest headroom, the deepest water over the footing; `problems`, everything that stops a player, each once over the
-  stretch it covers: blocked (a boundary across the way at half a player's height, where it stands), rise (a wall or step over 2 in
-  the way, its height, how far up its face stays steeper than 60, a plane's as much as a block's; null past 60), drop (no footing
-  within 60 below), steep (a face over 60 climbed, its steepest), headroom (under 6, its lowest); after a boundary, a rise, or a drop
-  the walk takes up again where the route's own heights find footing (resumesAt, null if never); `oneWay`, ways down a player cannot
-  climb back: ledge (a drop over a step, its height) and steep (a face over 60 descended); walkable when there are no problems; and a
-  profile along the way (each row with the water depth over its footing, or null). Use it on decks, ramps, ledges, and the ways into
-  an area."""
   return await callBridge(context, "walkRoute", {"path": path, "route": route, "sampleSpacing": sampleSpacing})
 
 
@@ -1627,8 +1688,8 @@ async def gradeRoute(
   A bend turns on an arc the route's width in radius, so the bench stays level across it; a turn over 90 degrees (a hairpin) turns on
   an arc of half the width and is a flat landing, at least `landingLength` long (by default the width) and at least the arc, centered
   on the turn. Ground above the bench is cut down to it, meeting the ground at cutBatterDegrees; ground below is filled up to it,
-  meeting the ground at fillBatterDegrees (null makes a ledge whose outside drops away, refused where its bench would stand more than 2
-  over the ground, naming each span). The whole route is graded as one: inside its bench the bench's height wins, elsewhere the lowest
+  meeting the ground at fillBatterDegrees (null makes a ledge whose outside drops away, refused where its bench would stand more than a
+  step (playerScale) over the ground, naming each span). The whole route is graded as one: inside its bench the bench's height wins, elsewhere the lowest
   cut and the highest fill, and where those disagree (between two legs) the cut, so a lower leg is never buried; the ground between two
   legs close together is dressed into one straight bank from one's edge to the other's, and between legs further apart nothing is left
   standing above the higher of them, so no ridge or berm stands between a switchback's legs. Refused where one part's
@@ -1936,18 +1997,24 @@ async def placeEmitters(context: Context, emitters: list[dict], collection: str 
 
 
 @guardedTool()
-async def createRegion(context: Context, name: str, outline: list[list[float]], bottom: float, top: float, intent: str):
+async def createRegion(context: Context, name: str, outline: list[list[float]], bottom: float, top: float, intent: str, access: str):
   """Mark an area of the zone for what it is to become: a vertical prism over `outline` ([[x, y], ...], in order) from `bottom` to
   `top`, kept in the regions collection (seen in Blender, never rendered or exported) with its `intent` ("north guild terrace: packed
-  earth, dwellings carved into the back wall"). A zone is planned as regions first and each is shaped, surfaced, and dressed for its
-  own intent; the {"region": name} selector confines any tool to one."""
-  return await callBridge(context, "createRegion", {"name": name, "outline": outline, "bottom": bottom, "top": top, "intent": intent})
+  earth, dwellings carved into the back wall") and its `access`, whether players reach it: "play" (they walk or swim there; walking
+  against swimming is the swim volumes' decision), "view" (seen but never entered: a backdrop slope, a far shore), or "none" (never
+  reached: behind the rim, rock interiors, under the world). A zone is planned as regions first and each is shaped, surfaced, and
+  dressed for its own intent; the {"region": name} selector confines any tool to one."""
+  return await callBridge(context, "createRegion", {"name": name, "outline": outline, "bottom": bottom, "top": top, "intent": intent, "access": access})
 
 
 @guardedTool()
-async def editRegion(context: Context, name: str, outline: list[list[float]] | None = None, bottom: float | None = None, top: float | None = None, intent: str | None = None):
-  """Change a region's outline, bottom, top, or intent as the plan changes."""
-  return await callBridge(context, "editRegion", {"name": name, "outline": outline, "bottom": bottom, "top": top, "intent": intent})
+async def editRegion(
+  context: Context, name: str, outline: list[list[float]] | None = None, bottom: float | None = None, top: float | None = None, intent: str | None = None,
+  access: str | None = None,
+):
+  """Change a region's outline, bottom, top, intent, or access (play, view, or none) as the plan changes. Refused, changing nothing,
+  when any of them is invalid."""
+  return await callBridge(context, "editRegion", {"name": name, "outline": outline, "bottom": bottom, "top": top, "intent": intent, "access": access})
 
 
 sketchShapeHelp = (
@@ -1987,8 +2054,8 @@ async def getSketch(context: Context, sheet: str | None = None):
 
 @guardedTool()
 async def renderSketch(
-  context: Context, center: list[float], width: float, sheets: list[str] | None = None, layers: list[str] = ["regions", "plots", "water", "boundaries", "zoneLines"],
-  bandHeight: float = 25.0, spotHeights: bool = True,
+  context: Context, center: list[float], width: float, sheets: list[str] | None = None,
+  layers: list[str] = ["regions", "plots", "water", "boundaries", "zoneLines", "entries"], bandHeight: float = 25.0, spotHeights: bool = True,
 ):
   """Draw a plan: the zone from straight above in quiet grey relief (lighter higher, a step every bandHeight units, slopes shaded
   from the game's northwest), `width` units across (along y) about `center`, the game's north (+X) up and east (-Y) right as the
@@ -1996,7 +2063,10 @@ async def renderSketch(
   crossing unless spotHeights is false, giving way wherever a label must stand on it), a scale bar, the sketch sheets (all, or
   those named) in their own colors (areas dashed and faintly filled, footprints filled with their facing arrows and heights, paths at
   their widths, points, notes; every shape shows, inside an area or under another sheet's), and the plan's own layers: regions
-  (dashed, named), plots (outlined, by address, with a mark pointing out of the entrance side), water (as players see it, not where a
+  (dashed, named, filled by access: view hatched amber, none hatched red, undecided hatched grey, play outlined alone), entries (where
+  players arrive, getEntries: dark arrows from the point toward the heading, hollow when isolated, a ring where a teleport keeps the
+  player's heading, labelled S for the safe point, zoneIn with the zone it comes from, landing with its name, T<number> for a teleport's
+  landing, and entrance with its plot), plots (outlined, by address, with a mark pointing out of the entrance side), water (as players see it, not where a
   surface runs on tucked under its banks: blue, lava orange), swim (the swim volumes, dashed, cyan water and magenta lava, each
   named inside itself where its name fits clear of the other labels, else by its number; `unnamedSwimVolumes` lists those in the
   drawing left unnamed, to see closer), boundaries (red, named: walls as lines along their foot, lids and floors faintly filled), and
@@ -2232,17 +2302,19 @@ def problemText(problem):
   return text
 
 
-@guardedTool()
+@guardedTool(description=(
+  "walkRoute as a strip of eye-level frames: walks a saved review route or a bridge's, flight's, or walkway's walk line (route) or a"
+  " path [[x, y, z], ...] as walkRoute does, and renders a frame every `spacing` along it in plan (from its start) and one where each"
+  " problem the walk meets starts, each standing where the walk stands there ("
+  f"eye {playerScale.eyeHeight:g} over the footing"
+  "; no scale figure), heading along the route and pitched toward where the walk stands 30 further on, or toward the brink where it"
+  " stops if sooner (a problem's frame looks past the problem: down past the brink of a drop), laid out on one sheet in order along"
+  " the route, each labeled with its distance and any problem (up to 16 frames). Places the walk cannot reach, between a stop and"
+  " where it walks on, get no frame (stationsNotStoodOn); the problem's frame shows why. The result gives the walk (length in plan,"
+  " walkable, problems, oneWay) and each frame's distance, view (renderView renders it, adding the scale figure), problem, and render"
+  " path."
+))
 async def renderRouteStrip(context: Context, spacing: float, route: str | None = None, path: list[list[float]] | None = None):
-  """walkRoute as a strip of eye-level frames: walks a saved review route or a bridge's, flight's, or walkway's walk line (route) or a
-  path [[x, y, z], ...] as walkRoute does, and
-  renders a frame every `spacing` along it in plan (from its start) and one where each problem the walk meets starts, each standing
-  where the walk stands there (eye 5.5 over the footing; no scale figure), heading along the route and pitched toward where the walk
-  stands 30 further on, or toward the brink where it stops if sooner (a problem's frame looks past the problem: down past the brink of a
-  drop), laid out on one sheet in order along the route, each labeled with its distance and any problem (up to 16 frames). Places the
-  walk cannot reach, between a stop and where it walks on, get no frame (stationsNotStoodOn); the problem's frame shows why. The result
-  gives the walk (length in plan, walkable, problems, oneWay) and each frame's distance, view (renderView renders it, adding the scale
-  figure), problem, and render path."""
   planned = await callBridge(context, "planRouteStrip", {"path": path, "route": route, "spacing": spacing})
   frames, problems, length = planned["frames"], len(planned["problems"]), planned["length"]
   if len(frames) > sheetViews:
@@ -2377,8 +2449,8 @@ async def placeZoneLine(context: Context, number: int, label: str, minimum: list
   clockwise; each coordinate and the heading may be "keep" (the player's own). Zone lines sit in gaps of the boundary walls, tint
   views with guides green in every shading, draw green in plans and sections, and export as ATP_ regions; the server's rows are not written yet. A line placed
   with a number already in use replaces that line; adjust a box with transformObjects, remove it with deleteObjects."""
-  if not isinstance(target, dict) or not isinstance(target.get("zone"), str) or not eqgExport.zoneNamePattern.match(target["zone"]):
-    raise ToolError(f"target zone is a zone short name, lowercase letters and digits, got {target.get('zone') if isinstance(target, dict) else target!r}")
+  if not isinstance(target, dict) or not isinstance(target.get("zone"), str) or not eqgFiles.zoneNamePattern.match(target["zone"]):
+    raise ToolError(f"target zone is a zone short name, {eqgFiles.zoneNameRule}, got {target.get('zone') if isinstance(target, dict) else target!r}")
   return await callBridge(context, "placeZoneLine", {"number": number, "label": label, "minimum": minimum, "maximum": maximum, "target": target})
 
 
@@ -2390,8 +2462,53 @@ async def getZoneLines(context: Context):
 
 
 @guardedTool()
+async def placeEntry(
+  context: Context, name: str, at: list[float], headingDegrees: float, kind: str, fromZone: str | None = None, fromNumber: int | None = None,
+  isolated: bool = False,
+):
+  """Place an entry, where players arrive, as an arrow at its footing facing headingDegrees (0 = +Y, clockwise): kind "zoneIn", where a
+  neighbour's zone line lands players (fromZone, the neighbour's short name; fromNumber, that line's zone_points number, when known),
+  or "landing", where a port inside the world lands them (a teleport door, an NPC port). isolated marks an area reached only by its own
+  port. at [x, y] takes the highest footing there, [x, y, z] the footing from 3 above z down to 50 below it, as standAt finds it, on
+  what the zone ships and the client collides with: reference zones, placed client objects, guides, and what players pass through are
+  no ground. Refused, changing nothing: no footing, footing steeper than players walk or with less headroom than a player's height
+  (playerScale), a zone line or a swim volume reaching into the player's height over the footing (the client tests a player's origin,
+  which stands somewhere in it by race and size: players would zone out at once, or arrive in the water), or footing under the surface
+  of a pool or river whose swimming is undecided (a floating pool over the point, with its basin between, is not over it). Placing an
+  entry's name again replaces it; transformObjects moves it and deleteObjects removes it, and getEntries says when one no longer
+  stands on its footing, which a game export refuses. Entries are never exported as geometry. Returns the entry and its arrival view:
+  standing on its footing (a standOn view, so reference content there does not lift the eye) facing its heading, in client shading,
+  with the scale figure ahead."""
+  placed = await callBridge(context, "placeEntry", {
+    "name": name, "at": at, "headingDegrees": headingDegrees, "kind": kind, "fromZone": fromZone, "fromNumber": fromNumber, "isolated": isolated,
+  })
+  view = {"standOn": placed["at"], "headingDegrees": placed["headingDegrees"], "pitchDegrees": 0.0}
+  outputPath = newRenderPath()
+  zone = await callBridge(context, "getZoneProperties", {})
+  arrival = await callBridge(context, "renderView", {
+    "view": view, "outputPath": str(outputPath), "figureModel": await scaleFigureModel(zone, view), "shading": "client", "bandHeight": 50.0,
+    "guides": True, "sky": await zoneSky(zone), "swimVolumes": False, "labels": None, "emitters": await previewEmitterAssets(),
+  })
+  return [Image(data=outputPath.read_bytes(), format="png"), placed | {"arrivalView": {"outputPath": str(outputPath), "view": view, "eye": arrival["eye"], "figure": arrival["figure"]}}]
+
+
+@guardedTool()
+async def getEntries(context: Context):
+  """Every place players arrive, stored and derived, each with its point, heading, source, and state (onFooting, or offFooting with
+  the footing found there and how far off): the entries placeEntry placed (zoneIn with fromZone and fromNumber, landing, isolated);
+  the safe point; the landing of each zone line whose target is this zone's shortName at a whole point (a teleport, named T<number>);
+  and each plot's entrance, facing into the plot. Footing is read on what the zone ships, as placeEntry reads it. The safe point and a
+  teleport's landing are where the client puts a player's origin, as /loc gives it, which stands over the floor, and a plot's entrance
+  stands at the plot's level, so these can read offFooting by that height: the footing given is where players stand there.
+  notFollowed lists the zone lines whose landing cannot be placed, with why (a kept coordinate, or no shortName to tell which lead
+  back here)."""
+  return await callBridge(context, "getEntries", {})
+
+
+@guardedTool()
 async def getRegions(context: Context):
-  """Every region with its intent, outline, height span, and area: the zone's plan."""
+  """Every region with its intent, access, outline, height span, and area: the zone's plan; and under `undecided` the regions made
+  before access was decided, which a game export refuses until editRegion gives each its access."""
   return await callBridge(context, "getRegions", {})
 
 
@@ -2947,8 +3064,8 @@ async def buildBridge(
   " a beam piece swept along both sides under the treads' ends. `posts` {piece, spacing, sides (both by default)}: legs just outside the"
   " edges, evenly at most `spacing` apart, from `sink` under the ground up to the rails' height where that side has rails (else to the"
   " flight's underside), where the flight stands more than a step over the ground or that side has rails." + railsHelp + " A walkway's"
-  " stair legs are laid by the same code. Refused: steeper than 45 degrees (naming the run it needs); riser not above 0 or over 2 (a"
-  " step); a top not a riser higher than the bottom; a foot or head without footing within a step, or lying under what it stands on"
+  " stair legs are laid by the same code. Refused: steeper than 45 degrees (naming the run it needs); riser not above 0 or over"
+  f" {playerScale.stepHeight:g} (a step, playerScale); a top not a riser higher than the bottom; a foot or head without footing within a step, or lying under what it stands on"
   " (naming its top: the treads would lie in it); a head set back on the surface it climbs to, so the top tread would lie inside it"
   " (set the head at its edge); the treads' underside meeting the ground beyond a step from its ends (naming where); a leg with no"
   " ground within 300; rails without posts. Returns the risers (count and height), run per step, pitch, plan length, the legs and their"

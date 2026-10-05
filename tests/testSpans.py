@@ -1,6 +1,11 @@
 import math
+import sys
+from pathlib import Path
 
 import structurePlots
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
+from playerScale import eyeHeight, stepHeight
 
 # Anchors on the gorge's lips: a deck sagging from an anchor back on the rim would dip into the rim's flat ground, and one from the wall
 # below the lip leaves a notch to step into.
@@ -54,7 +59,9 @@ def hangsPlumb(face):
 
 def testRopesAndRailsArePassableAndNothingElse(stageBlenderServer, tmp_path):
   railY = 40.0
-  bars = {"piece": "testKitRail", "height": 2.5}
+  # A bar hangs from the rail's height; hung half its depth over a step (playerScale), its underside is under a step and its top over
+  # one, so made solid it is neither stepped over nor walked under.
+  bars = {"piece": "testKitRail", "height": stepHeight + structurePlots.testKitPieces["testKitRail"][1][2] / 2}
   across = [[-70, railY, 0], [-70, railY + 14, 0]]
 
   async def steps(session):
@@ -161,7 +168,7 @@ def testAFlightHasEqualRisersAtMostTheRiserAndWalksFootToHead(stageBlenderServer
     })
     found = await structurePlots.faces(session, "gorgeFlight")
     steep = await session.expectError("buildStairs", {"name": "steepFlight", "kitPath": kitPath, "bottom": [-55, -60, -40], "top": head, "width": 6, "tread": "testKitTread"})
-    tall = await session.expectError("buildStairs", {"name": "tallFlight", "kitPath": kitPath, "bottom": foot, "top": head, "width": 6, "tread": "testKitTread", "riser": 2.5})
+    tall = await session.expectError("buildStairs", {"name": "tallFlight", "kitPath": kitPath, "bottom": foot, "top": head, "width": 6, "tread": "testKitTread", "riser": stepHeight + 0.5})
     return built, found, steep, tall
 
   built, found, steep, tall = stageBlenderServer.session(steps)
@@ -233,11 +240,13 @@ def testWalkwayRefusals(stageBlenderServer, tmp_path):
     def walkway(name, points, **changes):
       return {"name": name, "kitPath": kitPath, "points": points, "width": 4, "deck": "testKitPlank", "treads": "testKitTread"} | changes
 
+    # Its deck's underside over a step (playerScale) above the flat ground at 0, a walkway is raised and must be held.
+    raised = stepHeight + 2
     return {
       "steep": await session.expectError("buildWalkway", walkway("steep", [[110, -10, 0], [70, -10, 20]])),
       "stairTooSteep": await session.expectError("buildWalkway", walkway("stair", [[110, -10, 0], [100, -10, 12]], stairLegs=[0])),
-      "noRock": await session.expectError("buildWalkway", walkway("bracketed", [[110, -10, 6], [70, -10, 6]], posts={"piece": "testKitLeg", "spacing": 8, "sides": "left"}, brackets={"piece": "testKitBeam", "side": "right", "reach": 5, "legs": [0]})),
-      "unheld": await session.expectError("buildWalkway", walkway("raised", [[110, -10, 5], [70, -10, 5]])),
+      "noRock": await session.expectError("buildWalkway", walkway("bracketed", [[110, -10, raised], [70, -10, raised]], posts={"piece": "testKitLeg", "spacing": 8, "sides": "left"}, brackets={"piece": "testKitBeam", "side": "right", "reach": 5, "legs": [0]})),
+      "unheld": await session.expectError("buildWalkway", walkway("raised", [[110, -10, raised], [70, -10, raised]])),
       "turn": await session.expectError("buildWalkway", walkway("hairpin", [[110, -10, 0], [70, -10, 0], [109, -3, 0]])),
     }
 
@@ -316,7 +325,7 @@ def testAFlightIsRailedHeadToFootAndRefusesAHeadInOrOnWhatItLandsOn(stageBlender
     assert stations[0] == foot[0] and stations[-1] == head[0], (side, stations)
   assert abs(built["rails"]["length"] - 2 * math.hypot(run, rise)) <= 0.01
   assert abs(built["walk"]["steepestGrade"]["degrees"] - math.degrees(math.atan2(rise, run))) <= 3 and built["walk"]["steepest"]["slopeDegrees"] == 0.0
-  assert built["views"]["fromHead"] == {"standAt": [-17.0, -60.0, 0.0], "headingDegrees": 270.0, "pitchDegrees": round(-math.degrees(math.atan2(5.5 + rise / 2, 3 + run / 2)), 2)}
+  assert built["views"]["fromHead"] == {"standAt": [-17.0, -60.0, 0.0], "headingDegrees": 270.0, "pitchDegrees": round(-math.degrees(math.atan2(eyeHeight + rise / 2, 3 + run / 2)), 2)}
   assert "The flight's head [-20.0, -100.0, -2.0] lies 2.00 under what it stands on there (the top of 'ground' at 0.00)" in refusals["buried"]
   assert "The flight's top tread would lie inside what its head stands on ('ground', its top at 0.00)" in refusals["onto"]
 

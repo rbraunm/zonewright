@@ -16,8 +16,7 @@ import bridgeMeshAccess
 import bridgeReviewGuides
 import bridgeStructureData
 import bridgeStructures
-import bridgeViews
-from playerScale import playerHeight, stepHeight, walkableNormalZ
+from playerScale import eyeHeight, playerHeight, stepHeight, walkableNormalZ
 
 # How far a route looks to each side for a drop or a wall, and how finely; how far above for a ceiling; and how far below it still
 # finds footing.
@@ -284,7 +283,7 @@ class RouteWalk:
     if self.footing is None:
       return
     side = mathutils.Vector((-direction.y, direction.x, 0.0))
-    waterDepth = bridgeMeshAccess.waterDepthAt(self.water, self.footing)
+    waterDepth = bridgeMeshAccess.waterDepthAt(self.water, self.surfaces, self.footing)
     self.rows.append({
       "distance": round(self.travelled, 1), "at": roundVector(self.footing), "slopeDegrees": round(self.slope, 1),
       "headroom": None if self.headroom is None else round(self.headroom, 1),
@@ -388,7 +387,7 @@ def lookedAt(strides, distance, pastStops):
 def stripFrame(line, distance, footing, target, problem):
   """An eye-level frame standing on footing at a distance along the route, heading along it, its pitch toward target (level for none)."""
   heading = line.direction(line.segmentAt(distance))
-  pitch = 0.0 if target is None else math.degrees(math.atan2(target.z - (footing.z + bridgeViews.eyeHeight), math.hypot(target.x - footing.x, target.y - footing.y)))
+  pitch = 0.0 if target is None else math.degrees(math.atan2(target.z - (footing.z + eyeHeight), math.hypot(target.x - footing.x, target.y - footing.y)))
   return {
     "distance": round(distance, 1), "standAt": [round(float(value), 3) for value in footing],
     "headingDegrees": round(math.degrees(math.atan2(heading.x, heading.y)) % 360, 2), "pitchDegrees": round(pitch, 2), "problem": problem,

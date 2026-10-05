@@ -1,5 +1,6 @@
 import io
 import math
+import sys
 from pathlib import Path
 
 import numpy
@@ -8,6 +9,9 @@ from PIL import Image
 from conftest import writePNG
 from testModelsAndDressing import freshScene
 from testReviewViews import crateScene, environment
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
+from playerScale import eyeHeight
 
 longNote = "The crate from the south, low over the ground: does it sit on the grass, and does the grass run on behind it to the edge"
 
@@ -56,7 +60,7 @@ def testReviewCamerasReproduceTheirViewsAndRenderAsOneSheet(stageBlenderServer, 
   assert listed["high"]["note"] == longNote and listed["high"]["view"] == views["high"]
   assert listed["high"]["headingDegrees"] == round(math.degrees(math.atan2(40, 160)), 2)
   assert listed["high"]["pitchDegrees"] == round(math.degrees(math.atan2(-75, math.hypot(40, 160))), 2)
-  assert listed["standing"]["eye"] == [0.0, 0.0, 5.5] and listed["standing"]["headingDegrees"] == 45.0 and listed["standing"]["pitchDegrees"] == 0.0
+  assert listed["standing"]["eye"] == [0.0, 0.0, eyeHeight] and listed["standing"]["headingDegrees"] == 45.0 and listed["standing"]["pitchDegrees"] == 0.0
   figure = listed["standing"]["figure"]
   assert figure[2] == 0.0 and 13 <= math.hypot(figure[0], figure[1]) <= 17 and figure[0] > 0 and figure[1] > 0
   # One sheet of the three in name order, each render as renderView gives it; the long note wraps to a second line under its cell.
@@ -108,9 +112,9 @@ def testReviewRoutesWalkByNameAndRenderAsAStripOfEyeLevelFrames(stageBlenderServ
   assert len(drop) == 1 and drop[0]["problem"]["kind"] == "drop" and 80 <= drop[0]["distance"] <= 81 and drop[0]["problem"]["resumesAtDistance"] <= 82
   assert [frame["view"]["standAt"][2] for frame in frames] == [70.0, 70.0, 70.0, 0.0, 0.0, 0.0]
   assert all(frame["view"]["headingDegrees"] == 270.0 for frame in frames)
-  # Along the way a frame looks at where the walk stands 30 on (on flat ground 5.5 below the eye); the drop's frame looks past the brink
+  # Along the way a frame looks at where the walk stands 30 on (on flat ground eyeHeight below the eye); the drop's frame looks past the brink
   # down to the ground below.
-  assert abs(frames[0]["view"]["pitchDegrees"] - math.degrees(math.atan2(-5.5, 30))) < 0.02
+  assert abs(frames[0]["view"]["pitchDegrees"] - math.degrees(math.atan2(-eyeHeight, 30))) < 0.02
   assert drop[0]["view"]["pitchDegrees"] < -60
   assert Image.open(io.BytesIO(image)).size == (8 + 4 * (640 + 8), 8 + 2 * (360 + 20 + 8))
   # A frame is the eye-level view of its standAt, heading, and pitch without the scale figure: the same view rendered by renderView
@@ -135,7 +139,7 @@ def testLabelsNameOnlyWhatTheViewShowsAndTheObjectsShadingColorsEachObject(stage
     await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [200, 200], "spacing": 8, "location": [0, 0, 0], "collection": "terrain"})
     for name, kind, size, location in labelScene:
       await session.expectSuccess("createPrimitive", {"kind": kind, "name": name, "size": size, "location": location} | ({"segments": 12} if kind == "cylinder" else {}))
-    await session.expectSuccess("createRegion", {"name": "yard", "outline": [[-50, -50], [50, -50], [50, 50], [-50, 50]], "bottom": -5, "top": 40, "intent": "a yard"})
+    await session.expectSuccess("createRegion", {"name": "yard", "outline": [[-50, -50], [50, -50], [50, 50], [-50, 50]], "bottom": -5, "top": 40, "intent": "a yard", "access": "play"})
     await session.expectSuccess("setZoneProperties", environment)
     labelled = await session.expectImage("renderView", {"view": southLow, "labels": ["crate", "pillar", "hidden", "wall"]})
     plain = await session.expectImage("renderView", {"view": southLow})

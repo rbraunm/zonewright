@@ -1,4 +1,10 @@
+import sys
+from pathlib import Path
+
 import structurePlots
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
+from playerScale import stepHeight
 
 prefab = "testKitHouse"
 partNames = {"exterior": "testKitHouseExterior", "interior": "testKitHouseInterior", "roof": "testKitHouseRoof"}
@@ -351,7 +357,8 @@ def testTheFloorIsSeatedAndRefusedOnWhatLiesUnderTheFootprint(stageBlenderServer
     kitPath = await structurePlots.testPrefab(session, tmp_path)
     await structurePlots.testPlot(session, tmp_path)
     refusals = {
-      "lowerable": await session.expectError("placePrefab", {"name": "barn", "kitPath": str(kitPath), "prefab": prefab, "location": [60, -14, 10], "facingDegrees": 0}),
+      # A floor over two steps above the plot's flat ground at 0 floats; within a step of it, it would stand.
+      "lowerable": await session.expectError("placePrefab", {"name": "barn", "kitPath": str(kitPath), "prefab": prefab, "location": [60, -14, 2 * stepHeight + 1], "facingDegrees": 0}),
       "slope": await session.expectError("placePrefab", {"name": "barn", "kitPath": str(kitPath), "prefab": prefab, "location": [55, -90], "facingDegrees": 0}),
     }
     # A loose wall whose top, 30 up, reaches under the house's north-east corner.
@@ -370,7 +377,7 @@ def testTheFloorIsSeatedAndRefusedOnWhatLiesUnderTheFootprint(stageBlenderServer
   assert onGround["floor"] == 0.0 and onGround["floorOn"]["object"] == "ground" and onGround["floorOn"]["ground"] is True and "warnings" not in onGround
   # Something placed over the building since makes which ground it stands on a choice: the stale report names it.
   assert covered["stale"] is True and covered["ground"]["largest"]["probe"] == "overhead" and covered["ground"]["largest"]["overGround"]["object"] == "canopy"
-  assert "give a plinth, or lower the floor to 2.00 or less" in refusals["lowerable"]
+  assert f"give a plinth, or lower the floor to {stepHeight:.2f} or less" in refusals["lowerable"]
   assert "give a plinth; no floor without one stands on it, the ground under the footprint running from" in refusals["slope"] and "more than two steps apart, so grade the site" in refusals["slope"]
 
 

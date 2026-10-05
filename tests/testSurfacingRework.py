@@ -545,7 +545,7 @@ def testPaintSurfaceMasksStayInsideTheRegion(stageBlenderServer, tmp_path):
     await twoMaterials(session, tmp_path)
     await stripedGround(session, "ground", 160, 8)
     await session.expectSuccess("sculptOutline", {"objectName": "ground", "mode": "fill", "outline": [[-60, -40], [60, -40], [60, 40], [-60, 40]], "base": 0, "profile": [[-8, 0], [0, 30], [40, 30]], "conformBreaks": False})
-    await session.expectSuccess("createRegion", {"name": "west", "outline": [[-84, -84], [-4, -84], [-4, 84], [-84, 84]], "bottom": -100, "top": 100, "intent": "the mesa's west half"})
+    await session.expectSuccess("createRegion", {"name": "west", "outline": [[-84, -84], [-4, -84], [-4, 84], [-84, 84]], "bottom": -100, "top": 100, "intent": "the mesa's west half", "access": "play"})
     await session.expectSuccess("addSurfaceLayer", {"objectName": "ground", "name": "rock"})
     await session.expectSuccess("addSurfaceLayer", {"objectName": "ground", "name": "band"})
     await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "rock", "material": "stone", "selector": {"and": [{"region": "west"}, {"slope": {"minimumDegrees": 40, "maximumDegrees": 180}}]}})
@@ -579,18 +579,31 @@ def testPaintSurfaceMasksStayInsideTheRegion(stageBlenderServer, tmp_path):
 def testRegionEditsAreValidated(stageBlenderServer):
   async def steps(session):
     await freshScene(session)
-    await session.expectSuccess("createRegion", {"name": "camp", "outline": [[0, 0], [10, 0], [10, 10]], "bottom": -10, "top": 10, "intent": "a camp"})
-    return [
+    await session.expectSuccess("createRegion", {"name": "camp", "outline": [[0, 0], [10, 0], [10, 10]], "bottom": -10, "top": 10, "intent": "a camp", "access": "play"})
+    await session.expectSuccess("transformObjects", {"names": ["camp"], "translate": [5, 0, 0]})
+    before = await session.expectSuccess("getRegions", {})
+    refusals = [
       await session.expectError("editRegion", {"name": "camp"}),
-      await session.expectError("editRegion", {"name": "camp", "bottom": 10}),
-      await session.expectError("createRegion", {"name": "camp", "outline": [[0, 0], [10, 0], [10, 10]], "bottom": -10, "top": 10, "intent": "again"}),
-      await session.expectError("createRegion", {"name": "field", "outline": [[0, 0], [10, 0], [10, 10]], "bottom": -10, "top": 10, "intent": "  "}),
+      await session.expectError("editRegion", {"name": "camp", "bottom": 10, "access": "none", "intent": "a moved camp"}),
+      await session.expectError("editRegion", {"name": "camp", "intent": "   ", "access": "view", "top": 20}),
+      await session.expectError("editRegion", {"name": "camp", "outline": [[0, 0], [1, 1]], "access": "none"}),
+      await session.expectError("editRegion", {"name": "camp", "access": "walk", "intent": "a moved camp", "bottom": -20}),
+      await session.expectError("createRegion", {"name": "camp", "outline": [[0, 0], [10, 0], [10, 10]], "bottom": -10, "top": 10, "intent": "again", "access": "play"}),
+      await session.expectError("createRegion", {"name": "field", "outline": [[0, 0], [10, 0], [10, 10]], "bottom": -10, "top": 10, "intent": "  ", "access": "play"}),
     ]
+    after = await session.expectSuccess("getRegions", {})
+    return before, refusals, after
 
-  empty, inverted, duplicate, blank = stageBlenderServer.session(steps)
-  assert "editRegion needs an outline, bottom, top, or intent" in empty
+  before, (empty, inverted, blankIntent, twoPoints, badAccess, duplicate, blank), after = stageBlenderServer.session(steps)
+  assert "editRegion needs an outline, bottom, top, intent, or access" in empty
   assert "A region's bottom must lie below its top, got 10.0 and 10.0" in inverted
+  assert "A region needs its intent" in blankIntent
+  assert "A region outline is at least three [x, y] points" in twoPoints
+  assert "A region's access is one of ['play', 'view', 'none']" in badAccess and "got 'walk'" in badAccess
   assert "camp" in duplicate and "A region needs its intent" in blank
+  # A refused edit changes nothing: not the access or intent given with the bad value, nor where the region was moved to.
+  assert before["regions"][0]["outline"] == [[5, 0], [15, 0], [15, 10]]
+  assert after == before
 
 
 def testCutContoursByHeightCarriesTheProjection(stageBlenderServer, tmp_path):
@@ -636,7 +649,7 @@ mesh.update()
     await stripedGround(session, "ground", 160, 8)
     await session.expectSuccess("runPython", {"code": tilt})
     base = (await session.expectSuccess("runPython", shaped("ground")))["result"]
-    await session.expectSuccess("createRegion", {"name": "mound", "outline": [[-36, -36], [36, -36], [36, 36], [-36, 36]], "bottom": -500, "top": 500, "intent": "a mound to take back"})
+    await session.expectSuccess("createRegion", {"name": "mound", "outline": [[-36, -36], [36, -36], [36, 36], [-36, 36]], "bottom": -500, "top": 500, "intent": "a mound to take back", "access": "play"})
     await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "mound"})
     await session.expectSuccess("sculptAtPoint", {"objectName": "ground", "mode": "raise", "center": [0, 0, 0], "radius": 36, "strength": 25, "direction": [0, 0, 1]})
     turned = await session.expectSuccess("followContours", {"objectName": "ground", "selector": {"region": "mound"}})
@@ -661,7 +674,7 @@ def testRebuildRegionSplitsItsQuadsAndTurnsTheirDiagonalsToTheNewGround(stageBle
   async def steps(session):
     await freshScene(session)
     await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [160, 160], "spacing": 8, "location": [0, 0, 0], "collection": "terrain"})
-    await session.expectSuccess("createRegion", {"name": "terrace", "outline": [[0, -40], [40, 0], [0, 40], [-40, 0]], "bottom": -100, "top": 100, "intent": "a diamond terrace"})
+    await session.expectSuccess("createRegion", {"name": "terrace", "outline": [[0, -40], [40, 0], [0, 40], [-40, 0]], "bottom": -100, "top": 100, "intent": "a diamond terrace", "access": "play"})
     rebuilt = await session.expectSuccess("rebuildRegion", {"objectName": "ground", "selector": {"region": "terrace"}, "mode": "height", "height": 12, "fadeDistance": 16})
     return rebuilt, (await session.expectSuccess("runPython", shaped("ground")))["result"]
 
@@ -685,7 +698,7 @@ def testClearRegionTakesBackSpilledPaintWithTheSameEdgeNoiseAndResetNamesPassesS
     await freshScene(session)
     await twoMaterials(session, tmp_path)
     await stripedGround(session, "ground", 160, 8)
-    await session.expectSuccess("createRegion", {"name": "camp", "outline": [[-30, -30], [30, -30], [30, 30], [-30, 30]], "bottom": -100, "top": 200, "intent": "a camp clearing"})
+    await session.expectSuccess("createRegion", {"name": "camp", "outline": [[-30, -30], [30, -30], [30, 30], [-30, 30]], "bottom": -100, "top": 200, "intent": "a camp clearing", "access": "play"})
     await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "hill"})
     await session.expectSuccess("sculptAtPoint", {"objectName": "ground", "mode": "raise", "center": [0, 0, 0], "radius": 70, "strength": 20, "direction": [0, 0, 1]})
     await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "terrace"})
@@ -720,7 +733,7 @@ def testClearRegionTakesBackTheSpillOnGroundReshapedSincePainting(stageBlenderSe
     await freshScene(session)
     await twoMaterials(session, tmp_path)
     await stripedGround(session, "ground", 200, 8)
-    await session.expectSuccess("createRegion", {"name": "camp", "outline": [[-40, -40], [40, -40], [40, 40], [-40, 40]], "bottom": -50, "top": 100, "intent": "a camp clearing"})
+    await session.expectSuccess("createRegion", {"name": "camp", "outline": [[-40, -40], [40, -40], [40, 40], [-40, 40]], "bottom": -50, "top": 100, "intent": "a camp clearing", "access": "play"})
     await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "mound"})
     await session.expectSuccess("sculptAtPoint", {"objectName": "ground", "mode": "raise", "center": [0, 0, 0], "radius": 60, "strength": 14, "direction": [0, 0, 1]})
     await session.expectSuccess("addSurfaceLayer", {"objectName": "ground", "name": "ground"})
@@ -751,7 +764,7 @@ def testResetRegionNamesThePassesThatStillShapeTheArea(stageBlenderServer):
   async def steps(session):
     await freshScene(session)
     await stripedGround(session, "ground", 160, 8)
-    await session.expectSuccess("createRegion", {"name": "butte", "outline": [[-40, -40], [40, -40], [40, 40], [-40, 40]], "bottom": -100, "top": 200, "intent": "a butte"})
+    await session.expectSuccess("createRegion", {"name": "butte", "outline": [[-40, -40], [40, -40], [40, 40], [-40, 40]], "bottom": -100, "top": 200, "intent": "a butte", "access": "play"})
     await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "hill"})
     await session.expectSuccess("sculptAtPoint", {"objectName": "ground", "mode": "raise", "center": [0, 0, 0], "radius": 70, "strength": 20, "direction": [0, 0, 1]})
     await session.expectSuccess("addShapingPass", {"objectName": "ground", "name": "plateau"})

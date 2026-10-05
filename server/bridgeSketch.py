@@ -11,6 +11,7 @@ import numpy
 
 import bridgeAuthoring
 import bridgeBoundaries
+import bridgeEntries
 import bridgeHousing
 import bridgeMeshAccess
 import bridgeObjects
@@ -30,7 +31,7 @@ massingColor = (0.82, 0.8, 0.76)
 massingShade = {"base": 0.45, "up": 0.4, "northSouth": 0.25, "eastWest": 0.1}
 # A boundary face whose plan covers less than this share of its own area stands upright: a wall, drawn in plan as a line.
 uprightPlanShare = 0.01
-planLayers = ("regions", "plots", "water", "swim", "boundaries", "zoneLines")
+planLayers = ("regions", "plots", "water", "swim", "boundaries", "zoneLines", "entries")
 # Ground under a shape is sampled on a grid at least this fine, and no finer than this many samples.
 groundSampleSpacing = 4.0
 groundSampleLimit = 2500
@@ -165,7 +166,7 @@ class GroundProbe:
     return None if hit is None else hit.z
 
   def waterDepth(self, x, y, z):
-    return bridgeMeshAccess.waterDepthAt(self.water, (x, y, z))
+    return bridgeMeshAccess.waterDepthAt(self.water, self.surfaces, (x, y, z))
 
 
 def insidePolygon(points, outline):
@@ -468,8 +469,9 @@ def getSketch(sheet):
 
 
 def planOverlays(sheets, layers, spots):
-  """What a plan drawing lays over the base: the sheets' shapes, the plan's own regions, plots, water, swim volumes, boundaries, and
-  zone lines, and the ground's height at each of spots ([x, y]; those over no ground are left out), in plan coordinates."""
+  """What a plan drawing lays over the base: the sheets' shapes, the plan's own regions (with their access), plots, water, swim
+  volumes, boundaries, zone lines, and entries (bridgeEntries.getEntries, labelled), and the ground's height at each of spots ([x, y];
+  those over no ground are left out), in plan coordinates."""
   known = {readSpec(shape)["sheet"] for shape in sketchObjects()}
   if sheets is not None:
     missing = sorted(set(sheets) - known)
@@ -480,7 +482,7 @@ def planOverlays(sheets, layers, spots):
   if unknownLayers:
     raise ValueError(f"layers are {list(planLayers)}; got {unknownLayers}")
   bpy.context.view_layer.update()
-  overlays = {"sheets": [], "regions": [], "plots": [], "water": [], "swim": [], "boundaries": [], "zoneLines": [], "spots": []}
+  overlays = {"sheets": [], "regions": [], "plots": [], "water": [], "swim": [], "boundaries": [], "zoneLines": [], "entries": [], "spots": []}
   if spots:
     probe = GroundProbe()
     for x, y in spots:
@@ -494,7 +496,12 @@ def planOverlays(sheets, layers, spots):
       shapes.append({key: value for key, value in spec.items() if key not in ("sheet", "count")} | {"plan": [roundPoint(point[:2]) for point in worldGeometry(shape)]})
     overlays["sheets"].append({"sheet": sheet, "shapes": shapes})
   if "regions" in layers:
-    overlays["regions"] = [{"name": region["name"], "outline": region["outline"]} for region in bridgeAuthoring.getRegions()["regions"]]
+    overlays["regions"] = [{"name": region["name"], "outline": region["outline"], "access": region["access"]} for region in bridgeAuthoring.getRegions()["regions"]]
+  if "entries" in layers:
+    overlays["entries"] = [
+      {"label": entryLabel(entry), "at": entry["at"][:2], "headingDegrees": entry["headingDegrees"], "isolated": entry["source"] == "placeEntry" and entry["isolated"]}
+      for entry in bridgeEntries.getEntries()["entries"]
+    ]
   if "plots" in layers:
     overlays["plots"] = [
       {"address": plot.name, "corners": [roundPoint(corner) for corner in bridgeHousing.footprint(plot)], "facingDegrees": round(bridgeHousing.facingOf(plot), 1)}
@@ -518,6 +525,21 @@ def planOverlays(sheets, layers, spots):
         shown = bridgeWater.visibleSurface(body, ground)
       overlays["water"].append({"name": body.name, "liquid": liquid} | shown)
   return overlays
+
+
+def entryLabel(entry):
+  """An entry's label in plan: S the safe point, zoneIn with the zone it comes from, landing with its name, T<number> a teleport's
+  landing, and a plot's entrance by its plot."""
+  kind = entry["kind"]
+  if kind == "safePoint":
+    return "S"
+  if kind == "zoneIn":
+    return f"zoneIn {entry['fromZone']}"
+  if kind == "landing":
+    return f"landing {entry['name']}"
+  if kind == "teleport":
+    return entry["name"]
+  return f"entrance {entry['name']}"
 
 
 def boundaryPlan(boundary):

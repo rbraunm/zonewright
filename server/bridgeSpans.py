@@ -11,7 +11,7 @@ import numpy
 import bridgeKitGeometry
 import bridgeStructures
 from bridgeStructures import isNumber, requireKeys, requireNonNegative, requirePoint, requirePositive, requireSides, roundVector, size
-from playerScale import stepHeight
+from playerScale import eyeHeight, stepHeight
 
 bridgeKeys = ("kitPath", "start", "end", "width", "deck", "profile", "posts", "rails", "stringers", "bents", "sink", "maximumDeckDegrees", "collection")
 stairsKeys = ("kitPath", "bottom", "top", "width", "tread", "riser", "stringers", "posts", "rails", "sink", "collection")
@@ -348,7 +348,7 @@ def bridgeViewSet(definition, groundHeight):
   below = middle + profile.left * 0.4 * profile.span
   ground = groundHeight(below[0], below[1])
   if ground is not None:
-    views["below"] = bridgeStructures.lookView((below[0], below[1], ground + bridgeStructures.bridgeViews.eyeHeight), middle)
+    views["below"] = bridgeStructures.lookView((below[0], below[1], ground + eyeHeight), middle)
   return views
 
 
@@ -426,8 +426,8 @@ def layGroundedPosts(laying, bake, postData, stations, rail, side, sink, onlyRai
     railAt = station.point + station.offsetOut * (railOut(rail, postDepth) if railed else 0.0)
     railTop = [railAt[0], railAt[1], station.height + rail["height"]] if railed else None
     # A rail runs the whole stretch, so a railed station keeps its post however low the walk runs there; where what it stands on
-    # already reaches the rail's height (the post of a walkway the flight lands on), the rail meets that.
-    if railed and ground >= top - stepHeight:
+    # already reaches the rail (the post of a walkway the flight lands on), the rail meets that.
+    if railed and ground >= top - size(rail["data"], 2):
       tops.append(railTop)
       continue
     if (onlyRaised and not railed and station.underside - ground <= stepHeight) or top - bottom <= 0:
@@ -564,7 +564,7 @@ def stairsViewSet(definition, groundHeight):
   eyes = [middle + leftOf(direction) * side * reach for side in (1, -1)]
   grounds = [groundHeight(eye[0], eye[1]) for eye in eyes]
   buried = [-math.inf if ground is None else ground - eye[2] for ground, eye in zip(grounds, eyes)]
-  headPitch = -math.degrees(math.atan2(bridgeStructures.bridgeViews.eyeHeight + rise / 2, headBack + run / 2))
+  headPitch = -math.degrees(math.atan2(eyeHeight + rise / 2, headBack + run / 2))
   return {
     "fromFoot": bridgeStructures.standView(bottom - direction * viewBack, bottom, direction, groundHeight, round(math.degrees(math.atan2(rise, run + viewBack)), 2)),
     "fromHead": bridgeStructures.standView(top + direction * headBack, top, -direction, groundHeight, round(headPitch, 2)),

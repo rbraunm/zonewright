@@ -1,7 +1,8 @@
-"""Plan and section drawings. A plan lays sketch sheets and the plan's regions, plots, and water in crisp lines and labels over a top-down
-relief render, with a coordinate grid, a scale bar, and north up. A section draws where a vertical plane cuts the zone, at one scale
-across and up. Translucent fills each go on their own layer, composited in turn, so a fill tints what lies under it and never erases
-it; lines go over the fills and labels over everything, each label clear of those placed before it."""
+"""Plan and section drawings. A plan lays sketch sheets and the plan's regions (filled by access), entries, plots, and water in crisp
+lines and labels over a top-down relief render, with a coordinate grid, a scale bar, and north up. A section draws where a vertical
+plane cuts the zone, at one scale across and up. Translucent fills each go on their own layer, composited in turn, so a fill tints
+what lies under it and never erases it; lines go over the fills and labels over everything, each label clear of those placed before
+it."""
 import math
 
 from PIL import Image, ImageDraw, ImageFont
@@ -27,6 +28,15 @@ spotColor = (90, 30, 0)
 gridLabelColor = (40, 40, 40)
 entranceMarkLength = 11
 entranceMarkWidth = 14
+entryColor = (15, 15, 15)
+entryMarkLength = 18
+entryMarkWidth = 16
+# None is a region made before access was decided.
+accessColors = {"view": (235, 160, 0), "none": (210, 30, 30), None: (130, 130, 130)}
+accessFillAlpha = 45
+accessHatchAlpha = 190
+hatchSpacing = 10
+hatchWidth = 2
 
 
 class PlanFrame:
@@ -303,10 +313,55 @@ def boundaryLabelSpot(frame, boundary):
   return centroidOf([frame.pixel(point) for area in boundary["areas"] for point in area])
 
 
+def pixelDirection(headingDegrees):
+  """A heading (0 = +Y, clockwise) as a direction in plan pixels, which run with -Y (east) right and +X (north) up: its world step
+  (sin, cos) is (-cos, -sin) there."""
+  heading = math.radians(headingDegrees)
+  return (-math.cos(heading), -math.sin(heading))
+
+
 def drawRegions(draw, frame, regions):
   for region in regions:
     points = [frame.pixel(point) for point in region["outline"]]
     dashedLine(draw, points + points[:1], (*regionColor, 230), 2)
+
+
+def accessFills(size, frame, regions):
+  """Each region players do not simply play in, hatched in its access's color over a faint fill (view amber, none red, undecided grey),
+  each clipped to its outline, on one layer; a play region keeps its dashed outline alone."""
+  layer = Image.new("RGBA", size, (0, 0, 0, 0))
+  for region in regions:
+    if region["access"] == "play":
+      continue
+    color = accessColors[region["access"]]
+    points = [frame.pixel(point) for point in region["outline"]]
+    hatch = Image.new("RGBA", size, (*color, accessFillAlpha))
+    hatchDraw = ImageDraw.Draw(hatch)
+    for offset in range(-size[1], size[0], hatchSpacing):
+      hatchDraw.line([(offset, size[1]), (offset + size[1], 0)], fill=(*color, accessHatchAlpha), width=hatchWidth)
+    mask = Image.new("L", size, 0)
+    ImageDraw.Draw(mask).polygon(points, fill=255)
+    layer = Image.alpha_composite(layer, Image.composite(hatch, Image.new("RGBA", size, (0, 0, 0, 0)), mask))
+  return layer
+
+
+def drawEntries(draw, frame, entries):
+  """Each entry as a triangle about its point pointing along its heading, filled, or hollow when isolated; a ring where its heading
+  is kept."""
+  for entry in entries:
+    x, y = frame.pixel(entry["at"])
+    if entry["headingDegrees"] == "keep":
+      draw.ellipse([x - entryMarkWidth / 2, y - entryMarkWidth / 2, x + entryMarkWidth / 2, y + entryMarkWidth / 2], outline=(*entryColor, 255), width=3)
+      continue
+    ahead = pixelDirection(entry["headingDegrees"])
+    side = (-ahead[1], ahead[0])
+    tip = (x + ahead[0] * entryMarkLength, y + ahead[1] * entryMarkLength)
+    back = (x - ahead[0] * entryMarkLength / 2, y - ahead[1] * entryMarkLength / 2)
+    arrow = [tip, (back[0] + side[0] * entryMarkWidth / 2, back[1] + side[1] * entryMarkWidth / 2), (back[0] - side[0] * entryMarkWidth / 2, back[1] - side[1] * entryMarkWidth / 2)]
+    if entry["isolated"]:
+      draw.polygon(arrow, fill=(255, 255, 255, 255), outline=(*entryColor, 255), width=3)
+    else:
+      draw.polygon(arrow, fill=(*entryColor, 255), outline=(255, 255, 255, 255), width=1)
 
 
 def drawPlots(draw, frame, plots):
@@ -315,8 +370,7 @@ def drawPlots(draw, frame, plots):
     points = [frame.pixel(point) for point in plot["corners"]]
     draw.polygon(points, outline=(*plotColor, 255), width=2)
     middle = ((points[0][0] + points[1][0]) / 2, (points[0][1] + points[1][1]) / 2)
-    heading = math.radians(plot["facingDegrees"])
-    out = (math.sin(heading), -math.cos(heading))
+    out = pixelDirection(plot["facingDegrees"])
     side = (-out[1], out[0])
     tip = (middle[0] + out[0] * entranceMarkLength, middle[1] + out[1] * entranceMarkLength)
     draw.polygon([tip, (middle[0] + side[0] * entranceMarkWidth / 2, middle[1] + side[1] * entranceMarkWidth / 2), (middle[0] - side[0] * entranceMarkWidth / 2, middle[1] - side[1] * entranceMarkWidth / 2)], fill=(*plotColor, 255))
@@ -403,10 +457,10 @@ labelOrder = ("point", "footprint", "note", "path", "area")
 
 def drawPlan(basePath, outputPath, center, width, overlays):
   """Lay the overlays over the base render, scaled up so lines and labels stay crisp, and save the drawing: water, swim volumes,
-  boundaries, zone lines, regions, then every sheet's area fills, footprint fills and path widths each composited in turn, then every
-  line and mark, then the labels: swim volumes' names inside them first, then the sketch's, the plots', the boundaries', the zone
-  lines', and the regions', each set beside the ground's spot heights where it can be, and the spot heights giving way to them where it
-  cannot."""
+  boundaries, zone lines, the regions' access fills and outlines, then every sheet's area fills, footprint fills and path widths each
+  composited in turn, then every line and mark (the entries' arrows last), then the labels: swim volumes' names inside them first,
+  then the sketch's, the entries', the plots', the boundaries', the zone lines', and the regions', each set beside the ground's spot
+  heights where it can be, and the spot heights giving way to them where it cannot."""
   with Image.open(basePath) as base:
     size = (round(base.width * planScale), round(base.height * planScale))
     image = base.convert("RGB").resize(size, Image.Resampling.BICUBIC).convert("RGBA")
@@ -426,6 +480,7 @@ def drawPlan(basePath, outputPath, center, width, overlays):
   overlay(lambda draw: drawSwim(draw, frame, overlays["swim"]))
   overlay(lambda draw: drawBoundaries(draw, frame, overlays["boundaries"]))
   overlay(lambda draw: drawZoneLines(draw, frame, overlays["zoneLines"]))
+  image = Image.alpha_composite(image, accessFills(size, frame, overlays["regions"]))
   overlay(lambda draw: drawRegions(draw, frame, overlays["regions"]))
   for kinds in (("area",), ("footprint", "path")):
     for shape, color in shapes:
@@ -436,6 +491,7 @@ def drawPlan(basePath, outputPath, center, width, overlays):
     for shape, color in shapes:
       strokeShape(draw, frame, shape, color)
     drawPlots(draw, frame, overlays["plots"])
+    drawEntries(draw, frame, overlays["entries"])
 
   overlay(strokes)
   step = gridStepFor(frame.width)
@@ -455,6 +511,9 @@ def drawPlan(basePath, outputPath, center, width, overlays):
       for shape, color in shapes:
         if shape["kind"] == kind:
           labelShape(board, frame, shape, color)
+    for entry in overlays["entries"]:
+      x, y = frame.pixel(entry["at"])
+      board.place((x + entryMarkLength + 4, y), entry["label"], entryColor, 13, "lm")
     for plot in overlays["plots"]:
       board.place(centroidOf([frame.pixel(point) for point in plot["corners"]]), plot["address"], plotColor, 12)
     for boundary in overlays["boundaries"]:

@@ -215,7 +215,7 @@ def testMeasureSnapsOntoRenderedGroundThroughRegions(stageBlenderServer):
   async def steps(session):
     await freshScene(session)
     await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [100, 100], "spacing": 10, "location": [0, 0, 5], "collection": "terrain"})
-    await session.expectSuccess("createRegion", {"name": "plot", "outline": [[-20, -20], [20, -20], [20, 20], [-20, 20]], "bottom": 0, "top": 50, "intent": "a test plot"})
+    await session.expectSuccess("createRegion", {"name": "plot", "outline": [[-20, -20], [20, -20], [20, 20], [-20, 20]], "bottom": 0, "top": 50, "intent": "a test plot", "access": "play"})
     return await session.expectSuccess("measure", {"points": [[0, 0, 100]], "snapToSurface": True})
 
   measured = stageBlenderServer.session(steps)

@@ -12,6 +12,7 @@ import bridgeAuthoring
 import bridgeBoundaries
 import bridgeCaves
 import bridgeDressing
+import bridgeEntries
 import bridgeEnvironment
 import bridgeExportChecks
 import bridgeGrading
@@ -32,13 +33,14 @@ import bridgeSurfacing
 import bridgeViews
 import bridgeWalls  # registers its kind with bridgeStructures
 import bridgeWater
+import eqgFiles
 import skyDrawing
 from bridgeState import requireNoUnsavedChanges, state
 
 zonePropertyName = "zonewrightZone"
 zonePropertyKeys = (
   "ambientColor", "specialAmbientColor", "bounceColor", "sunColor", "sunAzimuthDegrees", "sunElevationDegrees", "fogColor", "fogStart", "fogEnd",
-  "fogDensity", "fogOn", "minClip", "maxClip", "newEngineZone", "sky", "safePoint", "underworld",
+  "fogDensity", "fogOn", "minClip", "maxClip", "newEngineZone", "sky", "safePoint", "underworld", "shortName",
 )
 # The client raises a lower minimum clip to this (eqgame 0x4c9ee6).
 clientMinimumClip = 50.0
@@ -277,6 +279,8 @@ def setZoneProperties(updates):
     raise ValueError(f"maxClip {zone['maxClip']} must be greater than fogStart {zone['fogStart']}: nothing would be drawn far enough to fog")
   if "newEngineZone" in zone and not isinstance(zone["newEngineZone"], bool):
     raise ValueError(f"newEngineZone must be true or false, got {zone['newEngineZone']!r}")
+  if "shortName" in zone and not (isinstance(zone["shortName"], str) and eqgFiles.zoneNamePattern.match(zone["shortName"])):
+    raise ValueError(f"shortName is {eqgFiles.zoneNameRule}, got {zone['shortName']!r}")
   validatePlayerValues(zone)
   bpy.context.scene[zonePropertyName] = zone
   return {"zone": readZoneProperties(bpy.context.scene), "replacedBySky": replaced}
@@ -320,7 +324,7 @@ commands = {
   "pick": (pick, False),
   "renderPasses": (renderPasses, False),
   "renderModelThumbnails": (bridgeViews.renderModelThumbnails, False),
-} | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands | bridgeModels.commands | bridgeExportChecks.commands | bridgePasses.commands | bridgeEnvironment.commands | bridgeReview.commands | bridgeReviewGuides.commands | bridgeAuthoring.commands | bridgeWater.commands | bridgeHousing.commands | bridgeGrading.commands | bridgeSketch.commands | bridgeSwim.commands | bridgeArrangement.commands | bridgeBoundaries.commands | bridgeCaves.commands | bridgeKits.commands | bridgeStructures.commands | bridgePrefabs.commands
+} | bridgeObjects.commands | bridgeShaping.commands | bridgeSurfacing.commands | bridgeDressing.commands | bridgeModels.commands | bridgeExportChecks.commands | bridgePasses.commands | bridgeEnvironment.commands | bridgeReview.commands | bridgeReviewGuides.commands | bridgeAuthoring.commands | bridgeWater.commands | bridgeHousing.commands | bridgeGrading.commands | bridgeSketch.commands | bridgeSwim.commands | bridgeArrangement.commands | bridgeBoundaries.commands | bridgeCaves.commands | bridgeKits.commands | bridgeStructures.commands | bridgePrefabs.commands | bridgeEntries.commands
 
 
 def dispatch(command, arguments):

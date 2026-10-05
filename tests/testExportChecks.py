@@ -34,7 +34,8 @@ pixels = {name: (480 - 8 * y, 270 - 8 * x) for name, (x, y) in mapPoints.items()
 async def faultyPlot(session, folder):
   """A 64 x 64 terrain of 8-unit cells surfaced with grass over a dirt base: a 2 x 2 cell patch left unpainted at the middle's
   southeast (-x, -y), a sand band along the north (+x) edge meeting the grass with no transition, a blockout patch; a slab textured at four times
-  grass's repeat with its top wound backwards, and a post projected from above so its sides take no texture."""
+  grass's repeat with its top wound backwards, and a post projected from above so its sides take no texture; planned as one region
+  players play in."""
   await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
   await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [64, 64], "spacing": 8, "location": [0, 0, 0], "collection": "terrain"})
   for name, color, blockout in (("dirt", (120, 90, 60, 255), False), ("grass", (70, 120, 50, 255), False), ("sand", (200, 180, 120, 255), False), ("grey", (128, 128, 128, 255), True), ("edge", (150, 150, 90, 255), False)):
@@ -52,6 +53,7 @@ async def faultyPlot(session, folder):
   await session.expectSuccess("projectUVs", {"objectName": "slab", "method": "box", "worldUnitsPerRepeat": 64})
   await session.expectSuccess("projectUVs", {"objectName": "post", "method": "planar", "worldUnitsPerRepeat": 16, "direction": [0, 0, 1]})
   await session.expectSuccess("runPython", {"code": flipSlabTop})
+  await session.expectSuccess("createRegion", {"name": "plot", "outline": [[-32, -32], [32, -32], [32, 32], [-32, 32]], "bottom": -10, "top": 20, "intent": "the plot", "access": "play"})
   await session.expectSuccess("setZoneProperties", environment)
   await session.expectSuccess("saveFile", {"path": str(folder / "plot.blend")})
 

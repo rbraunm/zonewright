@@ -21,7 +21,7 @@ import bridgeStructureData
 import bridgeSurfacing
 import bridgeSwim
 import skyDrawing
-from playerScale import swimEyeAboveSurface
+from playerScale import eyeHeight, swimEyeAboveSurface
 
 requiredZoneKeys = (
   "ambientColor", "specialAmbientColor", "bounceColor", "sunColor", "sunAzimuthDegrees", "sunElevationDegrees", "fogColor", "fogStart", "fogEnd",
@@ -38,7 +38,6 @@ verticalFieldOfViewDegrees = 46.5
 minimumFieldOfViewDegrees = 10.0
 maximumFieldOfViewDegrees = 120.0
 maximumFrameSide = 1920
-eyeHeight = 5.5
 cameraClipStart = 0.5
 # A point given with its height finds the ground from this far above it, so a height read off a floor or a little under it still
 # stands on that floor, down to groundSearchDistance below it.
@@ -373,11 +372,11 @@ def placeCamera(preview, view, figureModel):
     return placeMapCamera(preview, view["map"])
   if viewKeys == {"frame"}:
     return placeFrameCamera(preview, view["frame"])
-  if viewKeys - {"figureAt"} == {"standAt", "headingDegrees", "pitchDegrees"}:
+  if viewKeys - {"figureAt"} in ({"standAt", "headingDegrees", "pitchDegrees"}, {"standOn", "headingDegrees", "pitchDegrees"}):
     surfaces = bridgeMeshAccess.PlayerSurfaces()
-    ground = standingGround(preview, surfaces, view["standAt"], "standAt")
+    ground = standingGround(preview, surfaces, view["standAt"], "standAt") if "standAt" in view else footingPoint(view["standOn"])
     # Where the water stands over the eye, the player swims, eye at the surface.
-    waterDepth = bridgeMeshAccess.waterDepthAt(bridgeMeshAccess.swimSurfaces(), ground)
+    waterDepth = bridgeMeshAccess.waterDepthAt(bridgeMeshAccess.swimSurfaces(), surfaces, ground)
     swimming = waterDepth is not None and waterDepth > eyeHeight - swimEyeAboveSurface
     eye = ground + mathutils.Vector((0, 0, waterDepth + swimEyeAboveSurface if swimming else eyeHeight))
     forward = headingPitchForward(view["headingDegrees"], view["pitchDegrees"])
@@ -395,7 +394,17 @@ def placeCamera(preview, view, figureModel):
     elif figureModel is not None:
       description |= {"figure": list(placeScaleFigure(preview, surfaces, ground, view["headingDegrees"], figureModel)), "figureFacingDegrees": (view["headingDegrees"] + 180) % 360}
     return description
-  raise ValueError(f"A view is {{camera}}, {{eye, target}}, {{map}}, {{frame}}, or {{standAt, headingDegrees, pitchDegrees}} with an optional figureAt; got keys {sorted(viewKeys)}")
+  raise ValueError(
+    f"A view is {{camera}}, {{eye, target}}, {{map}}, {{frame}}, {{standAt, headingDegrees, pitchDegrees}}, or {{standOn, headingDegrees,"
+    f" pitchDegrees}}, the last two with an optional figureAt; got keys {sorted(viewKeys)}"
+  )
+
+
+def footingPoint(point):
+  """A standOn view's footing, stood on as given: no ground is looked for."""
+  if not isinstance(point, list) or len(point) != 3 or not all(isinstance(value, (int, float)) and math.isfinite(value) for value in point):
+    raise ValueError(f"standOn is a footing [x, y, z], got {point!r}")
+  return mathutils.Vector(point)
 
 
 def standingGround(preview, surfaces, point, name):

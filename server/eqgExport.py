@@ -4,7 +4,6 @@ a version 1 .zon with the swim volumes and zone lines as regions and the scene's
 No baked light yet: placements carry no .lit. The scene's emitters go beside the archive in the client's emitter list, which the
 client reads loose."""
 import os
-import re
 from pathlib import Path
 
 import numpy
@@ -12,8 +11,6 @@ from PIL import Image
 
 import eqgFiles
 import eqgWriter
-
-zoneNamePattern = re.compile(r"^[a-z0-9]+$")
 
 
 def textureEntry(path):
@@ -32,8 +29,8 @@ def textureEntry(path):
 def zoneArchive(collected):
   """The archive's bytes and what went into it."""
   zone = collected["zone"]
-  if not zoneNamePattern.match(zone):
-    raise ValueError(f"Zone name '{zone}' must be lowercase letters and digits, as the client's zone short names are")
+  if not eqgFiles.zoneNamePattern.match(zone):
+    raise ValueError(f"Zone name '{zone}' is not a zone short name: {eqgFiles.zoneNameRule}")
   arrays = numpy.load(collected["arrays"])
   materials = {material["name"]: material for material in collected["materials"]}
   files, textureSources, textureNames = {}, {}, {}

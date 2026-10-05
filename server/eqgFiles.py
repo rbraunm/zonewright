@@ -3,6 +3,12 @@ import struct
 
 import numpy
 
+# A zone's short name, which names its .eqg and .zon and its server rows.
+zoneNamePattern = re.compile(r"^[a-z0-9]{1,31}$")
+zoneNameRule = (
+  "1 to 31 lowercase letters and digits (the server keeps a short name in char[32], and the client reads what follows an underscore as"
+  " a number)"
+)
 supportedModelVersions = (1, 2, 3)
 supportedZoneVersions = (1, 2)
 modelVertexTypes = {
