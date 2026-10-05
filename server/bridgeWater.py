@@ -665,12 +665,9 @@ class BodySurface:
 
 
 def heightAt(column, level):
-  """The point where a column of a fall's sheet, its lip first, passes a height."""
-  for upper, lower in zip(column[:-1], column[1:]):
-    if upper[2] >= level >= lower[2]:
-      share = 0.0 if upper[2] == lower[2] else (upper[2] - level) / (upper[2] - lower[2])
-      return upper + share * (lower - upper)
-  return column[-1]
+  """The point where a column of a fall's sheet, its lip first and falling row by row, passes a height between its ends."""
+  rising = column[::-1]
+  return numpy.array([numpy.interp(level, rising[:, 2], rising[:, axis]) for axis in range(3)])
 
 
 def footOfColumn(column, ground, water):
@@ -776,13 +773,11 @@ def placeSprays(sceneObject, records):
 
 def replaceFallFeet(ground):
   """Place again the sprays of every fall that sprays its foot, after the water it lands in changed; the falls' names."""
-  falls = [
-    sceneObject for sceneObject in bpy.context.scene.objects
-    if bridgeMeshAccess.waterProperty in sceneObject and readDefinition(sceneObject)["kind"] == "fall" and any(spray["at"] == "foot" for spray in readDefinition(sceneObject)["sprays"])
-  ]
-  for fall in falls:
-    placeSprays(fall, sprayRecords(fall.name, readDefinition(fall), None, ground))
-  return sorted(fall.name for fall in falls)
+  bodies = [(sceneObject, readDefinition(sceneObject)) for sceneObject in bpy.context.scene.objects if bridgeMeshAccess.waterProperty in sceneObject]
+  falls = [(fall, definition) for fall, definition in bodies if definition["kind"] == "fall" and any(spray["at"] == "foot" for spray in definition["sprays"])]
+  for fall, definition in falls:
+    placeSprays(fall, sprayRecords(fall.name, definition, None, ground))
+  return sorted(fall.name for fall, _ in falls)
 
 
 def describeSprays(sceneObject, definition):
