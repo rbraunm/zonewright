@@ -33,7 +33,7 @@ Each zone variant is keyed `zone:format` (`wld`, `eqgz`, `eqtzp`); some zones sh
 
 Measured values are cached per zone variant, keyed by the SHA-256 of every source file and by each group's own version. Changing one group's method (its version in `server/surveyFields.py`) recomputes only that group; the others keep their cached values.
 
-An interpretation is of the variant `importZone` draws: the classic one where a zone has one, else the EQ terrain one, else the EQG one. It is kept under the tooling root in `survey\interpretations\<zone>`, with copies of its screenshots, the SHA-256 of that variant's source files, and the version of the procedure it followed. `getZoneSurvey` reports its state:
+An interpretation is of the variant `importZone` draws, the one the client loads: the zone's `.eqg` (its loose `.zon` over the archive's) where that holds a zone, else the classic one. It is kept under the tooling root in `survey\interpretations\<zone>`, with copies of its screenshots, the SHA-256 of that variant's source files, and the version of the procedure it followed. `getZoneSurvey` reports its state:
 
 - `current`: the zone's files and the procedure's version are as they were when it was recorded.
 - `stale`: `staleBecause` names the zone files that changed (`zoneFilesChanged`) and the procedure version raised since (`procedureChanged`). It is still returned, for what it is worth, but it is never current again until it is recorded anew; nothing re-records it on its own.

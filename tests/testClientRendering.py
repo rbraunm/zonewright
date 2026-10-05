@@ -146,10 +146,24 @@ def testImportZoneBringsTheClientsZone(stageBlenderServer):
   assert imported["source"] | {"particleCloudsNotDrawn": None} == {
     "archive": "poknowledge.s3d", "format": "wld", "regionMeshes": 1802, "placements": 1249, "placedObjects": 1249,
     "objectArchives": ["poknowledge_obj.s3d"], "missingModels": [], "missingTextures": [], "droppedTriangles": 0, "particleCloudsNotDrawn": None,
+    "placementColorsIgnoredBySkeletalActors": 0, "placementColorsShort": [], "placementsLitAtLoadNotDrawn": 883,
   }
   assert imported["dimensions"] == [1968.0, 1968.0, 1011.931]
   # A classic zone's zone lines are BSP regions, whose places are not read.
   assert imported["zoneLines"] is None and imported["zoneLinesTilted"] is None
+  assert imported["lights"] == 620 and imported["lightsOfRadiusZero"] == [] and imported["filesTheClientNeverOpens"] == []
+
+
+@pytest.mark.clientData("clientFiles")
+def testImportZoneLeavesOutALightOfRadiusZero(stageBlenderServer):
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    return await session.expectSuccess("importZone", {"zone": "runnyeye"})
+
+  imported = stageBlenderServer.session(steps)
+  # Every Runnyeye placement carries its own vertex colors; one of its 383 lights has radius 0, which lights nothing in the client.
+  assert imported["source"]["placements"] == imported["source"]["placedObjects"] == 648 and imported["source"]["placementColorsShort"] == []
+  assert imported["lights"] == 382 and imported["lightsOfRadiusZero"] == ["L277_LDEF"]
 
 
 def pixelAt(image, x, y):

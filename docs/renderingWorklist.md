@@ -24,26 +24,27 @@ Blender-built zones drawn as the client would draw them depend on these.
 
 ## Next: matching client zones in calibration
 
-6. **Character lighting.** Spawns are lit like zone meshes; the client lights them with the `SkinMesh*` effects, not yet read.
-7. **Equipment.** NPCs and players draw without equipment (Luclin bodies show bare skin); Drakkin armor pieces and layers are not drawn either. The recordings carry each spawn's equipment and armor colors.
-8. **Levels of detail.** The client switches `.lod` models by distance (for example `OBJ_pinetree` 100, 200, 500, 5000 units); every object draws at full detail.
-9. **Radial flora.** EQ terrain zones draw grass cards around the camera (`radialfloradefs.rfd`, the ecosystems' flora layers).
-10. **Water.** EQG water and waterfall materials draw by their effects ([clientRendering.md](clientRendering.md#eqg-zones)), still and with three stand-ins: the environment cube map's average color for its lookup, opaque water where the client's is 2.9 times fresnel opaque, and no point light 0 term. Lava's effects (`RegionLava`, `SModelLava`) are not read: it draws its two diffuses averaged. EQ terrain water sheets (`water.dat`) are not drawn.
-11. **EQ terrain remainder.** Quad kinds 1 and 4; `BLENDMAP` and `LAYERINGMAP`; child layers; tiles without ecosystems (the client's default texture); a `.lit` file whose count does not fit its model (drawn without baked light, inferred from a screenshot).
-12. **Scene light sources.** `SpecialAmbient` and `BounceColor` sources in `eqgame.exe`; the calibration fit folds special ambient into ambient.
-13. **Cover map mips.** D3DX recompresses each generated mip level of a terrain cover map to DXT5; the preview box filters without recompressing.
-14. **Spawn looks not read.** Appearance values some EQG models carry (an ALA's face style and heritage) are refused rather than guessed.
+6. **Load-time light of placed objects.** A classic zone's placed static objects without colors of their own get colors the client computes once the zone has loaded, from the zone's lights and the share of scene light of the floor beneath them ([clientRendering.md](clientRendering.md#placements-and-their-vertex-light)); EQG objects whose baked light doesn't fit seem to get the same. The preview draws them with the mesh's own vertex light (or none) and the import counts them (`placementsLitAtLoadNotDrawn`). A reading of the traced rules matches the RoF2 dump of the Plane of Knowledge in every alpha but drops lights the client drops for a reason not yet found; the dump's color hashes check a fix.
+7. **Character lighting.** Spawns are lit like zone meshes; the client lights them with the `SkinMesh*` effects, not yet read.
+8. **Equipment.** NPCs and players draw without equipment (Luclin bodies show bare skin); Drakkin armor pieces and layers are not drawn either. The recordings carry each spawn's equipment and armor colors.
+9. **Levels of detail.** The client switches `.lod` models by distance (for example `OBJ_pinetree` 100, 200, 500, 5000 units); every object draws at full detail.
+10. **Radial flora.** EQ terrain zones draw grass cards around the camera (`radialfloradefs.rfd`, the ecosystems' flora layers).
+11. **Water.** EQG water and waterfall materials draw by their effects ([clientRendering.md](clientRendering.md#eqg-zones)), still and with three stand-ins: the environment cube map's average color for its lookup, opaque water where the client's is 2.9 times fresnel opaque, and no point light 0 term. Lava's effects (`RegionLava`, `SModelLava`) are not read: it draws its two diffuses averaged. EQ terrain water sheets (`water.dat`) are not drawn.
+12. **EQ terrain remainder.** Quad kinds 1 and 4; `BLENDMAP` and `LAYERINGMAP`; child layers; tiles without ecosystems (the client's default texture); a `.lit` file whose count does not fit its model (drawn without baked light, inferred from a screenshot).
+13. **Scene light sources.** `SpecialAmbient` and `BounceColor` sources in `eqgame.exe`; the calibration fit folds special ambient into ambient.
+14. **Cover map mips.** D3DX recompresses each generated mip level of a terrain cover map to DXT5; the preview box filters without recompressing.
+15. **Spawn looks not read.** Appearance values some EQG models carry (an ALA's face style and heritage) are refused rather than guessed.
+16. **WLD normals.** The client reads each WLD normal byte through a table in steps of 1/15 ([clientRendering.md](clientRendering.md#zone-files-as-the-renderer-reads-them)); the preview divides by 127.
 
 ## Validation
 
 Rules the renderer uses that are not yet confirmed against the RoF2 client itself. Code traces read what the DLL does but can miss a step. Calibration screenshots so far come from the live client, which has moved on since RoF2. Each of these needs RoF2 evidence: screenshots taken in the RoF2 client on Peridot, its `Logs\dbg.txt` (the graphics DLL logs there, including every baked light it ignores), or a read of the running client. MQPeridotEmu's `/peridotemu dump` (`PhoenixCampfire/mqperidotemu`) reads the running client: the zone in MQ2PeridotLive's dump format, plus the graphics camera (position, orientation, view angle, clip planes, projection scales), every actor in the scene (definition, position, orientation, scale, and a simple actor's vertex count and baked light colors), and the engine's property tree (sky, fog colors, time of day). A dump taken with a screenshot settles most of the rules below.
 
-- **Which variant a zone loads.** Some zones ship both a classic `.s3d` and an EQG `.eqg` with a `.zon` (`arena`, `tutorialb`, ...); the import takes the classic one, an untested choice.
 - **Texture orientation** of static EQG models (checked against live screenshots only).
 - **The camera:** the RoF2 client's field of view and eye height, read from the client, differ from those measured against live screenshots (clientRendering.md, Camera); the renderer needs a camera per client. The pitch offset is not yet checked.
 - **EQ terrain:** 32 texels per tile (the DLL's default distance table; `eqgame.exe` may set others); quad kind bit 2 drawn as ordinary; placement z above the ground; tilt order; the cover map's mip filtering.
-- **Objects without baked light** (most placed objects in classic zones): drawn with no baked light and the full share of scene light, an assumption (`0x1009d670` is the client's path). EQG objects whose baked light doesn't fit get colors the client computes (clientRendering.md, EQG zones).
 - **Tilt order** of EQG zone placements.
+- **Models drawn without colors.** A WLD object mesh without vertex colors gets `0xFFFFFFFF` in the client's object builder (`0x10057060`), which `SModelC1` would draw at full texture brightness; a zone's placed objects get colors at load instead (worklist 6), but a door, ground object, or model placed by hand that never gets any is drawn here with no baked light and the full share of scene light. A RoF2 night screenshot of a door whose model stores no colors (with its MQPeridotEmu dump) would show which.
 - **Back faces.** The preview draws both sides of every face and lights each by its own normal, as the vertex shaders light a vertex whichever side is seen, so a face turned inside out draws darker, as it does once exported. Whether the client draws back faces at all is not traced: it needs the cull mode set for zone and object meshes (`D3DRS_CULLMODE` in `EQGraphicsDX9.dll`'s draw setup, or a `CullMode` state in the effects' passes), or an RoF2 screenshot of an exported zone with a box turned inside out, seen from outside. Until then the preview does not cull.
 
 ## Parked

@@ -20,29 +20,36 @@ import eqTextures
 import eqWorldFile
 import zoneSources
 
-zoneCacheFormat = 7
-readFormats = ("wld", "eqtzp", "eqgz")
+zoneCacheFormat = 8
 # A model's vertex light where its file gives none: no baked light and the full share of scene light, an assumption until the client's
 # lighting of EQG objects is traced.
 unlitColor = (0, 0, 0, 255)
 anglesPerTurn = 512
-# objects.wld placement flag for a per-instance vertex color fragment.
+# objects.wld placement (0x15) flags the client reads its fields by (EQGraphicsDX9.dll 0x1001cad0): 0x1 shifts them past one more
+# field; 0x2, 0x4, and 0x8 store the position and turns, then two scales; 0x100 a reference to the placement's own vertex colors.
+placementLayoutFlags = 0xF
+placementLayout = 0xE
 instanceColorsFlag = 0x100
+instanceColorsOffset = 52
+# The vertex light the client's region builder gives a zone mesh that stores no colors (EQGraphicsDX9.dll 0x1001f7d2: 0xFF1F1F1F).
+colorlessRegionColor = (0x1F, 0x1F, 0x1F, 0xFF)
 
 
 def objectPlacements(objectsFile):
-  """objects.wld's object placements (0x15): the actor, position, heading and tilt in 512ths of a turn, and a uniform scale."""
+  """objects.wld's object placements (0x15): the actor, position, heading and tilt in 512ths of a turn, a uniform scale, and the
+  placement's own vertex colors (flag 0x100, RGBA bytes) or None."""
   placements = []
   for fragment in objectsFile.fragmentsOfType(0x15):
     body = fragment.body
     nameReference, flags = struct.unpack_from("<iI", body, 4)
-    x, y, z, heading, tilt, roll, _, scaleY, scaleZ = struct.unpack_from("<9f", body, 16)
     actor = objectsFile.lookupName(nameReference)
-    if flags & instanceColorsFlag:
-      raise ValueError(f"{objectsFile.sourceName}: {actor} carries per-instance vertex colors, which are not read yet")
+    if flags & placementLayoutFlags != placementLayout:
+      raise ValueError(f"{objectsFile.sourceName}: {actor} has placement flags {flags:#x}; only those storing a position, turns, and two scales are read")
+    x, y, z, heading, tilt, roll, _, scaleY, scaleZ = struct.unpack_from("<9f", body, 16)
     if roll != 0 or scaleY != scaleZ:
       raise ValueError(f"{objectsFile.sourceName}: {actor} has roll {roll} and scales {scaleY}, {scaleZ}; only a heading, a tilt, and one scale are read")
-    placements.append({"actor": actor, "position": numpy.array((x, y, z)), "heading": heading, "tilt": tilt, "scale": scaleY})
+    colors = objectsFile.vertexColorTrack(struct.unpack_from("<i", body, instanceColorsOffset)[0]) if flags & instanceColorsFlag else None
+    placements.append({"actor": actor, "position": numpy.array((x, y, z)), "heading": heading, "tilt": tilt, "scale": scaleY, "colors": colors})
   return placements
 
 
@@ -56,26 +63,34 @@ def placementRotation(placement):
   return aboutZ @ aboutY
 
 
-def placedPart(part, placement):
+def placedPart(part, placement, colors=None):
+  """A part moved, turned, and scaled by its placement, its vertex colors replaced by colors when given."""
   rotation = placementRotation(placement)
-  lighting = part["lighting"] and {"normals": part["lighting"]["normals"] @ rotation.T, "colors": part["lighting"]["colors"]}
+  lighting = part["lighting"] and {"normals": part["lighting"]["normals"] @ rotation.T, "colors": part["lighting"]["colors"] if colors is None else colors}
   return part | {"vertices": (part["vertices"] * placement["scale"]) @ rotation.T + placement["position"], "lighting": lighting}
 
 
-def drawnVariant(clientRoot, zoneName):
-  """The key and source of the variant importZone draws: the classic one where the client has one, else the EQ terrain one, else EQG."""
-  variants = zoneSources.zoneVariants(clientRoot, zoneName)
-  for zoneFormat in readFormats:
-    # The client loads a loose <zone>.zon beside the archive over the archive's own (EQGraphicsDX9.dll 0x10066230).
-    for key in (f"{zoneName}:{zoneFormat}:loose", f"{zoneName}:{zoneFormat}"):
-      if key in variants:
-        return key, variants[key]
-  raise ValueError(f"Zone '{zoneName}' has no classic (WLD), EQ terrain, or EQG variant in the client; it has {sorted(variants)}")
+def staticPlacementParts(parts, placement, label):
+  """A static actor's parts as its placement draws them, and whether its own colors run short of its vertices. A placement with its own
+  colors gives them to the actor's one mesh by vertex index (EQGraphicsDX9.dll 0x10054630, 0x1008f6d0); one without them gets colors
+  the client computes at load (0x100530f0), which are not drawn yet: it keeps the mesh's own vertex light here. Either way the model
+  then holds baked light, so it takes only the lights marked for baked geometry, which lights.wld never marks (0x1000e45e asks the model,
+  0x10056470). Where its own colors run short, the client reads on past their copy into whatever its memory pool holds next; the
+  vertices past them keep the mesh's own vertex light here."""
+  colors = placement["colors"]
+  if colors is None:
+    return [placedPart(part, placement) | {"takesAllLights": False} for part in parts], False
+  if len(parts) != 1:
+    raise ValueError(f"{label} gives {placement['actor']} its own vertex colors across {len(parts)} meshes; the client's static actor draws one")
+  ownColors = parts[0]["lighting"]["colors"]
+  short = len(colors) < len(ownColors)
+  drawnColors = numpy.concatenate([colors, ownColors[len(colors):]]) if short else colors[:len(ownColors)]
+  return [placedPart(parts[0], placement, drawnColors) | {"takesAllLights": False}], short
 
 
 def zoneSource(clientRoot, zoneName):
-  """The zone variant to build: the one importZone draws."""
-  return drawnVariant(clientRoot, zoneName)[1]
+  """The zone variant to build: the one the client loads, which importZone draws."""
+  return zoneSources.loadedVariant(clientRoot, zoneName)[1]
 
 
 def clientEQGZone(source, zoneName):
@@ -94,6 +109,21 @@ def zoneLights(clientRoot, zoneName):
   if source["format"] == "eqgz":
     return clientEQGZone(source, zoneName)["lights"]
   return None
+
+
+def lightsNothing(light):
+  """Whether a light lights nothing: the client keeps a light's radius as stored (EQGraphicsDX9.dll 0x100128f0), reaches with it as its
+  region of influence (0x1000e4f0), scores it by radius squared over distance squared (0x1000ff61), and fades it to nothing at it
+  (1 - min((distance / radius)^2, 1) in every SPL vertex shader), so a light of radius 0 lights no vertex."""
+  return light["radius"] == 0
+
+
+def unreadZoneFiles(clientRoot, zoneName):
+  """Files beside a classic zone, named for it, that the client never opens: a Luclin zone's loose <zone>.dat (dawnshroud, grimling,
+  and nine more). No code in eqgame.exe or EQGraphicsDX9.dll names it: the game's one .dat name is <zone>_switches.dat (eqgame.exe
+  0x512850), and the DLL's are the EQ terrain system's, read from the zone's .eqg (0x1010c0d0)."""
+  path = clientRoot / f"{zoneName}.dat"
+  return [path.name.lower()] if zoneSource(clientRoot, zoneName)["format"] == "wld" and path.is_file() else []
 
 
 def zoneLineBoxes(regions):
@@ -150,12 +180,12 @@ def buildClassicZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
   """A classic zone's region meshes and the objects its objects.wld places."""
   archive = eqArchive.EQArchive(source["archive"])
   worldFile = eqWorldFile.WorldFile(archive.read(f"{zoneName}.wld"), f"{source['archive'].name}:{zoneName}.wld")
-  # A zone's regions take only the lights marked for baked geometry, which lights.wld never marks; a placed model takes every light
-  # unless it carries baked light (EQGraphicsDX9.dll 0x1000e45e).
-  parts = [eqModels.wldMeshPart(mesh, {}, True) | {"takesAllLights": False} for mesh in worldFile.meshes()]
+  label = f"Zone '{zoneName}'"
+  # A zone's regions take only the lights marked for baked geometry, which lights.wld never marks (EQGraphicsDX9.dll 0x1000db20).
+  parts = [eqModels.wldMeshPart(mesh, {}, colorlessRegionColor) | {"takesAllLights": False} for mesh in worldFile.meshes()]
   regionMeshCount = len(parts)
   placements = objectPlacements(eqWorldFile.WorldFile(archive.read("objects.wld"), f"{source['archive'].name}:objects.wld")) if "objects.wld" in archive.entries else []
-  objectParts, missingModels, objectArchives, placedCounts, particleClouds = {}, set(), [], {}, 0
+  objectParts, missingModels, objectArchives, placedCounts, particleClouds, colorsIgnored, colorsShort, litAtLoad = {}, set(), [], {}, 0, 0, {}, 0
   for placement in placements:
     actor = placement["actor"]
     if actor not in objectParts:
@@ -167,23 +197,37 @@ def buildClassicZone(clientRoot, cacheRoot, zoneName, source, zoneFolder):
       definition = eqModels.resolveModel(clientRoot, cacheRoot, actor, zoneName)
       holder = eqArchive.EQArchive(clientRoot / definition["archive"])
       if definition["kind"] == "wldStatic":
-        objectParts[actor] = eqModels.wldStaticParts(holder, definition, {}, None)["parts"]
+        objectParts[actor] = {"skeletal": False, "parts": eqModels.wldStaticParts(holder, definition, {}, None)["parts"]}
       elif definition["kind"] == "wldSkeletal":
-        objectParts[actor], clouds = eqModels.wldSkeletalBindParts(holder, definition)
+        skeletalParts, clouds = eqModels.wldSkeletalBindParts(holder, definition)
+        objectParts[actor] = {"skeletal": True, "parts": skeletalParts}
         particleClouds += clouds
       else:
-        raise ValueError(f"Zone '{zoneName}' places {actor}, a {definition['kind']} model from {definition['archive']}; only WLD objects are placed yet")
+        raise ValueError(f"{label} places {actor}, a {definition['kind']} model from {definition['archive']}; only WLD objects are placed yet")
       if definition["archive"] not in objectArchives:
         objectArchives.append(definition["archive"])
     if objectParts[actor] is None:
       continue
-    parts += [placedPart(part, placement) | {"takesAllLights": not part.get("colored", False)} for part in objectParts[actor]]
+    if objectParts[actor]["skeletal"]:
+      # A skeletal actor never reads its placement's colors (EQGraphicsDX9.dll 0x10044550) and, holding no model whose baked light
+      # 0x1000e45e asks after (0x10102930), takes every light.
+      colorsIgnored += placement["colors"] is not None
+      parts += [placedPart(part, placement) | {"takesAllLights": True} for part in objectParts[actor]["parts"]]
+    else:
+      placedParts, short = staticPlacementParts(objectParts[actor]["parts"], placement, label)
+      parts += placedParts
+      litAtLoad += placement["colors"] is None
+      if short:
+        entry = colorsShort.setdefault(actor, {"actor": actor, "vertices": len(placedParts[0]["vertices"]), "colorCounts": [], "placements": 0})
+        entry["colorCounts"] = sorted(set(entry["colorCounts"]) | {len(placement["colors"])})
+        entry["placements"] += 1
     placedCounts[actor] = placedCounts.get(actor, 0) + 1
   textureHolders = [archive] + [eqArchive.EQArchive(clientRoot / name) for name in objectArchives]
-  written = eqModels.writePartsCache(zoneFolder, parts, textureHolders, f"Zone '{zoneName}'")
+  written = eqModels.writePartsCache(zoneFolder, parts, textureHolders, label)
   return {
     "regionMeshes": regionMeshCount, "placements": len(placements), "placedObjects": sum(placedCounts.values()), "objectArchives": objectArchives,
-    "missingModels": sorted(missingModels), "particleCloudsNotDrawn": particleClouds,
+    "missingModels": sorted(missingModels), "particleCloudsNotDrawn": particleClouds, "placementColorsIgnoredBySkeletalActors": colorsIgnored,
+    "placementColorsShort": [colorsShort[actor] for actor in sorted(colorsShort)], "placementsLitAtLoadNotDrawn": litAtLoad,
   } | written
 
 

@@ -21,8 +21,8 @@ import eqWorldFile
 import machineProfile
 import zoneSources
 
-indexFormat = 10
-modelCacheFormat = 18
+indexFormat = 11
+modelCacheFormat = 19
 actorTrailingBytes = 4
 staticKinds = ("wldStatic",)
 defaultAppearance = {
@@ -31,9 +31,11 @@ defaultAppearance = {
 }
 eqgPlayerOnly = ("faceStyle", "hairColor", "facialHair", "facialHairColor", "eyeColor1", "heritage", "tattoo", "details")
 bindTolerance = 1e-3
-# A WLD mesh without vertex colors (most placed objects): no baked light and the full share of scene light. Where the client takes
-# this from is not traced; calibration against screenshots checks it.
+# A placed WLD object's mesh without vertex colors: no baked light and the full share of scene light. Not settled: the client's object
+# builder fills 0xFFFFFFFF (EQGraphicsDX9.dll 0x10057060), which SModelC1 would draw at full texture brightness (docs/clientRendering.md).
 colorlessMeshColor = (0, 0, 0, 255)
+# No baked light and the full share of scene light: how SkinMeshOld lights a skin, which has no vertex colors.
+sceneLitColor = (0, 0, 0, 255)
 
 
 def actorReferences(worldFile, actorFragment):
@@ -591,9 +593,11 @@ def eqgSkinnedParts(archive, definition, appearance, context):
   }
 
 
-def wldMeshPart(mesh, materialSwaps, lit):
-  """A WLD mesh's drawn triangles; lit keeps its normals and vertex colors, which a posed skin's would no longer match. A mesh the
-  client draws none of (a collision mesh) needs neither UVs nor normals."""
+def wldMeshPart(mesh, materialSwaps, colorless):
+  """A WLD mesh's drawn triangles with the per-vertex values the client builds it with: a UV of (0, 0) and a zero normal where the file
+  stores none (EQGraphicsDX9.dll 0x1001f630 regions, 0x10057060 objects, 0x1004ad50 skins). Lit by its normals and vertex colors,
+  colorless (RGBA) standing for colors the file does not store; unlit when colorless is None (a posed character, whose normals and
+  colors would no longer match it)."""
   materials = [materialSwaps.get(material["name"].upper(), material) for material in mesh["materials"]]
   textures, alphaModes = [], []
   for index in mesh["triangleMaterials"]:
@@ -602,17 +606,13 @@ def wldMeshPart(mesh, materialSwaps, lit):
     textures.append(material["textureNames"][0].removesuffix("_layer") if drawn else None)
     alphaModes.append("cutout" if drawn and material["renderMethod"] & 0xFF == 0x13 else "opaque")
   vertexCount = len(mesh["vertices"])
-  drawsNothing = all(texture is None for texture in textures)
-  if mesh["uvs"] is None and not drawsNothing:
-    raise ValueError(f"mesh '{mesh['name']}' has no per-vertex UVs")
+  # The client's (0, 0), flipped as every WLD texture coordinate is.
+  uvs = mesh["uvs"] if mesh["uvs"] is not None else numpy.tile((0.0, 1.0), (vertexCount, 1))
   lighting = None
-  if lit:
-    if mesh["normals"] is None and not drawsNothing:
-      raise ValueError(f"mesh '{mesh['name']}' lacks per-vertex normals, which the client lights it by")
-    colors = mesh["colors"] if mesh["colors"] is not None else numpy.tile(numpy.array(colorlessMeshColor, dtype=numpy.uint8), (vertexCount, 1))
+  if colorless is not None:
+    colors = mesh["colors"] if mesh["colors"] is not None else numpy.tile(numpy.array(colorless, dtype=numpy.uint8), (vertexCount, 1))
     lighting = {"normals": mesh["normals"] if mesh["normals"] is not None else numpy.zeros((vertexCount, 3)), "colors": colors}
-  uvs = mesh["uvs"] if mesh["uvs"] is not None else numpy.zeros((vertexCount, 2))
-  return meshPart(mesh["vertices"], mesh["triangles"], uvs, textures, alphaModes, lighting) | {"colored": mesh["colors"] is not None}
+  return meshPart(mesh["vertices"], mesh["triangles"], uvs, textures, alphaModes, lighting)
 
 
 def wldActor(archive, definition):
@@ -623,7 +623,7 @@ def wldActor(archive, definition):
 def wldStaticParts(archive, definition, appearance, context):
   worldFile, actor = wldActor(archive, definition)
   meshes = [worldFile.fragment(struct.unpack_from("<i", reference.body, 4)[0], 0x36) for reference in actorReferences(worldFile, actor)]
-  return {"parts": [wldMeshPart(worldFile.mesh(meshFragment), {}, True) for meshFragment in meshes], "pose": {"static": True}}
+  return {"parts": [wldMeshPart(worldFile.mesh(meshFragment), {}, colorlessMeshColor) for meshFragment in meshes], "pose": {"static": True}}
 
 
 def wldTextureSetSwaps(worldFile, code, textureSet):
@@ -641,11 +641,16 @@ def wldTextureSetSwaps(worldFile, code, textureSet):
 
 
 def wldSkeletalBindParts(archive, definition):
-  """A skeletal WLD actor's meshes in the bind pose, lit by their normals and vertex colors: a placed zone object such as a torch."""
+  """A skeletal WLD actor's meshes in the bind pose, lit by their normals: a placed zone object such as a torch. Its skins take no
+  vertex colors: the client builds them without any (EQGraphicsDX9.dll 0x1004ae5f, vertex format 0x112) and lights them by scene light
+  alone (SkinMeshOld); the meshes on its bones keep theirs."""
   worldFile, actor = wldActor(archive, definition)
   skeleton = worldFile.fragment(struct.unpack_from("<i", actorReferences(worldFile, actor)[0].body, 4)[0], 0x10)
   _, skins = eqSkeletons.readSkeleton(worldFile, skeleton)
-  parts, particleClouds, _ = eqSkeletons.posedSkeleton(worldFile, skeleton, eqSkeletons.skinMeshes(worldFile, skins), lambda mesh: wldMeshPart(mesh, {}, True))
+  parts, particleClouds, _ = eqSkeletons.posedSkeleton(
+    worldFile, skeleton, eqSkeletons.skinMeshes(worldFile, skins), lambda mesh: wldMeshPart(mesh | {"colors": None}, {}, sceneLitColor),
+    lambda mesh: wldMeshPart(mesh, {}, colorlessMeshColor),
+  )
   return parts, particleClouds
 
 
@@ -676,7 +681,10 @@ def wldSkeletalParts(archive, definition, appearance, context):
   if clashing:
     raise ValueError(f"Model {code}: the eye colors and the face or texture set both swap {clashing}; which the client keeps is not known")
   swaps |= eyes
-  parts, particleClouds, boneWorlds = eqSkeletons.posedSkeleton(worldFile, skeleton, chosen, lambda mesh: wldMeshPart(mesh, swaps, False), localTransforms)
+  def unlit(mesh):
+    return wldMeshPart(mesh, swaps, None)
+
+  parts, particleClouds, boneWorlds = eqSkeletons.posedSkeleton(worldFile, skeleton, chosen, unlit, unlit, localTransforms)
   attached, unattached = wldHeadItems(context, code, appearance, boneWorlds)
   return {
     "parts": parts + [item["part"] for item in attached], "pose": pose, "pieces": [mesh.name for mesh in chosen] + [item["piece"] for item in attached],

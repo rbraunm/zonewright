@@ -4,10 +4,36 @@ import zlib
 pfsMagic = b"PFS "
 directoryCRC = 0x61580AC9
 maximumBlockBytes = 65536
+keyPolynomial = 0x04C11DB7
+
+
+def keyTable():
+  table = []
+  for index in range(256):
+    value = index << 24
+    for _ in range(8):
+      value = ((value << 1) ^ keyPolynomial) if value & 0x80000000 else value << 1
+    table.append(value & 0xFFFFFFFF)
+  return table
+
+
+filenameKeyTable = keyTable()
+
+
+def filenameKey(name):
+  """The key an archive files an entry under and the client finds a name by (EQGraphicsDX9.dll 0x100dae40, table 0x101750b0): a CRC-32
+  with polynomial 0x04C11DB7, unreflected, from 0, over the name and its terminating zero."""
+  value = 0
+  for byte in name.encode("latin1") + b"\0":
+    value = ((value << 8) ^ filenameKeyTable[((value >> 24) ^ byte) & 0xFF]) & 0xFFFFFFFF
+  return value
 
 
 class EQArchive:
-  """Read-only view of a PFS archive (.s3d, .eqg); entry names are lowercased. Reads seek into the file on demand."""
+  """Read-only view of a PFS archive (.s3d, .eqg); entry names are lowercased. Reads seek into the file on demand. The client files
+  entries by key only (EQGraphicsDX9.dll 0x100dd090) and reads a name through its key, so a name the directory lists without an entry
+  under its key (greatdivide_chr.s3d lists growthplane_chr.wld, velketor_chr.s3d kael_chr.wld) is not in entries, as the client cannot
+  read it either."""
 
   def __init__(self, archivePath):
     self.archivePath = archivePath
@@ -26,11 +52,9 @@ class EQArchive:
       if len(directoryEntries) != 1:
         raise ValueError(f"{archivePath}: expected one filename directory, found {len(directoryEntries)}")
       names = self.readFilenames(self.inflate(archiveFile, directoryEntries[0][1], directoryEntries[0][2]))
-    # Filenames are listed in data-offset order, not in the CRC-sorted entry table order.
-    fileEntries = sorted((entry for entry in entries if entry[0] != directoryCRC), key=lambda entry: entry[1])
-    if len(fileEntries) != len(names):
-      raise ValueError(f"{archivePath}: {len(names)} filenames for {len(fileEntries)} file entries")
-    self.entries = {name.lower(): (offset, size) for name, (_, offset, size) in zip(names, fileEntries)}
+    keyed = {key: (offset, size) for key, offset, size in entries if key != directoryCRC}
+    nameKeys = {name: filenameKey(name) for name in names}
+    self.entries = {name.lower(): keyed[key] for name, key in nameKeys.items() if key in keyed}
 
   def inflate(self, archiveFile, offset, size):
     archiveFile.seek(offset)

@@ -18,14 +18,21 @@ repositoryRoot = Path(__file__).resolve().parent.parent
 everquestClient = Path(json.loads((repositoryRoot / ".mcp.json").read_text(encoding="utf-8"))["mcpServers"]["zonewright"]["env"]["EVERQUEST_CLIENT"])
 
 
-def testFilenameCRCsMatchAClientArchivesDirectory():
+def testFilenameKeysMatchAClientArchivesDirectory():
   data = (everquestClient / "guildlobby.eqg").read_bytes()
   archive = eqArchive.EQArchive(everquestClient / "guildlobby.eqg")
   directoryOffset = struct.unpack_from("<I", data, 0)[0]
   count = struct.unpack_from("<I", data, directoryOffset)[0]
-  stored = {struct.unpack_from("<I", data, directoryOffset + 4 + 12 * index)[0] for index in range(count)} - {eqgWriter.directoryCRC}
+  stored = {struct.unpack_from("<I", data, directoryOffset + 4 + 12 * index)[0] for index in range(count)} - {eqArchive.directoryCRC}
   assert len(stored) == len(archive.entries) > 100
-  assert {eqgWriter.filenameCRC(name) for name in archive.entries} == stored
+  assert {eqArchive.filenameKey(name) for name in archive.entries} == stored
+
+
+def testArchiveListingANameWithoutAnEntryReadsEveryOtherFileByItsKey():
+  archive = eqArchive.EQArchive(everquestClient / "greatdivide_chr.s3d")
+  assert "growthplane_chr.wld" not in archive.entries
+  assert len(archive.entries) == 725
+  assert archive.read("greatdivide_chr.wld")[:4] == struct.pack("<I", 0x54503D02)
 
 
 def testArchiveReadsBackWithItsDirectorySortedLikeTheClients(tmp_path):

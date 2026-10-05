@@ -5,14 +5,13 @@ import zlib
 
 import numpy
 
+import eqArchive
 import eqgFiles
 
 pfsVersion = 0x20000
-directoryCRC = 0x61580AC9
 blockBytes = 8192
 modelVersion = 2
 zoneVersion = 1
-crcPolynomial = 0x04C11DB7
 # Shaders by material: each pairing appears on client zone terrain and objects with exactly these textures (diffuse, normal).
 shaderOpaqueBump = "Opaque_MaxCB1.fx"
 shaderOpaque = "Opaque_MaxC1.fx"
@@ -21,27 +20,6 @@ shaderCutout = "Chroma_MPLBasicAT.fx"
 liquidShaders = {"water": "Opaque_MaxWater.fx", "waterfall": "Opaque_MaxWaterFall.fx", "lava": "Opaque_MaxLava.fx"}
 # Material property value types: a float, a string (a texture's name), and a color (0xAARRGGBB).
 propertyFloat, propertyString, propertyColor = 0, 2, 3
-
-
-def crcTable():
-  table = []
-  for index in range(256):
-    value = index << 24
-    for _ in range(8):
-      value = ((value << 1) ^ crcPolynomial) if value & 0x80000000 else value << 1
-    table.append(value & 0xFFFFFFFF)
-  return table
-
-
-filenameCRCTable = crcTable()
-
-
-def filenameCRC(name):
-  """The CRC a PFS directory keys a file by: over the lowercase name and its terminating zero, unreflected."""
-  value = 0
-  for byte in name.encode("latin1") + b"\0":
-    value = ((value << 8) ^ filenameCRCTable[((value >> 24) ^ byte) & 0xFF]) & 0xFFFFFFFF
-  return value
 
 
 def deflatedBlocks(data):
@@ -55,32 +33,32 @@ def deflatedBlocks(data):
 
 
 def archiveBytes(files):
-  """A PFS archive of {name: bytes}: names lowercase; directory entries sorted by unsigned CRC and the filename list in data order,
-  as the client's own archives keep them; no footer."""
+  """A PFS archive of {name: bytes}: names lowercase; directory entries sorted by unsigned key (eqArchive.filenameKey) and the
+  filename list in data order, as the client's own archives keep them; no footer."""
   names = list(files)
   if any(name != name.lower() for name in names):
     raise ValueError(f"Archive names must be lowercase: {[name for name in names if name != name.lower()]}")
   # The client aborts loading an empty file (EQGraphicsDX9.dll 0x10065c00).
   if any(not files[name] for name in names):
     raise ValueError(f"Archive files must not be empty: {[name for name in names if not files[name]]}")
-  crcs = {}
+  keyNames = {}
   for name in names:
-    crc = filenameCRC(name)
-    if crc in crcs or crc == directoryCRC:
-      raise ValueError(f"'{name}' has the same CRC as '{crcs.get(crc, 'the filename directory')}'")
-    crcs[crc] = name
+    key = eqArchive.filenameKey(name)
+    if key in keyNames or key == eqArchive.directoryCRC:
+      raise ValueError(f"'{name}' has the same key as '{keyNames.get(key, 'the filename directory')}'")
+    keyNames[key] = name
   body = bytearray(struct.pack("<I4sI", 0, b"PFS ", pfsVersion))
   entries = []
-  for name in names:
-    entries.append((filenameCRC(name), len(body), len(files[name])))
+  for key, name in keyNames.items():
+    entries.append((key, len(body), len(files[name])))
     body += deflatedBlocks(files[name])
   filenameList = struct.pack("<I", len(names)) + b"".join(struct.pack("<I", len(name) + 1) + name.encode("latin1") + b"\0" for name in names)
-  entries.append((directoryCRC, len(body), len(filenameList)))
+  entries.append((eqArchive.directoryCRC, len(body), len(filenameList)))
   body += deflatedBlocks(filenameList)
   directoryOffset = len(body)
   body += struct.pack("<I", len(entries))
-  for crc, offset, size in sorted(entries):
-    body += struct.pack("<III", crc, offset, size)
+  for key, offset, size in sorted(entries):
+    body += struct.pack("<III", key, offset, size)
   struct.pack_into("<I", body, 0, directoryOffset)
   return bytes(body)
 
