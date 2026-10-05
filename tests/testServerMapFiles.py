@@ -255,6 +255,10 @@ def testReadersRefuseTrailingAndMissingBytes():
   assert len(serverMapFiles.readWater(water)) == 1
   with pytest.raises(ValueError, match=r"region 0 at byte 18 needs 52 bytes; 51 remain"):
     serverMapFiles.readWater(water[:-1])
+  with pytest.raises(ValueError, match="a V1 map"):
+    serverMapFiles.readMap(struct.pack("<I", 0x01000000) + bytes(48))
+  with pytest.raises(ValueError, match="a V1 water map"):
+    serverMapFiles.readWater(b"EQEMUWATER" + struct.pack("<2I", 1, 0))
   nav = oneTileNav()
   decoded = serverMapFiles.readNav(serverMapFiles.navFile(serverMapFiles.navPayload(nav)))
   assert decoded["tiles"][0]["reference"] == 1 and numpy.array_equal(decoded["tiles"][0]["vertices"], nav["tiles"][0]["vertices"])
