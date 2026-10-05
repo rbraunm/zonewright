@@ -487,19 +487,14 @@ class FloorRelief:
     """The floor's relief over the run's floor at floor points: alongs (rows), offsets (rows x points, across), plan (rows x points x 2)
     and widths (rows). Rough ground stands in its own ground (roughWeights), lumps of its noise (lumpHeights) easing to nothing at a
     level stroke's side over its edge; a pad blends from its top at its sides to what stands round it at its feet; a level stroke holds
-    the floor. Refuses a rough stroke none of whose ground lies on the run's floor."""
+    the floor."""
     rows, count = offsets.shape
     alongGrid = numpy.repeat(alongs[:, None], count, axis=1)
     flatPlan = plan.reshape(-1, 2)
     relief = numpy.zeros((rows, count))
-    wallDistance = widths[:, None] / 2 - numpy.abs(offsets)
+    wallDistance = numpy.maximum(widths[:, None] / 2 - numpy.abs(offsets), 0.0)
     for stroke in self.rough:
       weights = self.roughWeights(stroke, flatPlan).reshape(rows, count)
-      if not weights.any():
-        raise ValueError(
-          f"Floor stroke '{stroke['name']}' (rough) lies wholly off its run '{stroke['run']}': no floor of the run lies within its outline or"
-          f" {stroke['edge']:g} of it. Draw its outline over the run's floor, or name the run it lies on"
-        )
       lumps = lumpHeights(stroke, flatPlan, wallDistance.ravel()).reshape(rows, count)
       for level in self.level:
         lumps *= smoothstep(numpy.clip(strokeDistances(alongGrid, offsets, level) / stroke["edge"], 0.0, 1.0))
@@ -515,6 +510,27 @@ class FloorRelief:
     for stroke in self.level:
       level |= insideStroke(alongGrid, offsets, stroke)
     return numpy.where(level, 0.0, relief)
+
+  def requireRoughOnFloor(self, points):
+    """Refuse a rough stroke none of whose ground reaches the run's floor points (plan, flat)."""
+    for stroke in self.rough:
+      if not self.roughWeights(stroke, points).any():
+        raise ValueError(
+          f"Floor stroke '{stroke['name']}' (rough) lies wholly off its run '{stroke['run']}': no floor of the run lies within its outline or"
+          f" {stroke['edge']:g} of it. Draw its outline over the run's floor, or name the run it lies on"
+        )
+
+  def strokesAt(self, alongs, offsets, points):
+    """The names of the rubble and pads each floor point (flat arrays) stands in or on the side of."""
+    found = [[] for _ in range(len(alongs))]
+    for stroke in self.rough:
+      for index in numpy.flatnonzero(self.roughWeights(stroke, points) > 0):
+        found[index].append(stroke["name"])
+    for pad in self.pads:
+      weight = numpy.minimum(sideWeights(alongs, pad["start"], pad["end"], pad["edge"]), sideWeights(offsets, pad["across"][0], pad["across"][1], pad["edge"]))
+      for index in numpy.flatnonzero(weight > 0):
+        found[index].append(pad["name"])
+    return found
 
   def roughWeights(self, stroke, points):
     """How far each plan point stands in a rough stroke's ground, 0 to 1: full inside its outline, easing to nothing past it at its foot,

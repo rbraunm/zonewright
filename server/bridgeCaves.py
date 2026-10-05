@@ -398,7 +398,7 @@ def workedRuns(definition, surface):
     def startHeight(run=run, parent=parent, owner=owner):
       if parent is None:
         return surface.groundHeight(run["path"][0], f"{bridgeCaveRuns.capitalized(owner)}'s start")
-      return parentFloorAt(worked[parent]["line"], run["path"][0])
+      return float(relievedFloorsAt(worked[parent], numpy.array([run["path"][0][:2]]))[0][0])
 
     def endHeight(run=run, owner=owner):
       return surface.groundHeight(run["path"][-1], f"{bridgeCaveRuns.capitalized(owner)}'s end")
@@ -658,6 +658,7 @@ def relieved(definition, worked, rows, sections, vertices, surface):
   materials = [[None] * floorCount for _ in range(count - 1)]
   if not (relief.level or relief.pads or relief.rough):
     return materials
+  relief.requireRoughOnFloor(sections[own, :floorCount + 1, :2].reshape(-1, 2))
   values = numpy.zeros((count, floorCount + 1))
   values[own] = relief.relief(rows["alongs"][own], offsets[own], sections[own, :floorCount + 1, :2], rows["widths"][own])
   vertices[:, :floorCount + 1, 2] += values
@@ -774,21 +775,36 @@ def junctionOf(branch, parent, rows, unbroken, parentTree):
   parent's (a hole in the floor) nor more than a step over it unless it is an overlook; the place it passes out through the parent's
   walls is its opening, framed for a portal piece {center (the floor's middle), facingDegrees (back into the parent), width, height}."""
   line, parentLine, owner = branch["line"], parent["line"], branch["owner"]
+  named = bridgeCaveRuns.capitalized(owner)
   own = numpy.flatnonzero(rows["scales"] == 1.0)
   first = unbroken["sections"][own[0]]
   start = line.at(numpy.array([0.0]))[0][0]
   floorPoints = first[:rows["shape"]["floorCount"] + 1]
-  parentFloors = numpy.array([parentFloorAt(parentLine, point) for point in floorPoints])
+  designed = numpy.array([parentFloorAt(parentLine, point) for point in floorPoints])
+  parentFloors, _, _, standing = relievedFloorsAt(parent, floorPoints)
   drop = parentFloors - floorPoints[:, 2]
   if drop.max() > bridgeCaveRuns.levelTolerance:
+    worst = int(drop.argmax())
+    if designed.max() - designed.min() > bridgeCaveRuns.levelTolerance:
+      raise ValueError(
+        f"{named}'s first section lies across its parent '{parent['name']}''s floor where it climbs {designed.max() - designed.min():.1f} over the"
+        f" branch's width, so part of the branch's level floor would lie {drop.max():.2f} under the parent's (at {roundedPoint(floorPoints[worst])}), a hole in"
+        " the parent's floor. Leave the parent where its floor is level across the branch's width (a stretch graded 0, or a landing at a bend,"
+        " at least as long as the branch is wide), or make the branch an overlook"
+      )
+    if standing[worst]:
+      raise ValueError(
+        f"{named}'s floor where it starts lies {drop.max():.2f} under its parent '{parent['name']}''s floor stroke(s) {sorted(set(standing[worst]))} there"
+        f" (at {roundedPoint(floorPoints[worst])}): it would cut into them. Start it on them, at their height, or keep them clear of where it starts"
+      )
     raise ValueError(
-      f"{bridgeCaveRuns.capitalized(owner)}'s floor where it starts, at {roundedPoint(floorPoints[int(drop.argmax())])}, lies {drop.max():.2f} under its"
-      f" parent '{parent['name']}''s floor there: it would leave a hole in the parent's floor. Start it level with the parent's floor or above it"
+      f"{named}'s floor where it starts, at {roundedPoint(floorPoints[worst])}, lies {drop.max():.2f} under its parent '{parent['name']}''s floor there:"
+      " it would leave a hole in the parent's floor. Start it level with the parent's floor or above it"
     )
-  rise = float(start[2] - parentFloorAt(parentLine, start))
+  rise = float(start[2] - relievedFloorsAt(parent, start[None])[0][0])
   if rise > playerScale.stepHeight + 1e-9 and not branch["run"]["overlook"]:
     raise ValueError(
-      f"{bridgeCaveRuns.capitalized(owner)} starts {rise:.1f} over its parent '{parent['name']}''s floor, more than a step ({playerScale.stepHeight:g}):"
+      f"{named} starts {rise:.1f} over its parent '{parent['name']}''s floor, more than a step ({playerScale.stepHeight:g}):"
       " a branch starts on its parent's floor; an opening high in the parent's wall that nobody walks through (a balcony, a window) is an"
       " overlook: give the branch overlook true"
     )
@@ -814,6 +830,7 @@ def junctionOf(branch, parent, rows, unbroken, parentTree):
     else:
       low = middle
   exitFloor, exitDirection, exitWidth, exitHeight = (part[0] for part in line.at(numpy.array([high])))
+  requireNoTrench(branch, parent, high)
   return {
     "branch": branch["name"], "from": parent["name"], "start": roundedPoint(start), "rise": round(rise, 2), "overlook": branch["run"]["overlook"],
     "exitAlong": high, "frame": {
@@ -821,6 +838,41 @@ def junctionOf(branch, parent, rows, unbroken, parentTree):
       "width": round(float(exitWidth), 1), "height": round(float(exitHeight), 1),
     },
   }
+
+
+def relievedFloorsAt(run, points):
+  """A run's floor as its strokes leave it under plan points: its designed floor at the nearest point of its line plus its strokes'
+  relief there; with how far across the line each point stands, the run's width there, and the rubble and pads standing there."""
+  line, relief = run["line"], run["relief"]
+  points = numpy.asarray(points, dtype=numpy.float64)[:, :2]
+  alongs = numpy.array([line.nearestAlong(point)[0] for point in points])
+  floors, directions, widths, _ = line.at(alongs)
+  offsets = ((points - floors[:, :2]) * numpy.column_stack([directions[:, 1], -directions[:, 0]])).sum(axis=1)
+  raised = relief.relief(alongs, offsets[:, None], points[:, None, :], widths)[:, 0]
+  return floors[:, 2] + raised, offsets, widths, relief.strokesAt(alongs, offsets, points)
+
+
+def requireNoTrench(branch, parent, exitAlong):
+  """Refuse a branch whose floor, from its start to where it leaves its parent's walls, runs more than a step under the parent's floor
+  strokes standing there (rubble, a pad): the union would cut a trench through them that nobody drew."""
+  line = branch["line"]
+  alongs = numpy.linspace(0.0, exitAlong, max(2, math.ceil(exitAlong / 2.0) + 1))
+  floors, directions, widths, _ = line.at(alongs)
+  shares = numpy.linspace(-0.5, 0.5, 9)
+  right = numpy.column_stack([directions[:, 1], -directions[:, 0]])
+  points = (floors[:, None, :2] + shares[None, :, None] * widths[:, None, None] * right[:, None, :]).reshape(-1, 2)
+  heights = numpy.repeat(floors[:, 2], len(shares))
+  parentFloors, offsets, parentWidths, standing = relievedFloorsAt(parent, points)
+  stroked = numpy.array([bool(names) for names in standing])
+  over = numpy.where((numpy.abs(offsets) <= parentWidths / 2) & stroked, parentFloors - heights, -math.inf)
+  if over.max() <= playerScale.stepHeight + 1e-9:
+    return
+  worst = int(over.argmax())
+  raise ValueError(
+    f"{bridgeCaveRuns.capitalized(branch['owner'])} leaves its parent '{parent['name']}' through its floor stroke(s) {sorted(set(standing[worst]))}, standing"
+    f" {over[worst]:.1f} over the branch's floor at {roundedPoint(points[worst])}: the branch would cut a trench through them. Run a level way to"
+    " where it leaves (a threshold), keep them clear of it, or start the branch on them"
+  )
 
 
 def tubeSamples(tube):

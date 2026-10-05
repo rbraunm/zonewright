@@ -1712,8 +1712,10 @@ async def cutCave(
   featureSize at least twice edgeLength (a cave with rubble at 8).
   `branches` [{name, from, path, widths, heights, grades?, landings?, daylight?, overlook?}] are runs of their own leaving the main run
   ("main") or a branch named before: a side passage, a side room, a fork, a second mouth. A branch's first point stands inside its parent
-  (its whole first section within the parent's walls), on its parent's floor (its height may be left out to take the parent's floor
-  there) unless it is an `overlook` (a balcony or window high in the parent's wall that nobody walks through); it takes the cave's
+  (its whole first section within the parent's walls), on its parent's floor as its strokes leave it (its height may be left out to
+  take that floor there: a pad's top where it starts on a pad) unless it is an `overlook` (a balcony or window high in the parent's wall
+  that nobody walks through), where the parent's floor is level across the branch's width (off a ramp, a stretch graded 0 or a
+  landing), and leaving through no rubble or pad standing over its floor (a threshold, a level way, cleared to where it leaves); it takes the cave's
   section, breakup, materials, and edgeLength, and its far end is open, a ledge, or blind as any end. Every run is cut at once, the
   tubes united by the exact boolean, so a junction is one opening where the branch leaves its parent's wall; the breakup is left out
   within half of mouthFade of the tube each run meets there and eases in over the rest, so the opening is the meeting of two clean
@@ -1752,7 +1754,8 @@ async def cutCave(
   than twice edgeLength (naming the edgeLength it needs);
   relief raising a wall's foot to within a step of the lowest trim band or of the top of the walls' straight part (naming the wall and
   where); a pad sunk where no rock lies under it; a branch whose first section reaches out of its parent (naming how far and where),
-  whose floor where it starts lies under its parent's (a hole) or more than a step over it without overlook, that never leaves its
+  whose floor where it starts lies under its parent's (a hole; off a slope, naming the climb across its width; under a stroke, naming
+  it) or more than a step over it without overlook, that would cut a trench through its parent's rubble or pad (naming it), that never leaves its
   parent, named twice or "main", or leaving an unknown run; two runs closer than minimumRock away from their junction, or a run passing
   that close to itself (naming the runs, the place, and the rock); another cave's lining within minimumRock of the tubes, or crossed by
   them (naming the cave and the place); another cave's mouth within reach; daylight not one value from 0 to 1 per point; a cut that

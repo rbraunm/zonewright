@@ -426,6 +426,42 @@ def testBranchRefusals(stageBlenderServer, tmp_path):
   assert detail["caves"] == []
 
 
+def testABranchLeavesThroughItsParentsStrokesOnlyAsTheAuthorDrewIt(stageBlenderServer, tmp_path):
+  # Rubble over the room's east side, which the side branch (at y 185 to 215) leaves through; a threshold held level from the room's
+  # middle to its east wall where the branch leaves; a dais the branch can start on; and a ramp climbing at 12 degrees through y 150.
+  rubbleEast = {"kind": "rough", "name": "rubbleEast", "run": "main", "outline": [[10, 120], [60, 120], [60, 250], [10, 250]], "rise": 6, "edge": 6, "breakup": {"featureSize": 32, "amplitude": 2, "seed": 3}}
+  threshold = {"kind": "level", "name": "threshold", "run": "main", "from": 245, "to": 275, "across": [0, 60]}
+  dais = {"kind": "pad", "name": "dais", "run": "main", "from": 230, "to": 290, "across": [-20, 59.5], "rise": 3, "edge": 0.5}
+  ramp = {"objectName": "ground", "name": "ramp", "path": [[0, -60, 2], [0, 10, 2], [0, 250]], "grades": [None, 12], "widths": [40, 40, 60], "heights": [45, 45, 60], "breakup": None} | caveMaterials
+  landed = ramp | {"path": [[0, -60, 2], [0, 10, 2], [0, 135], [0, 165], [0, 250]], "grades": [None, 12, 0, 12], "widths": [40] * 4 + [60], "heights": [45] * 4 + [60]}
+  sideOfRamp = {"name": "side", "from": "main", "path": [[0, 150], [80, 150], [130, 150]], "grades": [0, 0], "widths": [24, 24, 40], "heights": [30, 30, 40]}
+  onTheDais = side | {"path": [[0, 200], [90, 200], [150, 200]]}
+
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    trench = await session.expectError("cutCave", branched | {"breakup": None, "floor": [rubbleEast]})
+    throughThreshold = await session.expectSuccess("cutCave", branched | {"breakup": None, "floor": [rubbleEast, threshold]})
+    walked = await session.expectSuccess("walkRoute", {"cave": {"objectName": "ground", "name": "branched", "run": "side"}})
+    await session.expectSuccess("removeCave", {"objectName": "ground", "name": "branched"})
+    onDais = await session.expectSuccess("cutCave", branched | {"breakup": None, "floor": [dais], "branches": [onTheDais]})
+    await session.expectSuccess("removeCave", {"objectName": "ground", "name": "branched"})
+    sloped = await session.expectError("cutCave", ramp | {"branches": [sideOfRamp]})
+    level = await session.expectSuccess("cutCave", landed | {"branches": [sideOfRamp]})
+    return trench, throughThreshold, walked, onDais, sloped, level
+
+  trench, throughThreshold, walked, onDais, sloped, level = stageBlenderServer.session(steps)
+  # Through rubble no one cleared, the branch would cut a trench; refused, naming the rubble and how to clear it.
+  assert "Branch 'side' leaves its parent 'main' through its floor stroke(s) ['rubbleEast']" in trench and "Run a level way to where it leaves" in trench
+  # Over a threshold the author drew, it leaves cleanly and is walked from the mouth.
+  assert [junction["rise"] for junction in throughThreshold["junctions"]] == [0.0] and walked["walkable"] is True and walked["problems"] == []
+  # Started without a height on a dais, it takes the dais's top and stands on it, no step over its parent's floor there.
+  assert onDais["runs"]["side"]["floors"][0] == 5.0 and onDais["junctions"][0]["rise"] == 0.0
+  # Off a ramp's slope it would leave a hole; refused with advice that works: a level stretch, which then cuts.
+  assert "Branch 'side''s first section lies across its parent 'main''s floor where it climbs 5.1 over the branch's width" in sloped
+  assert "Leave the parent where its floor is level across the branch's width" in sloped
+  assert level["junctions"][0]["rise"] == 0.0 and level["runs"]["side"]["floors"][0] == level["runs"]["main"]["floors"][2]
+
+
 # A branch leaving the room's west wall, climbing south at x -100 to 60, then running east over the tunnel at y 30 (its vault at 47).
 over = {"name": "over", "from": "main", "path": [[-40, 150, 2], [-100, 150, 2], [-100, 30, 60], [60, 30, 60]], "widths": [30] * 4, "heights": [30] * 4}
 # A second cave from its own approach 150 east, falling under the room (its floor at 2) to end blind beneath it.
