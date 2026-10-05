@@ -229,6 +229,30 @@ def testPointLightsLightWhatTheyReachAsTheClientDoes(stageBlenderServer, tmp_pat
 
 
 @pytest.mark.clientData("clientFiles")
+def testATextureDrawnBlendedAndAddedDrawsAgain(stageBlenderServer):
+  # Definitions 50 (added) and 204 (blended), both Guardian of the Gears' smoke, share pt_add_smoke.dds: one image, two materials.
+  definitionsPath = eqEmitterDefinitions.environmentDefinitionsPath(everquestClient)
+  definitions = eqEmitterDefinitions.parseDefinitions(definitionsPath.read_bytes(), definitionsPath.name)
+  assert [(definitions[index]["texture"].lower(), definitions[index]["additive"]) for index in (50, 204)] == [("pt_add_smoke.dds", 1), ("pt_add_smoke.dds", 0)]
+  view = {"eye": [0, -30, 3], "target": [0, 0, 3]}
+  emitters = [
+    {"name": "added", "position": [-3, 0, 0], "definition": 50, "lifespan": 4000000},
+    {"name": "blended", "position": [3, 0, 0], "definition": 204, "lifespan": 4000000},
+  ]
+
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    await session.expectSuccess("setZoneProperties", darkEnvironment)
+    await session.expectSuccess("placeEmitters", {"emitters": emitters})
+    _, first = await session.expectImage("renderView", {"view": view})
+    _, second = await session.expectImage("renderView", {"view": view})
+    return first, second
+
+  first, second = stageBlenderServer.session(steps)
+  assert first["emitters"]["emitters"] == second["emitters"]["emitters"] == 2 and first["emitters"]["notDrawn"] == []
+
+
+@pytest.mark.clientData("clientFiles")
 def testEmittersDrawTheirParticlesWhereTheyStand(stageBlenderServer, tmp_path):
   texturePath = writePNG(tmp_path / "stone.png", 8, 8, texture)
   view = {"eye": [0, -8, 3], "target": [0, 0, 3]}
@@ -236,6 +260,7 @@ def testEmittersDrawTheirParticlesWhereTheyStand(stageBlenderServer, tmp_path):
     {"name": "flame", "position": [0, 0, 2], "definition": 57, "lifespan": 4000000},
     {"name": "neverMade", "position": [10, 0, 2], "definition": 57, "lifespan": 0},
     {"name": "unknown", "position": [-10, 0, 2], "definition": 9999, "lifespan": 4000000},
+    {"name": "negative", "position": [-12, 0, 2], "definition": -7, "lifespan": 0},
   ]
 
   async def steps(session):
@@ -253,7 +278,9 @@ def testEmittersDrawTheirParticlesWhereTheyStand(stageBlenderServer, tmp_path):
   drawn, without = stageBlenderServer.session(steps)
   # new_torch_flame makes 12 events a second of one particle living one second: 12 alive, all drawn this near (its detail distance is 80).
   assert drawn["emitters"] | {"notDrawn": None} == {"emitters": 1, "particles": 12, "notDrawn": None}
+  # The client checks the index before the lifespan: a negative index with a lifespan of 0 is refused for its index.
   assert sorted(drawn["emitters"]["notDrawn"], key=lambda group: group["reason"]) == [
+    {"reason": "definition -7: the client makes no emitter for a negative definition index", "count": 1, "emitters": ["negative"]},
     {"reason": "definition 9999 is past the client's 626 environment emitter definitions", "count": 1, "emitters": ["unknown"]},
     {"reason": "lifespan 0: the client makes an emitter only for a lifespan above 0", "count": 1, "emitters": ["neverMade"]},
   ]

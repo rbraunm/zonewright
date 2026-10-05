@@ -415,6 +415,34 @@ def eqgSkeletonPose(bones, animation, sourceName):
   return {"bind": dict(zip(bones["names"], bind)), "posed": dict(zip(bones["names"], posed))}
 
 
+def animationRootDrop(resource, rootOffsets):
+  """How far EQGraphicsDX9.dll lowers ROOT_BONE's keys as it loads an animation (0x1003c960): by the moddat.ini ROffset of the section
+  named by the resource name's last three characters, or 3.125 without one, except in an animation named _MT_ or whose first _IT is
+  followed by a digit."""
+  name = resource.upper()
+  marker = name.find("_IT")
+  if "_MT_" in name or (marker >= 0 and name[marker + 3:marker + 4].isdigit()) or len(name) <= 2:
+    return 0.0
+  return rootOffsets.get(name[-3:], eqRaces.defaultAvatarOffset)
+
+
+def placedSkinnedPose(model, tracks, resource, rootOffsets, sourceName):
+  """A skinned .mod a zone places, as the client poses it: a CHierarchicalActor that loops its <model>_DEFAULT animation from a random
+  point (rand() / 32767 of its length, EQGraphicsDX9.dll 0x10044550), drawn here at the animation's first key; the bind pose when the
+  zone registers no such animation (tracks None). Returns the posed vertices and normals."""
+  if tracks is None:
+    return model["vertices"], model["normals"]
+  bones = model["bones"]
+  parents, order = eqgSkeletons.boneParents(bones, sourceName)
+  bindWorlds = eqgSkeletons.worldMatrices(eqgSkeletons.bindLocals(bones), parents, order)
+  poseWorlds = eqgSkeletons.worldMatrices(eqgSkeletons.animatedLocals(bones, tracks, 0, animationRootDrop(resource, rootOffsets)), parents, order)
+  matrices = eqgSkeletons.skinMatrices(bindWorlds, poseWorlds)
+  vertices, unweighted = eqgSkeletons.skinVertices(model["vertices"], model["weights"], matrices, sourceName)
+  if unweighted[model["triangles"]].any():
+    raise ValueError(f"{sourceName}: triangles use vertices with no bone weights; how the client poses them is not known")
+  return vertices, eqgSkeletons.skinNormals(model["normals"], model["weights"], matrices, sourceName)
+
+
 def eqgSkinnedPart(mesh, bones, pose, textures, alphaModes, sourceName, pointBone=None):
   """A skinned mesh moved from its own bind pose to the skeleton's pose, or as stored when the skeleton keeps its bind pose; drawn
   triangles must use weighted vertices. A piece attached at a point bone shares that bone's matrix for its first bone and the

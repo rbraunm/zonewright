@@ -12,6 +12,7 @@ import numpy
 
 import bridgeEnvironment
 import emitterParticles
+import eqEmitters
 
 particleColorAttribute = "eqParticleColor"
 materialPrefix = "zonewrightParticles"
@@ -53,7 +54,9 @@ def particleMaterial(preview, texturePath, additive):
   nodes.clear()
   texture = nodes.new("ShaderNodeTexImage")
   texture.image = bpy.data.images.load(texturePath, check_existing=True)
-  preview.loadedImages.append(texture.image)
+  # A texture drawn both blended and added loads once for both materials, and is removed once.
+  if texture.image not in preview.loadedImages:
+    preview.loadedImages.append(texture.image)
   texture.image.colorspace_settings.name = "Non-Color"
   texture.image.alpha_mode = "STRAIGHT"
   texture.interpolation = "Linear"
@@ -150,12 +153,11 @@ def emitterMesh(preview, label, particles, mode, camera, material, emitterPositi
 
 def emitterParticlesOrReason(emitter, definitions, textures, camera):
   """An emitter's particles the view shows and its definition, or why it draws none."""
+  reason = eqEmitters.notMadeReason(emitter, len(definitions))
+  if reason is not None:
+    return None, None, reason
   index, lifespan = emitter["definition"], emitter["lifespan"]
-  if index >= len(definitions):
-    return None, None, f"definition {index} is past the client's {len(definitions)} environment emitter definitions"
   definition = definitions[index]
-  if lifespan <= 0:
-    return None, None, f"lifespan {lifespan}: the client makes an emitter only for a lifespan above 0"
   try:
     particles = emitterParticles.steadyParticles(definition, emitter["name"], emitter["position"], lifespan, list(camera["position"]))
   except ValueError as error:
