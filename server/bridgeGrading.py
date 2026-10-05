@@ -13,6 +13,7 @@ import numpy
 
 import bridgeAuthoring
 import bridgeCaveData
+import bridgeCaveRuns
 import bridgeCaves
 import bridgeExport
 import bridgeFacades
@@ -21,12 +22,15 @@ import bridgeMeshAccess
 import bridgePasses
 import bridgeReview
 import bridgeShaping
+import bridgeSketch
 import bridgeStructures
 import bridgeSurfacing
 from playerScale import stepHeight, steepestWalkableDegrees
 
 routePassPrefix = "route "
 routeKind = "route"
+# A cave's profile sheet draws at most this many runs, so the picture stays a size a client takes in; the rest are named in the result.
+profileMostRuns = 4
 # Batters are looked for this far out at least and refused past the farthest, as gradePlot's are.
 minimumReach = 20.0
 maximumReach = 600.0
@@ -861,11 +865,46 @@ def dress(sceneObject, definition):
   }
 
 
+def profileCuts(objectName, cave, runs):
+  """A cave's profile as the section cuts of its runs along their centerlines with the ground and the caves (renderSection's cave), at
+  most profileMostRuns of them, the rest named."""
+  panels = [[f"{cave}: {run}", bridgeSketch.sectionCuts(None, None, None, {"objectName": objectName, "name": cave, "run": run}, None, None, ["ground", "caves"])] for run in runs[:profileMostRuns]]
+  return {"panels": panels, "runsNotDrawn": runs[profileMostRuns:]}
+
+
+def cutCave(objectName, name, **definition):
+  """Cut a cave (bridgeCaves.cutCave) and draw its profile's cuts, whole or not at all."""
+  sceneObject = bridgeCaves.requireTerrain(objectName)
+  with bridgeCaves.restoredOnFailure(sceneObject):
+    cut = bridgeCaves.cutCave(objectName, name, **definition)
+    return cut | {"profileCuts": profileCuts(objectName, name, list(cut["runs"]))}
+
+
+def editedRuns(record, changes, runs):
+  """The runs an edit changed, for its profile: every run when it changes nothing (a refit), else the main run, each branch it adds or
+  changes (the parent of one it takes back), and the run of each floor stroke it adds, changes, or takes back."""
+  if not changes:
+    return runs
+  stored = record["definition"]
+  branchParents = {branch["name"]: branch["from"] for branch in stored.get("branches") or []}
+  strokeRuns = {stroke["name"]: stroke["run"] for stroke in stored.get("floor") or []}
+  touched = {bridgeCaveRuns.mainRun}
+  for branch, change in (changes.get("branches") or {}).items():
+    touched.add(branch if change is not None else branchParents[branch])
+  for stroke, change in (changes.get("floor") or {}).items():
+    if isinstance(change, dict) and "run" in change:
+      touched.add(change["run"])
+    if stroke in strokeRuns:
+      touched.add(strokeRuns[stroke])
+  return [run for run in runs if run in touched]
+
+
 def editCave(objectName, name, changes):
   """Cut a cave again with changes (bridgeCaves.recut), and dress its facades again where the cave they frame moved under them, refusing
-  a change a facade would no longer frame."""
+  a change a facade would no longer frame; with the profile cuts of the runs it changed, whole or not at all."""
   sceneObject = bridgeCaves.requireTerrain(objectName)
   bridgeCaves.requireIntact(sceneObject)
+  record = bridgeCaves.requireCave(sceneObject, name)
   facades = [feature["definition"] for feature in definedFeatures(sceneObject) if feature["kind"] == bridgeFacades.facadeKind and feature["definition"]["cave"] == name]
   with bridgeCaves.restoredOnFailure(sceneObject):
     result = {"object": objectName, "cave": name, "changes": changes or {}} | bridgeCaves.recut(sceneObject, name, changes or {})
@@ -881,7 +920,8 @@ def editCave(objectName, name, changes):
         ) from refusal
       if current != definition:
         refitted.append({"end": definition["end"]} | dress(sceneObject, current))
-  return result | {"refitFacades": refitted}
+    drawn = profileCuts(objectName, name, editedRuns(record, changes, list(result["cut"]["runs"])))
+  return result | {"refitFacades": refitted, "profileCuts": drawn}
 
 
 def removeShapingPass(objectName, name):
@@ -904,6 +944,7 @@ def removeShapingPass(objectName, name):
 
 
 commands = {
+  "cutCave": (cutCave, True),
   "gradeRoute": (gradeRoute, True),
   "regradeTerrain": (regradeTerrain, True),
   "dressFacade": (dressFacade, True),

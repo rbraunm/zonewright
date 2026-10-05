@@ -128,7 +128,7 @@ def testAPieceHungOverTheFloorIsLeftOutOfTheFootprint(stageBlenderServer, tmp_pa
 def testNestedInstancesAreStoodOnSettledOntoAndSectioned(stageBlenderServer, tmp_path):
   section = """
 import bridgeSketch
-cuts = bridgeSketch.sectionCuts([-60.0, 0.0], [60.0, 0.0], -10.0, 80.0, ['ground'])['ground']
+cuts = bridgeSketch.sectionCuts([-60.0, 0.0], [60.0, 0.0], None, None, -10.0, 80.0, ['ground'])['ground']
 result = sorted(set(round(value, 2) for s0, z0, s1, z1 in cuts for value in (s0, s1) if max(z0, z1) >= 30.0))
 """
 

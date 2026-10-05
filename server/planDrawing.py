@@ -320,6 +320,35 @@ def pixelDirection(headingDegrees):
   return (-math.cos(heading), -math.sin(heading))
 
 
+def drawCaves(draw, frame, caves):
+  """Caves' runs in plan, lowest floor first, each over a pale floor of its own, so a run passing over another hides what lies under it
+  as a level over a level: their walls at floor height, their middles dotted, their floor strokes' outlines, and their junctions."""
+  for cave in sorted(caves, key=lambda cave: cave["meanFloor"]):
+    draw.polygon([frame.pixel(point) for point in cave["left"] + cave["right"][::-1]], fill=caveFloorFill)
+    for stroke in cave["strokes"]:
+      points = [frame.pixel(point) for point in stroke["outline"]]
+      if stroke["kind"] == "rough":
+        dashedLine(draw, points + points[:1], (*strokeColors["rough"], 255), 2)
+      else:
+        draw.polygon(points, fill=(*strokeColors[stroke["kind"]], 70), outline=(*strokeColors[stroke["kind"]], 255), width=2)
+    for side in ("left", "right"):
+      draw.line([frame.pixel(point) for point in cave[side]], fill=(*caveColor, 255), width=2)
+    dashedLine(draw, [frame.pixel(point) for point in cave["middle"]], (*caveColor, 150), 1)
+    for meeting in (cave["junction"], cave["opening"]):
+      if meeting is not None:
+        x, y = frame.pixel(meeting)
+        draw.ellipse([x - 5, y - 5, x + 5, y + 5], fill=(255, 255, 255, 255), outline=(*caveColor, 255), width=2)
+
+
+def labelCaves(board, frame, caves):
+  """Name each run by the middle of its middle line, and write its floor height at each of its path points."""
+  for cave in caves:
+    for spot in cave["floors"]:
+      board.place(frame.pixel(spot["at"]), f"{spot['floor']:g}", caveColor, 11)
+    middle = cave["middle"][len(cave["middle"]) // 2]
+    board.place(frame.pixel(middle), cave["label"], caveColor, 13)
+
+
 def drawRegions(draw, frame, regions):
   for region in regions:
     points = [frame.pixel(point) for point in region["outline"]]
@@ -482,6 +511,7 @@ def drawPlan(basePath, outputPath, center, width, overlays):
   overlay(lambda draw: drawZoneLines(draw, frame, overlays["zoneLines"]))
   image = Image.alpha_composite(image, accessFills(size, frame, overlays["regions"]))
   overlay(lambda draw: drawRegions(draw, frame, overlays["regions"]))
+  overlay(lambda draw: drawCaves(draw, frame, overlays["caves"]))
   for kinds in (("area",), ("footprint", "path")):
     for shape, color in shapes:
       if shape["kind"] in kinds:
@@ -522,6 +552,7 @@ def drawPlan(basePath, outputPath, center, width, overlays):
       board.place(centroidOf([frame.pixel(point) for point in line["corners"]]), line["name"], zoneLineColor, 13)
     for region in overlays["regions"]:
       board.place(centroidOf([frame.pixel(point) for point in region["outline"]]), region["name"], regionColor, 13)
+    labelCaves(board, frame, overlays["caves"])
     drawSpots(board, spots)
     return unnamedSwimVolumes
 
@@ -543,6 +574,16 @@ padWidth = 5
 padTick = 7
 entranceMarkSection = 10
 crossingMark = 5
+bendColor = (70, 70, 160)
+caveColor = (120, 40, 140)
+# A run's floor in plan: pale enough that the relief reads through it, opaque enough that a run under it fades.
+caveFloorFill = (246, 242, 248, 150)
+strokeColors = {"level": (30, 150, 60), "pad": (220, 120, 0), "rough": (130, 90, 60)}
+strokeWidth = 5
+# A cave's profile stacks one panel per run, each at most this tall (and at least the shorter), a few pixels apart.
+profilePanelHeight = 540
+profilePanelMinimum = 220
+profileGap = 6
 
 
 def clippedSegment(segment, length, bottom, top):
@@ -561,24 +602,58 @@ def clippedSegment(segment, length, bottom, top):
   return (s0 + enter * (s1 - s0), z0 + enter * (z1 - z0), s0 + leave * (s1 - s0), z0 + leave * (z1 - z0))
 
 
-def drawSection(outputPath, cuts, start, end, bottom, top):
-  """Draw a section's cuts, clipped to its frame: the ground's profile, water surfaces, swim volumes and zone lines as boxes, sketch
-  massing, sketch area floors (dashed) and paths in their sheets' colors, plot pads with their entrances, and boundaries in red, at one
-  scale across and up, with a height grid, the distance along the line, and its two ends named by their coordinates; each label just
-  above what it names."""
-  width, height = sectionSize
+def closedLoops(segments):
+  """How many closed shapes a section's ground segments make (a room or a passage cut across, a hole through an arch): groups of
+  segments joined end to end where every end meets exactly one other. A segment with no length (where the plane passes through a
+  vertex) joins nothing."""
+  ends = {}
+  segments = [segment for segment in segments if (round(segment[0], 2), round(segment[1], 2)) != (round(segment[2], 2), round(segment[3], 2))]
+  for index, (s0, z0, s1, z1) in enumerate(segments):
+    for end in ((round(s0, 2), round(z0, 2)), (round(s1, 2), round(z1, 2))):
+      ends.setdefault(end, []).append(index)
+  parent = list(range(len(segments)))
+
+  def root(index):
+    while parent[index] != index:
+      parent[index] = parent[parent[index]]
+      index = parent[index]
+    return index
+
+  for members in ends.values():
+    for other in members[1:]:
+      parent[root(other)] = root(members[0])
+  groups, openGroups = set(), set()
+  for index in range(len(segments)):
+    groups.add(root(index))
+  for members in ends.values():
+    if len(members) != 2:
+      openGroups.update(root(member) for member in members)
+  return len(groups - openGroups)
+
+
+def sectionFit(cuts, size):
+  """The scale (pixels per unit) that fits a section's length and height into a drawing of size."""
+  return min((size[0] - 2 * sectionPadding[0]) / cuts["length"], (size[1] - 2 * sectionPadding[1]) / (cuts["top"] - cuts["bottom"]))
+
+
+def sectionImage(cuts, size, scale, title=None):
+  """Draw a section's cuts at scale (pixels per unit) on an image of size, clipped to its frame: the ground's profile, water surfaces,
+  swim volumes and zone lines as boxes, sketch massing, sketch area floors (dashed) and paths in their sheets' colors, plot pads with
+  their entrances, boundaries in red, and the caves' runs (their floors solid, vaults dashed, floor strokes as bars, landings and
+  junctions marked, a run crossing the line as a dashed box), at one scale across and up, with a height grid, the distance along the
+  line, its bends marked by their point numbers, and its two ends named by their coordinates; each label just above what it names."""
+  width, height = size
   padX, padY = sectionPadding
-  length = cuts["length"]
-  scale = min((width - 2 * padX) / length, (height - 2 * padY) / (top - bottom))
+  length, bottom, top = cuts["length"], cuts["bottom"], cuts["top"]
   left = padX + ((width - 2 * padX) - length * scale) / 2
   baseline = height - padY - ((height - 2 * padY) - (top - bottom) * scale) / 2
 
   def pixel(s, z):
     return (left + s * scale, baseline - (z - bottom) * scale)
 
-  image = Image.new("RGB", sectionSize, sectionBackground)
+  image = Image.new("RGB", size, sectionBackground)
   draw = ImageDraw.Draw(image, "RGBA")
-  board = LabelBoard(draw, sectionSize)
+  board = LabelBoard(draw, size)
   labels = []
 
   def lines(segments, color, lineWidth, dashed=False):
@@ -617,12 +692,18 @@ def drawSection(outputPath, cuts, start, end, bottom, top):
     x = pixel(s, 0)[0]
     draw.line([(x, pixel(0, top)[1]), (x, pixel(0, bottom)[1])], fill=(218, 218, 218, 255), width=1)
     board.write((x, pixel(0, bottom)[1] + 12), str(s), (60, 60, 60), 12)
-  fromLabel, toLabel = (f"[{point[0]:g}, {point[1]:g}]" for point in (start, end))
-  board.write((left, padY / 2), fromLabel, (0, 0, 0), 14, "lm")
-  board.write((left + length * scale, padY / 2), toLabel, (0, 0, 0), 14, "rm")
+  for bend in cuts["bends"]:
+    x = pixel(bend["s"], 0)[0]
+    dashedLine(draw, [(x, pixel(0, top)[1]), (x, pixel(0, bottom)[1])], (*bendColor, 160), 1)
+    draw.polygon([(x, pixel(0, bottom)[1] + 2), (x - 5, pixel(0, bottom)[1] + 10), (x + 5, pixel(0, bottom)[1] + 10)], fill=(*bendColor, 255))
+    board.write((x, pixel(0, bottom)[1] + 22), bend["label"], bendColor, 12)
+  first, last = cuts["points"][0], cuts["points"][-1]
+  board.write((left, padY / 2), title or f"[{first[0]:g}, {first[1]:g}]", (0, 0, 0), 14, "lm")
+  if title is None:
+    board.write((left + length * scale, padY / 2), f"[{last[0]:g}, {last[1]:g}]", (0, 0, 0), 14, "rm")
   bar = step * scale
   draw.line([(width - padX - bar, height - 16), (width - padX, height - 16)], fill=(0, 0, 0, 255), width=4)
-  board.write((width - padX - bar / 2, height - 28), f"{step} units", (0, 0, 0), 13)
+  board.place((width - padX - bar / 2, height - 28), f"{step} units", (0, 0, 0), 13)
   for box in cuts["swim"]:
     corners = [pixel(box["s"][0], box["z"][1]), pixel(box["s"][1], box["z"][0])]
     color = swimColors[box["liquid"]]
@@ -634,7 +715,23 @@ def drawSection(outputPath, cuts, start, end, bottom, top):
     corners = [pixel(box["s"][0], box["z"][1]), pixel(box["s"][1], box["z"][0])]
     draw.rectangle([corners[0], corners[1]], fill=(*zoneLineColor, 70), outline=(*zoneLineColor, 255), width=2)
     labels.append((((corners[0][0] + corners[1][0]) / 2, corners[0][1] - sectionLabelLift), box["name"], zoneLineColor, 12))
+  for entry in cuts["caves"]:
+    for crossing in entry["crossings"]:
+      (s0, s1), (z0, z1) = crossing["s"], crossing["z"]
+      kept = [piece for piece in ([s0, z0, s1, z0], [s1, z0, s1, z1], [s1, z1, s0, z1], [s0, z1, s0, z0]) if clippedSegment(piece, length, bottom, top) is not None]
+      nameAbove(lines(kept, caveColor, 2, dashed=True), entry["label"], caveColor, 12, True)
   lines(cuts["ground"], groundColor, 3)
+  for entry in cuts["caves"]:
+    for stroke in entry["strokes"]:
+      lines([stroke["segment"]], strokeColors[stroke["kind"]], strokeWidth, dashed=stroke["kind"] == "rough")
+    if entry["floor"]:
+      lines(entry["floor"], caveColor, 2 if entry["followed"] else 1)
+      nameAbove(lines(entry["vault"], caveColor, 2 if entry["followed"] else 1, dashed=True), entry["label"], caveColor, 13, False)
+    for mark in entry["marks"]:
+      if 0 <= mark["s"] <= length and bottom <= mark["z"] <= top:
+        x, y = pixel(mark["s"], mark["z"])
+        draw.polygon([(x, y - 3), (x - 6, y - 13), (x + 6, y - 13)], fill=(*caveColor, 255))
+        labels.append(((x, y - 15), mark["label"], caveColor, 12))
   for entry in cuts["boundaries"]:
     nameAbove(lines(entry["segments"], boundaryColor, boundaryLineWidth), entry["name"], boundaryColor, 12, True)
   for entry in cuts["massing"]:
@@ -670,5 +767,28 @@ def drawSection(outputPath, cuts, start, end, bottom, top):
     nameAbove(kept, entry["name"], plotColor, 12, True)
   for position, text, color, size in labels:
     board.place(position, text, color, size, "mb")
+  return image, {"gridStep": step, "unitsPerPixel": round(1 / scale, 4)}
+
+
+def drawSection(outputPath, cuts):
+  """Draw a section (sectionImage) at the scale that fits it, and save it."""
+  image, drawn = sectionImage(cuts, sectionSize, sectionFit(cuts, sectionSize))
   image.save(outputPath)
-  return {"gridStep": step, "unitsPerPixel": round(1 / scale, 4)}
+  return drawn
+
+
+def drawProfiles(outputPath, panels):
+  """Draw a cave's runs' sections ([(title, cuts)], each along a run) one under another at one scale, each panel as tall as its run's
+  heights need and all as wide as the longest, and save them as one picture."""
+  scale = min(min(sectionFit(cuts, (sectionSize[0], profilePanelHeight)) for _, cuts in panels), sectionFit(panels[0][1], sectionSize))
+  images = []
+  for title, cuts in panels:
+    height = min(profilePanelHeight, max(profilePanelMinimum, round((cuts["top"] - cuts["bottom"]) * scale + 2 * sectionPadding[1])))
+    images.append(sectionImage(cuts, (sectionSize[0], height), scale, title)[0])
+  sheet = Image.new("RGB", (sectionSize[0], sum(image.height for image in images) + profileGap * (len(images) - 1)), (255, 255, 255))
+  top = 0
+  for image in images:
+    sheet.paste(image, (0, top))
+    top += image.height + profileGap
+  sheet.save(outputPath)
+  return {"unitsPerPixel": round(1 / scale, 4), "panels": [title for title, _ in panels], "size": list(sheet.size)}

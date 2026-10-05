@@ -8,6 +8,7 @@ import math
 import numpy
 
 import bridgeCaveData
+import bridgeCaveRuns
 import bridgeCaves
 import bridgeMeshAccess
 
@@ -64,7 +65,7 @@ def facadeDefinition(sceneObject, cave, end, faceAt, width, height, apron, blend
   if not -steepestTurnDegrees <= turnDegrees <= steepestTurnDegrees:
     raise ValueError(f"turnDegrees turns the face from square to the cave's path toward the cliff's line, at most {steepestTurnDegrees:g} either way, got {turnDegrees}")
   caveDefinition = bridgeCaves.caveDefinition(**record["definition"])
-  line = bridgeCaves.CaveLine(caveDefinition)
+  line = bridgeCaves.recordedLines(cave, record)[bridgeCaveRuns.mainRun]
   straight = straightFrom(line, end)
   if faceAt > straight + 1e-9:
     raise ValueError(f"faceAt {faceAt:g} is past the cave's first bend from its {end}: its path runs straight only {straight:.1f} in from there; stand the face within it")
@@ -112,7 +113,8 @@ def endKindOnUncutGround(sceneObject, caveDefinition, floor, direction, width, h
   shown, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
   triangles, _ = uncutGround(sceneObject)
   surface = bridgeCaves.caveSurface(shown, triangles, caveDefinition)
-  kind, _ = bridgeCaves.endKind(caveDefinition, bridgeCaves.sectionShape(caveDefinition), surface, floor, direction, width, height, end)
+  shape = bridgeCaves.sectionShape(caveDefinition, caveDefinition["widths"], caveDefinition["heights"], caveDefinition["path"], "the cave")
+  kind, _ = bridgeCaves.endKind(caveDefinition, shape, surface, floor, direction, width, height, end)
   return kind
 
 

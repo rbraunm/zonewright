@@ -648,7 +648,7 @@ result = bridgeSketch.planOverlays(None, ["water"], [])["water"]
 """
 sectionWater = """
 import bridgeSketch
-result = bridgeSketch.sectionCuts([-130, 0], [130, 0], -30, 12, ["water"])["water"]
+result = bridgeSketch.sectionCuts([-130, 0], [130, 0], None, None, -30, 12, ["water"])["water"]
 """
 
 

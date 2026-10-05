@@ -12,6 +12,7 @@ import mathutils
 import numpy
 
 import bridgeCaveData
+import bridgeCaves
 import bridgeGrading
 import bridgeMeshAccess
 import bridgeModels
@@ -417,7 +418,7 @@ def placePlot(address, kind, center, facingDegrees, size, height, items, pets, t
   bridgeObjects.targetCollection(collection or housingCollectionName).objects.link(plot)
   border = setBorder(plot, kind, size, borderFolder)
   bpy.context.view_layer.update()
-  return plotRecord(plot, housing) | {"border": border, "overlaps": overlapsOf(plot)}
+  return plotRecord(plot, housing) | {"border": border, "overlaps": overlapsOf(plot), "caveFloor": bridgeCaves.strokeUnder(center[0], center[1], height)}
 
 
 def requirePrice(pricePlatinum):
@@ -938,7 +939,7 @@ def assessPlot(address):
   if overhead is not None:
     suggested.append({"feature": "sheltered", "because": f"rock or roof over its center at {overhead}"})
   return {
-    "address": address, "under": under, "sides": sides,
+    "address": address, "under": under, "caveFloor": bridgeCaves.strokeUnder(center[0], center[1], center[2]), "sides": sides,
     "entrance": {"point": [round(float(value), 1) for value in entrance], "ground": None if entranceGround is None else round(entranceGround, 2)},
     "waterDistance": water, "standsAboveSurroundings": standsAbove, "enclosure": enclosure, "overhead": overhead,
     "nearestPlot": None if nearestPlot is None else round(nearestPlot, 1), "routeDistance": routeDistance, "prominence": prominence,

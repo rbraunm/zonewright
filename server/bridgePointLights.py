@@ -12,6 +12,8 @@ import bridgeMeshAccess
 import clientPointLights
 
 previewCopySuffix = "PointLit"
+# A preview's copy of a terrain (bridgeCaveLight draws a terrain holding daylit caves from one) is lit as the terrain is.
+previewTerrainProperty = "zonewrightPreviewTerrain"
 
 
 def sceneLights(scene):
@@ -106,7 +108,7 @@ def collectUnits(preview, depsgraph, terrainNames, reached):
     if owner.name not in units:
       if owner.get(bridgeMeshAccess.clientContentProperty) in ("zone", "zoneFile"):
         kind = "zone"
-      elif owner.name in terrainNames:
+      elif owner.name in terrainNames or owner.get(previewTerrainProperty):
         kind = "region"
       else:
         kind = "model"

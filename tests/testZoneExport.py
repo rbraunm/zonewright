@@ -470,6 +470,6 @@ def testExportLeavesOutWhatIsNotTheZonesOwnAndSaysWhy(stageBlenderServer, tmp_pa
     {"reason": "an entry: where players arrive (server rows)", "count": 1, "objects": ["gate"]},
     {"reason": "hidden from renders", "count": 1, "objects": ["pillar"]},
   ]
-  assert exported["toConfirm"] == [{"object": "ground", "passesOff": ["mound"], "layersMuted": ["path"], "staleCaves": [], "staleDefinedPasses": []}]
+  assert exported["toConfirm"] == [{"object": "ground", "passesOff": ["mound"], "layersMuted": ["path"], "staleCaves": [], "staleDefinedPasses": [], "daylitCaves": []}]
   assert exported["modelTriangles"] == {"obj_crate.mod": 12}
   assert sorted(eqArchive.EQArchive(archivePath).entries) == ["ground.dds", "obj_crate.mod", "ter_testplot.ter", "testplot.zon"]

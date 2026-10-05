@@ -11,6 +11,8 @@ import mathutils.bvhtree
 import numpy
 
 import bridgeBoundaries
+import bridgeCaveRuns
+import bridgeCaves
 import bridgeExport
 import bridgeMeshAccess
 import bridgeReviewGuides
@@ -330,18 +332,26 @@ def roundVector(vector):
   return [round(float(component), 1) for component in vector]
 
 
-def givenPath(path, route):
-  """A route's points: given, a saved review route's, or a bridge's, flight's, or walkway's walk line."""
-  if (path is None) == (route is None):
-    raise ValueError("Give path, the route's [x, y, z] points, or route, the name of a saved review route or of a bridge, flight, or walkway")
+def givenPath(path, route, cave):
+  """A route's points: given, a saved review route's, a bridge's, flight's, or walkway's walk line, or a cave run's centerline at its
+  floor (cave {objectName, name, run}: a branch's walk starts at the cave's mouth and passes through each junction on its way)."""
+  if sum(value is not None for value in (path, route, cave)) != 1:
+    raise ValueError(
+      "Give path, the route's [x, y, z] points; route, the name of a saved review route or of a bridge, flight, or walkway; or cave"
+      " {objectName, name, run}, a cave's run"
+    )
   if path is not None:
     return path
+  if cave is not None:
+    if not isinstance(cave, dict) or set(cave) - {"objectName", "name", "run"} or not {"objectName", "name"} <= set(cave):
+      raise ValueError(f"cave is {{objectName, name, run}} (run 'main' unless a branch is named), got {cave!r}")
+    return bridgeCaves.caveWalkPath(cave["objectName"], cave["name"], cave.get("run", bridgeCaveRuns.mainRun))
   structure = bridgeStructureData.findStructure(route)
   return bridgeStructures.walkLine(structure) if structure is not None else bridgeReviewGuides.routePath(route)
 
 
-def walkGivenRoute(path, route, sampleSpacing):
-  return walkRoute(givenPath(path, route), sampleSpacing)
+def walkGivenRoute(path, route, cave, sampleSpacing):
+  return walkRoute(givenPath(path, route, cave), sampleSpacing)
 
 
 class RouteLine:
@@ -393,11 +403,11 @@ def stripFrame(line, distance, footing, target, problem):
   }
 
 
-def planRouteStrip(path, route, spacing):
+def planRouteStrip(path, route, cave, spacing):
   """Walk a route as walkRoute does and plan an eye-level frame every `spacing` along it in plan, where the walk stands, and one where
   each of the walk's problems starts; stations the walk cannot reach (between a stop and where it takes up again) get none. A frame along
   the way looks at where the walk stands stripLookAhead on, or at its brink when it stops sooner; a problem's frame looks past it."""
-  path = givenPath(path, route)
+  path = givenPath(path, route, cave)
   if spacing <= 0:
     raise ValueError(f"spacing must be positive, got {spacing}")
   line = RouteLine(path)

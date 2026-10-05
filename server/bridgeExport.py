@@ -19,6 +19,7 @@ import mathutils.bvhtree
 import numpy
 
 import bridgeBoundaries
+import bridgeCaveLight
 import bridgeCaves
 import bridgeEnvironment
 import bridgeGrading
@@ -112,8 +113,10 @@ def exportedObjects():
 
 
 def decisionsToConfirm(shipped):
-  """Shaping passes and surfacing layers that are off on shipped meshes, which leave the zone as if never made (which may be meant); and
-  the caves and defined passes whose ground moved since they were made (stale), which export as they stand and a game export refuses."""
+  """Shaping passes and surfacing layers that are off on shipped meshes, which leave the zone as if never made (which may be meant); the
+  caves and defined passes whose ground moved since they were made (stale), which export as they stand and a game export refuses; and
+  the caves whose daylight goes out as the terrain placement's baked light (its .lit), which the client's use of on a terrain placement
+  is unverified until a test load."""
   decisions = []
   for sceneObject, role in shipped:
     if sceneObject.type != "MESH":
@@ -123,8 +126,12 @@ def decisionsToConfirm(shipped):
     mutedLayers = [layer["name"] for layer in bridgeMeshAccess.surfaceLayers(sceneObject) if layer["muted"]]
     staleCaves = bridgeCaves.staleCaves(sceneObject)
     staleDefined = [name for entry in bridgeGrading.describeDefinedPasses(sceneObject) if entry["stale"] for name in entry["passes"]]
-    if offPasses or mutedLayers or staleCaves or staleDefined:
-      decisions.append({"object": sceneObject.name, "passesOff": offPasses, "layersMuted": mutedLayers, "staleCaves": staleCaves, "staleDefinedPasses": staleDefined})
+    daylit = bridgeCaveLight.daylitCaves(sceneObject)
+    if offPasses or mutedLayers or staleCaves or staleDefined or daylit:
+      decisions.append({
+        "object": sceneObject.name, "passesOff": offPasses, "layersMuted": mutedLayers, "staleCaves": staleCaves, "staleDefinedPasses": staleDefined,
+        "daylitCaves": daylit,
+      })
   return decisions
 
 
@@ -202,7 +209,7 @@ def meshArrays(sceneObject, depsgraph, matrix, materialNames, marked):
   unique, firstLoop, loopToVertex = numpy.unique(corners, axis=0, return_index=True, return_inverse=True)
   loopToVertex = loopToVertex.ravel()
   return {
-    "positions": positions[loopVertices[firstLoop]], "normals": normals[firstLoop], "uvs": uvs[firstLoop],
+    "positions": positions[loopVertices[firstLoop]], "normals": normals[firstLoop], "uvs": uvs[firstLoop], "sourceVertices": loopVertices[firstLoop],
     "triangles": loopToVertex[triangleLoops].reshape(-1, 3),
     "materials": [materialNames(slotMaterials[slot]) for slot in triangleSlots], "passable": passable,
   }
@@ -339,7 +346,7 @@ def collectZoneExport(outputFolder, zoneName):
 
   shipped, _ = exportedObjects()
   regions = bridgeSwim.swimRegions() + bridgeBoundaries.zoneLineRegions()
-  terrainParts, models, placements, lights, emitters = [], {}, [], [], []
+  terrainParts, terrainShares, models, placements, lights, emitters = [], [], {}, [], [], []
   for sceneObject, role in shipped:
     if role == "light":
       lights.append(bridgeEnvironment.lightRecord(sceneObject))
@@ -348,10 +355,14 @@ def collectZoneExport(outputFolder, zoneName):
       emitters.append(bridgeEnvironment.emitterRecord(sceneObject))
       continue
     if role == "terrain":
-      terrainParts.append(meshArrays(sceneObject, depsgraph, numpy.array(sceneObject.matrix_world), materialName, bridgeMeshAccess.passableProperty in sceneObject))
+      part = meshArrays(sceneObject, depsgraph, numpy.array(sceneObject.matrix_world), materialName, bridgeMeshAccess.passableProperty in sceneObject)
+      shares = bridgeCaveLight.daylightShares(sceneObject)
+      terrainParts.append(part)
+      terrainShares.append(numpy.ones(len(part["positions"])) if shares is None else shares[part["sourceVertices"]])
       continue
     if role == "boundary":
       terrainParts.append(bridgeBoundaries.boundaryArrays(sceneObject, depsgraph))
+      terrainShares.append(numpy.ones(len(terrainParts[-1]["positions"])))
       continue
     key = modelKey(sceneObject, role)
     if key not in models and role == "mesh":
@@ -373,6 +384,10 @@ def collectZoneExport(outputFolder, zoneName):
   terrain = mergeArrays(terrainParts)
   for field in ("positions", "normals", "uvs", "triangles", "passable"):
     arrays[f"terrain_{field}"] = terrain[field]
+  shares = numpy.concatenate(terrainShares)
+  daylit = bool((shares < 1).any())
+  if daylit:
+    arrays["terrain_shares"] = shares
   os.makedirs(outputFolder, exist_ok=True)
   numpy.savez(os.path.join(outputFolder, modelArraysFileName), **arrays)
   counts = {}
@@ -386,7 +401,7 @@ def collectZoneExport(outputFolder, zoneName):
     })
   return {
     "zone": zoneName, "arrays": os.path.join(outputFolder, modelArraysFileName),
-    "terrain": {"file": f"ter_{zoneName}.ter", "materials": [exportedNames[name] for name in terrain["materials"]], "arrays": "terrain"},
+    "terrain": {"file": f"ter_{zoneName}.ter", "materials": [exportedNames[name] for name in terrain["materials"]], "arrays": "terrain", "daylight": daylit},
     "models": modelList, "materials": [materialRecord(material) | {"name": exportedNames[name]} for name, material in materials.items()],
     "placements": placementList, "lights": lights, "emitters": emitters,
     "regions": regions, "housing": bridgeHousing.collectHousing(),

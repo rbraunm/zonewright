@@ -188,6 +188,131 @@ def testACaveIsCutSealedWalkableAndSurfacedAndItsLiningStrokesComeBack(stageBlen
   assert recut["cut"]["liningFaces"] > 0 and repainted == {"floor": ["rock"], "walls": ["caveRock"]}
 
 
+def testFineCutsCloseWhereTheTubesEndStandsOnTheGround(stageBlenderServer, tmp_path):
+  # Two faces meeting along a line from x 0 to 10, each with a corner of its own on it (the upper at 7, the lower at 4), and between them
+  # the slit the exact boolean leaves where a tube's flat end stands on the ground: its outline back along the line by the upper face's
+  # corners and out again by the lower's.
+  slit = r"""
+import numpy
+import bridgeCaves
+positions = numpy.array([[0, 0, 0], [10, 0, 0], [10, 5, 0], [0, 5, 0], [4, 0, 0], [10, -5, 0], [0, -5, 0], [7, 0, 0]], dtype=float)
+faces = [[0, 7, 1, 2, 3], [6, 5, 1, 4, 0], [1, 7, 0, 4]]
+kept, sources, _ = bridgeCaves.withoutSlivers(positions, faces, [0, 1, -2], [[0, 0, 1]] * 3)
+result = {'faces': kept, 'sources': sources}
+"""
+  fine = hall | {"path": [[0, -60, 2], [0, 10, 2], [0, 60, 2], [0, 90, 2], [0, 250, 2]], "breakup": None}
+
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    zipped = (await session.expectSuccess("runPython", {"code": slit}))["result"]
+    checks = []
+    for edgeLength, breakup in ((8, None), (8, {"featureSize": 40, "amplitude": 3, "seed": 11}), (12, None), (16, None), (16, None)):
+      await session.expectSuccess("cutCave", fine | {"edgeLength": edgeLength, "breakup": breakup})
+      checks.append((await session.expectSuccess("runPython", {"code": checkCave}))["result"])
+      await session.expectSuccess("removeCave", {"objectName": "ground", "name": "hall"})
+    return zipped, checks
+
+  zipped, checks = stageBlenderServer.session(steps)
+  # The slit goes, and each face takes the other's corner on the line, so the two meet edge to edge.
+  assert zipped == {"faces": [[0, 4, 7, 1, 2, 3], [6, 5, 1, 7, 4, 0]], "sources": [0, 1]}
+  # At every edgeLength, and cut again after being taken back, the cut is sealed where the tube's end stands on the ground in front of
+  # the mouth.
+  for checked in checks:
+    assert checked["edgesOnThreeOrMoreFaces"] == 0 and checked["openEdges"] == borderEdges
+
+
+def testPiecesOfGroundAtTheMouthStayInTheirTrianglesPlanes(stageBlenderServer, tmp_path):
+  # Each piece of ground the cut left at the mouth against the plane of the ground triangle it is a piece of: the angle between them.
+  readTilts = r"""
+import numpy
+import bridgeCaveData, bridgeMeshAccess
+ground = bpy.data.objects['ground']
+mesh = ground.data
+shown, _ = bridgeMeshAccess.readVertexArrays(ground)
+tags = bridgeCaveData.faceTags(ground, 'hall')
+vertexTags = bridgeCaveData.attributeValues(mesh, 'zonewrightCaveVertex:hall')
+record = bridgeCaveData.caves(ground)['hall']
+byIdentifier = {int(tag): index for index, tag in enumerate(vertexTags.tolist()) if tag > 0}
+tilts = []
+for polygon in mesh.polygons:
+  tag = int(tags[polygon.index])
+  if tag <= 0:
+    continue
+  corners = shown[list(polygon.vertices)]
+  normal = numpy.cross(corners[1] - corners[0], corners[2] - corners[0])
+  plug = shown[[byIdentifier[identifier] for identifier in record['plug'][tag - 1]['vertices']]]
+  plugNormal = numpy.cross(plug[1] - plug[0], plug[2] - plug[0])
+  tilts.append(float(numpy.degrees(numpy.arccos(numpy.clip(abs(normal @ plugNormal) / (numpy.linalg.norm(normal) * numpy.linalg.norm(plugNormal)), 0, 1)))))
+result = {'pieces': len(tilts), 'worstTilt': max(tilts)}
+"""
+
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    await session.expectSuccess("cutCave", hall)
+    return (await session.expectSuccess("runPython", {"code": readTilts}))["result"]
+
+  tilts = stageBlenderServer.session(steps)
+  # The welds at the seam move no piece out of its triangle's plane, so none stands out of the cliff as a blade.
+  assert tilts["pieces"] > 20 and tilts["worstTilt"] <= 0.5
+
+
+def testLiningWallsAreMappedRoundTheirBendsWithoutSeams(stageBlenderServer, tmp_path):
+  # A tunnel into the cliff turning 90 degrees east at y 100 on an arc of radius 40; its walls and vault in the bend, away from its ends.
+  bent = hall | {"path": [[0, -60, 2], [0, 10, 2], [0, 140, 2], [120, 140, 2]], "widths": [40] * 4, "heights": [45] * 4, "breakup": None}
+  readMapping = r"""
+import numpy
+import bridgeCaveData, bridgeMeshAccess, bridgeSurfacing
+ground = bpy.data.objects['ground']
+mesh = ground.data
+shown, _ = bridgeMeshAccess.readVertexArrays(ground)
+tags = bridgeCaveData.faceTags(ground, 'hall')
+uvs = numpy.empty(len(mesh.loops) * 2)
+mesh.uv_layers[bridgeSurfacing.uvLayerName].data.foreach_get('uv', uvs)
+uvs = uvs.reshape(-1, 2)
+byVertex, stretch = {}, []
+for polygon in mesh.polygons:
+  corners = shown[list(polygon.vertices)]
+  middle = corners.mean(axis=0)
+  e1, e2 = corners[1] - corners[0], corners[2] - corners[0]
+  normal = numpy.cross(e1, e2)
+  if tags[polygon.index] != -1 or normal[2] > 0.7 * numpy.linalg.norm(normal) or not (60 < middle[1] < 180 and middle[0] < 80) or middle[2] < 3:
+    continue
+  texture = uvs[list(polygon.loop_indices)]
+  axisU = e1 / numpy.linalg.norm(e1)
+  axisV = numpy.cross(normal / numpy.linalg.norm(normal), axisU)
+  world = numpy.array([[e1 @ axisU, e2 @ axisU], [e1 @ axisV, e2 @ axisV]])
+  singular = numpy.linalg.svd(numpy.column_stack([texture[1] - texture[0], texture[2] - texture[0]]) @ numpy.linalg.inv(world), compute_uv=False)
+  stretch.append([float(singular.max() / singular.min()), bool(middle[1] > 100 - 16 and middle[0] < 40 + 16)])
+  for vertex, uv in zip(polygon.vertices, texture.tolist()):
+    byVertex.setdefault(vertex, []).append(uv)
+spreads = [float(numpy.ptp(numpy.array(values), axis=0).max()) for values in byVertex.values() if len(values) > 1]
+result = {'faces': len(stretch), 'worstInTheBend': max(value for value, inBend in stretch if inBend), 'worstOnTheStraights': max(value for value, inBend in stretch if not inBend), 'worstSeam': max(spreads)}
+"""
+
+  # Every wall and vault face of the hall, whose tunnel flares out into its room between y 90 and 130: how far its mapping draws its
+  # texture out at worst.
+  readFlare = readMapping.replace("not (60 < middle[1] < 180 and middle[0] < 80)", "False").replace("result = {", "result = {'worst': max(value for value, _ in stretch)} or {")
+
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    await session.expectSuccess("cutCave", bent)
+    mapping = (await session.expectSuccess("runPython", {"code": readMapping}))["result"]
+    await session.expectSuccess("removeCave", {"objectName": "ground", "name": "hall"})
+    await session.expectSuccess("cutCave", hall)
+    flare = (await session.expectSuccess("runPython", {"code": readFlare}))["result"]
+    return mapping, flare
+
+  mapping, flare = stageBlenderServer.session(steps)
+  # Round the bend the walls and vault carry one mapping, every corner the same place in it from each face that meets there. On the
+  # straights either side (a row clear of it) a texel is square; in the bend, its walls on radii 20 and 60, each takes the texture
+  # sqrt(3) closer or wider along it than up it (mapped as at the radius between them), inside the export's limit of 2.
+  assert mapping["faces"] > 50 and mapping["worstSeam"] <= 1e-4
+  assert mapping["worstOnTheStraights"] <= 1.05 and 1.6 <= mapping["worstInTheBend"] <= 1.8
+  # Where the tunnel flares into the room its faces look along the run, which the tube's own mapping would draw out; they are mapped
+  # from the side instead, so no face of the lining is drawn out past the export's limit.
+  assert flare["worst"] <= 2.0
+
+
 def testTakingACaveBackLeavesTheGroundAsAnUncutCopyGivenTheSameChange(stageBlenderServer, tmp_path):
   async def steps(session):
     await caveCanyon(session, tmp_path)
@@ -269,9 +394,8 @@ def testCaveRefusals(stageBlenderServer, tmp_path):
     overWalkable = await session.expectError("cutCave", hall | {"name": "overWalkable", "maximumFloorDegrees": 75})
     await session.expectSuccess("cutCave", hall)
     before = (await session.expectSuccess("runPython", {"code": checkCave}))["result"]
-    # A tunnel 110 east of the hall, whose reach takes in the hall room's wall.
-    await session.expectSuccess("gradeRoute", {"objectName": "ground", "name": "besideApproach", "points": [[110, -140, 2], [110, -50, 2]], "width": 56})
-    overlap = await session.expectError("cutCave", hall | {"name": "beside", "path": [[110, -60, 2], [110, 30, 6], [110, 150, 8]], "widths": [40] * 3, "heights": [45] * 3})
+    # A tunnel 45 east of the hall, whose reach takes in the hall's mouth.
+    overlap = await session.expectError("cutCave", hall | {"name": "beside", "path": [[45, -60, 2], [45, 30, 6], [45, 150, 8]], "widths": [40] * 3, "heights": [45] * 3})
     edited = await session.expectError("editCave", {"objectName": "ground", "name": "hall", "changes": {"path": [[0, -60, 2], [0, 0, 60], [0, 90, 8], [0, 130, 8], [0, 250, 8]]}})
     after = (await session.expectSuccess("runPython", {"code": checkCave}))["result"]
     detail = await session.expectSuccess("getObjectDetail", {"name": "ground"})
@@ -286,7 +410,7 @@ def testCaveRefusals(stageBlenderServer, tmp_path):
   assert "reaches the edge of 'ground'" in border
   # A cave's floor is walked, so its grade limit runs up to the steepest face players walk (playerScale).
   assert f"maximumFloorDegrees is above 0 and at most {steepestWalkableDegrees:.1f} (the steepest face players walk, playerScale), got 75" in overWalkable
-  assert "would overlap cave(s) ['hall']" in overlap
+  assert "Cave 'beside' would reach the mouth of cave(s) ['hall']" in overlap
   # A refused edit leaves the cave as it was.
   assert "rises 58.0" in edited and after == before and detail["caves"][0]["from"] == hall["path"][0]
 

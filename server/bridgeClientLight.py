@@ -8,8 +8,11 @@ import bpy
 
 groupName = "eqClientLight"
 # Raised whenever buildGroup changes, so a group saved in an older .blend is rebuilt in place.
-groupVersion = 10
+groupVersion = 12
 bakedAttribute = "eqColor"
+# The share of scene light a cave's lining does not take (1 less its daylight), which a preview puts on the copy it draws a terrain
+# holding daylit caves from (bridgeCaveLight); a surface without it reads none, and so takes its full share.
+caveShadeAttribute = "eqCaveShade"
 normalAttribute = "eqNormal"
 tintAttribute = "eqTint"
 # The point lights' light per corner, which a preview puts on the copies it draws lit meshes from (bridgePointLights).
@@ -105,7 +108,9 @@ def buildGroup(tree):
   sunTerm = build.scale(build.color("sunColor"), build.math("MAXIMUM", facing, 0.0))
   bounceTerm = build.scale(build.color("bounceColor"), build.math("MAXIMUM", build.math("MULTIPLY", facing, -1.0), 0.0))
   sceneLight = build.vectorMath("ADD", build.vectorMath("ADD", build.color("ambientColor"), bounceTerm), sunTerm)
-  light = build.vectorMath("ADD", build.vectorMath("ADD", inputs["Baked"], build.scale(sceneLight, inputs["Share"])), build.color("specialAmbientColor"))
+  caveShade = build.node("ShaderNodeAttribute", attribute_type="GEOMETRY", attribute_name=caveShadeAttribute)
+  share = build.math("MULTIPLY", inputs["Share"], build.math("SUBTRACT", 1.0, caveShade.outputs["Fac"]))
+  light = build.vectorMath("ADD", build.vectorMath("ADD", inputs["Baked"], build.scale(sceneLight, share)), build.color("specialAmbientColor"))
   # The client adds its point lights unscaled by the share of scene light; a surface without the attribute reads none.
   pointLight = build.node("ShaderNodeAttribute", attribute_type="GEOMETRY", attribute_name=pointLightAttribute)
   light = build.vectorMath("ADD", light, pointLight.outputs["Color"])
@@ -129,7 +134,7 @@ def buildGroup(tree):
   tree.links.new(build.vectorMath("MINIMUM", build.vectorMath("ADD", lit, inputs["Added"]), ones.outputs["Vector"]), colorInputs[1])
   shareColor = build.node("ShaderNodeCombineXYZ")
   for axis in "XYZ":
-    tree.links.new(inputs["Share"], shareColor.inputs[axis])
+    tree.links.new(share, shareColor.inputs[axis])
   selected = next(socket for socket in fogged.outputs if socket.type == "RGBA")
   passSelect = build.value("passSelect")
   halves = build.node("ShaderNodeCombineXYZ")
