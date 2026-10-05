@@ -33,14 +33,17 @@ import bridgeSurfacing
 import bridgeViews
 import bridgeWalls  # registers its kind with bridgeStructures
 import bridgeWater
+import eqClientZones
 import eqgFiles
+import serverRows
 import skyDrawing
 from bridgeState import requireNoUnsavedChanges, state
 
 zonePropertyName = "zonewrightZone"
 zonePropertyKeys = (
   "ambientColor", "specialAmbientColor", "bounceColor", "sunColor", "sunAzimuthDegrees", "sunElevationDegrees", "fogColor", "fogStart", "fogEnd",
-  "fogDensity", "fogOn", "minClip", "maxClip", "newEngineZone", "sky", "safePoint", "underworld", "shortName", "zoneId",
+  "fogDensity", "fogOn", "minClip", "maxClip", "newEngineZone", "sky", "safePoint", "underworld", "shortName", "zoneId", "longName", "timeType",
+  "entryGate", "serverTemplate",
 )
 # The client raises a lower minimum clip to this (eqgame 0x4c9ee6).
 clientMinimumClip = 50.0
@@ -242,12 +245,51 @@ def validatePlayerValues(zone):
     raise ValueError(f"underworld {zone['underworld']} must lie below the safe point's height {zone['safePoint'][2]}")
 
 
-def setZoneProperties(updates):
+def validateServerRowValues(zone, clientZones):
+  """The zone row's identity and gate (docs/serverFiles.md, Zone row): shortName, zoneId, longName, timeType, entryGate, and
+  serverTemplate, and, given clientZones (short name to id, the zones the client registers), that the client registers neither the short
+  name under another id nor the id under another short name, and does register the template, another zone than this one."""
+  if "shortName" in zone and not (isinstance(zone["shortName"], str) and eqgFiles.zoneNamePattern.match(zone["shortName"])):
+    raise ValueError(f"shortName is {eqgFiles.zoneNameRule}, got {zone['shortName']!r}")
+  if "zoneId" in zone:
+    zoneID = zone["zoneId"]
+    if isinstance(zoneID, bool) or not isinstance(zoneID, int) or not 1 <= zoneID <= eqClientZones.highestZoneID or zoneID == eqClientZones.runtimeZoneID:
+      raise ValueError(
+        f"zoneId is the zone's id, 1 to {eqClientZones.highestZoneID} (the client's AddZone takes no other) but not"
+        f" {eqClientZones.runtimeZoneID} (the client's run-time zone), got {zoneID!r}"
+      )
+  if "longName" in zone and not (isinstance(zone["longName"], str) and serverRows.longNamePattern.match(zone["longName"])):
+    raise ValueError(f"longName is {serverRows.longNameRule}, got {zone['longName']!r}")
+  if "timeType" in zone and zone["timeType"] not in serverRows.timeTypes:
+    raise ValueError(f"timeType is one of {list(serverRows.timeTypes)}, got {zone['timeType']!r}")
+  if "entryGate" in zone:
+    serverRows.entryGateColumns(zone["entryGate"])
+  if "serverTemplate" in zone:
+    if not (isinstance(zone["serverTemplate"], str) and eqgFiles.zoneNamePattern.match(zone["serverTemplate"])):
+      raise ValueError(f"serverTemplate is a zone's short name, {eqgFiles.zoneNameRule}, got {zone['serverTemplate']!r}")
+    if zone["serverTemplate"] == zone.get("shortName"):
+      raise ValueError(f"serverTemplate is another zone whose row a new zone row copies its other columns from, not this zone's own '{zone['shortName']}'")
+  if clientZones is None:
+    return
+  registeredIDs = {zoneID: name for name, zoneID in clientZones.items()}
+  shortName, zoneID = zone.get("shortName"), zone.get("zoneId")
+  if shortName in clientZones and zoneID is not None and clientZones[shortName] != zoneID:
+    raise ValueError(f"The client registers '{shortName}' under id {clientZones[shortName]}, not {zoneID}: its files load by that id")
+  if zoneID in registeredIDs and shortName is not None and registeredIDs[zoneID] != shortName:
+    raise ValueError(f"The client registers id {zoneID} to '{registeredIDs[zoneID]}', not '{shortName}': it would load that zone's files")
+  if "serverTemplate" in zone and zone["serverTemplate"] not in clientZones:
+    raise ValueError(f"serverTemplate '{zone['serverTemplate']}' is not a zone the client registers; name a zone whose row the server holds")
+
+
+def setZoneProperties(updates, clientZones=None):
   """Store zone properties. A sky supplies the light and the fog color, so setting one drops those that were set by hand, and they
-  cannot be set while it stays; sky "none" (skyDrawing.noSky) states the zone draws none."""
+  cannot be set while it stays; sky "none" (skyDrawing.noSky) states the zone draws none. Setting shortName, zoneId, or serverTemplate
+  needs clientZones, the zones the client registers (short name to id)."""
   unknownKeys = sorted(set(updates) - set(zonePropertyKeys))
   if unknownKeys:
     raise ValueError(f"Unknown zone properties {unknownKeys}; known: {list(zonePropertyKeys)}")
+  if clientZones is None and set(updates) & set(eqClientZones.checkedZoneProperties):
+    raise ValueError(f"Setting {sorted(set(updates) & set(eqClientZones.checkedZoneProperties))} needs the zones the client registers (clientZones)")
   zone = readZoneProperties(bpy.context.scene) | updates
   replaced = []
   if drawsSky(zone):
@@ -279,10 +321,7 @@ def setZoneProperties(updates):
     raise ValueError(f"maxClip {zone['maxClip']} must be greater than fogStart {zone['fogStart']}: nothing would be drawn far enough to fog")
   if "newEngineZone" in zone and not isinstance(zone["newEngineZone"], bool):
     raise ValueError(f"newEngineZone must be true or false, got {zone['newEngineZone']!r}")
-  if "shortName" in zone and not (isinstance(zone["shortName"], str) and eqgFiles.zoneNamePattern.match(zone["shortName"])):
-    raise ValueError(f"shortName is {eqgFiles.zoneNameRule}, got {zone['shortName']!r}")
-  if "zoneId" in zone and (isinstance(zone["zoneId"], bool) or not isinstance(zone["zoneId"], int) or zone["zoneId"] < 0):
-    raise ValueError(f"zoneId is the zone header's ZoneID, a whole number from 0, got {zone['zoneId']!r}")
+  validateServerRowValues(zone, clientZones)
   validatePlayerValues(zone)
   bpy.context.scene[zonePropertyName] = zone
   return {"zone": readZoneProperties(bpy.context.scene), "replacedBySky": replaced}

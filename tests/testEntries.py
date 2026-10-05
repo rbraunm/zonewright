@@ -154,11 +154,12 @@ def testGetEntriesListsDerivedEntriesAndOffFooting(stageBlenderServer, tmp_path)
     await session.expectSuccess("setZoneProperties", environment | {"safePoint": [-200, -200, 0, 45], "underworld": -100})
     await session.expectSuccess("setZoneHousing", decision)
     await session.expectSuccess("placePlot", {"address": "101 Test Street", "center": [0, 0], "facingDegrees": 0, "size": [60, 80]})
-    await session.expectSuccess("placeZoneLine", {"number": 2, "label": "loop", "minimum": [300, -20, -5], "maximum": [320, 20, 40], "target": {"zone": "entryplot", "x": 200, "y": 200, "z": 0, "headingDegrees": 270}})
-    await session.expectSuccess("placeZoneLine", {"number": 3, "label": "kept", "minimum": [-320, -20, -5], "maximum": [-300, 20, 40], "target": {"zone": "entryplot", "x": "keep", "y": 0, "z": 0, "headingDegrees": 0}})
     await session.expectSuccess("placeZoneLine", {"number": 4, "label": "away", "minimum": [-20, 300, -5], "maximum": [20, 320, 40], "target": otherZone})
     unnamed = await session.expectSuccess("getEntries", {})
+    # A zone line can lead back into this zone only once it has its short name: a target the client does not register is refused.
     await session.expectSuccess("setZoneProperties", {"shortName": "entryplot"})
+    await session.expectSuccess("placeZoneLine", {"number": 2, "label": "loop", "minimum": [300, -20, -5], "maximum": [320, 20, 40], "target": {"zone": "entryplot", "x": 200, "y": 200, "z": 0, "headingDegrees": 270}})
+    await session.expectSuccess("placeZoneLine", {"number": 3, "label": "kept", "minimum": [-320, -20, -5], "maximum": [-300, 20, 40], "target": {"zone": "entryplot", "x": "keep", "y": 0, "z": 0, "headingDegrees": 0}})
     await session.expectImage("placeEntry", entryArguments("dock", [100, -100], headingDegrees=0, isolated=True))
     await session.expectSuccess("transformObjects", {"names": ["dock"], "translate": [0, 0, 3]})
     listed = await session.expectSuccess("getEntries", {})
@@ -169,7 +170,7 @@ def testGetEntriesListsDerivedEntriesAndOffFooting(stageBlenderServer, tmp_path)
   unnamed, listed, badNames, longTarget = stageBlenderServer.session(steps)
   # Without the zone's short name no zone line can be told to lead back into it.
   assert [entry["kind"] for entry in unnamed["entries"]] == ["safePoint", "plotEntrance"]
-  assert [line["zoneLine"] for line in unnamed["notFollowed"]] == ["ATP_2_loop", "ATP_3_kept", "ATP_4_away"]
+  assert [line["zoneLine"] for line in unnamed["notFollowed"]] == ["ATP_4_away"]
   assert all("shortName is not set" in line["why"] for line in unnamed["notFollowed"])
   assert listed["entries"] == [
     {

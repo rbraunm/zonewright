@@ -3,7 +3,8 @@ kit that cannot be found), and for a game export what it must have decided (bloc
 targets, the player space's regions, their access, and entries on their footing, structures laid on ground or a kit that changed
 since, containment). Findings are for an artist to look at: texture coverage
 (the base material showing where no surfacing layer covers a face, ground borders without a transition strip, stretched or collapsed
-texture coordinates, faces wound against the rest of their surface), and for a test export what a game export would still refuse.
+texture coordinates, faces wound against the rest of their surface), the zone's slot among the client's registrations (an id it does
+not register, a short name it does), and for a test export what a game export would still refuse.
 Each names the object, material, image, and face count, with where the faces lie. The report also gives each structure's models and
 triangles and the triangles of every placement. The coverage view draws the same face statuses. Runs under Blender's Python."""
 import os
@@ -41,6 +42,7 @@ stretchDigits = 3
 zeroTextureArea = 1e-12
 degenerateArea = 1e-9
 locationsShown = 8
+gameRowKeys = ("shortName", "zoneId", "longName", "timeType", "entryGate", "serverTemplate")
 gameViewKeys = ("fogOn", "minClip", "maxClip", "sky")
 gameFogKeys = ("fogStart", "fogEnd", "fogDensity")
 gamePlayerKeys = ("safePoint", "underworld")
@@ -657,10 +659,11 @@ def staleStructures(stale):
   ]
 
 
-def checkZoneExport(purpose):
+def checkZoneExport(purpose, exportName, client):
   """Every failure that stops an export for its purpose and every finding to look at, each with where it is; plus what the export leaves
   out, the decisions it leaves to confirm, and the zone's faces by coverage status. hardFailures are those that refuse both purposes:
-  an unsaved file and what no zone file can hold."""
+  an unsaved file and what no zone file can hold. exportName is the archive's stem and client what the zone row's checks read from the
+  client (zoneRowGaps)."""
   requirePurpose(purpose)
   bpy.context.view_layer.update()
   failures, findings = [], []
@@ -690,7 +693,8 @@ def checkZoneExport(purpose):
   hardFailures = list(failures)
   gapKey = "failure" if purpose == "game" else "finding"
   gaps = blockouts.listed(gapKey) + [{gapKey: f"swim {swimState}", "body": body.name, "at": bodyCenter(body)} for swimState, bodies in decisions.items() for body in bodies]
-  gaps += [{gapKey: gap["gap"]} | {key: value for key, value in gap.items() if key != "gap"} for gap in zoneRowGaps() + bridgeBoundaries.zoneLineGaps() + playerSpaceGaps()]
+  gaps += [{gapKey: gap["gap"]} | {key: value for key, value in gap.items() if key != "gap"} for gap in zoneRowGaps(exportName, client) + bridgeBoundaries.zoneLineGaps() + playerSpaceGaps()]
+  findings += zoneSlotFindings(client)
   objectDecisions = bridgeExport.decisionsToConfirm(shipped)
   toConfirm = objectDecisions + [{"structure": entry["structure"], "why": entry["why"]} for entry in stale]
   if purpose == "game":
@@ -712,9 +716,12 @@ def checkZoneExport(purpose):
   }
 
 
-def zoneRowGaps():
-  """What the zone row a game export writes still lacks: its view values, the safe point and underworld, and ground under the safe
-  point above the underworld, where players arrive."""
+def zoneRowGaps(exportName, client):
+  """What the zone row a game export writes still lacks or gets wrong: its view values, the safe point and underworld, and ground under
+  the safe point above the underworld, where players arrive; its identity, gate, and template; an archive not named by the short
+  name; a stored sky the game would not draw, as the client picks its sky by the short name (client["skySections"]: the sky settings
+  the stored type and the short name resolve to); and a zone line leading to a zone the client does not register (client["zones"],
+  short name to id) other than this one."""
   zone = bridgeCommands.readZoneProperties(bpy.context.scene)
   gaps = []
   missing = [key for key in gameViewKeys if key not in zone] + ([key for key in gameFogKeys if key not in zone] if zone.get("fogOn") else [])
@@ -730,7 +737,53 @@ def zoneRowGaps():
     surfaces = bridgeExport.collisionSurfaces(bridgeExport.collisionTriangles())
     if surfaces is None or surfaces.footingBelow(mathutils.Vector((x, y, z + 1)), z + 1 - floor) is None:
       gaps.append({"gap": "safe point over no ground", "at": [x, y, z], "message": f"No ground the zone ships lies under the safe point {[x, y, z]} above {floor}; players arriving there would fall"})
+  missing = [key for key in gameRowKeys if key not in zone]
+  if missing:
+    gaps.append({"gap": "zone row values missing", "missing": missing, "message": f"A game export writes the zone's server row; set {missing} with setZoneProperties"})
+  if "shortName" in zone and exportName != zone["shortName"]:
+    gaps.append({
+      "gap": "archive not named by the short name", "shortName": zone["shortName"], "archive": exportName,
+      "message": f"A game export is named by the zone's short name: export to {zone['shortName']}.eqg, or set shortName '{exportName}'",
+    })
+  sections = client["skySections"]
+  if sections is not None and sections["stored"] != sections["shortName"]:
+    gaps.append({
+      "gap": "sky not the short name's", "previews": sections["stored"], "game": sections["shortName"],
+      "message": f"previews draw {sections['stored']}'s sky, the game draws {sections['shortName']}'s: the client picks its sky by the short name '{zone['shortName']}' (EQEmu sends no override); set sky's type to it",
+    })
+  for line in bridgeBoundaries.zoneLineObjects():
+    target = bridgeBoundaries.readSpec(line, bridgeMeshAccess.zoneLineProperty) if bridgeBoundaries.isAuthored(line) else None
+    if target is not None and target["zone"] not in registeredZones(client) and target["zone"] != zone.get("shortName"):
+      gaps.append({
+        "gap": "zone line target unregistered", "zoneLine": line.name, "target": target["zone"],
+        "message": f"Zone line '{line.name}' leads to '{target['zone']}', which the client does not register and is not this zone's shortName: a client cannot load it",
+      })
   return gaps
+
+
+def registeredZones(client):
+  """The zones the client registers (short name to id), which the server reads only when the zone has something to check against them."""
+  if client["zones"] is None:
+    raise ValueError("The zone has a short name, id, template, or zone line to check, and the zones the client registers were not passed")
+  return client["zones"]
+
+
+def zoneSlotFindings(client):
+  """Findings, for either purpose, about the slot the zone takes in the client's registrations (client["zones"], short name to id): an
+  id the client does not register, and a short name it does (a reused slot)."""
+  zone = bridgeCommands.readZoneProperties(bpy.context.scene)
+  findings = []
+  if "zoneId" in zone and zone["zoneId"] not in registeredZones(client).values():
+    findings.append({
+      "finding": "unregistered zone id", "zoneId": zone["zoneId"],
+      "message": f"The client registers no zone under id {zone['zoneId']}: the client needs a registration entry before it can load this zone",
+    })
+  if "shortName" in zone and zone["shortName"] in registeredZones(client):
+    findings.append({
+      "finding": "reused slot", "shortName": zone["shortName"], "zoneId": registeredZones(client)[zone["shortName"]],
+      "message": f"The client registers '{zone['shortName']}' already: this export replaces {zone['shortName']}'s server maps and rows, which every instance of it uses",
+    })
+  return findings
 
 
 def playerSpaceGaps():
@@ -754,10 +807,10 @@ def playerSpaceGaps():
   return gaps
 
 
-def collectZoneExport(outputFolder, zoneName, purpose):
+def collectZoneExport(outputFolder, zoneName, purpose, client):
   """The checks, then, when none of their failures is a hard one, what the export writes (bridgeExport.collectZoneExport): a game
   export's server files are built from it beside its gaps."""
-  report = checkZoneExport(purpose)
+  report = checkZoneExport(purpose, zoneName, client)
   return {"report": report, "collected": None if report["hardFailures"] else bridgeExport.collectZoneExport(outputFolder, zoneName)}
 
 

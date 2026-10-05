@@ -66,6 +66,14 @@ class SkyFiles:
       return None
     return self.sections.get(f"{kind}-{name}".lower())
 
+  def section(self, skyType):
+    """The sky setting the client draws for a sky type, lowercased: the type's own when sky.ini has a usable one, else 'default'."""
+    for name in (skyType, "default"):
+      setting = self.find("SkySetting", name)
+      if setting is not None and setting.get("defaultweather"):
+        return name.lower()
+    raise ValueError("sky.ini has no usable [SkySetting-default], so the client draws no sky for this type")
+
   def require(self, kind, name, referrer):
     section = self.find(kind, name)
     if section is None:
@@ -188,14 +196,10 @@ def skyState(clientRoot, cachePath, sky):
   hour, minute = sky["hour"], sky["minute"]
   files = SkyFiles(clientRoot)
   chain = []
-  settingName = sky["type"]
+  settingName = files.section(sky["type"])
   setting = files.find("SkySetting", settingName)
-  if setting is None or not setting.get("defaultweather"):
-    chain.append(f"sky.ini has no sky type '{settingName}', so the client uses 'default'")
-    settingName = "default"
-    setting = files.find("SkySetting", settingName)
-    if setting is None or not setting.get("defaultweather"):
-      raise ValueError("sky.ini has no usable [SkySetting-default], so the client draws no sky for this type")
+  if settingName != sky["type"].lower():
+    chain.append(f"sky.ini has no sky type '{sky['type']}', so the client uses 'default'")
   weatherName = sky.get("weather") or setting["defaultweather"]
   chain.append(f"SkySetting-{settingName} -> WeatherPattern-{weatherName}" + ("" if sky.get("weather") else " (its DefaultWeather)"))
   pattern = files.require("WeatherPattern", weatherName, "SkySetting-" + settingName)
