@@ -177,7 +177,7 @@ def meshArrays(sceneObject, depsgraph, matrix, materialNames, marked):
     "positions": positions[loopVertices[firstLoop]], "normals": normals[firstLoop], "uvs": uvs[firstLoop],
     "triangles": loopToVertex[triangleLoops].reshape(-1, 3),
     "materials": [materialNames(slotMaterials[slot]) for slot in triangleSlots],
-    "passable": marked | numpy.array([bridgeBoundaries.isPassableMaterial(slotMaterials[slot]) for slot in triangleSlots], dtype=bool),
+    "passable": marked | numpy.array([bridgeSurfacing.isPassableMaterial(slotMaterials[slot]) for slot in triangleSlots], dtype=bool),
   }
 
 

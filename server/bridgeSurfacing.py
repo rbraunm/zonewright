@@ -240,6 +240,11 @@ def liquidOf(material):
   return json.loads(material[liquidPropertyName])
 
 
+def isPassableMaterial(material):
+  """Players pass through liquid surfaces (water, waterfall, lava) and cutout cards, as the client's own zones flag them (0x1)."""
+  return material is not None and (liquidPropertyName in material or bool(material.get(cutoutPropertyName)))
+
+
 def assignMaterial(objectName, materialName, selector):
   sceneObject = bridgeMeshAccess.requireMeshObject(objectName)
   if bridgeMeshAccess.surfaceLayersProperty in sceneObject:

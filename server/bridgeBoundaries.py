@@ -34,11 +34,6 @@ keep = "keep"
 turnTolerance = 1e-9
 
 
-def isPassableMaterial(material):
-  """Players pass through liquid surfaces (water, waterfall, lava) and cutout cards, as the client's own zones flag them (0x1)."""
-  return material is not None and (bridgeSurfacing.liquidPropertyName in material or bool(material.get(bridgeSurfacing.cutoutPropertyName)))
-
-
 def isAuthored(sceneObject):
   return bridgeMeshAccess.clientContentProperty not in sceneObject
 
@@ -81,7 +76,7 @@ def evaluatedTriangles(sceneObject, depsgraph):
 
 def passableFaces(slots, flagged, materials):
   """Which faces players pass through: a liquid or cutout material, or flagged so by the zone file it came from."""
-  slotPassable = numpy.array([isPassableMaterial(material) for material in materials] + [False], dtype=bool)
+  slotPassable = numpy.array([bridgeSurfacing.isPassableMaterial(material) for material in materials] + [False], dtype=bool)
   return slotPassable[numpy.minimum(slots, len(materials))] | flagged
 
 

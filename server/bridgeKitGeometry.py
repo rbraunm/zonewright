@@ -11,10 +11,9 @@ import bridgeKitData
 import bridgeMeshAccess
 import bridgeSurfacing
 
-# A box's corners as multiples of half its length, half its depth, and its height, and its faces wound to face out.
 boxCorners = numpy.array([[-1, -1, 0], [1, -1, 0], [1, 1, 0], [-1, 1, 0], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]], dtype=numpy.float64)
 boxFaces = {"front": (2, 3, 7, 6), "back": (0, 1, 5, 4), "right": (1, 2, 6, 5), "left": (3, 0, 4, 7), "top": (4, 5, 6, 7), "bottom": (0, 3, 2, 1)}
-# Which faces of its box each kind keeps, and the role each plays; a wall, post, or cap has no bottom, as it stands on something.
+# A wall, post, or cap has no bottom: it stands on something, and an unseen face is a wasted triangle pair.
 kindFaces = {
   "wall": {"front": "face", "back": "face", "left": "edge", "right": "edge", "top": "edge"},
   "floor": {"top": "top", "front": "edge", "back": "edge", "left": "edge", "right": "edge", "bottom": "under"},

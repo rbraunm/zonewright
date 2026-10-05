@@ -16,7 +16,6 @@ import bridgeSurfacing
 
 pieceProperty = "zonewrightKitPiece"
 prefabProperty = "zonewrightPrefab"
-# Each kind's roles (the parts of it a material is given to), its default sockets, and whether players pass through it by default.
 kinds = {
   "wall": {"roles": ("face", "edge"), "sockets": ("start", "end", "top"), "passable": False},
   "floor": {"roles": ("top", "edge", "under"), "sockets": ("start", "end", "front", "back"), "passable": False},
@@ -148,10 +147,10 @@ def pieceGeometry(collection):
     totals.append(loopTotals)
     corners.append(loopVertices.astype(numpy.int64) + count)
     count += len(mesh.vertices)
-    layer = mesh.uv_layers.active
-    loopUVs = numpy.zeros(len(mesh.loops) * 2)
-    if layer is not None:
-      layer.data.foreach_get("uv", loopUVs)
+    if mesh.uv_layers.active is None:
+      raise ValueError(f"Mesh '{member.name}' of kit piece '{collection.name}' has no texture coordinates (projectUVs)")
+    loopUVs = numpy.empty(len(mesh.loops) * 2)
+    mesh.uv_layers.active.data.foreach_get("uv", loopUVs)
     uvs.append(loopUVs.reshape(-1, 2))
     slots = numpy.empty(len(mesh.polygons), dtype=numpy.int64)
     mesh.polygons.foreach_get("material_index", slots)
@@ -162,7 +161,7 @@ def pieceGeometry(collection):
     if attribute is not None and attribute.domain == "FACE":
       attribute.data.foreach_get("value", flagged)
     wholly = record["passable"] or bridgeMeshAccess.passableProperty in member
-    passable.append(flagged | wholly | numpy.array([isPassableMaterial(material) for material in faceMaterials], dtype=bool))
+    passable.append(flagged | wholly | numpy.array([bridgeSurfacing.isPassableMaterial(material) for material in faceMaterials], dtype=bool))
     materials.extend(faceMaterials)
   if not positions:
     raise ValueError(f"Kit piece '{collection.name}' holds no mesh")
@@ -170,10 +169,6 @@ def pieceGeometry(collection):
     "positions": numpy.concatenate(positions), "loopTotals": numpy.concatenate(totals), "loopVertices": numpy.concatenate(corners),
     "uvs": numpy.concatenate(uvs), "materials": materials, "passable": numpy.concatenate(passable),
   }
-
-
-def isPassableMaterial(material):
-  return material is not None and (bridgeSurfacing.liquidPropertyName in material or bool(material.get(bridgeSurfacing.cutoutPropertyName)))
 
 
 def fingerprint(collection):
