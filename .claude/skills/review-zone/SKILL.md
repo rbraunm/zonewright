@@ -70,6 +70,7 @@ After each authoring step (`author-zone`), and before showing work to the owner,
 - the zone, and the step just done (what kind of work, which areas), in one line;
 - the concept art's paths;
 - the layout: the plan's path, and each region's name and intent;
+- the zone's use: its housing role and intent (`getHousing`) and where its plots stand (each plot's address, centre, and size), so it can tell ground left open for players to build on from ground left bare;
 - reference screenshots of client zones of the same kind (`getZoneSurvey` interpretations' screenshots or `importZone` views), with what each shows;
 - each render's path, its view name, its note (what to judge there), and its view (the `view` renderView took), so it can `pick` what it names;
 - how tall the scale figure is drawn in the zone (see the checklist's scale item).
