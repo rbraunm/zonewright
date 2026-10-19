@@ -39,6 +39,9 @@ entryProperty = "zonewrightEntry"
 surfaceLayersProperty = "zonewrightSurfaceLayers"
 # A water body (bridgeWater) keeps what it was made from in this property, so every edit rebuilds it from that against the ground.
 waterProperty = "zonewrightWater"
+# A mesh the client could not draw as one model is split into parts (bridgeSplit): each part keeps the whole's name (the first part's),
+# its place among the parts, and how many there were, in this property. A water body's parts are water too: they carry its definition.
+splitProperty = "zonewrightSplit"
 # A swim volume (bridgeSwim) keeps its liquid, its body, and what it was built from in this property.
 swimProperty = "zonewrightSwimVolume"
 # An emitter a water body's spray placed keeps its body, its spray, and what it stands on in this property; it goes with its body.
@@ -126,10 +129,53 @@ def insideRegion(regionObject, worldPoints):
   return insidePolygon(worldPoints[:, :2], outline) & (worldPoints[:, 2] >= bottom) & (worldPoints[:, 2] <= top)
 
 
+def splitMark(sceneObject):
+  return json.loads(sceneObject[splitProperty]) if splitProperty in sceneObject else None
+
+
+def isSplitPart(sceneObject):
+  """A part split off a whole, which the first part (named for the whole) is not."""
+  mark = splitMark(sceneObject)
+  return mark is not None and mark["index"] > 1
+
+
+def splitParts(sceneObject):
+  """The parts of the whole an object is a part of, the first first; the object alone when it is not split."""
+  mark = splitMark(sceneObject)
+  if mark is None:
+    return [sceneObject]
+  parts = [part for part in bpy.data.objects if splitProperty in part and splitMark(part)["whole"] == mark["whole"]]
+  return sorted(parts, key=lambda part: splitMark(part)["index"])
+
+
+def waterBodies():
+  """The scene's water bodies: each water object but the parts split off a body's first."""
+  return [sceneObject for sceneObject in bpy.context.scene.objects if waterProperty in sceneObject and not isSplitPart(sceneObject)]
+
+
+def wholeName(sceneObject):
+  """The name of the whole an object is a part of (its own, when it is not split)."""
+  mark = splitMark(sceneObject)
+  return sceneObject.name if mark is None else mark["whole"]
+
+
+def requireNotWaterPart(sceneObject, action):
+  if waterProperty in sceneObject and isSplitPart(sceneObject):
+    raise ValueError(f"'{sceneObject.name}' is part {splitMark(sceneObject)['index']} of the water body '{wholeName(sceneObject)}'; name the body to {action}")
+
+
+def partsPositions(sceneObject):
+  """The world positions of every vertex of an object's whole (its parts', when it is split)."""
+  return numpy.concatenate([readVertexArrays(part)[0] for part in splitParts(sceneObject)])
+
+
 def requireWater(name):
   waterObject = requireObject(name)
   if waterObject.type != "MESH" or waterProperty not in waterObject:
     raise ValueError(f"'{name}' is not a water body; floodWater, runWater, and pourWaterfall make them")
+  if isSplitPart(waterObject):
+    mark = splitMark(waterObject)
+    raise ValueError(f"'{name}' is part {mark['index']} of the water body '{mark['whole']}'; name the body, which editWater builds again with its parts")
   return waterObject
 
 
@@ -461,7 +507,7 @@ def swimSurfaces(leftOut=(), added=None):
   polygons)); None when there are none."""
   bodies = [
     sceneObject for sceneObject in bpy.context.scene.objects
-    if waterProperty in sceneObject and not sceneObject.hide_render and json.loads(sceneObject[waterProperty])["kind"] != "fall" and sceneObject.name not in leftOut
+    if waterProperty in sceneObject and not sceneObject.hide_render and json.loads(sceneObject[waterProperty])["kind"] != "fall" and wholeName(sceneObject) not in leftOut
   ]
   liquidOwners = [owner for owner in playerSolidObjects(leftOut) if any(isSwumMaterial(slot.material) for part, _ in objectParts(owner) for slot in part.material_slots)]
   positions, triangles = selectedTriangles(liquidOwners, swumFaces)
@@ -536,7 +582,7 @@ class WaterSurface:
     if json.loads(waterObject[waterProperty])["kind"] == "fall":
       raise ValueError(f"'{waterObject.name}' is a fall; it has no waterline, bed, or banks")
     self.name = waterObject.name
-    positions, triangles = worldTriangles([waterObject])
+    positions, triangles = worldTriangles(splitParts(waterObject))
     first, second, third = (positions[triangles[:, corner]] for corner in range(3))
     normals = numpy.cross(second - first, third - first)
     # A triangle of a clipped cell can come out without area; it has no plane to give a height.
@@ -1152,6 +1198,13 @@ def triangleCount(sceneObject):
 def meshCounts(sceneObject):
   mesh = sceneObject.data
   return {"vertices": len(mesh.vertices), "faces": len(mesh.polygons), "triangles": triangleCount(sceneObject)}
+
+
+def wholeCounts(sceneObject):
+  """The counts of an object's whole: its parts' together, and how many parts when it is split."""
+  parts = splitParts(sceneObject)
+  counts = [meshCounts(part) for part in parts]
+  return {key: sum(count[key] for count in counts) for key in counts[0]} | ({"parts": len(parts)} if len(parts) > 1 else {})
 
 
 def rayCast(origin, direction, distance):

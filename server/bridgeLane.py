@@ -69,7 +69,7 @@ def laneInput(outputPath):
     "boundary": boundaryOwners[collision["owners"]],
   }
   for index, body in enumerate(bodies):
-    positions, triangles = bridgeMeshAccess.worldTriangles([body])
+    positions, triangles = bridgeMeshAccess.worldTriangles(bridgeMeshAccess.splitParts(body))
     arrays[f"undecided{index}"] = positions[triangles].astype(numpy.float32)
   description = {
     "swimBoxes": [region | {key: bridgeSwim.readBox(bpy.data.objects[region["name"]])[key] for key in ("liquid", "body")} for region in bridgeSwim.swimRegions()],

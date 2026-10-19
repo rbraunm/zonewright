@@ -523,7 +523,7 @@ def planOverlays(sheets, layers, spots):
     for body in bodies:
       liquid = bridgeSurfacing.liquidOf(body.material_slots[0].material)["liquid"]
       if bridgeWater.readDefinition(body)["kind"] == "fall":
-        positions, triangles = bridgeMeshAccess.worldTriangles([body])
+        positions, triangles = bridgeMeshAccess.worldTriangles(bridgeMeshAccess.splitParts(body))
         shown = {"runs": [], "loops": numpy.round(positions[triangles][:, :, :2], 1).tolist()}
       else:
         shown = bridgeWater.visibleSurface(body, ground)
@@ -624,7 +624,7 @@ def boundaryPlan(boundary):
 
 
 def renderedWater():
-  return [body for body in bpy.context.scene.objects if bridgeMeshAccess.waterProperty in body and not body.hide_render]
+  return [body for body in bridgeMeshAccess.waterBodies() if not body.hide_render]
 
 
 sectionLayers = ("ground", "water", "swim", "massing", "sketch", "plots", "boundaries", "zoneLines", "caves")
@@ -1046,7 +1046,7 @@ def sectionCuts(start, end, path, cave, bottom, top, layers):
     bodies = renderedWater()
     waterGround = bridgeWater.Ground() if bodies else None
     for body in bodies:
-      bodyPositions, bodyTriangles = bridgeMeshAccess.worldTriangles([body])
+      bodyPositions, bodyTriangles = bridgeMeshAccess.worldTriangles(bridgeMeshAccess.splitParts(body))
       shown = [leg.shifted(shownWater(planeSegments(bodyPositions, bodyTriangles, leg.start, leg.along, leg.normal), leg.start, leg.along, waterGround)) for leg in legs]
       segments = keptSegments(numpy.vstack(shown), length, bottom, top)
       if segments:

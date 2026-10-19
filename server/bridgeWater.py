@@ -19,6 +19,7 @@ import bridgeEnvironment
 import bridgeMeshAccess
 import bridgeObjects
 import bridgeShaping
+import bridgeSplit
 import bridgeSurfacing
 
 waterCollectionName = "water"
@@ -578,9 +579,9 @@ def surfaceMesh(name, definition, cells):
 def visibleSurface(body, ground):
   """Where a pool or river's surface shows in plan, not tucked under the ground, on the body's grid with its edges placed by halving: row runs [x0, y0, x1, y1] of whole cells and loops of [x, y] where its edge crosses a cell."""
   step = readDefinition(body)["spacing"]
-  positions, _ = bridgeMeshAccess.readVertexArrays(body)
+  positions = bridgeMeshAccess.partsPositions(body)
   low, high = positions[:, :2].min(0), positions[:, :2].max(0)
-  surface = bridgeMeshAccess.worldTree([body])
+  surface = bridgeMeshAccess.worldTree(bridgeMeshAccess.splitParts(body))
   above = float(positions[:, 2].max()) + 1
 
   def shows(points):
@@ -608,7 +609,7 @@ def visibleSurface(body, ground):
 def visibleExtent(body, ground):
   """The plan bounds of the water players see (a surface not tucked under its banks, a fall's sheet out of the rock), or None."""
   if readDefinition(body)["kind"] == "fall":
-    positions, _ = bridgeMeshAccess.readVertexArrays(body)
+    positions = bridgeMeshAccess.partsPositions(body)
     shown = [point[:2] for point in positions if not ground.insideRock(point)]
   else:
     surface = visibleSurface(body, ground)
@@ -883,7 +884,7 @@ def placeSprays(sceneObject, records):
 def footSprayingFalls(leaving=()):
   falls = []
   for sceneObject in bpy.context.scene.objects:
-    if bridgeMeshAccess.waterProperty not in sceneObject or sceneObject.name in leaving:
+    if bridgeMeshAccess.waterProperty not in sceneObject or bridgeMeshAccess.isSplitPart(sceneObject) or sceneObject.name in leaving:
       continue
     definition = readDefinition(sceneObject)
     if definition["kind"] == "fall" and any(spray["at"] == "foot" for spray in definition["sprays"]):
@@ -1024,7 +1025,7 @@ def buildBody(name, definition, ground, previous=None, rendered=True):
     requireSprayNames(name, records)
     feet = {}
     if surface is not None:
-      surfaces = [surface.tree] + ([bridgeMeshAccess.worldTree([previous])] if previous is not None and len(previous.data.polygons) else [])
+      surfaces = [surface.tree] + ([bridgeMeshAccess.worldTree(bridgeMeshAccess.splitParts(previous))] if previous is not None and len(previous.data.polygons) else [])
       feet = fallFeetOn(surfaces, ground, lambda: bridgeMeshAccess.swimSurfaces({name}, (surface.positions, surface.polygons) if rendered else None))
   except ValueError:
     bpy.data.meshes.remove(mesh)
@@ -1035,12 +1036,12 @@ def buildBody(name, definition, ground, previous=None, rendered=True):
 def describeBody(sceneObject, ground, report=None):
   definition = readDefinition(sceneObject)
   material = sceneObject.material_slots[0].material if sceneObject.material_slots else None
-  positions, _ = bridgeMeshAccess.readVertexArrays(sceneObject)
+  positions = bridgeMeshAccess.partsPositions(sceneObject)
   description = {
     "name": sceneObject.name, "kind": definition["kind"], "material": material.name if material else None,
     "definition": definition, "levels": [round(float(positions[:, 2].min()), 2), round(float(positions[:, 2].max()), 2)],
     "visibleExtent": visibleExtent(sceneObject, ground), "flow": bodyFlow(sceneObject, definition), "sprays": describeSprays(sceneObject, definition),
-  } | bridgeMeshAccess.meshCounts(sceneObject)
+  } | bridgeMeshAccess.wholeCounts(sceneObject)
   return description | ({"built": report} if report is not None else {})
 
 
@@ -1061,6 +1062,7 @@ def placeBody(name, definition, materialName, collection):
   sceneObject = bpy.data.objects.new(name, mesh)
   sceneObject[bridgeMeshAccess.waterProperty] = json.dumps(definition)
   bridgeObjects.targetCollection(collection or waterCollectionName).objects.link(sceneObject)
+  bridgeSplit.splitBody(sceneObject)
   bpy.context.view_layer.update()
   return describeBody(sceneObject, ground, settleSprays(sceneObject, records, feet, report))
 
@@ -1069,12 +1071,14 @@ def installBody(sceneObject, definition, mesh, material, ground, report, records
   """Put a body's newly built mesh in place of its old one, with what it was made from, and its sprays and those of the falls landing
   on it where they now stand."""
   mesh.materials.append(material)
+  bridgeSplit.removeParts(sceneObject)
   oldMesh = sceneObject.data
   sceneObject.matrix_world = mathutils.Matrix.Identity(4)
   sceneObject.data = mesh
   bpy.data.meshes.remove(oldMesh)
   mesh.name = sceneObject.name
   sceneObject[bridgeMeshAccess.waterProperty] = json.dumps(definition)
+  bridgeSplit.splitBody(sceneObject)
   bpy.context.view_layer.update()
   return describeBody(sceneObject, ground, settleSprays(sceneObject, records, feet, report))
 
@@ -1183,13 +1187,32 @@ def editWater(name, changes, material):
   return rebuildBody(sceneObject, definition | changes, material)
 
 
-def meshShape(mesh, matrix):
-  """A mesh's face count and its vertices in world space, sorted, to tell whether a rebuild changed anything."""
-  coordinates = numpy.empty(len(mesh.vertices) * 3)
-  mesh.vertices.foreach_get("co", coordinates)
-  transform = bridgeMeshAccess.matrixArray(matrix)
-  world = coordinates.reshape(-1, 3) @ transform[:3, :3].T + transform[:3, 3]
-  return len(mesh.polygons), sorted(map(tuple, numpy.round(world, 3).tolist()))
+def surfaceShape(meshes):
+  """A surface's area and its vertices in world space, of meshes with their matrices, and those a cut left on a seam (bridgeSplit),
+  to tell whether a rebuild changed anything."""
+  area, vertices, seam = 0.0, set(), set()
+  for mesh, matrix in meshes:
+    areas = numpy.empty(len(mesh.polygons))
+    mesh.polygons.foreach_get("area", areas)
+    area += float(areas.sum())
+    coordinates = numpy.empty(len(mesh.vertices) * 3)
+    mesh.vertices.foreach_get("co", coordinates)
+    transform = bridgeMeshAccess.matrixArray(matrix)
+    world = numpy.round(coordinates.reshape(-1, 3) @ transform[:3, :3].T + transform[:3, 3], 3)
+    vertices |= set(map(tuple, world.tolist()))
+    if bridgeSplit.seamAttribute in mesh.attributes:
+      marks = numpy.empty(len(mesh.vertices), dtype=numpy.int32)
+      mesh.attributes[bridgeSplit.seamAttribute].data.foreach_get("value", marks)
+      seam |= set(map(tuple, world[marks > 0].tolist()))
+  return round(area, 2), vertices, seam
+
+
+def surfaceUnchanged(rebuilt, standing):
+  """Whether a rebuilt surface (its mesh and matrix) is the one standing (its parts'): the same area and vertices, but for vertices a
+  cut put on a seam, which the rebuilt surface may or may not have."""
+  newArea, newVertices, _ = surfaceShape([rebuilt])
+  oldArea, oldVertices, oldSeam = surfaceShape(standing)
+  return newArea == oldArea and newVertices <= oldVertices and oldVertices - oldSeam <= newVertices
 
 
 def unchangedStrokeReason(definition, mode, area, ground):
@@ -1237,7 +1260,7 @@ def shapeWaterExtent(name, mode, area):
   definition = validatedDefinition(definition | {"strokes": definition["strokes"] + [{"mode": mode, "area": requireArea(area)}]})
   ground = Ground()
   mesh, report, records, feet = buildBody(name, definition, ground, sceneObject, not sceneObject.hide_render)
-  changed = meshShape(mesh, mathutils.Matrix.Identity(4)) != meshShape(sceneObject.data, sceneObject.matrix_world)
+  changed = not surfaceUnchanged((mesh, mathutils.Matrix.Identity(4)), [(part.data, part.matrix_world) for part in bridgeMeshAccess.splitParts(sceneObject)])
   description = installBody(sceneObject, definition, mesh, sceneObject.material_slots[0].material, ground, report, records, feet)
   if changed:
     return description | {"strokeChanged": True}
@@ -1246,7 +1269,7 @@ def shapeWaterExtent(name, mode, area):
 
 def getWater():
   bpy.context.view_layer.update()
-  bodies = [sceneObject for sceneObject in bpy.context.scene.objects if bridgeMeshAccess.waterProperty in sceneObject]
+  bodies = bridgeMeshAccess.waterBodies()
   ground = Ground() if bodies else None
   return {"bodies": [describeBody(sceneObject, ground) for sceneObject in bodies]}
 

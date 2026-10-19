@@ -18,6 +18,7 @@ import bridgeKitGeometry
 import bridgeMeshAccess
 import bridgePasses
 import bridgeShaping
+import bridgeSplit
 import bridgeStructureData
 import bridgeStructures
 import bridgeWater
@@ -309,6 +310,7 @@ def transformObjects(names, translate, rotateDegrees, scale, location, rotationD
   sceneObjects = [bridgeMeshAccess.requireObject(name) for name in names]
   for sceneObject in sceneObjects:
     bridgeStructureData.requireNotStructurePart(sceneObject, "transformObjects")
+    bridgeMeshAccess.requireNotWaterPart(sceneObject, "move it")
   bodies = [sceneObject for sceneObject in sceneObjects if bridgeMeshAccess.waterProperty in sceneObject]
   if bodies and any(value is not None for value in (rotateDegrees, scale, location, rotationDegrees)):
     raise ValueError(
@@ -355,6 +357,7 @@ def duplicateObjects(names, offset, linkData):
   sources = [bridgeMeshAccess.requireObject(name) for name in names]
   for source in sources:
     bridgeStructureData.requireNotStructurePart(source, "duplicateObjects")
+    bridgeMeshAccess.requireNotWaterPart(source, "copy it")
   roots = [source for source in sources if not any(ancestor in sources for ancestor in ancestorsOf(source))]
   bodies = [root for root in roots if bridgeMeshAccess.waterProperty in root]
   for body in bodies:
@@ -365,6 +368,8 @@ def duplicateObjects(names, offset, linkData):
     carried = [root] + list(root.children_recursive)
     for source in carried:
       duplicate = source.copy()
+      if bridgeMeshAccess.splitProperty in duplicate:
+        del duplicate[bridgeMeshAccess.splitProperty]
       if source.data is not None and not linkData:
         duplicate.data = source.data.copy()
       for collection in source.users_collection:
@@ -400,6 +405,9 @@ def joinObjects(names, into):
     raise ValueError(f"joinObjects needs at least two distinct meshes including '{into}', got {names}")
   sceneObjects = [bridgeMeshAccess.requireEditableMesh(name, "joinObjects") for name in names]
   target = bridgeMeshAccess.requireEditableMesh(into, "joinObjects")
+  for sceneObject in sceneObjects:
+    if bridgeMeshAccess.splitProperty in sceneObject:
+      raise ValueError(f"'{sceneObject.name}' is part of the split '{bridgeMeshAccess.wholeName(sceneObject)}'; joinParts puts its parts back as one")
   if any(len(sceneObject.modifiers) for sceneObject in sceneObjects):
     raise ValueError("Apply or remove modifiers before joining; join merges the base meshes")
   for sceneObject in sceneObjects:
@@ -431,6 +439,9 @@ def deleteObjects(names):
   sceneObjects = [bridgeMeshAccess.requireObject(name) for name in names]
   for sceneObject in sceneObjects:
     bridgeStructureData.requireNotStructurePart(sceneObject, "deleteObjects")
+    bridgeMeshAccess.requireNotWaterPart(sceneObject, "delete it")
+  sceneObjects = list(dict.fromkeys(part for sceneObject in sceneObjects for part in (bridgeMeshAccess.splitParts(sceneObject) if bridgeMeshAccess.waterProperty in sceneObject else [sceneObject])))
+  names = [sceneObject.name for sceneObject in sceneObjects]
   feet = bridgeWater.fallFeetWithout(sceneObjects)
   sprays = [spray for spray in bodySprays({sceneObject.name for sceneObject in sceneObjects if bridgeMeshAccess.waterProperty in sceneObject}) if spray.name not in names]
   removedSprays = sorted(spray.name for spray in sprays)
@@ -455,21 +466,25 @@ def organize(renames, parents, collections):
     sceneObject = bridgeMeshAccess.requireObject(oldName)
     requireNewName(newName)
     sprayRenames = bridgeWater.sprayRenames(oldName, newName) if bridgeMeshAccess.waterProperty in sceneObject else []
-    sceneObject.name = newName
+    if bridgeMeshAccess.splitProperty in sceneObject:
+      bridgeSplit.renameWhole(sceneObject, newName)
+    else:
+      sceneObject.name = newName
     bridgeWater.renameSprays(sprayRenames, newName)
     nameOwnMesh(sceneObject)
   bpy.context.view_layer.update()
   for childName, parentName in (parents or {}).items():
-    child = bridgeMeshAccess.requireObject(childName)
-    worldMatrix = child.matrix_world.copy()
-    child.parent = bridgeMeshAccess.requireObject(parentName) if parentName is not None else None
-    child.matrix_world = worldMatrix
+    parent = bridgeMeshAccess.requireObject(parentName) if parentName is not None else None
+    for child in bridgeMeshAccess.splitParts(bridgeMeshAccess.requireObject(childName)):
+      worldMatrix = child.matrix_world.copy()
+      child.parent = parent
+      child.matrix_world = worldMatrix
   for objectName, collectionName in (collections or {}).items():
-    sceneObject = bridgeMeshAccess.requireObject(objectName)
     destination = targetCollection(collectionName)
-    for collection in list(sceneObject.users_collection):
-      collection.objects.unlink(sceneObject)
-    destination.objects.link(sceneObject)
+    for sceneObject in bridgeMeshAccess.splitParts(bridgeMeshAccess.requireObject(objectName)):
+      for collection in list(sceneObject.users_collection):
+        collection.objects.unlink(sceneObject)
+      destination.objects.link(sceneObject)
   bpy.context.view_layer.update()
   affected = set((renames or {}).values()) | set(parents or {}) | set(collections or {})
   return {"objects": [describeTransform(bridgeMeshAccess.requireObject(name)) | {

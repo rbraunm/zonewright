@@ -101,7 +101,7 @@ def undecidedSurfaceOver(footing):
   arrive in its water), or None. A surface with ground or a basin between, as over a floating pool's underside, is not over it."""
   ceiling = footing.overhead[0].z if footing.overhead is not None else math.inf
   for body in bridgeSwim.swimDecisions()["undecided"]:
-    location, _, _, _ = bridgeMeshAccess.worldTree([body]).ray_cast(footing.point + up * bridgeMeshAccess.castNudge, up, bridgeMeshAccess.waterReach)
+    location, _, _, _ = bridgeMeshAccess.worldTree(bridgeMeshAccess.splitParts(body)).ray_cast(footing.point + up * bridgeMeshAccess.castNudge, up, bridgeMeshAccess.waterReach)
     if location is not None and location.z <= ceiling:
       return body.name
   return None

@@ -59,7 +59,7 @@ def swimBodies():
   """Rendered pools and rivers: falls are not swum."""
   return [
     sceneObject for sceneObject in bpy.context.scene.objects
-    if bridgeMeshAccess.waterProperty in sceneObject and not sceneObject.hide_render and bridgeWater.readDefinition(sceneObject)["kind"] != "fall"
+    if bridgeMeshAccess.waterProperty in sceneObject and not bridgeMeshAccess.isSplitPart(sceneObject) and not sceneObject.hide_render and bridgeWater.readDefinition(sceneObject)["kind"] != "fall"
   ]
 
 
@@ -89,8 +89,8 @@ def bodyCells(body, ground, area=None):
   shallowest = min(group.minimumSwimDepth for group in playerScale.groups.values())
   depths = []
   spacing = bridgeWater.readDefinition(body)["spacing"]
-  surface = bridgeMeshAccess.worldTree([body])
-  positions, _ = bridgeMeshAccess.readVertexArrays(body)
+  surface = bridgeMeshAccess.worldTree(bridgeMeshAccess.splitParts(body))
+  positions = bridgeMeshAccess.partsPositions(body)
   low, high = numpy.floor(positions[:, :2].min(0) / spacing).astype(int), numpy.ceil(positions[:, :2].max(0) / spacing).astype(int)
   above = float(positions[:, 2].max()) + 1
   cells, shallow = {}, 0
@@ -168,8 +168,7 @@ def bodyFingerprint(body, cells):
   the bed under it."""
   definition = {key: value for key, value in bridgeWater.readDefinition(body).items() if key != "sprays"}
   digest = hashlib.sha256(json.dumps(definition, sort_keys=True).encode())
-  positions, _ = bridgeMeshAccess.readVertexArrays(body)
-  digest.update(numpy.round(positions, 2).tobytes())
+  digest.update(numpy.unique(numpy.round(bridgeMeshAccess.partsPositions(body), 2), axis=0).tobytes())
   digest.update(json.dumps(sorted([[cell[0], cell[1], round(level, 2), round(floor, 2)] for cell, (level, floor, _) in cells.items()])).encode())
   return digest.hexdigest()[:16]
 
@@ -301,8 +300,8 @@ def describeBody(body, ground):
   uncovered = [cell for cell, (level, _, _) in cells.items() if not any(insideBox((cell[0] + 0.5) * spacing, (cell[1] + 0.5) * spacing, level - volumeTolerance / 2, center, half) for center, half in bounds)]
   if uncovered:
     findings.append({"finding": "surface uncovered", "cells": len(uncovered), "at": [[round((i + 0.5) * spacing, 1), round((j + 0.5) * spacing, 1)] for i, j in uncovered[:findingSamples]]})
-  surface = bridgeMeshAccess.worldTree([body])
-  above = float(bridgeMeshAccess.readVertexArrays(body)[0][:, 2].max()) + 1
+  surface = bridgeMeshAccess.worldTree(bridgeMeshAccess.splitParts(body))
+  above = float(bridgeMeshAccess.partsPositions(body)[:, 2].max()) + 1
   for box, (center, half) in zip(boxes, bounds):
     top = center[2] + half[2]
     levels = [level for cell, (level, _, _) in cells.items() if insideBox((cell[0] + 0.5) * spacing, (cell[1] + 0.5) * spacing, center[2], center, half)]

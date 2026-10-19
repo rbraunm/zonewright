@@ -32,6 +32,9 @@ approachGroundReach = 4.0
 # A ground border wants a transition strip where a side's normal z is at least this, reading as ground underfoot; a steeper face reads
 # as a cliff, where materials meet without one.
 transitionGroundNormalZ = 0.5
+# The client draws no placed model of more triangles than this, which is as many as its own placed models run to (the Chapterhouse
+# chancery's 6,763); one of more draws nothing, so a mesh of more is split into parts (bridgeSplit) and export refuses one that is not.
+maxModelTriangles = 6763
 # A view's lane tint covers a face whose normal z is at least this, a floor players stand or slide on; a steeper face is a wall beside
 # the lane's floors, or something standing on them, and stays untinted.
 laneTintNormalZ = 0.1

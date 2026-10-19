@@ -34,7 +34,7 @@ import bridgeWater
 import clientModelRows
 import serverRows
 from bridgeState import state
-from buildTolerances import transitionGroundNormalZ
+from buildTolerances import maxModelTriangles, transitionGroundNormalZ
 
 exportPurposes = ("test", "game")
 # A face's texture is stretched where a texel lies more than this many times longer one way than the other in the world, and stretched
@@ -683,13 +683,42 @@ def materialNameFailures(placed):
   ]
 
 
+def ownerTriangles(placed):
+  """The exported triangles of each placed object, by its name."""
+  triangles = {}
+  for entry in placed:
+    triangles[entry["owner"].name] = triangles.get(entry["owner"].name, 0) + len(entry["data"]["triangleLoops"])
+  return triangles
+
+
+def oversizeFailures(shipped, placed):
+  """The placed models with more triangles than the client draws in one (buildTolerances.maxModelTriangles): it draws none of one."""
+  triangles = ownerTriangles(placed)
+  failures, seen = [], set()
+  for sceneObject, role in shipped:
+    if role not in ("mesh", "instance"):
+      continue
+    key = bridgeExport.modelKey(sceneObject, role)
+    if key in seen:
+      continue
+    seen.add(key)
+    count = triangles.get(sceneObject.name, 0)
+    if count > maxModelTriangles:
+      failures.append({
+        "failure": "model too large", "object": sceneObject.name, "at": objectLocation(sceneObject), "triangles": count, "limit": maxModelTriangles,
+        "message": (
+          f"'{sceneObject.name}' has {count} triangles, over the {maxModelTriangles} the client draws in one placed model (it draws nothing of one over);"
+          " splitObject cuts a mesh into parts that fit, and editWater builds a water body in parts"
+        ),
+      })
+  return failures
+
+
 def structureReport(shipped, placed):
   """Each structure's export: the models its parts are placed as, with their triangles and placements, and its triangles in all (a
   structure laid as ground has its triangles in the terrain and no model); and the triangles of every placement of every model."""
   roles = {sceneObject.name: role for sceneObject, role in shipped}
-  triangles = {}
-  for entry in placed:
-    triangles[entry["owner"].name] = triangles.get(entry["owner"].name, 0) + len(entry["data"]["triangleLoops"])
+  triangles = ownerTriangles(placed)
   structures = []
   for collection in bridgeStructureData.structureCollections():
     models, total = {}, 0
@@ -744,7 +773,7 @@ def checkZoneExport(purpose, exportName, client):
     for sceneObject, role in shipped if sceneObject.type == "MESH" for problem in bridgeCaves.integrityProblems(sceneObject)
   ]
   placed, faceFailures, faceFindings, blockouts, coverage = surveyFaces(shipped)
-  failures += faceFailures + materialNameFailures(placed)
+  failures += faceFailures + materialNameFailures(placed) + oversizeFailures(shipped, placed)
   findings += faceFindings
   structures, placedTriangles = structureReport(shipped, placed)
   stale = bridgeStructures.staleStructures()
