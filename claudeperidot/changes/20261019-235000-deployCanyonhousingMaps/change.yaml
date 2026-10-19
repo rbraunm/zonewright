@@ -1,0 +1,29 @@
+title: claudeperidot's maps folder holds canyonhousing's server maps from its game export
+why: 'zonewright''s deployZone: the zone process for canyonhousing loads its collision (.map), water regions (.wtr) and NPC
+  nav (.nav) from the maps folder by the lowercase short name; these are the game export''s server\maps (C:\Users\Toshiro\AppData\Local\zonewright\staging\canyonhousing\canyonhousing_export.json),
+  each installed owned as its folder is, mode 644.'
+disposition: fixture
+significance: minor
+ownerClearance:
+  ownerMessage: '2026-10-13, the owner: "pick the neutral area and build that out then show it to me in the world when you
+    feel ilke you''ve captured the concept art"'
+activation: restart the zone processes (a zone process loads its maps when it boots)
+production: none
+commits: []
+author:
+  session: session_0121Qm1vvZgAKaiV6dKmANxe
+kind: files
+scope:
+- /opt/eqemu/akk-stack/server/maps/base/canyonhousing.map
+- /opt/eqemu/akk-stack/server/maps/water/canyonhousing.wtr
+- /opt/eqemu/akk-stack/server/maps/nav/canyonhousing.nav
+files:
+- path: /opt/eqemu/akk-stack/server/maps/base/canyonhousing.map
+  source: C:\Users\Toshiro\AppData\Local\zonewright\staging\canyonhousing\server\maps\base\canyonhousing.map
+  sha256: eab8f8b3d7718dd86f693d97a395849067df3ebe67e8867cf933c60ee5ab107a
+- path: /opt/eqemu/akk-stack/server/maps/water/canyonhousing.wtr
+  source: C:\Users\Toshiro\AppData\Local\zonewright\staging\canyonhousing\server\maps\water\canyonhousing.wtr
+  sha256: db6a9cf6ab8fd159562b364653e7784b2e110fd2a1169c5dda998b504e97f55b
+- path: /opt/eqemu/akk-stack/server/maps/nav/canyonhousing.nav
+  source: C:\Users\Toshiro\AppData\Local\zonewright\staging\canyonhousing\server\maps\nav\canyonhousing.nav
+  sha256: cc7456be4097ed888a0b2281dcc6a7764ed4819f31bfad33e81f0f151a8a189b
