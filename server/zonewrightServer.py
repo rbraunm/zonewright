@@ -1549,7 +1549,7 @@ def groupedExclusions(excluded, shownPerReason=25):
 exportChecksHelp = (
   " purpose is \"test\" (quick renders and test loads) or \"game\" (files for the EQ client and server). Both refuse the hard errors:"
   " the file unsaved; objects export cannot take (a non-mesh in the terrain collection, or among a placed collection's members, to any"
-  " depth, anything but meshes and collection instances; a placed model scaled unevenly; model names that collide; a placed model of more triangles than the client draws, 6,763, which splitObject fixes); a placed kit piece or"
+  " depth, anything but meshes and collection instances; a placed model scaled unevenly; model names that collide; a placed model of more triangles than the client draws, 3,600, which splitObject fixes); a placed kit piece or"
   " building, or a structure, whose kit file or collection cannot be found; two materials that would share one name in the archive (a"
   " kit's material and the zone's own of one name export apart, the kit's as <name>_<kit file stem>);"
   " faces with no material or a material createMaterial or createLiquidMaterial did not"
@@ -2258,8 +2258,8 @@ async def joinObjects(context: Context, names: list[str], into: str):
 
 @guardedTool()
 async def splitObject(context: Context, name: str, maxTriangles: int | None = None):
-  """Split a mesh the client could not draw as one model into parts of at most `maxTriangles` triangles (default 6,763, as many as the
-  client's own placed models run to; a placed model of more draws nothing, and checkExport refuses one). The mesh's connected pieces
+  """Split a mesh the client could not draw as one model into parts of at most `maxTriangles` triangles (default 3,600: models of up to 4,852
+  triangles draw in the client and a model of 6,426 does not; a placed model of more draws nothing, and checkExport refuses one). The mesh's connected pieces
   go to parts of their own (or together, where they are small), and a piece of more is cut across its longest axis into slabs, along
   the gaps between faces where there are any, so no face is cut. The first part keeps the name, object, and place; the others are
   copies named <name>.part2, <name>.part3, in its collections and under its parent, each its own model on export. Materials and
@@ -5100,7 +5100,7 @@ waterBodyHelp = (
   " editWater's swimmable false marks a body no one swims in. The ground is what players stand on: rendered meshes and collection"
   " instances that are not water, guides, regions, spawns, or doors, without the faces players pass through. The result's `built` reports what the build found: a pool or river's deepest point and where it"
   " runs off the end of the ground (a zone edge used as a source or an end, or a leak to bound). The client draws no placed model of more"
-  " than 6,763 triangles, so a body whose surface is bigger is built in parts: the body's object holds the first and the others stand"
+  " than 3,600 triangles, so a body whose surface is bigger is built in parts: the body's object holds the first and the others stand"
   " beside it as <name>.part2, <name>.part3 (a fall's two sides, a river's slabs), each exporting as a model of its own, and every"
   " tool takes the body by its name, the parts going with it (a part is refused by name); the result's counts are the whole's and `parts` says how many."
 )

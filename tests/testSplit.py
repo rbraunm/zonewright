@@ -1,5 +1,10 @@
+import sys
+from pathlib import Path
+
 import numpy
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
+from buildTolerances import maxModelTriangles
 from testModelsAndDressing import freshScene
 from testWater import liquidMaterials
 
@@ -184,12 +189,12 @@ def testCheckExportRefusesAModelOverTheClientsLimitUntilItIsSplit(stageBlenderSe
 
   over, overForGame, split, fitted = stageBlenderServer.session(steps)
   refusals = [failure for failure in over["failures"] if failure["failure"] == "model too large"]
-  assert [(failure["object"], failure["triangles"], failure["limit"]) for failure in refusals] == [("bigRock", 11250, 6763)]
+  assert [(failure["object"], failure["triangles"], failure["limit"]) for failure in refusals] == [("bigRock", 11250, maxModelTriangles)]
   assert "splitObject cuts a mesh into parts that fit" in refusals[0]["message"]
   # A test export is refused too: the client draws nothing of the model whatever the export is for.
   assert [failure["object"] for failure in overForGame["failures"] if failure["failure"] == "model too large"] == ["bigRock"]
-  # The limit is the default: two parts, each under it.
-  assert len(split["parts"]) == 2 and all(part["triangles"] <= 6763 for part in split["parts"])
+  # The limit is the default: four parts, each under it.
+  assert len(split["parts"]) == 4 and all(part["triangles"] <= maxModelTriangles for part in split["parts"])
   assert not [failure for failure in fitted["failures"] if failure["failure"] == "model too large"]
 
 
@@ -199,7 +204,7 @@ def testARiverOverTheLimitIsBuiltInPartsAndEveryToolTakesItWhole(stageBlenderSer
     await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [1200, 400], "spacing": 8, "location": [0, 0, 0], "collection": "terrain"})
     await session.expectSuccess("sculptAlongPath", {"objectName": "ground", "mode": "carve", "path": [[-600, 0, -30], [600, 0, -30]], "radius": 40, "strength": 1, "profile": [[0, 0], [0.55, 0], [1, 30]], "conformRim": False})
     await liquidMaterials(session, tmp_path)
-    river = await session.expectSuccess("runWater", {"name": "river", "path": [[-500, 0, -4], [500, 0, -8]], "reach": 40, "spacing": 4, "material": "water"})
+    river = await session.expectSuccess("runWater", {"name": "river", "path": [[-500, 0, -4], [500, 0, -8]], "reach": 40, "spacing": 6, "material": "water"})
     partDetails = [await session.expectSuccess("getObjectDetail", {"name": name}) for name in ("river", "river.part2")]
     water = await session.expectSuccess("getWater", {})
     marks = await marksOf(session, "river")
@@ -219,8 +224,8 @@ def testARiverOverTheLimitIsBuiltInPartsAndEveryToolTakesItWhole(stageBlenderSer
     return river, partDetails, water, marks, partEdit, partDelete, rebuilt, afterRebuild, moved, boxes, volumes, rebuiltVolumes, checked, left
 
   river, partDetails, water, marks, partEdit, partDelete, rebuilt, afterRebuild, moved, boxes, volumes, rebuiltVolumes, checked, left = stageBlenderServer.session(steps)
-  assert river["triangles"] > 6763 and river["parts"] == 2
-  assert all(0 < detail["triangles"] <= 6763 for detail in partDetails)
+  assert river["triangles"] > maxModelTriangles and river["parts"] == 2
+  assert all(0 < detail["triangles"] <= maxModelTriangles for detail in partDetails)
   # Each part is a model named for its mesh on export.
   assert [detail["mesh"] for detail in partDetails] == ["river", "river.part2"]
   assert [body["name"] for body in water["bodies"]] == ["river"] and water["bodies"][0]["parts"] == 2
