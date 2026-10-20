@@ -1,0 +1,61 @@
+title: The spare client holds canyonhousing.eqg, canyonhousing_EnvironmentEmitters.txt and canyonhousing_assets.txt, Canyon Neighborhood's
+  client files
+why: 'A test of the water textures'' headers for the owner''s water (the river drew one flat color in the client where the client''s own water
+  ripples): zonewright''s verified export with the mip count of rc_cavewater_n.dds, rc_cavewater_c.dds and env_noswap_day.dds set back to the client''s
+  own 0 (the export wrote 9, 1 and 8, counting the normal map and the cube map as block-compressed, where each holds one level). Replaces the test
+  20261020-055740''s, reverted. The step refuses when the spare runs, a file already exists, or a source is not the test archive.'
+kind: client
+scope:
+- S:\Research\EverQuest\housingclient\canyonhousing.eqg
+- S:\Research\EverQuest\housingclient\canyonhousing_EnvironmentEmitters.txt
+- S:\Research\EverQuest\housingclient\canyonhousing_assets.txt
+disposition: fixture
+significance: minor
+ownerClearance:
+  ownerMessage: '2026-10-13, the owner: "pick the neutral area and build that out then show it to me in the world when you feel ilke you''ve
+    captured the concept art"'
+activation: the spare's next zoning into canyonhousing
+production: none
+commits: []
+steps:
+- |-
+  $ErrorActionPreference = 'Stop'
+  $source = 'C:\Users\Toshiro\AppData\Local\zonewright\experiment\canyonhousing'
+  $spare = 'S:\Research\EverQuest\housingclient'
+  $files = @{
+    'canyonhousing.eqg' = 'E6D225BE4787171F64B19F8471BD4392ABAD579B1474B18EA92D06ED3BBDB068'
+    'canyonhousing_EnvironmentEmitters.txt' = '82DA94524293791D0FE56478BEA4009E22C5ABB7690DCF7B160A424BB397C5BC'
+    'canyonhousing_assets.txt' = 'A104F8414208FE05B3C8178A2C40164A0F2B39A07A005DCDC4C950D0CFEECFFC'
+  }
+  if (Get-Process -Name eqgame -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$spare\*" }) { throw 'the spare client is running' }
+  foreach ($name in $files.Keys) {
+    if (Test-Path -LiteralPath "$spare\$name") { throw "$spare\$name already exists" }
+    if ((Get-FileHash -LiteralPath "$source\$name" -Algorithm SHA256).Hash -ne $files[$name]) { throw "$source\$name is not the verified export" }
+  }
+  foreach ($name in $files.Keys) {
+    Copy-Item -LiteralPath "$source\$name" -Destination "$spare\$name"
+    if ((Get-FileHash -LiteralPath "$spare\$name" -Algorithm SHA256).Hash -ne $files[$name]) { throw "$spare\$name does not match the export" }
+  }
+undo:
+- |-
+  $ErrorActionPreference = 'Stop'
+  $spare = 'S:\Research\EverQuest\housingclient'
+  $files = @{
+    'canyonhousing.eqg' = 'E6D225BE4787171F64B19F8471BD4392ABAD579B1474B18EA92D06ED3BBDB068'
+    'canyonhousing_EnvironmentEmitters.txt' = '82DA94524293791D0FE56478BEA4009E22C5ABB7690DCF7B160A424BB397C5BC'
+    'canyonhousing_assets.txt' = 'A104F8414208FE05B3C8178A2C40164A0F2B39A07A005DCDC4C950D0CFEECFFC'
+  }
+  if (Get-Process -Name eqgame -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$spare\*" }) { throw 'the spare client is running' }
+  foreach ($name in $files.Keys) {
+    if ((Get-FileHash -LiteralPath "$spare\$name" -Algorithm SHA256).Hash -ne $files[$name]) { throw "$spare\$name is not this change's file; nothing removed" }
+  }
+  foreach ($name in $files.Keys) { Remove-Item -LiteralPath "$spare\$name" -Confirm:$false }
+checks:
+- path: S:\Research\EverQuest\housingclient\canyonhousing.eqg
+  sha256: e6d225be4787171f64b19f8471bd4392abad579b1474b18ea92d06ed3bbdb068
+- path: S:\Research\EverQuest\housingclient\canyonhousing_EnvironmentEmitters.txt
+  sha256: 82da94524293791d0fe56478bea4009e22c5abb7690dcf7b160a424bb397c5bc
+- path: S:\Research\EverQuest\housingclient\canyonhousing_assets.txt
+  sha256: a104f8414208fe05b3c8178a2c40164a0f2b39a07a005dcdc4c950d0cfeecffc
+author:
+  session: session_0121Qm1vvZgAKaiV6dKmANxe
