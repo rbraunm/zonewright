@@ -973,6 +973,39 @@ def testFlowSetsSlidesAndGetWaterSaysWhichWayEachBodyFlows(stageBlenderServer, t
   assert upstream == {"flow": "upstream", "layers": {"color": {"along": -6.0, "across": 0.0}, "alpha": {"along": -4.0, "across": 0.0}}}
 
 
+def testPoolDriftTurnsItsTextureSoAFlowingMaterialDriftsTowardTheHeading(stageBlenderServer, tmp_path):
+  headings = (270, 90, 0, 180, 45)
+
+  async def steps(session):
+    await freshScene(session)
+    await basin(session)
+    await liquidMaterials(session, tmp_path)
+    await session.expectSuccess("createLiquidMaterial", {
+      "name": "flowing", "liquid": "water", "diffuseTexture": str(tmp_path / "water_c.png"), "normalTexture": str(tmp_path / "water_n.png"),
+      "environmentTexture": str(tmp_path / "water_e.dds"), "flow": [0.2, 0.05],
+    })
+    await session.expectSuccess("floodWater", {"name": "pool", "seed": [0, 0], "level": -5, "material": "flowing"})
+    measured = []
+    for heading in headings:
+      await session.expectSuccess("editWater", {"name": "pool", "drift": heading})
+      flow = {body["name"]: body for body in (await session.expectSuccess("getWater", {}))["bodies"]}["pool"]
+      measured.append((flow["definition"]["drift"], flow["flow"]["layers"], await cornersOf(session, "pool")))
+    return measured
+
+  measured = stageBlenderServer.session(steps)
+  for heading, (drift, layers, corners) in zip(headings, measured):
+    toward = numpy.array([math.cos(math.radians(heading)), math.sin(math.radians(heading))])
+    # getWater says the layers drift toward the heading, the first 0.2 and the second 0.05 repeats a second at 64 units a repeat.
+    assert drift == heading
+    assert numpy.allclose(layers["first"]["velocity"], 12.8 * toward, atol=0.01) and numpy.allclose(layers["second"]["velocity"], 3.2 * toward, atol=0.01)
+    # The surface's own coordinates agree: the client's v (1 - Blender's) rises toward the heading, u to its left, 64 units a repeat.
+    design = numpy.column_stack([corners[:, 0], corners[:, 1], numpy.ones(len(corners))])
+    gradientU = numpy.linalg.lstsq(design, corners[:, 3], rcond=None)[0][:2]
+    gradientV = -numpy.linalg.lstsq(design, corners[:, 4], rcond=None)[0][:2]
+    assert numpy.allclose(gradientV, toward / 64, atol=1e-6)
+    assert numpy.allclose(gradientU, numpy.array([-toward[1], toward[0]]) / 64, atol=1e-6)
+
+
 def testSprayWaterPlacesWhiteWaterWhereTheWaterStrikesAndKeepsItWithTheBody(stageBlenderServer, tmp_path):
   archivePath = tmp_path / "testspray.eqg"
 

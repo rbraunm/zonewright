@@ -5112,16 +5112,19 @@ waterBodyHelp = (
   " spreads over open ground to the end of the ground (a level over a plateau, a gap in a rim) is built, and its built.reachesGroundEnd"
   " says where it ran off (groundEndPoints how often); bound it with `within`, a lower level, or shapeWaterExtent unless it is meant to"
   " reach the zone's edge (a sea). Only a flood over 250,000 grid points is refused. Meshed every `spacing` units, its flat cells"
-  " merged, the material repeating every `worldUnitsPerRepeat` units. A starting point: shape it with editWater (level, seed, within)"
-  " and shapeWaterExtent, and its bed with carveWaterBed." + waterBodyHelp
+  " merged, the material repeating every `worldUnitsPerRepeat` units, its texture coordinates turned so the client's v increases toward"
+  " the heading `drift` (degrees counter-clockwise from +x, 90 toward +y, 270 toward -y): a material whose layers move one way"
+  " (createLiquidMaterial's flow) drifts the pool that way, so set it toward the pool's outlet, away from where a fall or stream enters;"
+  " a still-water material (its layers moving against each other) only churns in place. A starting point: shape it with editWater (level,"
+  " seed, within, drift) and shapeWaterExtent, and its bed with carveWaterBed." + waterBodyHelp
 ))
 async def floodWater(
   context: Context, name: str, seed: list[float], level: float, material: str, within: list[list[float]] | None = None,
-  spacing: float = 8.0, worldUnitsPerRepeat: float = 64.0, collection: str | None = None,
+  spacing: float = 8.0, worldUnitsPerRepeat: float = 64.0, drift: float = 270.0, collection: str | None = None,
 ):
   return await callBridge(context, "floodWater", {
     "name": name, "seed": seed, "level": level, "within": within, "spacing": spacing, "worldUnitsPerRepeat": worldUnitsPerRepeat,
-    "material": material, "collection": collection,
+    "drift": drift, "material": material, "collection": collection,
   })
 
 
@@ -5244,7 +5247,7 @@ async def sprayWater(
 
 @guardedTool(description=(
   "Change what a water body is made from and build it again against the ground as it is now: a pool's level, seed, within (an empty"
-  " list removes it), spacing, worldUnitsPerRepeat, or strokes (an empty list clears them); a river's path, reach, spacing,"
+  " list removes it), spacing, worldUnitsPerRepeat, drift, or strokes (an empty list clears them); a river's path, reach, spacing,"
   " worldUnitsPerRepeat, or strokes; a pool or river's swimmable (false: no one swims in it, a fountain or a trickle; true: it is"
   " swum, its swim volumes to be built; marking false is refused while the body has swim volumes, which go first, with deleteObjects);"
   " a fall's lip, bottom, throw, spread, spacing, worldUnitsPerRepeat, or acrossRepeats; any body's material; any body's sprays (the"
@@ -5257,13 +5260,13 @@ async def editWater(
   context: Context, name: str, level: float | None = None, seed: list[float] | None = None, within: list[list[float]] | None = None,
   path: list[list[float]] | None = None, reach: float | None = None, lip: list[list[float]] | None = None, bottom: float | None = None,
   throw: float | None = None, spread: float | None = None, spacing: float | None = None, worldUnitsPerRepeat: float | None = None,
-  acrossRepeats: int | None = None, strokes: list[dict] | None = None, swimmable: bool | None = None, sprays: list[dict] | None = None,
-  material: str | None = None,
+  drift: float | None = None, acrossRepeats: int | None = None, strokes: list[dict] | None = None, swimmable: bool | None = None,
+  sprays: list[dict] | None = None, material: str | None = None,
 ):
   changes = {
     "level": level, "seed": seed, "within": within, "path": path, "reach": reach, "lip": lip, "bottom": bottom, "throw": throw,
-    "spread": spread, "spacing": spacing, "worldUnitsPerRepeat": worldUnitsPerRepeat, "acrossRepeats": acrossRepeats, "strokes": strokes,
-    "swimmable": swimmable, "sprays": None if sprays is None else [resolvedSpray(spray) for spray in sprays],
+    "spread": spread, "spacing": spacing, "worldUnitsPerRepeat": worldUnitsPerRepeat, "drift": drift, "acrossRepeats": acrossRepeats,
+    "strokes": strokes, "swimmable": swimmable, "sprays": None if sprays is None else [resolvedSpray(spray) for spray in sprays],
   }
   return await callBridge(context, "editWater", {"name": name, "changes": {key: value for key, value in changes.items() if value is not None}, "material": material})
 

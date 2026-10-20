@@ -230,6 +230,9 @@ def readDefinition(sceneObject):
   definition.setdefault("sprays", [])
   if definition["kind"] == "fall":
     definition.setdefault("acrossRepeats", 1)
+  # Pools made before drift ran their v toward -y.
+  if definition["kind"] == "pool":
+    definition.setdefault("drift", 270.0)
   return definition
 
 
@@ -527,9 +530,16 @@ def loopPoint(key, cuts, step):
   return numpy.array(key, dtype=numpy.float64) * step
 
 
+def poolFrame(drift):
+  """The plan directions a pool's texture coordinates u and Blender's v increase along, turned so the client's v increases toward the
+  heading `drift` (degrees counter-clockwise from +x; 270, toward -y, leaves them along +x and +y)."""
+  turn = math.radians(drift - 270.0)
+  return numpy.array([[math.cos(turn), math.sin(turn)], [-math.sin(turn), math.cos(turn)]])
+
+
 def surfaceMesh(name, definition, cells):
   """The surface over the cells at the body's levels, cut along the bounds of where it may spread; a pool's flat cells merged and mapped
-  across the plan, a river's mapped along its path with its bends rounded (mappingPieces): u across (rightward looking downstream) and
+  across the plan with the client's v increasing toward its drift (poolFrame), a river's mapped along its path with its bends rounded (mappingPieces): u across (rightward looking downstream) and
   the client's v downstream, as the client's rivers run it (Brell's Rest, Beasts' Domain), so its liquid's slides flow as theirs do.
   Export counts v down from the texture's top (client v = 1 - Blender v), so Blender's v falls downstream."""
   spacing = definition["spacing"]
@@ -563,7 +573,7 @@ def surfaceMesh(name, definition, cells):
   for face in meshEditor.faces:
     points = numpy.array([list(loop.vert.co[:2]) for loop in face.loops])
     if definition["kind"] == "pool":
-      coordinates = points / repeat
+      coordinates = points @ poolFrame(definition["drift"]).T / repeat
     else:
       along, across = mappedPositions(points, pieces)
       coordinates = numpy.column_stack([across, -along]) / repeat
@@ -984,7 +994,8 @@ def bodyFlow(sceneObject, definition):
   repeat = definition["worldUnitsPerRepeat"]
   # Adding 0 makes a negative zero (a layer moving straight one way has one across it) read 0.
   if definition["kind"] == "pool":
-    velocities = {name: numpy.array([u * repeat, -v * repeat]) for name, (u, v) in motions.items()}
+    frame = poolFrame(definition["drift"])
+    velocities = {name: (u * frame[0] - v * frame[1]) * repeat for name, (u, v) in motions.items()}
     first, second = velocities.values()
     flow = "none" if not (first.any() or second.any()) else "still" if first @ second < 0 else "drifting"
     return {"flow": flow, "layers": {name: {"velocity": [value + 0.0 for value in bridgeObjects.roundVector(velocity, 2)]} for name, velocity in velocities.items()}}
@@ -1133,10 +1144,10 @@ def duplicateBody(source, offset):
   return name
 
 
-def floodWater(name, seed, level, within, spacing, worldUnitsPerRepeat, material, collection):
+def floodWater(name, seed, level, within, spacing, worldUnitsPerRepeat, drift, material, collection):
   definition = {
-    "kind": "pool", "seed": seed, "level": level, "within": within, "spacing": spacing, "worldUnitsPerRepeat": worldUnitsPerRepeat, "strokes": [],
-    "sprays": [],
+    "kind": "pool", "seed": seed, "level": level, "within": within, "spacing": spacing, "worldUnitsPerRepeat": worldUnitsPerRepeat, "drift": drift,
+    "strokes": [], "sprays": [],
   }
   return placeBody(name, definition, material, collection)
 
@@ -1162,7 +1173,7 @@ def sprayWater(name, spray):
 
 
 editableFields = {
-  "pool": ("seed", "level", "within", "spacing", "worldUnitsPerRepeat", "strokes", "swimmable", "sprays"),
+  "pool": ("seed", "level", "within", "spacing", "worldUnitsPerRepeat", "drift", "strokes", "swimmable", "sprays"),
   "river": ("path", "reach", "spacing", "worldUnitsPerRepeat", "strokes", "swimmable", "sprays"),
   "fall": ("lip", "bottom", "throw", "spread", "spacing", "worldUnitsPerRepeat", "acrossRepeats", "sprays"),
 }
