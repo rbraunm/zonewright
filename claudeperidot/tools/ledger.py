@@ -2443,12 +2443,9 @@ class Ledger:
 def openServer(host=hostName):
   """The Server for a host of facet's inventory: claudeperidot for every ledger command; zoneDeploy's read-only slot reads
   also reach Peridot."""
-  from facetClient.inventory import InventoryError, loadInventory
+  from facetClient.inventory import InventoryError, defaultInventoryPath, loadInventory
   from facetClient.sshConnection import SSHConnection
-  inventoryPath = os.environ.get("facetInventory")
-  if not inventoryPath:
-    raise LedgerError("set facetInventory to facet's inventory (operations hosts\\inventory.yaml), as the facet MCP server "
-      "has it")
+  inventoryPath = defaultInventoryPath
   try:
     hosts = loadInventory(inventoryPath)
   except (InventoryError, OSError) as error:

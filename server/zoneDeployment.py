@@ -1,6 +1,6 @@
 """A game export's server side as a deploy request for the claudeperidot ledger's zoneDeploy (claudeperidot/tools/zoneDeploy.py),
 and the run of that program. zonewright reaches no server itself: zoneDeploy runs under the ledger's own Python (PyYAML and
-facet's client, with facetInventory set, as claudeperidot/README.md gives them), records every change in the ledger before it
+facet's client, as claudeperidot/README.md gives them), records every change in the ledger before it
 runs, and reports its progress and result as JSON lines.
 
 The request is read from the export as it was written and verified: its game manifest (written by exportZone, no failures),

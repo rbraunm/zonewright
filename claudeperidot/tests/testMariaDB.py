@@ -4,9 +4,8 @@ ledger's, the guards inside apply and revert, per-statement check failures from 
 binary log, where a schema change's CREATE TABLE and DROP TABLE keep their tags. Their writes carry GTID domain 77, not the
 ledger's 7, and stay out of peq, so drift never counts them.
 
-They run only when a connection to claudeperidot is configured: facet's inventory (the facetInventory environment variable)
-holds claudeperidot and Claude's credential for it is in Credential Manager."""
-import os
+They run only when a connection to claudeperidot is configured: facet's inventory holds claudeperidot and Claude's
+login for it is in OpenBao."""
 import struct
 
 import pytest
@@ -19,15 +18,17 @@ testDomain = 77
 
 
 def configuredHost():
-  inventoryPath = os.environ.get("facetInventory")
-  if not inventoryPath:
-    return None
   try:
-    from facetClient.inventory import loadInventory
+    from facetClient.inventory import defaultInventoryPath, loadInventory
+    from facetClient.secretStore import SecretStoreUnreachableError, hasSecret
   except ImportError:
     return None
-  host = loadInventory(inventoryPath).get(ledger.hostName)
-  if host is None or not ledger.credentialExists(host.credentialTarget):
+  host = loadInventory(defaultInventoryPath).get(ledger.hostName)
+  if host is None:
+    return None
+  try:
+    return host if hasSecret(host.credentialPath) else None
+  except SecretStoreUnreachableError:
     return None
   return host
 
