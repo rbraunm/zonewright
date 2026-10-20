@@ -23,7 +23,7 @@ One row per planned set of spare shots (the `calibrate-renderer` skill), from th
 | Back faces, canyonhousing's falls rebuilt with a reversed twin on each face, in two parts: front `shot_20261019-160822-387161`, inside the hall `-160834-247650`, side-on `-160844-351532` | Not run through `calibrateShot` (looked at) | Settled: drawn from every side with a back face of its own |
 | Fog, Crescent Reach: `shot_20261011-235924-938651` (noon), `-235931-060369` (21:00), `shot_20261011-234743-528063`, `-234732-360190` | 3.9, 3.9, 2.4, 6.9 | Small |
 | Water and emitters, Highpass Hold fall pool: `shot_20261012-000203-553938` | 12.2 | The fall's mist whiter in the client |
-| Water, canyonhousing's river from 3.7 units over it: flat before `shot_20261019-225132-145107`, rippled after `shot_20261019-230230-673222` | Not run through `calibrateShot` (looked at) | Settled: the DDS header mip count of the water's normal and cube maps (docs/clientRendering.md, DDS headers) |
+| Water, canyonhousing's river from 3.7 units over it: flat before `shot_20261019-225132-145107`, rippled after `shot_20261019-230230-673222`, and from the real export, the river `shot_20261020-030346-955136` and the pool under the falls `shot_20261020-030357-547567` | Not run through `calibrateShot` (looked at) | Settled: the DDS header mip count of the water's normal and cube maps (docs/clientRendering.md, DDS headers) |
 
 ## First: what exported zones need
 
