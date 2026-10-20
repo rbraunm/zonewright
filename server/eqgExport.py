@@ -14,18 +14,20 @@ import numpy
 from PIL import Image
 
 import clientModelBundle
+import eqTextures
 import eqgFiles
 import eqgWriter
 
 
 def textureEntry(path):
-  """A texture as the archive stores it: a DDS file's bytes unchanged under its name, any other image as an uncompressed DDS."""
+  """A texture as the archive stores it: a DDS file under its name in the client's form (eqTextures.clientDDS), any other image as an
+  uncompressed DDS."""
   name = os.path.basename(path).lower()
   data = Path(path).read_bytes()
   if data[:4] == b"DDS ":
     if not name.endswith(".dds"):
       raise ValueError(f"{path} holds DDS data under another extension")
-    return name, data
+    return name, eqTextures.clientDDS(data)
   with Image.open(path) as image:
     rgba = numpy.asarray(image.convert("RGBA"))
   return os.path.splitext(name)[0] + ".dds", eqgWriter.ddsBytes(rgba)

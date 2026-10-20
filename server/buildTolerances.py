@@ -33,9 +33,9 @@ approachGroundReach = 4.0
 # as a cliff, where materials meet without one.
 transitionGroundNormalZ = 0.5
 # The client draws no placed model of more triangles than this. In the spare's dump the largest models that drew had 4,852 triangles and
-# 4,831 vertices (a chandelier) and 4,410 triangles (a fall's part); the smallest that drew nothing had 6,426 triangles and 7,177 vertices
-# (a river's part). The limit lies between, and this keeps a water mesh (about 1.3 vertices a triangle) under both. A mesh of more is split
-# into parts (bridgeSplit) and export refuses one that is not.
+# 4,831 vertices (a chandelier) and a river's parts of 3,506 triangles and 5,097 vertices; the smallest that drew nothing had 6,426
+# triangles and 7,177 vertices (a river's part). The limit lies between the triangle counts. A mesh of more is split into parts
+# (bridgeSplit) and export refuses one that is not.
 maxModelTriangles = 3600
 # A view's lane tint covers a face whose normal z is at least this, a floor players stand or slide on; a steeper face is a wall beside
 # the lane's floors, or something standing on them, and stays untinted.

@@ -1755,7 +1755,7 @@ async def checkExport(context: Context, path: str, purpose: str):
   " of its own, a bridge, flight, or walkway one model (or terrain, laid in the terrain collection), and a wall its section piece's"
   " model, one model per distinct shear, and its post's. createMaterial materials export as the client's shaders:"
   " Opaque_MaxC1.fx (diffuse only; a normal map stays in the work file), a cutout as Chroma_MPLBasicAT.fx;"
-  " createLiquidMaterial materials as its water, waterfall, and lava shaders with their values. DDS textures are stored unchanged, others"
+  " createLiquidMaterial materials as its water, waterfall, and lava shaders with their values. DDS textures are stored in the client's form (mipmap count 0 where the header flags none), others"
   " as uncompressed DDS. The swim volumes go into the .zon as AWT_ (water) and ALV_ (lava) regions as they stand (export derives none)"
   " and the zone lines as ATP_ regions, unturned. The boundaries (placeBoundaryWall, placeBoundaryPlane) go into the terrain as"
   " triangles without a material, which the client never draws but collides with (flag 0), a wall's facing both ways and a lid's down"
