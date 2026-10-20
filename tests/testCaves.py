@@ -257,6 +257,55 @@ result = {'faces': kept, 'sources': sources, 'snapped': snapped}
     assert checked["edgesOnThreeOrMoreFaces"] == 0 and checked["openEdges"] == borderEdges
 
 
+def testTheCavesPatchTakesInTheHolesInTheReachAndRefusesOnlyWhatNoGroundFills(stageBlenderServer, tmp_path):
+  # A grid of triangles; the patch is the faces whose centers lie within 3.5 of the origin on both axes, less the faces round the origin's
+  # vertex (a pinhole) or the eight triangles of the four cells about it.
+  holes = r"""
+import bmesh, numpy
+import bridgeCaves
+editor = bmesh.new()
+bmesh.ops.create_grid(editor, x_segments=8, y_segments=8, size=4)
+bmesh.ops.triangulate(editor, faces=list(editor.faces))
+editor.verts.ensure_lookup_table()
+editor.faces.ensure_lookup_table()
+centers = {face: face.calc_center_median() for face in editor.faces}
+inside = [face for face in editor.faces if abs(centers[face].x) < 3.5 and abs(centers[face].y) < 3.5]
+insideSet = set(inside)
+origin = min(editor.verts, key=lambda vertex: vertex.co.length)
+pinhole = [face for face in inside if origin not in face.verts]
+cells = [face for face in inside if max(abs(centers[face].x), abs(centers[face].y)) >= 1]
+positions = numpy.array([list(vertex.co) for vertex in editor.verts])
+free = [False] * len(editor.faces)
+lined = free[:]
+lined[next(face for face in inside if face not in set(cells)).index] = True
+border = [edge for face in inside for edge in face.edges if sum(other in insideSet for other in edge.link_faces) == 1]
+result = {
+  'inside': len(inside), 'pinhole': [len(pinhole), len(bridgeCaves.closedPatch(pinhole, free))],
+  'cells': [len(cells), len(bridgeCaves.closedPatch(cells, free))], 'lined': [len(cells), len(bridgeCaves.closedPatch(cells, lined))],
+  'whole': len(bridgeCaves.closedPatch(inside, free)), 'border': len(border),
+  'rings': [len(bridgeCaves.patchBoundary(bridgeCaves.closedPatch(patch, free), positions)) for patch in (pinhole, cells, inside)],
+}
+try:
+  bridgeCaves.patchBoundary(bridgeCaves.closedPatch(cells, lined), positions)
+except ValueError as error:
+  result['refusal'] = str(error)
+editor.free()
+"""
+
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    return (await session.expectSuccess("runPython", {"code": holes}))["result"]
+
+  found = stageBlenderServer.session(steps)
+  # Each hole's faces join the patch, so it comes out as the patch with no hole does (which also fills its jagged edge's notches) and its
+  # edge is one loop; a hole holding a face another cave's lining marks is left, and the refusal then says the edge has a second loop
+  # and where.
+  assert found["pinhole"][0] == found["inside"] - 6 and found["cells"][0] == found["inside"] - 8
+  assert found["pinhole"][1] == found["cells"][1] == found["whole"] > found["inside"]
+  assert found["rings"][0] == found["rings"][1] == found["rings"][2] and found["lined"][1] < found["whole"]
+  assert "first loop only" in found["refusal"] and "vertices of the other loops lie near [[" in found["refusal"]
+
+
 def testPiecesOfGroundAtTheMouthStayInTheirTrianglesPlanes(stageBlenderServer, tmp_path):
   # Each piece of ground the cut left at the mouth against the plane of the ground triangle it is a piece of: the angle between them.
   readTilts = r"""

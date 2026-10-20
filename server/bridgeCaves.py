@@ -56,6 +56,8 @@ breakupOctaves = 3
 breakupRoughness = 0.5
 patchChunk = 2048
 patchRounds = 8
+# A hole in the patch holds at most this many faces of ground; a gap of more is no hole in the reach but a region round it.
+holeFaceLimit = 2000
 # A blind end's rows run round its quarter ellipse down to this share of the section, then close on an apex.
 endShrink = 0.3
 endRows = 16
@@ -1534,14 +1536,53 @@ def removeTemporary(sceneObject):
   bpy.data.meshes.remove(mesh)
 
 
+def holeFaces(patchSet, excluded):
+  """The faces of ground that fill the holes in the patch (the reach's edge fell between a vertex and its neighbors, leaving a few
+  faces of ground out of a patch round them): each loop of the patch's edge but the longest is a hole, and the ground faces inside it, found
+  from the faces across its edges, join the patch. A hole holding a face excluded marks, or running past holeFaceLimit faces, is left."""
+  boundary = [edge for face in patchSet for edge in face.edges if sum(other in patchSet for other in edge.link_faces) == 1]
+  byVertex = {}
+  for edge in boundary:
+    for vertex in edge.verts:
+      byVertex.setdefault(vertex, []).append(edge)
+  seen, loops = set(), []
+  for edge in boundary:
+    if edge in seen:
+      continue
+    loop, stack = [], [edge]
+    while stack:
+      current = stack.pop()
+      if current in seen:
+        continue
+      seen.add(current)
+      loop.append(current)
+      for vertex in current.verts:
+        stack.extend(byVertex[vertex])
+    loops.append(loop)
+  filled = set()
+  for loop in sorted(loops, key=len)[:-1]:
+    region = set()
+    queue = [face for edge in loop for face in edge.link_faces if face not in patchSet]
+    while queue and len(region) <= holeFaceLimit:
+      face = queue.pop()
+      if face in region:
+        continue
+      region.add(face)
+      queue.extend(other for edge in face.edges for other in edge.link_faces if other not in patchSet and other not in region)
+    if len(region) <= holeFaceLimit and not any(excluded[face.index] for face in region):
+      filled |= region
+  return filled
+
+
 def closedPatch(patch, excluded):
-  """The patch with its notches filled: the faces around a vertex its edge passes through twice (two of its faces meeting at a corner),
-  and faces all of whose corners it holds, taken in until there are none; never a face whose index excluded marks (another cave's
-  lining, which the patch passes over or under)."""
+  """The patch with its notches and holes filled: the faces around a vertex its edge passes through twice (two of its faces meeting at a
+  corner), faces all of whose corners it holds, and the ground inside each hole in it (holeFaces), taken in until there are none; never a
+  face whose index excluded marks (another cave's lining, which the patch passes over or under)."""
   patchSet = set(patch)
   for _ in range(patchRounds):
     vertices = {vertex for face in patchSet for vertex in face.verts}
     added = {face for vertex in vertices for face in vertex.link_faces if face not in patchSet and not excluded[face.index] and all(corner in vertices for corner in face.verts)}
+    added |= holeFaces(patchSet, excluded)
     for vertex in vertices:
       if sum(1 for edge in vertex.link_edges if sum(face in patchSet for face in edge.link_faces) == 1) > 2:
         added |= {face for face in vertex.link_faces if face not in patchSet and not excluded[face.index]}
@@ -1551,8 +1592,9 @@ def closedPatch(patch, excluded):
   raise ValueError(f"The ground within the cave's reach still pinches after {patchRounds} rounds of filling it in (an arch, an overhang, or a hole in the same mesh lies within reach of the path); keep the cave clear of it")
 
 
-def patchBoundary(patch):
-  """The patch's edge as one loop of vertex indices, wound as its faces wind it (inside on the left seen from above)."""
+def patchBoundary(patch, positions):
+  """The patch's edge as one loop of vertex indices, wound as its faces wind it (inside on the left seen from above); `positions` are
+  the vertices' places, which a refusal names."""
   patchSet = set(patch)
   following = {}
   for face in patch:
@@ -1568,9 +1610,12 @@ def patchBoundary(patch):
     if len(ring) > len(following):
       break
   if len(ring) != len(following):
+    others = sorted(set(following) - set(ring))
+    where = [roundedPoint(positions[index]) for index in others[:4]]
     raise ValueError(
       f"The ground within the cave's reach is not one piece without holes: its edge runs {len(following)} vertices, its first loop only"
-      f" {len(ring)} (an arch, an overhang, or a hole in the same mesh lies within reach of the path); keep the cave clear of it"
+      f" {len(ring)} (an arch, an overhang, or a hole in the same mesh lies within reach of the path; vertices of the other loops lie near {where});"
+      " keep the cave clear of it"
     )
   return ring
 
@@ -1824,7 +1869,8 @@ def spliceInto(editor, sceneObject, name, definition, shown, inverse, layers, pa
       f"The ground within the cave's reach holds {len(doubledGround)} pair(s) of faces on the same corners, near {where} (ground folded onto itself by an"
       " earlier shaping); smooth the ground there (sculptAtPoint smooth) or move the cave"
     )
-  ring = patchBoundary(patch)
+  matrix = numpy.linalg.inv(inverse)
+  ring = patchBoundary(patch, numpy.asarray(shown) @ matrix[:3, :3].T + matrix[:3, 3])
   patchVertices = sorted({vertex.index for face in patch for vertex in face.verts})
   localIndex = {vertex: position for position, vertex in enumerate(patchVertices)}
   firsts = numpy.cumsum([0] + [len(run["faces"]) for run in tubes.values()])
