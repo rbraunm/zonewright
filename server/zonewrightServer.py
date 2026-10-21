@@ -59,6 +59,7 @@ import previewFrame
 import recastHelper
 import resultReports
 import serverMapFiles
+import ledgerRun
 import serverNav
 import serverRows
 import skyDrawing
@@ -5549,6 +5550,23 @@ async def undeployZone(context: Context, shortName: str, zoneId: int, target: st
   except ValueError as error:
     raise ToolError(str(error)) from error
   return {"zone": request["zone"], "target": target} | result
+
+
+@guardedTool(description=(
+  "Run a claudeperidot change ledger command (claudeperidot/tools/ledger.py, under the ledger's own Python). Every change to Claude's"
+  " test server and the spare client goes through the ledger so it is recorded before it runs and reverts; Peridot is never written."
+  " `status`: every change's state, read live, beside plan.md's step in progress (no `change`). `stage` `change`: saves the rows or"
+  " files the change touches and commits and pushes it before it runs. `apply` `change`: runs a staged change, checks it, rewrites"
+  " plan.md, commits and pushes; finishes an interrupted apply. `revert` `change`: undoes an applied change unless what it touched"
+  " changed since apply; finishes an interrupted revert. `change` is the change's number or folder name. A client-files change"
+  " needs the spare client closed. Returns the ledger's output lines; its own refusal comes back as the error."
+))
+async def runLedger(context: Context, command: str, change: str | None = None):
+  try:
+    lines = await anyio.to_thread.run_sync(ledgerRun.runLedger, command, change)
+  except ValueError as error:
+    raise ToolError(str(error)) from error
+  return {"command": command, "change": change, "output": lines}
 
 
 serverSourcePaths = loadedServerSources()
