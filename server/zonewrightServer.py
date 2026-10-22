@@ -1551,7 +1551,8 @@ exportChecksHelp = (
   " purpose is \"test\" (quick renders and test loads) or \"game\" (files for the EQ client and server). Both refuse the hard errors:"
   " the file unsaved; objects export cannot take (a non-mesh in the terrain collection, or among a placed collection's members, to any"
   " depth, anything but meshes and collection instances; a placed model scaled unevenly; model names that collide; a placed model of more triangles than the client draws, 3,600, which splitObject fixes); a placed kit piece or"
-  " building, or a structure, whose kit file or collection cannot be found; two materials that would share one name in the archive (a"
+  " building, or a structure, whose kit file or collection cannot be found, or a placement set to draw a collection that names none (its kit collection left the file:"
+  " lay its structure again); two materials that would share one name in the archive (a"
   " kit's material and the zone's own of one name export apart, the kit's as <name>_<kit file stem>);"
   " faces with no material or a material createMaterial or createLiquidMaterial did not"
   " make; a missing, packed, generated, or other-drive image, a non-DDS image whose sides are not powers of two, DDS data under another"
@@ -4256,7 +4257,7 @@ async def setSurfaceLayer(context: Context, objectName: str, name: str, muted: b
 
 @guardedTool()
 async def removeSurfaceLayer(context: Context, objectName: str, name: str):
-  """Remove a surfacing layer and what it painted."""
+  """Remove a surfacing layer and what it painted, and the strokes kept with the mesh's caves that painted it (a later cut would refuse them)."""
   return await callBridge(context, "removeSurfaceLayer", {"objectName": objectName, "name": name})
 
 

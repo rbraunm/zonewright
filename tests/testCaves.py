@@ -82,6 +82,10 @@ result = {
   'piecesOffTheirSource': int(sum(materials[face] != record['plug'][faceTags[face] - 1]['material'] for face in pieces)), 'pieces': len(pieces),
 }
 """
+readKeptStrokes = """
+import json
+result = len(json.loads(bpy.data.objects['ground']['zonewrightCaves'])['hall']['paint'])
+"""
 readLiningMaterials = r"""
 import numpy
 import bridgeMeshAccess
@@ -183,9 +187,13 @@ def testACaveIsCutSealedWalkableAndSurfacedAndItsLiningStrokesComeBack(stageBlen
     caveFloor = await session.expectSuccess("paintSurface", {"objectName": "ground", "layer": "moss", "material": "rock", "selector": {"and": [{"cave": "hall"}, {"slope": {"minimumDegrees": 0, "maximumDegrees": 20}}]}})
     recut = await session.expectSuccess("editCave", {"objectName": "ground", "name": "hall", "changes": {"heights": [45, 45, 45, 66, 66]}})
     repainted = (await session.expectSuccess("runPython", {"code": readLiningMaterials}))["result"]
-    return cut, checked, walk, surfacing, everywhere, caveFloor, recut, repainted
+    await session.expectSuccess("removeSurfaceLayer", {"objectName": "ground", "name": "moss"})
+    strokesLeft = (await session.expectSuccess("runPython", {"code": readKeptStrokes}))["result"]
+    refit = await session.expectSuccess("editCave", {"objectName": "ground", "name": "hall"})
+    unpainted = (await session.expectSuccess("runPython", {"code": readLiningMaterials}))["result"]
+    return cut, checked, walk, surfacing, everywhere, caveFloor, recut, repainted, strokesLeft, refit, unpainted
 
-  cut, checked, walk, surfacing, everywhere, caveFloor, recut, repainted = stageBlenderServer.session(steps)
+  cut, checked, walk, surfacing, everywhere, caveFloor, recut, repainted, strokesLeft, refit, unpainted = stageBlenderServer.session(steps)
   # Watertight: no edge on three or more faces and no open edge but the grid's border; the ring follows its plug triangles in the
   # mesh and every pass, the lining stands still in all of them, and every plug id is carried once.
   assert checked["edgesOnThreeOrMoreFaces"] == 0 and checked["openEdges"] == borderEdges
@@ -204,6 +212,8 @@ def testACaveIsCutSealedWalkableAndSurfacedAndItsLiningStrokesComeBack(stageBlen
   # A stroke that does not name the cave leaves its lining alone; one that names it paints it, and is painted again on the next cut.
   assert everywhere["painted"] > 0 and caveFloor["painted"] > 0
   assert recut["cut"]["liningFaces"] > 0 and repainted == {"floor": ["rock"], "walls": ["caveRock"]}
+  # The layer removed, the stroke kept with the cave goes with it: the next cut paints nothing into it and the lining takes its own materials.
+  assert strokesLeft == 0 and refit["cut"]["liningFaces"] > 0 and unpainted == {"floor": ["caveFloor"], "walls": ["caveRock"]}
 
 
 def testFineCutsCloseWhereTheTubesEndStandsOnTheGround(stageBlenderServer, tmp_path):

@@ -26,6 +26,7 @@ import bridgeEnvironment
 import bridgeGrading
 import bridgeHousing
 import bridgeMeshAccess
+import bridgeStructureData
 import bridgeSurfacing
 import bridgeSwim
 
@@ -64,7 +65,7 @@ def exclusionReason(sceneObject):
     return None
   if sceneObject.hide_render:
     return "hidden from renders"
-  if sceneObject.type == "EMPTY" and not bridgeEnvironment.isEmitter(sceneObject) and not bridgeMeshAccess.isCollectionInstance(sceneObject):
+  if sceneObject.type == "EMPTY" and not bridgeEnvironment.isEmitter(sceneObject) and not bridgeMeshAccess.isCollectionInstance(sceneObject) and sceneObject.instance_type != "COLLECTION":
     return "an empty with nothing to export"
   return None
 
@@ -112,6 +113,8 @@ def classifyObjects():
       shipped.append((sceneObject, "mesh"))
     elif bridgeMeshAccess.isCollectionInstance(sceneObject):
       shipped.append((sceneObject, "instance"))
+    elif sceneObject.type == "EMPTY" and sceneObject.instance_type == "COLLECTION":
+      failures.append(placementWithoutCollection(sceneObject))
     else:
       failures.append({"failure": "not a mesh", "object": sceneObject.name, "message": f"'{sceneObject.name}' is a {sceneObject.type}; zone export takes meshes and collection instances"})
   if terrainCollection is None or not any(member.type == "MESH" for member in terrainCollection.all_objects):
@@ -119,6 +122,19 @@ def classifyObjects():
   elif not any(role == "terrain" for _, role in shipped):
     failures.append({"failure": "no terrain", "message": f"Every mesh in the '{terrainCollectionName}' collection is left out: {[entry for entry in excluded if entry['object'] in terrainNames]}"})
   return shipped, sorted(excluded, key=lambda entry: entry["object"]), failures
+
+
+def placementWithoutCollection(sceneObject):
+  """A placement set to draw a collection that names none (its kit collection left the file) draws nothing, so it is refused, not skipped."""
+  structure = sceneObject.get(bridgeStructureData.partProperty)
+  failure = {"failure": "placement without a collection", "object": sceneObject.name, "at": [round(float(value), 1) for value in sceneObject.matrix_world.translation]}
+  if structure is not None:
+    failure["structure"] = structure
+    remedy = f"lay '{structure}' again (editStructure) or take it back (removeStructure)"
+  else:
+    remedy = "place it again or delete it"
+  failure["message"] = f"'{sceneObject.name}' is set to place a collection but names none (its kit collection left the file), so it draws nothing; {remedy}"
+  return failure
 
 
 def exportedObjects():

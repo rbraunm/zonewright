@@ -327,6 +327,7 @@ def removeSurfaceLayer(objectName, name):
     if attributeName in mesh.attributes:
       mesh.attributes.remove(mesh.attributes[attributeName])
   sceneObject[layerOrderProperty] = json.dumps(layers)
+  dropCaveStrokesOf(sceneObject, name)
   described = compose(sceneObject)
   if not layers:
     for attributeName in (baseAttributeName, bridgeSurfacing.baseMappingName):
@@ -334,6 +335,16 @@ def removeSurfaceLayer(objectName, name):
         mesh.attributes.remove(mesh.attributes[attributeName])
     del sceneObject[layerOrderProperty]
   return described
+
+
+def dropCaveStrokesOf(sceneObject, layer):
+  """Forget the strokes kept with the mesh's caves that painted the layer, which is gone: a later cut would refuse them."""
+  if not bridgeCaveData.holdsCaves(sceneObject):
+    return
+  known = bridgeCaveData.caves(sceneObject)
+  for record in known.values():
+    record["paint"] = [stroke for stroke in record["paint"] if stroke["arguments"]["layer"] != layer]
+  bridgeCaveData.writeCaves(sceneObject, known)
 
 
 def faceCenters(sceneObject):

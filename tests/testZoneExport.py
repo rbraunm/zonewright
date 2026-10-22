@@ -385,6 +385,13 @@ bpy.context.scene.collection.objects.link(placed)
 subdivideLayered = """
 bpy.data.objects['layered'].modifiers.new('rounder', 'SUBSURF')
 """
+orphanPlaced = """
+orphan = bpy.data.objects.new('orphanPlaced', None)
+orphan.instance_type = 'COLLECTION'
+orphan.location = (-40, 0, 0)
+orphan['zonewrightStructurePart'] = 'plazaFront'
+bpy.context.scene.collection.objects.link(orphan)
+"""
 ghostWall = """
 import json
 ghost = bpy.data.objects.new('ghostWall', None)
@@ -426,7 +433,7 @@ def testExportNamesEveryOtherHardErrorWithItsObject(stageBlenderServer, tmp_path
     await session.expectSuccess("placeZoneLine", {"number": 1, "label": "gate", "minimum": [56, -10, 0], "maximum": [64, 10, 30], "target": {"zone": "highpasshold", "x": 0, "y": 0, "z": 0, "headingDegrees": 0}})
     await session.expectSuccess("placeSwimVolume", {"name": "pond", "liquid": "water", "minimum": [-30, -10, -5], "maximum": [-10, 10, 0]})
     await session.expectSuccess("transformObjects", {"names": ["ATP_1_gate", "AWT_pond"], "rotateDegrees": [0, 0, 10]})
-    await session.expectSuccess("runPython", {"code": kitWithAMarker + subdivideLayered + ghostWall})
+    await session.expectSuccess("runPython", {"code": kitWithAMarker + subdivideLayered + ghostWall + orphanPlaced})
     return neverSaved, await session.expectSuccess("checkExport", {"path": str(archivePath), "purpose": "test"})
 
   neverSaved, checked = stageBlenderServer.session(steps)
@@ -436,6 +443,7 @@ def testExportNamesEveryOtherHardErrorWithItsObject(stageBlenderServer, tmp_path
     ("boundary", "bareLid"), ("boundary", "ghostWall"), ("collection holds more than meshes", "kitPlaced"),
     ("DDS data under another extension", "fakeBox"), ("image on another drive than the .blend", "farBox"), ("image packed into the .blend", "packedBox"),
     ("material not made by createMaterial or createLiquidMaterial", "foreignBox"), ("model names collide", ""),
+    ("placement without a collection", "orphanPlaced"),
     ("surfacing layers unlike the exported faces", "layered"), ("swim volume", "AWT_pond"), ("zone line", "ATP_1_gate"),
   ])
   failures = {failure.get("object"): failure for failure in checked["failures"][1:]}
@@ -449,6 +457,11 @@ def testExportNamesEveryOtherHardErrorWithItsObject(stageBlenderServer, tmp_path
   assert failures["kitPlaced"] == {"failure": "collection holds more than meshes", "object": "kitPlaced", "at": [40.0, 40.0, 0.0], "collection": "kit", "members": ["kitMarker"]}
   assert "'layered' has modifiers that change its faces" in failures["layered"]["message"]
   assert failures["ghostWall"] == {"failure": "boundary", "object": "ghostWall", "at": [0.0, -50.0, 0.0], "message": "'ghostWall' is a boundary but a EMPTY; boundaries are meshes"}
+  # A placement whose kit collection left the file draws nothing: refused with its structure, never skipped as an empty.
+  assert failures["orphanPlaced"] == {
+    "failure": "placement without a collection", "object": "orphanPlaced", "at": [-40.0, 0.0, 0.0], "structure": "plazaFront",
+    "message": "'orphanPlaced' is set to place a collection but names none (its kit collection left the file), so it draws nothing; lay 'plazaFront' again (editStructure) or take it back (removeStructure)",
+  }
   assert failures["bareLid"] == {"failure": "boundary", "object": "bareLid", "at": [0.0, 0.0, 0.0], "message": "Boundary 'bareLid' has no faces"}
   assert failures["ATP_1_gate"] == {"failure": "zone line", "object": "ATP_1_gate", "at": [60.0, 0.0, 15.0], "message": "'ATP_1_gate' is turned; zone lines stay square to the axes"}
   assert failures["AWT_pond"] == {"failure": "swim volume", "object": "AWT_pond", "at": [-20.0, 0.0, -2.5], "message": "'AWT_pond' is turned; swim volumes stay square to the axes"}
