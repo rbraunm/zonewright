@@ -348,7 +348,7 @@ def sceneDescription(inputPath):
         "tolerance": seedTolerance(entry["seedFooting"]["normalZ"]), "isolated": entry["kind"] != "safePoint" and entry["isolated"],
         "headingDegrees": entry["headingDegrees"],
       })
-    elif entry["kind"] == "plotEntrance":
+    elif entry["kind"] in ("plotEntrance", "apartmentThreshold"):
       plots.append({"name": entry["name"], "point": entry["at"]})
   seeds.sort(key=lambda seed: seed["kind"] != "safePoint")
   zoneLines = []

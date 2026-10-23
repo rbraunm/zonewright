@@ -39,7 +39,7 @@ laneFindingKinds = (
 )
 laneFindingMessages = {
   "disconnectedEntry": "entries some body group the place is not built for cannot pass both ways to and from the safe point",
-  "unreachedPlot": "plot entrances some body group the place is not built for does not reach",
+  "unreachedPlot": "plot entrances and apartment thresholds some body group the place is not built for does not reach",
   "trap": "places players reach and cannot leave: no way back to where they arrive or to a zone line",
   "viewRegion": "reach into regions planned only to be seen (access view)",
   "unreachedZoneLine": "zone lines some body group does not reach",
@@ -153,11 +153,11 @@ def sideContents(collected, zone):
   """The client side files' bytes by kind. A list left from an earlier export would place emitters or plots this scene no longer has,
   so a list with nothing to say is None, and is removed."""
   housing = collected["housing"]
-  hasPlots = housing is not None and bool(housing["plots"])
+  hasHomes = housing is not None and bool(housing["plots"] or housing["apartments"])
   return {
     "emitterList": eqEmitters.emitterListText(collected["emitters"]).encode("latin1") if collected["emitters"] else None,
-    "housing": json.dumps({"zone": zone} | housing, indent=1).encode("ascii") if hasPlots else None,
-    "assetList": "".join(f"{archive}\r\n" for archive in housing["assets"]).encode("latin1") if hasPlots else None,
+    "housing": json.dumps({"zone": zone} | housing, indent=1).encode("ascii") if hasHomes else None,
+    "assetList": "".join(f"{archive}\r\n" for archive in housing["assets"]).encode("latin1") if hasHomes and housing["assets"] else None,
   }
 
 
@@ -334,7 +334,7 @@ def leakFailure(problem, underworld, numbered="mapReach problem"):
       " an area only its own port reaches is marked isolated (placeEntry), and a place built for other groups says so (builtFor)"
     ),
     "unreachedPlot": (
-      f"The {problem.get('failingGroups')} body groups do not reach the entrance of plot '{problem.get('plot')}', and the place is built"
+      f"The {problem.get('failingGroups')} body groups do not reach the entrance of '{problem.get('plot')}', and the place is built"
       f" for {problem.get('builtFor')}"
     ),
   }[kind]

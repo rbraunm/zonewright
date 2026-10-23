@@ -27,6 +27,7 @@ from buildTolerances import levelProbeLift
 
 housingProperty = "zonewrightHousing"
 plotProperty = "zonewrightPlot"
+apartmentProperty = "zonewrightApartment"
 # The ground a plot is graded on is held by reference, so renaming the ground keeps the grading, and deleting it leaves the reference
 # empty.
 gradingProperty = "zonewrightPlotGrading"
@@ -36,6 +37,12 @@ housingRoles = ("none", "incidental", "featured", "primary")
 # from the zone as a template (its X2, custom neighborhood maps).
 housingPlacements = ("world", "neighborhood")
 plotKinds = ("player", "guild")
+# An apartment is a doorway already built into the zone (a facade's door, a front cut into a wall) that leads into its owner's own
+# instance of a client interior zone: nothing outside the door is the owner's, so it has no border, no yard and no pad, only the
+# threshold players stand on to buy it, a patch [across the door, out from it] in front of the door.
+apartmentKind = "apartment"
+homeKinds = plotKinds + (apartmentKind,)
+stockThreshold = (10.0, 10.0)
 # Plot sizes [across, along] in Peridot's Sunrise Hills content, from Live's neighborhood map and border stones: the median player plot,
 # and the guild plot. A plot's entrance is on one of its across sides; along runs from it to the back.
 stockSizes = {"player": (169.1, 170.1), "guild": (351.2, 699.8)}
@@ -45,17 +52,17 @@ borderArchive = "stonesquare.eqg"
 borderOpenType = 160
 # Pricing at Live's plot limits: the middle tier's 105 items and 5 pets at 84pp, and per item and per pet so that Live's other tiers
 # come out at its prices (90 items and 4 pets 42pp, 120 and 6 126pp); a guild plot 210 items and 12 pets at 21pp; upkeep a tenth of the
-# price a day. Features scale the price.
+# price a day; an apartment, with no yard, 50 items and no pets at 42pp, the lowest plot tier's price. Features scale the price.
 defaultPricing = {
-  "basePlatinum": {"player": 84, "guild": 21},
-  "defaultItems": {"player": 105, "guild": 210},
-  "defaultPets": {"player": 5, "guild": 12},
+  "basePlatinum": {"player": 84, "guild": 21, "apartment": 42},
+  "defaultItems": {"player": 105, "guild": 210, "apartment": 50},
+  "defaultPets": {"player": 5, "guild": 12, "apartment": 0},
   "platinumPerItem": 2.1,
   "platinumPerPet": 10.5,
   "featureMultipliers": {"prominent": 1.5, "secluded": 1.5, "view": 1.25, "waterfront": 1.25, "sheltered": 1.25, "remote": 0.75, "swamp": 0.5},
   "upkeepShare": 0.1,
 }
-guideColors = {"player": (0.1, 0.85, 1.0), "guild": (1.0, 0.3, 0.9)}
+guideColors = {"player": (0.1, 0.85, 1.0), "guild": (1.0, 0.3, 0.9), "apartment": (1.0, 0.75, 0.2)}
 guideBand = 1.5
 guideLift = 0.4
 # The entrance mark is a chevron with its tip on the middle of the entrance side, pointing out, kept within 9 units of that side: there
@@ -120,8 +127,8 @@ def mergedPricing(current, changes):
     else:
       pricing[key] = value
   for kindKey in ("basePlatinum", "defaultItems", "defaultPets"):
-    if set(pricing[kindKey]) != set(plotKinds) or any(value < 0 for value in pricing[kindKey].values()):
-      raise ValueError(f"pricing {kindKey} gives each of {list(plotKinds)} a value of at least 0, got {pricing[kindKey]!r}")
+    if set(pricing[kindKey]) != set(homeKinds) or any(value < 0 for value in pricing[kindKey].values()):
+      raise ValueError(f"pricing {kindKey} gives each of {list(homeKinds)} a value of at least 0, got {pricing[kindKey]!r}")
   if any(value <= 0 for value in pricing["featureMultipliers"].values()):
     raise ValueError(f"Feature multipliers must be positive, got {pricing['featureMultipliers']!r}")
   if not 0 <= pricing["upkeepShare"] <= 1 or pricing["platinumPerItem"] < 0 or pricing["platinumPerPet"] < 0:
@@ -134,8 +141,8 @@ def setZoneHousing(role, intent, placement, plotBudget, pricing, routes):
   if role is not None:
     if role not in housingRoles:
       raise ValueError(f"role is one of {list(housingRoles)}, got '{role}'")
-    if role == "none" and plotObjects():
-      raise ValueError(f"The zone has plots {sorted(plot.name for plot in plotObjects())}; remove them before its housing role is none")
+    if role == "none" and homeObjects():
+      raise ValueError(f"The zone has plots or apartments {[home.name for home in homeObjects()]}; remove them before its housing role is none")
     current["role"] = role
   if intent is not None:
     if not intent.strip():
@@ -146,9 +153,9 @@ def setZoneHousing(role, intent, placement, plotBudget, pricing, routes):
       raise ValueError(f"placement is one of {list(housingPlacements)}, got '{placement}'")
     current["placement"] = placement
   if plotBudget is not None:
-    if set(plotBudget) - set(plotKinds) or any(not isinstance(count, int) or count < 0 for count in plotBudget.values()):
-      raise ValueError(f"plotBudget gives counts of {list(plotKinds)}, got {plotBudget!r}")
-    current["plotBudget"] = {kind: plotBudget.get(kind, 0) for kind in plotKinds}
+    if set(plotBudget) - set(homeKinds) or any(not isinstance(count, int) or count < 0 for count in plotBudget.values()):
+      raise ValueError(f"plotBudget gives counts of {list(homeKinds)}, got {plotBudget!r}")
+    current["plotBudget"] = {kind: plotBudget.get(kind, 0) for kind in homeKinds}
   if pricing is not None:
     current["pricing"] = mergedPricing(current["pricing"], pricing)
   if routes is not None:
@@ -169,16 +176,23 @@ def describeHousing():
   housing = readHousing()
   if housing is None:
     return {"housing": None}
-  plots = [plotRecord(plot, housing) for plot in plotObjects()] if housing["role"] != "none" else []
-  counts = {kind: sum(record["kind"] == kind for record in plots) for kind in plotKinds}
+  decided = housing["role"] != "none"
+  plots = [plotRecord(plot, housing) for plot in plotObjects()] if decided else []
+  apartments = [apartmentRecord(apartment, housing) for apartment in apartmentObjects()] if decided else []
+  counts = {kind: sum(record["kind"] == kind for record in plots) for kind in plotKinds} | {apartmentKind: len(apartments)}
+  return {"housing": housing, "plotCounts": counts, "plots": plots, "apartments": apartments, "overlaps": homeOverlaps()}
+
+
+def homeOverlaps():
+  """Each pair of plots or apartments whose footprints overlap, which export refuses."""
   overlaps = []
-  objects = plotObjects()
-  for index, first in enumerate(objects):
-    for second in objects[index + 1:]:
-      depth = overlapDepth(footprint(first), footprint(second))
+  homes = homeObjects()
+  for index, first in enumerate(homes):
+    for second in homes[index + 1:]:
+      depth = overlapDepth(homeFootprint(first), homeFootprint(second))
       if depth > 0.01:
         overlaps.append({"plots": [first.name, second.name], "depth": round(depth, 2)})
-  return {"housing": housing, "plotCounts": counts, "plots": plots, "overlaps": overlaps}
+  return overlaps
 
 
 # Plots
@@ -197,6 +211,43 @@ def requirePlot(address):
 
 def readPlot(plot):
   return json.loads(plot[plotProperty])
+
+
+def apartmentObjects():
+  return sorted((sceneObject for sceneObject in bpy.context.scene.objects if apartmentProperty in sceneObject), key=lambda apartment: apartment.name)
+
+
+def homeObjects():
+  """Every plot and apartment, by name."""
+  return sorted(plotObjects() + apartmentObjects(), key=lambda home: home.name)
+
+
+def requireApartment(address):
+  apartment = bpy.context.scene.objects.get(address)
+  if apartment is None or apartmentProperty not in apartment:
+    raise ValueError(f"No apartment '{address}'; apartments: {[apartment.name for apartment in apartmentObjects()]}")
+  bpy.context.view_layer.update()
+  return apartment
+
+
+def readApartment(apartment):
+  return json.loads(apartment[apartmentProperty])
+
+
+def apartmentFacing(apartment):
+  """The way the apartment's door faces, out of its wall, as a heading; its guide's +Y (facingOf) points the other way, into the door."""
+  return (facingOf(apartment) + 180) % 360
+
+
+def apartmentFootprint(apartment, margin=0.0):
+  """The threshold patch: its entrance side along the door at the apartment's point, the rest out from the door."""
+  spec = readApartment(apartment)
+  center = numpy.array(apartment.matrix_world.translation[:2]) + frontDirection(apartmentFacing(apartment)) * spec["depth"] / 2
+  return footprintOf(center, facingOf(apartment), [spec["width"], spec["depth"]], margin)
+
+
+def homeFootprint(home, margin=0.0):
+  return footprint(home, margin) if plotProperty in home else apartmentFootprint(home, margin)
 
 
 def facingOf(plot):
@@ -251,8 +302,9 @@ def guideMaterial(kind):
   return material
 
 
-def guideMesh(name, kind, size):
-  """The plot's outline as a band just inside its edges, and a chevron pointing out of the middle of its entrance side (local +Y)."""
+def guideMesh(name, kind, size, originAtEntrance=False):
+  """The home's outline as a band just inside its edges, and a chevron pointing out of the middle of its entrance side (local +Y);
+  its origin is the outline's center, or with originAtEntrance the middle of its entrance side (an apartment's door)."""
   across, along = size
   halfAcross, halfAlong = across / 2, along / 2
   outer = [(halfAcross, halfAlong), (-halfAcross, halfAlong), (-halfAcross, -halfAlong), (halfAcross, -halfAlong)]
@@ -268,6 +320,8 @@ def guideMesh(name, kind, size):
     (-entranceSpan / 2, armBack), (-entranceSpan / 2, armBack - thickness),
   )]
   faces += [(base + 2, base, base + 1, base + 3), (base + 1, base, base + 4, base + 5)]
+  if originAtEntrance:
+    vertices = [(x, y - halfAlong, z) for x, y, z in vertices]
   mesh = bpy.data.meshes.new(name)
   mesh.from_pydata(vertices, [], faces)
   mesh.validate()
@@ -329,12 +383,13 @@ def seatGround(centers):
 
 
 def seatHeight(center):
-  """The ungraded ground's height at a plot's center; refused where there is none, or where rock lies over ground and either could be meant."""
+  """The ungraded ground's height at a plot's center or an apartment's threshold; refused where there is none, or where rock lies over
+  ground and either could be meant."""
   height, levels = seatGround([center])[0]
   if height is None:
-    raise ValueError(f"No ground under {center} to set the plot on")
+    raise ValueError(f"No ground under {center} to stand on")
   if levels is not None:
-    raise ValueError(f"A plot's ground is a choice here: {bridgeMeshAccess.describeRockOverGround(center, levels)}; give the plot its height, the ground under the rock or its top")
+    raise ValueError(f"The ground is a choice here: {bridgeMeshAccess.describeRockOverGround(center, levels)}; give the height meant, the ground under the rock or its top")
   return height
 
 
@@ -365,6 +420,27 @@ def plotPrice(spec, housing):
   price = pricing["basePlatinum"][kind] * area / stockArea
   if abs(area - stockArea) > 1e-6:
     steps.append({"step": f"area {area / stockArea:.2f} of a stock plot", "platinum": round(price, 2)})
+  return pricedWithAllowances(spec, kind, price, steps, pricing)
+
+
+def apartmentPrice(spec, housing):
+  """The apartment's price: the apartment base (it has no area to scale by), plus or less its item and pet allowances against the
+  apartment defaults, times each feature's multiplier; or its override."""
+  pricing = requireApartmentPricing(housing)
+  base = pricing["basePlatinum"][apartmentKind]
+  return pricedWithAllowances(spec, apartmentKind, base, [{"step": "apartment base", "platinum": base}], pricing)
+
+
+def requireApartmentPricing(housing):
+  """The zone's pricing, which prices apartments; a decision made before the zone priced apartments is refused until it does."""
+  pricing = housing["pricing"]
+  missing = [key for key in ("basePlatinum", "defaultItems", "defaultPets") if apartmentKind not in pricing[key]]
+  if missing:
+    raise ValueError(f"The zone's pricing has no apartment rules in {missing}; setZoneHousing pricing gives apartment its basePlatinum, defaultItems and defaultPets first")
+  return pricing
+
+
+def pricedWithAllowances(spec, kind, price, steps, pricing):
   itemChange = (spec["items"] - pricing["defaultItems"][kind]) * pricing["platinumPerItem"]
   petChange = (spec["pets"] - pricing["defaultPets"][kind]) * pricing["platinumPerPet"]
   if itemChange:
@@ -390,6 +466,15 @@ def plotRecord(plot, housing):
     "facingDegrees": round(facingOf(plot), 2), "size": spec["size"], "items": spec["items"], "pets": spec["pets"], "tags": spec["tags"],
     "border": None if border is None else {"size": round(border.scale[0] * 100)}, "grading": gradingRecord(plot),
   } | plotPrice(spec, housing)
+
+
+def apartmentRecord(apartment, housing):
+  spec = readApartment(apartment)
+  return {
+    "address": apartment.name, "kind": apartmentKind, "threshold": bridgeObjects.roundVector(apartment.matrix_world.translation, 2),
+    "facingDegrees": round(apartmentFacing(apartment), 2), "interior": spec["interior"], "width": spec["width"], "depth": spec["depth"],
+    "items": spec["items"], "pets": spec["pets"], "tags": spec["tags"],
+  } | apartmentPrice(spec, housing)
 
 
 def placePlot(address, kind, center, facingDegrees, size, height, items, pets, tags, pricePlatinum, borderFolder, collection):
@@ -435,9 +520,9 @@ def requireAllowances(spec):
     raise ValueError(f"items is a whole number of at least 1 and pets at least 0, got {spec['items']!r} and {spec['pets']!r}")
 
 
-def overlapsOf(plot):
-  mine = footprint(plot)
-  return [{"plot": other.name, "depth": round(depth, 2)} for other in plotObjects() if other != plot for depth in [overlapDepth(mine, footprint(other))] if depth > 0.01]
+def overlapsOf(home):
+  mine = homeFootprint(home)
+  return [{"plot": other.name, "depth": round(depth, 2)} for other in homeObjects() if other != home for depth in [overlapDepth(mine, homeFootprint(other))] if depth > 0.01]
 
 
 def editPlot(address, newAddress, kind, center, facingDegrees, size, height, items, pets, tags, pricePlatinum, objectName, borderFolder):
@@ -551,6 +636,109 @@ def removePlot(address, keepGrading):
   bpy.data.objects.remove(plot)
   bpy.data.meshes.remove(guide)
   return {"removed": removed, "grading": None if plan is None else bridgeGrading.applyPlots(plan)[0] | bridgeGrading.settledAfter(plan["object"])}
+
+
+# Apartments
+
+def requireExtent(name, value):
+  if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+    raise ValueError(f"{name} is the threshold's extent in units, positive, got {value!r}")
+  return float(value)
+
+
+def requireInterior(interior):
+  if not isinstance(interior, str) or not interior.strip():
+    raise ValueError("interior names the client zone the door leads into, such as phinterior1a1")
+  return interior.strip()
+
+
+def requireThreshold(threshold):
+  if len(threshold) != 2:
+    raise ValueError(f"threshold is [x, y], got {threshold!r}")
+  return [float(value) for value in threshold]
+
+
+def placeApartment(address, threshold, facingDegrees, interior, height, width, depth, items, pets, tags, pricePlatinum, collection):
+  housing = requireHousing()
+  pricing = requireApartmentPricing(housing)
+  if not address.strip():
+    raise ValueError("An apartment needs its address, such as 3 Ferry Row")
+  bridgeObjects.requireNewName(address)
+  threshold = requireThreshold(threshold)
+  spec = {
+    "interior": requireInterior(interior), "width": requireExtent("width", width), "depth": requireExtent("depth", depth),
+    "items": pricing["defaultItems"][apartmentKind] if items is None else items,
+    "pets": pricing["defaultPets"][apartmentKind] if pets is None else pets,
+    "tags": requireTags(tags or [], housing), "priceOverride": requirePrice(pricePlatinum),
+  }
+  requireAllowances(spec)
+  if height is None:
+    height = seatHeight(threshold)
+  apartment = bpy.data.objects.new(address, guideMesh(address, apartmentKind, [spec["width"], spec["depth"]], originAtEntrance=True))
+  apartment[apartmentProperty] = json.dumps(spec)
+  apartment[bridgeMeshAccess.guideProperty] = True
+  apartment.location = (threshold[0], threshold[1], height)
+  apartment.rotation_euler = (0, 0, -math.radians(facingDegrees + 180))
+  bridgeObjects.targetCollection(collection or housingCollectionName).objects.link(apartment)
+  bpy.context.view_layer.update()
+  return apartmentRecord(apartment, housing) | {"overlaps": overlapsOf(apartment)}
+
+
+def editApartment(address, newAddress, threshold, facingDegrees, height, interior, width, depth, items, pets, tags, pricePlatinum):
+  housing = requireHousing()
+  apartment = requireApartment(address)
+  spec = readApartment(apartment)
+  if all(change is None for change in (newAddress, threshold, facingDegrees, height, interior, width, depth, items, pets, tags, pricePlatinum)):
+    raise ValueError("editApartment needs something to change")
+  if interior is not None:
+    spec["interior"] = requireInterior(interior)
+  if width is not None:
+    spec["width"] = requireExtent("width", width)
+  if depth is not None:
+    spec["depth"] = requireExtent("depth", depth)
+  if items is not None:
+    spec["items"] = items
+  if pets is not None:
+    spec["pets"] = pets
+  requireAllowances(spec)
+  if tags is not None:
+    spec["tags"] = requireTags(tags, housing)
+  if pricePlatinum is not None:
+    spec["priceOverride"] = None if pricePlatinum == 0 else requirePrice(pricePlatinum)
+  name = apartment.name
+  if newAddress is not None and newAddress != apartment.name:
+    if not newAddress.strip():
+      raise ValueError("An apartment needs its address")
+    bridgeObjects.requireNewName(newAddress)
+    name = newAddress
+  location = numpy.array(apartment.matrix_world.translation)
+  if threshold is not None:
+    location[:2] = requireThreshold(threshold)
+    if height is None:
+      location[2] = seatHeight(threshold)
+  if height is not None:
+    location[2] = height
+  apartment.name = name
+  apartment.data.name = name
+  apartment.location = location.tolist()
+  if facingDegrees is not None:
+    apartment.rotation_euler = (0, 0, -math.radians(facingDegrees + 180))
+  apartment[apartmentProperty] = json.dumps(spec)
+  if width is not None or depth is not None:
+    oldMesh = apartment.data
+    apartment.data = guideMesh(apartment.name, apartmentKind, [spec["width"], spec["depth"]], originAtEntrance=True)
+    bpy.data.meshes.remove(oldMesh)
+  bpy.context.view_layer.update()
+  return apartmentRecord(apartment, housing) | {"overlaps": overlapsOf(apartment)}
+
+
+def removeApartment(address):
+  apartment = requireApartment(address)
+  removed = apartment.name
+  guide = apartment.data
+  bpy.data.objects.remove(apartment)
+  bpy.data.meshes.remove(guide)
+  return {"removed": [removed]}
 
 
 def gradePassName(address):
@@ -835,11 +1023,21 @@ def entrancePoint(plot):
   return numpy.append(center[:2] + frontDirection(facingOf(plot)) * (readPlot(plot)["size"][1] / 2 + entranceReach), center[2])
 
 
+def thresholdPoint(apartment):
+  """Where players stand to buy an apartment: the middle of its threshold patch, out from the door, at the door's height."""
+  point = numpy.array(apartment.matrix_world.translation)
+  return numpy.append(point[:2] + frontDirection(apartmentFacing(apartment)) * readApartment(apartment)["depth"] / 2, point[2])
+
+
 def plotEntrances():
-  """Each plot's entrance (entrancePoint), facing into the plot: [{plot, at, headingDegrees}]."""
+  """Each plot's entrance (entrancePoint), facing into the plot, then each apartment's threshold (thresholdPoint), facing into its
+  door: [{plot, kind, at, headingDegrees}]."""
   return [
-    {"plot": plot.name, "at": [round(float(value), 3) + 0.0 for value in entrancePoint(plot)], "headingDegrees": round((facingOf(plot) + 180) % 360, 3)}
+    {"plot": plot.name, "kind": "plot", "at": [round(float(value), 3) + 0.0 for value in entrancePoint(plot)], "headingDegrees": round((facingOf(plot) + 180) % 360, 3)}
     for plot in plotObjects()
+  ] + [
+    {"plot": apartment.name, "kind": apartmentKind, "at": [round(float(value), 3) + 0.0 for value in thresholdPoint(apartment)], "headingDegrees": round(facingOf(apartment), 3)}
+    for apartment in apartmentObjects()
   ]
 
 
@@ -1013,22 +1211,23 @@ def serverPoint(point):
 
 def collectHousing():
   """The zone's housing for its housing file: its decision, each plot as Peridot's plot content gives one (address, border door,
-  center in the server's axes, EQ heading, size across and along, price, item capacity, pets), and the border doors. None when the
-  zone has neither a decision nor plots."""
+  center in the server's axes, EQ heading, size across and along, price, item capacity, pets), the border doors, and each apartment
+  (address, threshold and the door's heading in the server's axes, the interior zone, the threshold's width and depth, price, item
+  capacity, pets). None when the zone has neither a decision nor plots nor apartments."""
   housing = readHousing()
-  plots = plotObjects()
+  plots, apartments = plotObjects(), apartmentObjects()
   if housing is None:
-    if plots:
-      raise ValueError(f"The zone has plots {[plot.name for plot in plots]} but no housing decision; setZoneHousing")
+    if plots or apartments:
+      raise ValueError(f"The zone has plots or apartments {[home.name for home in homeObjects()]} but no housing decision; setZoneHousing")
     return None
   if housing["role"] == "none":
-    return {"housing": housing, "plots": [], "doors": [], "assets": []}
-  if not plots:
-    raise ValueError(f"The zone's housing is {housing['role']} but it has no plots")
-  for index, first in enumerate(plots):
-    for second in plots[index + 1:]:
-      if overlapDepth(footprint(first), footprint(second)) > 0.01:
-        raise ValueError(f"Plots '{first.name}' and '{second.name}' overlap; the server refuses overlapping plots")
+    return {"housing": housing, "plots": [], "apartments": [], "doors": [], "assets": []}
+  if not plots and not apartments:
+    raise ValueError(f"The zone's housing is {housing['role']} but it has no plots or apartments")
+  overlaps = homeOverlaps()
+  if overlaps:
+    first, second = overlaps[0]["plots"]
+    raise ValueError(f"'{first}' and '{second}' overlap; the server refuses overlapping plots and apartments")
   records, doors = [], []
   for doorNumber, plot in enumerate(plots, 1):
     spec = readPlot(plot)
@@ -1047,7 +1246,17 @@ def collectHousing():
       "pricePlatinum": price["pricePlatinum"], "upkeepPlatinumPerDay": price["upkeepPlatinumPerDay"], "capacity": spec["items"], "pets": spec["pets"],
       "features": spec["tags"],
     })
-  return {"housing": housing, "plots": records, "doors": doors, "assets": [borderArchive]}
+  apartmentRecords = []
+  for apartment in apartments:
+    spec = readApartment(apartment)
+    price = apartmentPrice(spec, housing)
+    apartmentRecords.append({
+      "kind": apartmentKind, "address": apartment.name, "threshold": serverPoint(apartment.matrix_world.translation),
+      "heading": round(eqAxes.eqHeadingFromHeading(apartmentFacing(apartment)), 3), "interior": spec["interior"], "width": spec["width"],
+      "depth": spec["depth"], "pricePlatinum": price["pricePlatinum"], "upkeepPlatinumPerDay": price["upkeepPlatinumPerDay"],
+      "capacity": spec["items"], "pets": spec["pets"], "features": spec["tags"],
+    })
+  return {"housing": housing, "plots": records, "apartments": apartmentRecords, "doors": doors, "assets": [borderArchive] if records else []}
 
 
 commands = {
@@ -1056,6 +1265,9 @@ commands = {
   "placePlot": (placePlot, True),
   "editPlot": (editPlot, True),
   "removePlot": (removePlot, True),
+  "placeApartment": (placeApartment, True),
+  "editApartment": (editApartment, True),
+  "removeApartment": (removeApartment, True),
   "gradePlot": (gradePlot, True),
   "assessPlot": (assessPlot, False),
   "layOutPlots": (layOutPlots, True),

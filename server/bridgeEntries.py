@@ -245,7 +245,8 @@ def listEntries(ground):
     number = bridgeBoundaries.parsedName(line.name)[0]
     entries.append({"name": f"T{number}", "kind": "teleport", "at": roundPoint(point), "headingDegrees": target["headingDegrees"], "source": f"zone line {line.name}"} | ground.state(point))
   for entrance in bridgeHousing.plotEntrances():
-    entries.append({"name": entrance["plot"], "kind": "plotEntrance", "at": entrance["at"], "headingDegrees": entrance["headingDegrees"], "source": f"plot {entrance['plot']}"} | ground.state(entrance["at"]))
+    kind, source = ("plotEntrance", f"plot {entrance['plot']}") if entrance["kind"] == "plot" else ("apartmentThreshold", f"apartment {entrance['plot']}")
+    entries.append({"name": entrance["plot"], "kind": kind, "at": entrance["at"], "headingDegrees": entrance["headingDegrees"], "source": source} | ground.state(entrance["at"]))
   return {"entries": entries, "notFollowed": notFollowed}
 
 

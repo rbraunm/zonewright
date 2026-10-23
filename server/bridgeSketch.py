@@ -508,8 +508,8 @@ def planOverlays(sheets, layers, spots):
     ]
   if "plots" in layers:
     overlays["plots"] = [
-      {"address": plot.name, "corners": [roundPoint(corner) for corner in bridgeHousing.footprint(plot)], "facingDegrees": round(bridgeHousing.facingOf(plot), 1)}
-      for plot in bridgeHousing.plotObjects()
+      {"address": home.name, "corners": [roundPoint(corner) for corner in bridgeHousing.homeFootprint(home)], "facingDegrees": round(bridgeHousing.facingOf(home), 1)}
+      for home in bridgeHousing.homeObjects()
     ]
   if "swim" in layers:
     overlays["swim"] = [{"name": box.name, "liquid": bridgeSwim.readBox(box)["liquid"], "corners": bridgeSwim.boxCorners(box)} for box in bridgeSwim.swimBoxes()]
@@ -660,9 +660,9 @@ def insideStretches(outline, start, along, normal, length):
 
 
 def plotCut(plot, start, along, normal, length):
-  """Where a section's line crosses a plot: its pad, level at the plot's height, and where its entrance side is crossed and which way
-  it faces along the line."""
-  corners = bridgeHousing.footprint(plot)
+  """Where a section's line crosses a plot or an apartment's threshold: its pad, level at its height, and where its entrance side is
+  crossed and which way it faces along the line."""
+  corners = bridgeHousing.homeFootprint(plot)
   stretches = insideStretches(corners, start, along, normal, length)
   if not stretches:
     return None
@@ -1062,7 +1062,7 @@ def sectionCuts(start, end, path, cave, bottom, top, layers):
           merged.setdefault((entry["sheet"], entry["shape"]), entry | {"pieces": []})["pieces"] += pieces
     cuts["sketch"] = list(merged.values())
   if "plots" in layers:
-    for plot in bridgeHousing.plotObjects():
+    for plot in bridgeHousing.homeObjects():
       for leg in legs:
         cut = plotCut(plot, leg.start, leg.along, leg.normal, leg.length)
         if cut is not None:

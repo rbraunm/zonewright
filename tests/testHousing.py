@@ -46,7 +46,7 @@ def testHousingStartsWithTheZonesDecision(stageBlenderServer, tmp_path):
   undecided, incomplete, decided, stillHasPlots, unknownFeature, added = stageBlenderServer.session(steps)
   assert "made no housing decision" in undecided
   assert "needs ['placement', 'plotBudget']" in incomplete
-  assert decided["housing"]["role"] == "featured" and decided["plotCounts"] == {"player": 0, "guild": 0}
+  assert decided["housing"]["role"] == "featured" and decided["plotCounts"] == {"player": 0, "guild": 0, "apartment": 0}
   assert "remove them before its housing role is none" in stillHasPlots
   assert "Features ['haunted'] are not in the zone's pricing" in unknownFeature
   # Pricing changes keep the rest of the rules.
@@ -185,7 +185,7 @@ def testStreetOfPlotsExportsTheZonesHousingFile(stageBlenderServer, tmp_path):
   left, right = laid["placed"][0], laid["placed"][1]
   assert numpy.allclose(left["center"][:2], [-300 + 169.1 / 2, 20 + 170.1 / 2]) and left["facingDegrees"] == 180
   assert numpy.allclose(right["center"][:2], [-300 + 169.1 / 2, -20 - 170.1 / 2]) and right["facingDegrees"] == 0
-  assert exported["housing"] == {"role": "featured", "plots": 6, "file": str(tmp_path / "teststreet_housing.json"), "assetList": str(tmp_path / "teststreet_assets.txt")}
+  assert exported["housing"] == {"role": "featured", "plots": 6, "apartments": 0, "file": str(tmp_path / "teststreet_housing.json"), "assetList": str(tmp_path / "teststreet_assets.txt")}
   plots = {plot["address"]: plot for plot in housingFile["plots"]}
   first = plots["101 Main Street"]
   # The server's axes swap the zone's x and y; facing south (the street) the border's heading is 128 (EQ +x, zone +Y), opening away.
@@ -196,7 +196,7 @@ def testStreetOfPlotsExportsTheZonesHousingFile(stageBlenderServer, tmp_path):
   assert math.dist(doors[first["door"]]["position"][:2], first["center"][:2]) < 1.5
   assert housingFile["housing"]["placement"] == "world" and assets == b"stonesquare.eqg\r\n"
   assert "refused, nothing written: 1 failure(s)" in overlapped and "overlap" in overlapped
-  assert noHousing["housing"] == {"role": "none", "plots": 0, "file": None, "assetList": None}
+  assert noHousing["housing"] == {"role": "none", "plots": 0, "apartments": 0, "file": None, "assetList": None}
   assert not (tmp_path / "teststreet_housing.json").exists() and not (tmp_path / "teststreet_assets.txt").exists()
 
 
@@ -523,3 +523,79 @@ def testLayOutPlotsNumbersEveryPlaceAlongTheStreet(stageBlenderServer, tmp_path)
   assert laid["skipped"] == [{"address": "105 Hill Road", "center": [56.4, 135.7], "reason": "overlaps ['103 Hill Road']"}]
   assert "Addresses ['101 Hill Road', '102 Hill Road', '103 Hill Road', '104 Hill Road', '106 Hill Road'] are taken" in again
   assert "Features ['haunted'] are not in the zone's pricing" in haunted and not any(plot["address"].endswith("Low Road") for plot in housing["plots"])
+
+
+# The stored decision of a zone made before apartments were priced: its pricing without the apartment rules.
+pricingWithoutApartments = """
+import json
+housing = json.loads(bpy.context.scene["zonewrightHousing"])
+for key in ("basePlatinum", "defaultItems", "defaultPets"):
+  housing["pricing"][key].pop("apartment")
+bpy.context.scene["zonewrightHousing"] = json.dumps(housing)
+result = sorted(housing["pricing"]["basePlatinum"])
+"""
+
+
+def testAnApartmentIsADoorIntoAnInteriorInstanceWithNoPlotOfItsOwn(stageBlenderServer, tmp_path):
+  archivePath = tmp_path / "testrow.eqg"
+  door = {"facingDegrees": 180, "interior": "phinterior1a1"}
+
+  async def steps(session):
+    await freshScene(session)
+    await flatGround(session, tmp_path)
+    await session.expectSuccess("setZoneHousing", decision | {"plotBudget": {"player": 0, "apartment": 4}})
+    await session.expectSuccess("runPython", {"code": pricingWithoutApartments})
+    unpriced = await session.expectError("placeApartment", {"address": "1 Ferry Row", "threshold": [0, 50]} | door)
+    await session.expectSuccess("setZoneHousing", {"pricing": {"basePlatinum": {"apartment": 30}, "defaultItems": {"apartment": 50}, "defaultPets": {"apartment": 0}}})
+    unknownInterior = await session.expectError("placeApartment", {"address": "1 Ferry Row", "threshold": [0, 50], "facingDegrees": 180, "interior": "nosuchinterior"})
+    placed = await session.expectSuccess("placeApartment", {"address": "1 Ferry Row", "threshold": [0, 50], "features": ["view"]} | door)
+    overlapping = await session.expectSuccess("placeApartment", {"address": "2 Ferry Row", "threshold": [6, 50], "items": 60} | door)
+    # A balcony 30 up over a door: the ground under it or the balcony's floor could be meant.
+    await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "balcony", "size": [40, 20, 2], "location": [0, 160, 30]})
+    underBalcony = await session.expectError("placeApartment", {"address": "4 Ferry Row", "threshold": [0, 160]} | door)
+    onBalcony = await session.expectSuccess("placeApartment", {"address": "4 Ferry Row", "threshold": [0, 160], "height": 32} | door)
+    entries = await session.expectSuccess("getEntries", {})
+    housing = await session.expectSuccess("getHousing", {})
+    removed = await session.expectSuccess("removeApartment", {"address": "4 Ferry Row"})
+    await session.expectSuccess("deleteObjects", {"names": ["balcony"]})
+    await session.expectSuccess("saveFile", {"path": str(tmp_path / "testrow.blend")})
+    refused = await session.expectError("exportZone", {"path": str(archivePath), "purpose": "test"})
+    moved = await session.expectSuccess("editApartment", {"address": "2 Ferry Row", "newAddress": "3 Ferry Row", "threshold": [40, 50], "width": 8, "depth": 12, "pricePlatinum": 25})
+    await session.expectSuccess("saveFile", {})
+    exported = await session.expectSuccess("exportZone", {"path": str(archivePath), "purpose": "test"})
+    housingFile = json.loads((tmp_path / "testrow_housing.json").read_text())
+    await session.expectSuccess("removeApartment", {"address": "1 Ferry Row"})
+    after = await session.expectSuccess("getHousing", {})
+    return unpriced, unknownInterior, placed, overlapping, underBalcony, onBalcony, entries, housing, refused, moved, removed, exported, housingFile, after
+
+  unpriced, unknownInterior, placed, overlapping, underBalcony, onBalcony, entries, housing, refused, moved, removed, exported, housingFile, after = stageBlenderServer.session(steps)
+  assert "has no apartment rules in ['basePlatinum', 'defaultItems', 'defaultPets']" in unpriced
+  assert "The client registers no zone 'nosuchinterior'" in unknownInterior and "'phinterior1a1'" in unknownInterior
+  assert placed["kind"] == "apartment" and placed["threshold"] == [0.0, 50.0, 0.0] and placed["facingDegrees"] == 180 and placed["interior"] == "phinterior1a1"
+  assert placed["width"] == 10 and placed["depth"] == 10 and placed["items"] == 50 and placed["pets"] == 0 and placed["overlaps"] == []
+  # The apartment base times the view multiplier: no area to scale by.
+  assert placed["pricePlatinum"] == 38 and placed["upkeepPlatinumPerDay"] == 3.8 and [step["step"] for step in placed["steps"]] == ["apartment base", "view x1.25"]
+  # Ten more items than the apartment default at 2.1 each; two 10-wide thresholds 6 apart overlap by 4.
+  assert overlapping["pricePlatinum"] == 51 and overlapping["overlaps"] == [{"plot": "1 Ferry Row", "depth": 4.0}]
+  assert "The ground is a choice here" in underBalcony and onBalcony["threshold"] == [0.0, 160.0, 32.0]
+  thresholds = {entry["name"]: entry for entry in entries["entries"] if entry["kind"] == "apartmentThreshold"}
+  # The threshold entry stands in the middle of the patch, 5 out from a door facing south, facing north into it.
+  assert thresholds["1 Ferry Row"] == {"name": "1 Ferry Row", "kind": "apartmentThreshold", "at": [0.0, 45.0, 0.0], "headingDegrees": 0.0, "source": "apartment 1 Ferry Row", "state": "onFooting"}
+  assert thresholds["4 Ferry Row"]["at"] == [0.0, 155.0, 32.0] and thresholds["4 Ferry Row"]["state"] == "onFooting"
+  assert housing["plotCounts"] == {"player": 0, "guild": 0, "apartment": 3} and housing["overlaps"] == [{"plots": ["1 Ferry Row", "2 Ferry Row"], "depth": 4.0}]
+  assert housing["housing"]["plotBudget"] == {"player": 0, "guild": 0, "apartment": 4} and housing["plots"] == []
+  assert "refused, nothing written" in refused and "'1 Ferry Row' and '2 Ferry Row' overlap" in refused
+  assert moved["address"] == "3 Ferry Row" and moved["threshold"] == [40.0, 50.0, 0.0] and moved["width"] == 8 and moved["depth"] == 12
+  assert moved["pricePlatinum"] == 25 and moved["overridden"] and moved["derivedPlatinum"] == 51 and moved["overlaps"] == []
+  assert removed == {"removed": ["4 Ferry Row"]}
+  assert exported["housing"] == {"role": "featured", "plots": 0, "apartments": 2, "file": str(tmp_path / "testrow_housing.json"), "assetList": None}
+  assert not (tmp_path / "testrow_assets.txt").exists()
+  apartments = {entry["address"]: entry for entry in housingFile["apartments"]}
+  first = apartments["1 Ferry Row"]
+  # The server's axes swap the zone's x and y; a door facing south (zone -Y) has EQ heading 384.
+  assert first["threshold"] == [50.0, 0.0, 0.0] and first["heading"] == 384 and first["interior"] == "phinterior1a1" and first["kind"] == "apartment"
+  assert first["pricePlatinum"] == 38 and first["upkeepPlatinumPerDay"] == 3.8 and first["capacity"] == 50 and first["pets"] == 0 and first["features"] == ["view"]
+  assert first["width"] == 10 and first["depth"] == 10
+  assert apartments["3 Ferry Row"]["threshold"] == [50.0, 40.0, 0.0] and apartments["3 Ferry Row"]["pricePlatinum"] == 25 and apartments["3 Ferry Row"]["width"] == 8
+  assert housingFile["plots"] == [] and housingFile["doors"] == [] and housingFile["assets"] == []
+  assert after["plotCounts"]["apartment"] == 1 and [entry["address"] for entry in after["apartments"]] == ["3 Ferry Row"]

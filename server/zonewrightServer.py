@@ -1576,7 +1576,7 @@ exportChecksHelp = (
   " naming why. A test export lists the scene's gaps as"
   " findings, builds no server side, and says its containment is \"not checked for a test export\". A game check's or export's findings"
   " add the NPC nav's islands (each with whether players reach it: some reached floor within a step of it) and its failed path probes"
-  " (from the safe point to each zone line, stored entry, and plot entrance), and the lane's: traps, reach into view regions, zone lines,"
+  " (from the safe point to each zone line, stored entry, plot entrance, and apartment threshold), and the lane's: traps, reach into view regions, zone lines,"
   " swim boxes, and play floor no player reaches, pools and rivers without swim boxes whose bed players walk, squeeze reach (only a"
   " player shorter than playerHeight passes), a zone line overlapping a swim box (the server reads the overlap as water), no zone lines,"
   " no zoneIn entry, and what the lane does not model and its limits. Findings, never refusals, for both: texture coverage, each with"
@@ -1768,8 +1768,9 @@ async def checkExport(context: Context, path: str, purpose: str):
   " beside the archive (the client reads that list loose from its own folder). A zone with housing (setZoneHousing) also gets"
   " <zone>_housing.json beside the archive, its plots as Peridot's plot content gives them (address, border door, center and heading in"
   " the server's axes, size across and along, price, upkeep, item capacity, pets, features) with their border doors (OBP_LOTSQUARE or"
-  " OBP_GUILDSQUARE, open type 160, in the server's axes and EQ heading), and <zone>_assets.txt naming stonesquare.eqg, which holds the"
-  " border models. Lists an earlier export left that this scene no longer has are removed. Baked light is written only for the terrain"
+  " OBP_GUILDSQUARE, open type 160, in the server's axes and EQ heading), its apartments (address, threshold and the door's heading in"
+  " the server's axes, the interior zone the door leads into, the threshold's width and depth, price, upkeep, item capacity, pets,"
+  " features), and, when it has plots, <zone>_assets.txt naming stonesquare.eqg, which holds the border models. Lists an earlier export left that this scene no longer has are removed. Baked light is written only for the terrain"
   " placement where caves set daylight (ter_<zone>.lit: no color, each vertex's share of scene light as alpha; terrainBakedLight names"
   " it); placed models carry none." + exportChecksHelp
 ))
@@ -1787,11 +1788,14 @@ async def exportZone(context: Context, path: str, purpose: str):
   written = await writeExport(folder, built, blendPath, "exportZone")
   sides = exportPipeline.sideFilePaths(folder, zone)
   housing = built["housing"]
-  hasPlots = built["sides"]["housing"] is not None
   result = built["summary"] | {"path": str(archivePath)} | exportReport(report) | {
     "manifest": written["path"],
     "emitterList": str(sides["emitterList"]) if built["sides"]["emitterList"] is not None else None,
-    "housing": None if housing is None else {"role": housing["housing"]["role"], "plots": len(housing["plots"]), "file": str(sides["housing"]) if hasPlots else None, "assetList": str(sides["assetList"]) if hasPlots else None},
+    "housing": None if housing is None else {
+      "role": housing["housing"]["role"], "plots": len(housing["plots"]), "apartments": len(housing["apartments"]),
+      "file": str(sides["housing"]) if built["sides"]["housing"] is not None else None,
+      "assetList": str(sides["assetList"]) if built["sides"]["assetList"] is not None else None,
+    },
   }
   if purpose == "game":
     result |= {"serverFiles": exportPipeline.serverFilesReport(built, folder), "zonePointsRecord": recorded, "clientEntry": built["clientEntry"]}
@@ -3826,7 +3830,8 @@ async def getEntries(context: Context):
   """Every place players arrive, stored and derived, each with its point, heading, source, and state (onFooting, or offFooting with
   the footing found there and how far off): the entries placeEntry placed (zoneIn with fromZone and fromNumber, landing, isolated);
   the safe point; the landing of each zone line whose target is this zone's shortName at a whole point (a teleport, named T<number>);
-  and each plot's entrance, facing into the plot. Footing is read on what the zone ships, as placeEntry reads it. The safe point and a
+  each plot's entrance, facing into the plot; and each apartment's threshold, where players stand to buy it, facing into its door.
+  Footing is read on what the zone ships, as placeEntry reads it. The safe point and a
   teleport's landing are where the client puts a player's origin, as /loc gives it, which stands over the floor, and a plot's entrance
   stands at the plot's level, so these can read offFooting by that height: the footing given is where players stand there.
   notFollowed lists the zone lines whose landing cannot be placed, with why (a kept coordinate, or no shortName to tell which lead
@@ -3954,7 +3959,7 @@ async def mapReach(
   is built for and the plan's group, each entry and per group whether it is connected (reached from the safe point and reaching back),
   per group the reached area by label, per region its access, builtFor, and per group the reached share of its play floor and
   unreached play floor (walkable floor open space joins to the lane, never a boundary's top or floor under the underworld), the groups
-  that reach each zone line and plot entrance, and the swim boxes by the body they belong to (body null for boxes standing alone): how
+  that reach each zone line, plot entrance, and apartment threshold, and the swim boxes by the body they belong to (body null for boxes standing alone): how
   many it holds, how many of them each group reaches (boxesReachedBy; a box players walk through is reached), and the boxes some group
   does not reach (the unreachedSwim problems) with the groups that do, the first twenty listed and the rest counted in moreUnreached.
   Refused: no seeds, an entry off its footing, a seed with no lane node at its footing, the helper missing or stale (run syncTooling),
@@ -5339,9 +5344,10 @@ async def setZoneHousing(
   """The zone's housing decision, made before any plot: `role` none (no housing), incidental (a few plots in a zone for something
   else, such as along its main road), featured (a housing area is one of the zone's parts), or primary (the zone is for housing);
   `intent`, what housing is for here; `placement`, where Peridot hosts its plots: "world" (in the public zone itself, its world plots)
-  or "neighborhood" (instanced neighborhoods made from this zone); `plotBudget` {"player": n, "guild": n}, how many plots it means to
-  have; `pricing`, changes to its price rules: basePlatinum and defaultItems and defaultPets per kind (player 84pp for 105 items and 5
-  pets, guild 21pp for 210 and 12, Live's), platinumPerItem and platinumPerPet for allowances above or below the defaults (2.1 and 10.5,
+  or "neighborhood" (instanced neighborhoods made from this zone); `plotBudget` {"player": n, "guild": n, "apartment": n}, how many
+  plots and apartments it means to have; `pricing`, changes to its price rules: basePlatinum and defaultItems and defaultPets per kind
+  (player 84pp for 105 items and 5 pets, guild 21pp for 210 and 12, Live's; apartment 42pp for 50 items and no pets, which a decision
+  made before apartments existed gets this way), platinumPerItem and platinumPerPet for allowances above or below the defaults (2.1 and 10.5,
   which price Live's other tiers at Live's prices), featureMultipliers {feature: multiplier} (prominent 1.5, secluded 1.5,
   view 1.25, waterfront 1.25, sheltered 1.25, remote 0.75, swamp 0.5 to start; add any), upkeepShare (a tenth: upkeep a day is a tenth
   of the price, as on Live); `routes` [[[x, y], ...], ...], the zone's main routes, from which assessPlot judges how prominent a plot is.
@@ -5353,7 +5359,9 @@ async def setZoneHousing(
 async def getHousing(context: Context):
   """The zone's housing decision and every plot: address, kind, center, facing, size, allowances, features, price with each step that
   led to it, upkeep, border size, and grading (the ground it is graded on, its margin and batter, or null; the ground is null when it
-  was deleted); plot counts against its budget; and overlapping plots, which export refuses."""
+  was deleted); every apartment: address, threshold, the way its door faces, interior zone, threshold width and depth, allowances,
+  features, price with its steps, upkeep; plot and apartment counts against its budget; and overlapping plots and apartments, which
+  export refuses."""
   return await callBridge(context, "getHousing", {})
 
 
@@ -5415,6 +5423,71 @@ async def removePlot(context: Context, address: str, keepGrading: bool = False):
   shaping named "kept grade <address>"; a plot whose pass was collapsed, or whose ground was deleted, is removed only so. Nothing is
   removed when the removal is refused."""
   return await callBridge(context, "removePlot", {"address": address, "keepGrading": keepGrading})
+
+
+apartmentHelp = (
+  " An apartment is a doorway already built into the zone (a facade's door, a front cut into a wall) that leads into its owner's own"
+  " instance of a client interior zone: unlike a plot, nothing outside the door is the owner's (no border, no yard, no house model, no"
+  " pad), so it is placed and priced, never graded, and only its interior is furnished. Its guide is the threshold patch players stand"
+  " on to buy it, `width` across the door and `depth` out from it (10 by 10 unless given), with a chevron at the door pointing in;"
+  " guides draw in renderView and never export. `threshold` [x, y] is the door's floor point at its jamb line and `facingDegrees` the"
+  " way the door faces, out of its wall (0 = +Y, clockwise). `interior` is the short name of a zone the client registers, such as"
+  " phinterior1a1 (the client's house interiors are phinterior*, plhdkeinteriors*, and plhogrinteriors*; its guild halls guildhallsml,"
+  " guildhalllrg, and guildhall3). items and pets default to the zone's apartment pricing (50 and 0 unless set); features and"
+  " pricePlatinum set its price as a plot's do. getEntries lists its threshold, where players stand to buy it, and the export's housing"
+  " file lists it with its threshold and heading in the server's axes and its interior: the server treats the door as the way into the"
+  " instance."
+)
+
+
+async def requireClientZone(interior):
+  """The interior zone an apartment leads into is one the client registers."""
+  zones = await clientZoneIDs()
+  if interior not in zones:
+    interiors = sorted(name for name in zones if "interior" in name or "guildhall" in name)
+    raise ToolError(f"The client registers no zone '{interior}'; its house interiors and guild halls: {interiors}")
+
+
+@guardedTool(description=(
+  "Place one apartment at its door: `threshold` [x, y] and `facingDegrees`; its height is what stands under the threshold (the ground,"
+  " a building's floor) unless `height` is given, refused where one surface lies over another there (a door under an arcade or a"
+  " balcony: give the height of the floor meant). The result gives its price and any plots or apartments its threshold overlaps."
+  + apartmentHelp
+))
+async def placeApartment(
+  context: Context, address: str, threshold: list[float], facingDegrees: float, interior: str, height: float | None = None,
+  width: float = 10.0, depth: float = 10.0, items: int | None = None, pets: int | None = None, features: list[str] | None = None,
+  pricePlatinum: int | None = None, collection: str | None = None,
+):
+  await requireClientZone(interior)
+  return await callBridge(context, "placeApartment", {
+    "address": address, "threshold": threshold, "facingDegrees": facingDegrees, "interior": interior, "height": height, "width": width,
+    "depth": depth, "items": items, "pets": pets, "tags": features, "pricePlatinum": pricePlatinum, "collection": collection,
+  })
+
+
+@guardedTool(description=(
+  "Change one apartment: newAddress, threshold (its height follows what stands under it unless `height` is given, refused where one"
+  " surface lies over another, as placeApartment is), facingDegrees, height, interior, width, depth, items, pets, features (replacing"
+  " its list), pricePlatinum (an override; 0 returns it to its derived price). Nothing changes when the edit is refused." + apartmentHelp
+))
+async def editApartment(
+  context: Context, address: str, newAddress: str | None = None, threshold: list[float] | None = None, facingDegrees: float | None = None,
+  height: float | None = None, interior: str | None = None, width: float | None = None, depth: float | None = None,
+  items: int | None = None, pets: int | None = None, features: list[str] | None = None, pricePlatinum: int | None = None,
+):
+  if interior is not None:
+    await requireClientZone(interior)
+  return await callBridge(context, "editApartment", {
+    "address": address, "newAddress": newAddress, "threshold": threshold, "facingDegrees": facingDegrees, "height": height,
+    "interior": interior, "width": width, "depth": depth, "items": items, "pets": pets, "tags": features, "pricePlatinum": pricePlatinum,
+  })
+
+
+@guardedTool()
+async def removeApartment(context: Context, address: str):
+  """Remove an apartment and its threshold guide; the doorway it stood at stays as built."""
+  return await callBridge(context, "removeApartment", {"address": address})
 
 
 @guardedTool()
