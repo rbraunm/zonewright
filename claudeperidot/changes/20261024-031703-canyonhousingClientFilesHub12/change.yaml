@@ -3,7 +3,7 @@ title: The spare client holds canyonhousing.eqg, canyonhousing_EnvironmentEmitte
 why: 'Canyon Neighborhood''s client files with the hub''s two cascades rebuilt after the owner''s note of 2026-10-23 that the pools
   were better but the drop from the hollow stream had a rough looking transition: each cascade was one river ribbon folding at every
   bend; now the upper one is three hung falls with short chutes between them and a riffle into the fishing pond, the pond''s outlet a
-  fall over its lip onto a chute down the cleft to the river, the first drop cut steep, the second tread levelled, the riffle bed cut to the pond, and rock painted over the clefts. Replaces 20261023-200217,
+  fall over its lip onto a chute down the cleft to the river, the first drop cut steep, the second tread levelled, the riffle bed cut to the pond, the pond fall landing on its chute, the stream bedded in gravel, and rock painted over the clefts. Replaces 20261023-200217,
   reverted. zonewright''s game export of it (staging\canyonhousing), verified by verifyExport except its known looks finding (the
   scene draws normal maps; the export writes diffuse only). The step refuses when the spare runs, a file already exists, or a source
   is not the verified export.'
@@ -26,7 +26,7 @@ steps:
   $source = Join-Path $env:LOCALAPPDATA 'zonewright\staging\canyonhousing'
   $spare = 'S:\Research\EverQuest\housingclient'
   $files = @{
-    'canyonhousing.eqg' = 'A8089E16CDC978FAF18878E95F2FB69FFB9872BD84A7FD4E17EB885CA2E1A017'
+    'canyonhousing.eqg' = '67986E347DF8170DA1CC61D7CF55F260D2E5F3EF4E92C45AF6A3DD67ED6170CF'
     'canyonhousing_EnvironmentEmitters.txt' = '4BFC79738B62CD8C878C61B0579B0C97C5579FA73B3B5220DE07C351B70441E8'
     'canyonhousing_assets.txt' = 'A104F8414208FE05B3C8178A2C40164A0F2B39A07A005DCDC4C950D0CFEECFFC'
   }
@@ -44,7 +44,7 @@ undo:
   $ErrorActionPreference = 'Stop'
   $spare = 'S:\Research\EverQuest\housingclient'
   $files = @{
-    'canyonhousing.eqg' = 'A8089E16CDC978FAF18878E95F2FB69FFB9872BD84A7FD4E17EB885CA2E1A017'
+    'canyonhousing.eqg' = '67986E347DF8170DA1CC61D7CF55F260D2E5F3EF4E92C45AF6A3DD67ED6170CF'
     'canyonhousing_EnvironmentEmitters.txt' = '4BFC79738B62CD8C878C61B0579B0C97C5579FA73B3B5220DE07C351B70441E8'
     'canyonhousing_assets.txt' = 'A104F8414208FE05B3C8178A2C40164A0F2B39A07A005DCDC4C950D0CFEECFFC'
   }
@@ -55,7 +55,7 @@ undo:
   foreach ($name in $files.Keys) { Remove-Item -LiteralPath "$spare\$name" -Confirm:$false }
 checks:
 - path: S:\Research\EverQuest\housingclient\canyonhousing.eqg
-  sha256: a8089e16cdc978faf18878e95f2fb69ffb9872bd84a7fd4e17eb885ca2e1a017
+  sha256: 67986e347df8170da1cc61d7cf55f260d2e5f3ef4e92c45af6a3dd67ed6170cf
 - path: S:\Research\EverQuest\housingclient\canyonhousing_EnvironmentEmitters.txt
   sha256: 4bfc79738b62cd8c878c61b0579b0c97c5579fa73b3b5220de07c351b70441e8
 - path: S:\Research\EverQuest\housingclient\canyonhousing_assets.txt
