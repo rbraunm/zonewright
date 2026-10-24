@@ -1,0 +1,64 @@
+title: The spare client holds canyonhousing.eqg, canyonhousing_EnvironmentEmitters.txt and canyonhousing_assets.txt, Canyon Neighborhood's
+  client files
+why: 'Canyon Neighborhood''s client files with the hub''s two cascades rebuilt after the owner''s note of 2026-10-23 that the pools
+  were better but the drop from the hollow stream had a rough looking transition: each cascade was one river ribbon folding at every
+  bend; now the upper one is three hung falls with short chutes between them and a riffle into the fishing pond, the pond''s outlet a
+  fall over its lip onto a chute down the cleft to the river, the first drop cut steep, the second tread levelled, the riffle bed cut to the pond, the pond fall landing on its chute, the stream bedded in gravel, and rock painted over the clefts. Replaces 20261023-200217,
+  reverted. zonewright''s game export of it (staging\canyonhousing), verified by verifyExport except its known looks finding (the
+  scene draws normal maps; the export writes diffuse only). The step refuses when the spare runs, a file already exists, or a source
+  is not the verified export.'
+kind: client
+scope:
+- S:\Research\EverQuest\housingclient\canyonhousing.eqg
+- S:\Research\EverQuest\housingclient\canyonhousing_EnvironmentEmitters.txt
+- S:\Research\EverQuest\housingclient\canyonhousing_assets.txt
+disposition: fixture
+significance: minor
+ownerClearance:
+  ownerMessage: '2026-10-23, the owner: "the pools are better but this area has a rough looking transition" (with a picture of the
+    hollow stream''s drop)'
+activation: the spare's next zoning into canyonhousing
+production: none
+commits: []
+steps:
+- |-
+  $ErrorActionPreference = 'Stop'
+  $source = Join-Path $env:LOCALAPPDATA 'zonewright\staging\canyonhousing'
+  $spare = 'S:\Research\EverQuest\housingclient'
+  $files = @{
+    'canyonhousing.eqg' = 'FA298174F292AA9064187106557AD557D091DEC0BCE7795986E367D2A45E02C6'
+    'canyonhousing_EnvironmentEmitters.txt' = '4BFC79738B62CD8C878C61B0579B0C97C5579FA73B3B5220DE07C351B70441E8'
+    'canyonhousing_assets.txt' = 'A104F8414208FE05B3C8178A2C40164A0F2B39A07A005DCDC4C950D0CFEECFFC'
+  }
+  if (Get-Process -Name eqgame -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$spare\*" }) { throw 'the spare client is running' }
+  foreach ($name in $files.Keys) {
+    if (Test-Path -LiteralPath "$spare\$name") { throw "$spare\$name already exists" }
+    if ((Get-FileHash -LiteralPath "$source\$name" -Algorithm SHA256).Hash -ne $files[$name]) { throw "$source\$name is not the verified export" }
+  }
+  foreach ($name in $files.Keys) {
+    Copy-Item -LiteralPath "$source\$name" -Destination "$spare\$name"
+    if ((Get-FileHash -LiteralPath "$spare\$name" -Algorithm SHA256).Hash -ne $files[$name]) { throw "$spare\$name does not match the export" }
+  }
+undo:
+- |-
+  $ErrorActionPreference = 'Stop'
+  $spare = 'S:\Research\EverQuest\housingclient'
+  $files = @{
+    'canyonhousing.eqg' = 'FA298174F292AA9064187106557AD557D091DEC0BCE7795986E367D2A45E02C6'
+    'canyonhousing_EnvironmentEmitters.txt' = '4BFC79738B62CD8C878C61B0579B0C97C5579FA73B3B5220DE07C351B70441E8'
+    'canyonhousing_assets.txt' = 'A104F8414208FE05B3C8178A2C40164A0F2B39A07A005DCDC4C950D0CFEECFFC'
+  }
+  if (Get-Process -Name eqgame -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$spare\*" }) { throw 'the spare client is running' }
+  foreach ($name in $files.Keys) {
+    if ((Get-FileHash -LiteralPath "$spare\$name" -Algorithm SHA256).Hash -ne $files[$name]) { throw "$spare\$name is not this change's file; nothing removed" }
+  }
+  foreach ($name in $files.Keys) { Remove-Item -LiteralPath "$spare\$name" -Confirm:$false }
+checks:
+- path: S:\Research\EverQuest\housingclient\canyonhousing.eqg
+  sha256: fa298174f292aa9064187106557ad557d091dec0bce7795986e367d2a45e02c6
+- path: S:\Research\EverQuest\housingclient\canyonhousing_EnvironmentEmitters.txt
+  sha256: 4bfc79738b62cd8c878c61b0579b0c97c5579fa73b3b5220de07c351b70441e8
+- path: S:\Research\EverQuest\housingclient\canyonhousing_assets.txt
+  sha256: a104f8414208fe05b3c8178a2c40164a0f2b39a07a005dcdc4c950d0cfeecffc
+author:
+  session: session_0121Qm1vvZgAKaiV6dKmANxe
