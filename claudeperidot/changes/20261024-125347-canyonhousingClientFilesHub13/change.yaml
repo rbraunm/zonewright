@@ -1,12 +1,13 @@
 title: The spare client holds canyonhousing.eqg, canyonhousing_EnvironmentEmitters.txt and canyonhousing_assets.txt, Canyon Neighborhood's
   client files
-why: 'Canyon Neighborhood''s client files with the hub''s two cascades rebuilt after the owner''s note of 2026-10-23 that the pools
-  were better but the drop from the hollow stream had a rough looking transition: each cascade was one river ribbon folding at every
-  bend; now the upper one is three hung falls with short chutes between them and a riffle into the fishing pond, the pond''s outlet a
-  fall over its lip onto a chute down the cleft to the river, the first drop cut steep, the second tread levelled, the riffle bed cut to the pond, the pond fall landing on its chute, the stream bedded in gravel, and rock painted over the clefts. Replaces 20261023-200217,
-  reverted. zonewright''s game export of it (staging\canyonhousing), verified by verifyExport except its known looks finding (the
-  scene draws normal maps; the export writes diffuse only). The step refuses when the spare runs, a file already exists, or a source
-  is not the verified export.'
+why: 'Canyon Neighborhood''s client files with Ferry Row''s street built: the seven Ferry Row plots stood at 118 over a bank
+  that fell 10 to 27 below their doors straight into the river, with no way along their fronts, so the way from the ford to the
+  hub climbed 82-degree rock through a footing 4 wide; now a 20-wide paved street at 118 runs along the plots'' fronts from east
+  of 107 Ferry Row to the bay''s approach on a 60-degree quay face into the river, and a three-leg ramp of 17 to 23 degrees cut
+  into the quay carries the ford''s stepping stones up to it; the river''s swim boxes rebuilt. Replaces 20261024-031703, reverted.
+  zonewright''s game export of it (staging\canyonhousing), verified by verifyExport except its known looks finding (the scene draws
+  normal maps; the export writes diffuse only). The step refuses when the spare runs, a file already exists, or a source is not
+  the verified export.'
 kind: client
 scope:
 - S:\Research\EverQuest\housingclient\canyonhousing.eqg
@@ -15,8 +16,8 @@ scope:
 disposition: fixture
 significance: minor
 ownerClearance:
-  ownerMessage: '2026-10-23, the owner: "the pools are better but this area has a rough looking transition" (with a picture of the
-    hollow stream''s drop)'
+  ownerMessage: '2026-10-24, the owner: "so what''s the plan right now", after "i''m more worried about all the really bad
+    artifacts that make the zone basically unusable still" (2026-10-23)'
 activation: the spare's next zoning into canyonhousing
 production: none
 commits: []
