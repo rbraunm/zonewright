@@ -302,7 +302,7 @@ async def zoneRowClientFacts(context, zone):
 async def previewEmitterAssets():
   """The client's environment emitter definitions and textures, prepared for previews to draw emitters from, or None without a client
   (a preview of a scene holding emitters then refuses)."""
-  if not os.environ.get("EVERQUEST_CLIENT"):
+  if not os.environ.get("zonewrightEverQuestClient"):
     return None
   try:
     return str(await anyio.to_thread.run_sync(emitterAssets.prepareAssets, zoneSources.resolveClientRoot(), toolingRoot))

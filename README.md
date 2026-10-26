@@ -6,20 +6,24 @@ MCP server through which Claude manages and works in Blender to build EverQuest 
 
 Requires Python 3.14 on PATH as `python`, git, Claude Code, and Visual Studio 2022 (Community will do) with the "Desktop development with C++" workload and its "C++ CMake tools for Windows" component, with which `syncTooling` builds the Recast helper.
 
-From the root of a clone of this repository:
+From the root of a clone of this repository, in PowerShell, with a clone of rbraunm/mcps for facet's client (zone deployment reaches the test server through it):
 
 ```
 python -m venv .venv
 .venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python -m pip install -e <mcps clone>\facet
+$env:zonewrightEverQuestClient = '<EverQuest client folder>'
 .venv\Scripts\python -m pytest
-claude
+claude mcp add --scope user zonewright --env zonewrightEverQuestClient=<EverQuest client folder> -- "$PWD\.venv\Scripts\python.exe" "$PWD\server\zonewrightServer.py"
 ```
+
+`zonewrightEverQuestClient` is the one setting that differs by machine: the EverQuest client folder, holding `eqgame.exe`. The tests refuse to run without it. The server starts without it, and each tool that reads the client refuses, naming it.
 
 Tests run against the real pinned Blender through the real bridge. That Blender is installed once by `syncTooling` under `%LOCALAPPDATA%\zonewrightTests\<pin>` and shared by every test session in every worktree; each session has its own tooling root whose `blender` folder links to it. The Recast helper is built into the same shared install, once per fingerprint (each worktree's sources build their own and never remove another's), and each session's `recast` and `recastHelper` folders link to it. One server and Blender stay running for a session, each test starting from an empty file; a test that needs a process of its own (a crash, a code change, the machine profile) takes `freshBlenderServer`. Sessions running at the same time each need their own short `--basetemp`: pytest prunes its shared temp folder, and long paths break Blender.
 
 The suite runs in three tiers. Everyday tests (the tools on small built scenes, and the server and bridge lifecycle) always run. The client data tier checks the client's own data in three groups: surveys of client zones, reading client models, zones, emitters, and the zones `eqgame.exe` registers (with Highpass Hold's server rows written from them), and calibration against screenshots; and the server's own data in two: `serverMaps`, the server map files against Peridot's own and Highpass Hold's player lane from its safe point; and `serverNav`, Peridot's Highpass Hold and thulehouse2 navs rebuilt tile for tile and Highpass Hold's NPC islands and path probes, both from EQEmu's map pack at a pinned commit, fetched once into `%LOCALAPPDATA%\zonewrightTests\serverReference` and verified by hash. The install tier installs Blender, extensions, and the Recast helper for real, over the network. A run of the whole suite takes a heavy group only when a file its tests depend on (the code they check, every server module that imports but the plumbing every test runs, the references they compare against, the Recast helper's sources and build where they run it, and the test modules holding them with the test helpers those import, found as the suite is collected) changed since the branch left the last pushed `claude` (`heavyGroups` in `tests/conftest.py`), and says at the end which groups ran and why. `-m clientData` or `-m install` runs a whole tier, `--everyTier` runs everything, and naming a test file runs all of it.
 
-Run Claude Code from the repository root, since `.mcp.json` launches the server with paths relative to it. On first launch, accept the workspace trust prompt and approve the `zonewright` server. `claude mcp list` then shows `zonewright` as connected.
+`claude mcp list` then shows `zonewright` as connected. Its tools are available in any session; the `zone-survey` skill loads in sessions started from the repository root.
 
 ## Tooling
 
@@ -239,7 +243,7 @@ The EQ preview renders the open scene's objects (its own lights and cameras excl
 
 ## EverQuest reference
 
-`EVERQUEST_CLIENT` in `.mcp.json` points at an EverQuest client install. The `zone-survey` skill (`.claude/skills/zone-survey`) describes how to answer zone questions from the survey, and holds the procedure for interpreting a zone, with its version and zone types, which the server reads from it. Scale and layout come only from the actual zone files: classic WLD (`.s3d`), EQGZ (`.zon` with `.ter`/`.mod` models, including archives named in `<zone>_assets.txt`), and EQTZP terrain (`.zon`/`.dat`). Brewall map files (`maps\Brewall`) are not authoritative geometry; they serve only as place names for design notes.
+`zonewrightEverQuestClient` points at an EverQuest client install. The `zone-survey` skill (`.claude/skills/zone-survey`) describes how to answer zone questions from the survey, and holds the procedure for interpreting a zone, with its version and zone types, which the server reads from it. Scale and layout come only from the actual zone files: classic WLD (`.s3d`), EQGZ (`.zon` with `.ter`/`.mod` models, including archives named in `<zone>_assets.txt`), and EQTZP terrain (`.zon`/`.dat`). Brewall map files (`maps\Brewall`) are not authoritative geometry; they serve only as place names for design notes.
 
 | Tool | Does |
 |---|---|
@@ -276,7 +280,7 @@ The server also needs the zone's rows: a `zone` row and a `zone_points` row per 
 
 `exportZone` and `checkExport` take a required `purpose`. A `test` export is for quick renders and test loads: it writes everything designed and requires nothing beyond the hard errors, listing what a game export would still refuse as findings. A `game` export is for the EQ client and server and also requires completeness. There is no skip flag.
 
-Both take `path`, an absolute `<short>.eqg` in an existing folder, the short name lowercase letters and digits and at most 31 of them, and refuse an export that would write or remove any file inside `EVERQUEST_CLIENT` (which must hold `eqgame.exe`), however its path is spelled: each folder holding a file the export touches, resolved through links and junctions (a `server` folder linked into the client among them) and `..`, is compared with the client folder by file identity, so case, short names, and extended-length and UNC loopback prefixes all count. An export writes and removes files beside its archive and would remove the client's own, such as `neighborhood_assets.txt`. An export goes to a staging folder, laid out as:
+Both take `path`, an absolute `<short>.eqg` in an existing folder, the short name lowercase letters and digits and at most 31 of them, and refuse an export that would write or remove any file inside `zonewrightEverQuestClient` (which must hold `eqgame.exe`), however its path is spelled: each folder holding a file the export touches, resolved through links and junctions (a `server` folder linked into the client among them) and `..`, is compared with the client folder by file identity, so case, short names, and extended-length and UNC loopback prefixes all count. An export writes and removes files beside its archive and would remove the client's own, such as `neighborhood_assets.txt`. An export goes to a staging folder, laid out as:
 
 ```
 <folder>\<short>.eqg                      the archive, with _EnvironmentEmitters.txt, _assets.txt and _housing.json as the zone needs them

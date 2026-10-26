@@ -279,7 +279,7 @@ def testExportRefusesAPathInsideTheClientFolder(installedLocalAppData, tmp_path)
     refusals, staged = server.session(steps)
     notTheClient = server.callToolExpectingError(
       "exportZone", {"path": str(tmp_path / "staging" / "servertest.eqg"), "purpose": "test"},
-      environment={"LOCALAPPDATA": str(server.localAppData), "EVERQUEST_CLIENT": str(tmp_path / "staging")},
+      environment={"LOCALAPPDATA": str(server.localAppData), "zonewrightEverQuestClient": str(tmp_path / "staging")},
     )
   finally:
     server.close()
@@ -292,7 +292,7 @@ def testExportRefusesAPathInsideTheClientFolder(installedLocalAppData, tmp_path)
   assert staged["path"] == str(outside) and (tmp_path / "staging" / "servertest.eqg").is_file()
   assert sorted(path.relative_to(client).as_posix() for path in client.rglob("*")) == ["Resources", "Resources/GlobalLoad.txt", "eqgame.exe", "maps", "maps/base", "maps/base/servertest.map"]
   assert clientMap.read_bytes() == b"the client folder's map"
-  assert f"EVERQUEST_CLIENT '{tmp_path / 'staging'}' has no eqgame.exe" in notTheClient
+  assert f"zonewrightEverQuestClient '{tmp_path / 'staging'}' has no eqgame.exe" in notTheClient
 
 
 def testExportRefusesAShortNameOverThirtyOneCharacters(stageBlenderServer, tmp_path):

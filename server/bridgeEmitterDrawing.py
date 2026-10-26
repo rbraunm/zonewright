@@ -184,7 +184,7 @@ def drawEmitters(preview, sourceScene, assetsPath):
   if not emitters:
     return {"emitters": 0, "particles": 0, "notDrawn": []}
   if assetsPath is None:
-    raise ValueError("The scene has emitters and no client emitter definitions were passed; the server reads them from the client (EVERQUEST_CLIENT)")
+    raise ValueError("The scene has emitters and no client emitter definitions were passed; the server reads them from the client (zonewrightEverQuestClient)")
   assets = loadAssets(assetsPath)
   definitions, textures = assets["definitions"], assets["textures"]
   # The camera was just placed; its world matrix is current only once the preview's depsgraph is evaluated.

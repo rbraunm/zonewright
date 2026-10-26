@@ -13,12 +13,12 @@ eqgModelExtensions = (".mod", ".mds", ".ter", ".zon")
 
 
 def resolveClientRoot():
-  clientRoot = os.environ.get("EVERQUEST_CLIENT")
+  clientRoot = os.environ.get("zonewrightEverQuestClient")
   if not clientRoot:
-    raise ToolError("EVERQUEST_CLIENT is not set; point it at the EverQuest client folder in .mcp.json")
+    raise ToolError("zonewrightEverQuestClient is not set; set it to the EverQuest client folder with --env on zonewright's claude mcp add line")
   clientPath = Path(clientRoot)
   if not (clientPath / "eqgame.exe").is_file():
-    raise ToolError(f"EVERQUEST_CLIENT '{clientPath}' has no eqgame.exe")
+    raise ToolError(f"zonewrightEverQuestClient '{clientPath}' has no eqgame.exe")
   return clientPath
 
 

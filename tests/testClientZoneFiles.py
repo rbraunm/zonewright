@@ -20,8 +20,9 @@ import viewerLight
 import zoneGeometry
 import zoneSources
 
-repositoryRoot = Path(__file__).resolve().parent.parent
-everquestClient = Path(json.loads((repositoryRoot / ".mcp.json").read_text(encoding="utf-8"))["mcpServers"]["zonewright"]["env"]["EVERQUEST_CLIENT"])
+from conftest import everquestClient as clientFolder
+
+everquestClient = Path(clientFolder)
 
 
 def groundUnder(vertices, triangles, point):

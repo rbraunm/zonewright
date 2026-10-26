@@ -26,7 +26,9 @@ downloadCachePath = repositoryRoot / "tests" / ".cache"
 repositoryManifest = json.loads((repositoryRoot / "toolingManifest.json").read_text(encoding="ascii"))
 pinnedBlender = repositoryManifest["blender"]
 pinnedRecast = repositoryManifest["recast"]
-everquestClient = json.loads((repositoryRoot / ".mcp.json").read_text(encoding="utf-8"))["mcpServers"]["zonewright"]["env"]["EVERQUEST_CLIENT"]
+everquestClient = os.environ.get("zonewrightEverQuestClient")
+if not everquestClient:
+  raise pytest.UsageError("the tests need zonewrightEverQuestClient, the EverQuest client folder, set in the shell that runs pytest")
 # One install of each pinned Blender in the user's profile, shared by every test session in every worktree.
 sharedLocalAppDataPath = Path(os.environ["LOCALAPPDATA"]) / "zonewrightTests" / pinnedBlender["sha256"][:16]
 sharedInstallLockSeconds = 900
@@ -121,7 +123,7 @@ class ToolSession:
 
 class StagedServer:
   """A copy of the server, and of the zone-survey skill it reads its interpretive procedure from, with its own tooling root. Its tool
-  calls share one server process, as a client's calls do, until close; each session gets a process of its own. Its EVERQUEST_CLIENT is
+  calls share one server process, as a client's calls do, until close; each session gets a process of its own. Its zonewrightEverQuestClient is
   the real client's unless clientFolder names another."""
 
   def __init__(self, rootPath, manifest, localAppData=None, clientFolder=None):
@@ -162,7 +164,7 @@ class StagedServer:
     return StdioServerParameters(
       command=sys.executable,
       args=[str(self.repositoryPath / "server" / "zonewrightServer.py")],
-      env={"LOCALAPPDATA": str(self.localAppData), "EVERQUEST_CLIENT": self.clientFolder} if environment is None else environment,
+      env={"LOCALAPPDATA": str(self.localAppData), "zonewrightEverQuestClient": self.clientFolder} if environment is None else environment,
     )
 
   def session(self, steps):

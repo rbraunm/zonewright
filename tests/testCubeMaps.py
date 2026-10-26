@@ -1,4 +1,3 @@
-import json
 import math
 import sys
 from pathlib import Path
@@ -10,10 +9,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
 import eqArchive
 import eqCubeMaps
 import eqgWriter
-from conftest import writeCubeDDS
+from conftest import everquestClient as clientFolder, writeCubeDDS
 
-repositoryRoot = Path(__file__).resolve().parent.parent
-everquestClient = Path(json.loads((repositoryRoot / ".mcp.json").read_text(encoding="utf-8"))["mcpServers"]["zonewright"]["env"]["EVERQUEST_CLIENT"])
+everquestClient = Path(clientFolder)
 faceColors = [(200, 40, 40, 255), (40, 200, 40, 255), (40, 40, 200, 255), (200, 200, 40, 255), (40, 200, 200, 255), (200, 40, 200, 255)]
 
 

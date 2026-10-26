@@ -1,4 +1,3 @@
-import json
 import struct
 import sys
 import zlib
@@ -17,8 +16,9 @@ import serverMapDrawing
 import serverMapFiles
 from serverReference import referenceBytes
 
-repositoryRoot = Path(__file__).resolve().parent.parent
-everquestClient = Path(json.loads((repositoryRoot / ".mcp.json").read_text(encoding="utf-8"))["mcpServers"]["zonewright"]["env"]["EVERQUEST_CLIENT"])
+from conftest import everquestClient as clientFolder
+
+everquestClient = Path(clientFolder)
 float32 = numpy.float32
 
 

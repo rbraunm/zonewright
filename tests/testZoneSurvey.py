@@ -147,7 +147,7 @@ def testSurveyRefusesUnknownGroupsAndSortsByUnrequestedGroups(stageServer):
 def testSurveyWithoutClientFails(stageServer):
   server = stageSurveyServer(stageServer)
   errorText = server.callToolExpectingError("surveyZones", {"zones": ["gfaydark"]}, environment={"LOCALAPPDATA": str(server.localAppData)})
-  assert "EVERQUEST_CLIENT is not set" in errorText
+  assert "zonewrightEverQuestClient is not set" in errorText
 
 
 def testZoneNotesListBrewallLabelsOnTheZoneByLayerAndTheRestByName(stageServer):

@@ -5,7 +5,7 @@ description: Answer questions about existing EverQuest zones (size, polygons, la
 
 # Zone survey
 
-The survey caches what zonewright knows about every zone in the EverQuest client (`EVERQUEST_CLIENT`). Answer zone questions from it; read raw zone files only when the survey cannot answer.
+The survey caches what zonewright knows about every zone in the EverQuest client (`zonewrightEverQuestClient`). Answer zone questions from it; read raw zone files only when the survey cannot answer.
 
 ## Two lanes
 

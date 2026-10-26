@@ -1,5 +1,4 @@
 import collections
-import json
 import math
 import struct
 import sys
@@ -9,7 +8,7 @@ import numpy
 import pytest
 from PIL import Image
 
-from conftest import writePNG
+from conftest import everquestClient as clientFolder, writePNG
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
 import clientPointLights
@@ -18,8 +17,7 @@ import eqEmitterDefinitions
 import eqEmitters
 import previewFrame
 
-repositoryRoot = Path(__file__).resolve().parent.parent
-everquestClient = Path(json.loads((repositoryRoot / ".mcp.json").read_text(encoding="utf-8"))["mcpServers"]["zonewright"]["env"]["EVERQUEST_CLIENT"])
+everquestClient = Path(clientFolder)
 texture = (200, 150, 100, 255)
 darkEnvironment = {
   "ambientColor": [0.1, 0.1, 0.1], "specialAmbientColor": [0, 0, 0], "bounceColor": [0, 0, 0], "sunColor": [0, 0, 0], "sunAzimuthDegrees": 0,

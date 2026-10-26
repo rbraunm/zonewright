@@ -25,7 +25,9 @@ toolingRoot = Path(os.environ["LOCALAPPDATA"]) / "zonewright"
 workFile = toolingRoot / "measurementZone" / f"{layout.shortName}.blend"
 stagingFolder = toolingRoot / "staging" / layout.shortName
 archivePath = stagingFolder / f"{layout.shortName}.eqg"
-everquestClient = json.loads((repositoryRoot / ".mcp.json").read_text(encoding="utf-8"))["mcpServers"]["zonewright"]["env"]["EVERQUEST_CLIENT"]
+everquestClient = os.environ.get("zonewrightEverQuestClient")
+if not everquestClient:
+  raise SystemExit("buildMeasurementZone needs zonewrightEverQuestClient, the EverQuest client folder, set in its shell")
 textures = {
   "floor": "texture/di_hp_ground.dds@e7b128c3", "block": "texture/stonewall.dds@34d934e0", "ceiling": "texture/hp_floorboards_inta01_c.dds@f3aa5776",
   "label": "texture/di_sky_stone_plain2.dds@2906fc83", "bed": "texture/di_hp_cliff_underwater.dds@a096e39f",
@@ -78,7 +80,7 @@ def stagedServer(folder):
   shutil.copy2(repositoryRoot / "toolingManifest.json", folder / "toolingManifest.json")
   return StdioServerParameters(
     command=sys.executable, args=[str(folder / "server" / "zonewrightServer.py")],
-    env={"LOCALAPPDATA": os.environ["LOCALAPPDATA"], "EVERQUEST_CLIENT": everquestClient, "SYSTEMROOT": os.environ["SYSTEMROOT"]},
+    env={"LOCALAPPDATA": os.environ["LOCALAPPDATA"], "zonewrightEverQuestClient": everquestClient, "SYSTEMROOT": os.environ["SYSTEMROOT"]},
   )
 
 
