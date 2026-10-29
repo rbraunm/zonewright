@@ -161,9 +161,10 @@ class StagedServer:
     return json.loads(self.manifestPath.read_text(encoding="ascii"))
 
   def serverParameters(self, environment=None):
+    """The front (zonewrightFront.py) over a worker of this staged server, as Claude Code runs zonewright."""
     return StdioServerParameters(
       command=sys.executable,
-      args=[str(self.repositoryPath / "server" / "zonewrightServer.py")],
+      args=[str(self.repositoryPath / "server" / "zonewrightFront.py")],
       env={"LOCALAPPDATA": str(self.localAppData), "zonewrightEverQuestClient": self.clientFolder} if environment is None else environment,
     )
 
@@ -404,6 +405,12 @@ def writeCubeDDS(path, side, faceColors):
   header += struct.pack("<4I", 0x1000 | 0x8, 0xFE00, 0, 0) + bytes(4)
   path.write_bytes(header + b"".join(bytes((blue, green, red, alpha)) * side * side for red, green, blue, alpha in faceColors))
   return path
+
+
+def touch(path):
+  """Change a file's modification time the way an edit would, without changing its content."""
+  later = time.time_ns() + 2_000_000_000
+  os.utime(path, ns=(later, later))
 
 
 def gitOutput(*arguments):

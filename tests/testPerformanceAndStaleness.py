@@ -1,18 +1,10 @@
 import hashlib
 import json
-import os
-import time
 from pathlib import Path
 
 import pytest
 
-from conftest import everquestClient, pinnedBlender
-
-
-def touch(path):
-  """Change a file's modification time the way an edit would, without changing its content."""
-  later = time.time_ns() + 2_000_000_000
-  os.utime(path, ns=(later, later))
+from conftest import everquestClient, pinnedBlender, touch
 
 
 def testProfileChoosesTheFastestHardwareBackend(freshBlenderServer):
@@ -42,7 +34,7 @@ def testStaleProfileBlocksBlenderUntilSynced(freshBlenderServer):
   assert status["state"] == "stale"
 
 
-def testServerCodeChangeFailsUntilReconnect(freshBlenderServer):
+def testServerCodeChangeFailsUntilReload(freshBlenderServer):
   async def steps(session):
     before = await session.expectSuccess("getToolingStatus")
     touch(freshBlenderServer.repositoryPath / "server" / "zoneSurvey.py")
@@ -50,7 +42,7 @@ def testServerCodeChangeFailsUntilReconnect(freshBlenderServer):
 
   before, errorText = freshBlenderServer.session(steps)
   assert before["bridge"] == {"state": "notStarted"}
-  assert "zonewright server code changed on disk since this server started (zoneSurvey.py); reconnect with /mcp to load it" in errorText
+  assert "zonewright server code changed on disk since this server started (zoneSurvey.py); reloadZonewright loads it" in errorText
 
 
 def testBridgeCodeChangeRestartsBlenderAndReopensTheFile(freshBlenderServer, tmp_path):

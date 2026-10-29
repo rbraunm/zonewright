@@ -113,7 +113,11 @@ def requireCurrentServerCode():
   current = sourceSignatures(serverSourcePaths)
   changed = sorted(name for name, signature in current.items() if serverSourceFingerprint[name] != signature)
   if changed:
-    raise ToolError(f"zonewright server code changed on disk since this server started ({', '.join(changed)}); reconnect with /mcp to load it")
+    raise ToolError(f"zonewright server code changed on disk since this server started ({', '.join(changed)}); reloadZonewright loads it")
+
+
+# Saving runs on outdated server code too, so unsaved work can be kept before a reload.
+staleSafeTools = ("saveFile",)
 
 
 def refuseUnknownArguments(tool):
@@ -127,20 +131,33 @@ def refuseUnknownArguments(tool):
 def guardedTool(**options):
   """server.tool that refuses unknown arguments and first refuses to run outdated server code."""
   def decorate(function):
+    name = options.get("name", function.__name__)
+
+    def guard():
+      if name not in staleSafeTools:
+        requireCurrentServerCode()
+
     if inspect.iscoroutinefunction(function):
       @functools.wraps(function)
       async def guarded(*arguments, **keywordArguments):
-        requireCurrentServerCode()
+        guard()
         return resultReports.compactJSON(await function(*arguments, **keywordArguments))
     else:
       @functools.wraps(function)
       def guarded(*arguments, **keywordArguments):
-        requireCurrentServerCode()
+        guard()
         return resultReports.compactJSON(function(*arguments, **keywordArguments))
     server.tool(**options)(guarded)
-    refuseUnknownArguments(server._tool_manager.get_tool(options.get("name", function.__name__)))
+    refuseUnknownArguments(server._tool_manager.get_tool(name))
     return guarded
   return decorate
+
+
+def frontTool(function):
+  """server.tool for the front's own calls during reloadZonewright: they run on outdated server code and the front hides them from Claude."""
+  server.tool()(function)
+  refuseUnknownArguments(server._tool_manager.get_tool(function.__name__))
+  return function
 
 
 def progressReporter(context):
@@ -5641,6 +5658,20 @@ async def runLedger(context: Context, command: str, change: str | None = None):
   except ValueError as error:
     raise ToolError(str(error)) from error
   return {"command": command, "change": change, "output": lines}
+
+
+@frontTool
+async def handOverBridge():
+  """Front only (reloadZonewright): closes this server's connection to the running Blender without shutting it down and returns what
+  the next server's adoptBridge needs, or null when no Blender runs."""
+  return resultReports.compactJSON({"record": await anyio.to_thread.run_sync(bridge.handOver)})
+
+
+@frontTool
+async def adoptBridge(record: dict):
+  """Front only (reloadZonewright): takes over the Blender the previous server handed over (its handOverBridge record) and returns its
+  status."""
+  return resultReports.compactJSON(await anyio.to_thread.run_sync(bridge.adopt, record))
 
 
 serverSourcePaths = loadedServerSources()

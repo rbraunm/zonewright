@@ -8,6 +8,9 @@ portMarker = "ZONEWRIGHT_BRIDGE_PORT"
 tokenVariable = "ZONEWRIGHT_BRIDGE_TOKEN"
 extensionsVariable = "ZONEWRIGHT_EXTENSIONS"
 shaderWorkersVariable = "ZONEWRIGHT_SHADER_WORKERS"
+# After its server's connection closes, the bridge waits this long for the next server to take it over (reloadZonewright), then exits,
+# so a server that crashed leaves no Blender behind.
+handoverWaitSeconds = 120
 
 
 class ConnectionClosed(Exception):
@@ -24,15 +27,25 @@ def receiveExactly(connection, byteCount):
   return bytes(received)
 
 
-def sendFrame(connection, message):
+def encodeFrame(message):
   payload = json.dumps(message).encode("utf-8")
   if len(payload) > maximumFrameBytes:
     raise ValueError(f"frame of {len(payload)} bytes exceeds {maximumFrameBytes}")
-  connection.sendall(lengthHeader.pack(len(payload)) + payload)
+  return lengthHeader.pack(len(payload)) + payload
+
+
+def decodeFrame(payload):
+  if len(payload) > maximumFrameBytes:
+    raise ValueError(f"frame of {len(payload)} bytes exceeds {maximumFrameBytes}")
+  return json.loads(payload.decode("utf-8"))
+
+
+def sendFrame(connection, message):
+  connection.sendall(encodeFrame(message))
 
 
 def receiveFrame(connection):
   (payloadLength,) = lengthHeader.unpack(receiveExactly(connection, lengthHeader.size))
   if payloadLength > maximumFrameBytes:
     raise ValueError(f"frame of {payloadLength} bytes exceeds {maximumFrameBytes}")
-  return json.loads(receiveExactly(connection, payloadLength).decode("utf-8"))
+  return decodeFrame(receiveExactly(connection, payloadLength))

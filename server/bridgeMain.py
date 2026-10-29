@@ -36,16 +36,17 @@ def failureText(command, error):
 
 
 def serve(connection, token):
+  """Serves one server's connection: True once it asked for a shutdown, False when it closed the connection (a handover, or a crash)."""
   while True:
     try:
       request = bridgeProtocol.receiveFrame(connection)
     except bridgeProtocol.ConnectionClosed:
-      return
+      return False
     if not hmac.compare_digest(request.get("token", ""), token):
       raise RuntimeError("request with a wrong token")
     if request["command"] == "shutdown":
       bridgeProtocol.sendFrame(connection, {"ok": True, "result": None})
-      return
+      return True
     try:
       result = bridgeCommands.dispatch(request["command"], request["arguments"])
       response = {"ok": True, "result": result}
@@ -62,10 +63,18 @@ def main():
   listener.bind(("127.0.0.1", 0))
   listener.listen(1)
   print(f"{bridgeProtocol.portMarker} {listener.getsockname()[1]}", flush=True)
-  connection, _ = listener.accept()
-  listener.close()
-  with connection:
-    serve(connection, token)
+  acceptTimeout = None
+  while True:
+    listener.settimeout(acceptTimeout)
+    try:
+      connection, _ = listener.accept()
+    except TimeoutError:
+      return
+    connection.settimeout(None)
+    with connection:
+      if serve(connection, token):
+        return
+    acceptTimeout = bridgeProtocol.handoverWaitSeconds
 
 
 main()
