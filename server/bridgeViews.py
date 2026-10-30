@@ -822,6 +822,14 @@ def exportLeavesOut():
   return frozenset(entry["object"] for entry in bridgeExport.classifyObjects()[1])
 
 
+def leftOutOf(exportedOnly, keptNames):
+  """What a render leaves out: with exportedOnly, everything a zone export leaves out but the objects named in keptNames (what the
+  client draws from the server's data, such as a dump's spawns); nothing otherwise, when keptNames keeps nothing."""
+  if keptNames and not exportedOnly:
+    raise ValueError(f"keptNames keeps objects in an exportedOnly render; without exportedOnly nothing is left out, so {sorted(keptNames)} would keep nothing")
+  return exportLeavesOut() - frozenset(keptNames) if exportedOnly else frozenset()
+
+
 def requireFigureOn(figureOn, view, figureModel):
   """A figure stood by hand on a footing as given: {at: [x, y, z], facingDegrees}, in an eye view, with the figure's model."""
   if (
@@ -836,16 +844,16 @@ def requireFigureOn(figureOn, view, figureModel):
 
 def renderView(
   sourceScene, zone, sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes, labels, emitters, frame=None, liquidTime=None,
-  carriedLight=None, laneTint=None, exportedOnly=False, figureOn=None, normalMaps=False,
+  carriedLight=None, laneTint=None, exportedOnly=False, figureOn=None, keptNames=(), normalMaps=False,
 ):
   """Render a view; in client shading the zone's point lights and emitters are drawn too (emitters: the server's prepared emitter
   assets, or None without a client), its liquids as they stand at liquidTime on the effect clock (0 when it is None), and the light
   the view's character carries (a clientPointLights.carriedLight record, or None); with laneTint (a lane's tint file and grid, its
   labels' colors by number, and the floor's reach by slope), the view is tinted where it shows floor the lane reached (laneDecal), under
   the swim volumes' tint and hidden by the guides'. exportedOnly leaves out of this render alone, objects, lights, and emitters alike,
-  everything a zone export leaves out (exportLeavesOut), as the exported archive draws; figureOn ({at, facingDegrees}) stands the
-  scale figure exactly there in an eye view, as viewPose read where a view stood her; normalMaps lights createMaterial materials by
-  their normal maps, which the client never does (bridgeClientLight.selectNormalMaps)."""
+  everything a zone export leaves out (exportLeavesOut) but the objects named in keptNames, as the exported archive draws; figureOn
+  ({at, facingDegrees}) stands the scale figure exactly there in an eye view, as viewPose read where a view stood her; normalMaps
+  lights createMaterial materials by their normal maps, which the client never does (bridgeClientLight.selectNormalMaps)."""
   if shading not in viewShadings:
     raise ValueError(f"shading must be one of {list(viewShadings)}, got '{shading}'")
   if carriedLight is not None and shading != "client":
@@ -861,7 +869,7 @@ def renderView(
     requireScrollingLiquids(sourceScene)
   # A map, or a drawing for reading shape, coverage, or values, is neither fogged nor has a sky.
   shapeOnly = "map" in view or shading != "client"
-  leftOut = exportLeavesOut() if exportedOnly else frozenset()
+  leftOut = leftOutOf(exportedOnly, keptNames)
   preview = PreviewScene(sourceScene, zone | {"fogOn": False} if shapeOnly else zone, guides, None if shapeOnly else sky, leftOut)
   try:
     if liquidTime is not None:
@@ -946,16 +954,16 @@ def viewPose(sourceScene, zone, view, figureModel):
     preview.remove()
 
 
-def renderPasses(sourceScene, zone, view, outputFolder, passNames, frame=None, carriedLight=None):
+def renderPasses(sourceScene, zone, view, outputFolder, passNames, frame=None, carriedLight=None, exportedOnly=False, keptNames=()):
   """Render a view once per named bridgeClientLight pass as raw floats (numpy .npy, rows top to bottom, RGBA, alpha 0 where nothing
   is drawn) for calibration: the drawn color (lit), the base (texture) color, the normal, the baked light, the share of scene light,
   the distance, the point lights' light, and the fog's visibility, at frame ({size, verticalFieldOfViewDegrees}, the preview's own when
   None), with the zone's point lights and the light the view's character carries (a clientPointLights.carriedLight record, or None)
-  drawn as a client-shaded view draws them."""
+  drawn as a client-shaded view draws them, and with exportedOnly and keptNames leaving out what renderView leaves out."""
   unknown = sorted(set(passNames) - set(bridgeClientLight.passes))
   if unknown:
     raise ValueError(f"Unknown passes {unknown}; known: {list(bridgeClientLight.passes)}")
-  preview = PreviewScene(sourceScene, zone)
+  preview = PreviewScene(sourceScene, zone, True, None, leftOutOf(exportedOnly, keptNames))
   written = {}
   try:
     if frame is not None:

@@ -345,7 +345,8 @@ def sortValue(row, sortPath):
 @guardedTool()
 def getToolingStatus():
   """Compare installed Blender and extensions with the pins in toolingManifest.json, and report the bridge, runPython use, and the
-  renderer's latest calibration run against each claudelink shot (calibrateShot)."""
+  renderer's latest run against each claudelink shot (calibrateShot or compareShot), each naming what it drew: its source's kind (the
+  client's zone, a work file, or an archive) and path."""
   return toolingStatus.getToolingStatus(toolingRoot) | {
     "machineProfile": machineProfile.profileStatus(toolingRoot),
     "bridge": bridge.status(),
@@ -2058,22 +2059,22 @@ def readDump(dumpPath):
     raise ToolError(str(error)) from error
 
 
-async def placeFromDump(context, dump, placements, collection):
-  """Place what a claudelink dump shows (eqCalibration.dumpPlacements) in the open scene; each one the client data cannot draw is listed
-  with why. A spawn whose scale the client's rule (spawnModel) gives otherwise than its actor holds is marked with the rule's."""
-  zone = dump["zone"]["shortName"]
+async def placeFromDump(context, dump, placements, collection, loadOrderZone):
+  """Place what a claudelink dump shows (eqCalibration.dumpPlacements) in the open scene, each model found in the load order of
+  loadOrderZone (None: the startup archives alone, for a zone the client lacks); each one the client data cannot draw is listed with
+  why. A spawn whose scale the client's rule (spawnModel) gives otherwise than its actor holds is marked with the rule's."""
   newEngineZone = bool(dump["world"]["zoneHeader"]["newEngineZone"])
   placed, notPlaced = [], []
   for placement in placements:
     entry = {key: placement[key] for key in ("kind", "name", "model")}
     try:
       if placement["kind"] == "spawn":
-        spawn = await anyio.to_thread.run_sync(spawnModel, zone, placement["model"], placement["height"], newEngineZone, None, placement["appearance"], None)
+        spawn = await anyio.to_thread.run_sync(spawnModel, loadOrderZone, placement["model"], placement["height"], newEngineZone, None, placement["appearance"], None)
         folder, details, clientContent = spawn["folder"], spawn["details"], "spawn"
         if abs(spawn["scale"] - placement["scale"]) > dumpScaleTolerance:
           entry["ruleScale"] = spawn["scale"]
       else:
-        folder, details = await anyio.to_thread.run_sync(eqModel, zone, placement["model"])
+        folder, details = await anyio.to_thread.run_sync(eqModel, loadOrderZone, placement["model"])
         clientContent = "door" if placement["kind"] == "door" else "object"
       await placeEQModel(context, folder, placement["name"], placement["position"], placement["turnDegrees"], placement["scale"], 0, False, collection, details, clientContent)
       placed.append(entry)
@@ -2101,7 +2102,7 @@ async def placeDump(context: Context, dumpPath: str, near: list[float] | None = 
   placements, notPlaced = eqCalibration.dumpPlacements(dump)
   if near is not None:
     placements = [placement for placement in placements if math.dist(placement["position"], near) <= radius]
-  placed, failed = await placeFromDump(context, dump, placements, collection)
+  placed, failed = await placeFromDump(context, dump, placements, collection, dump["zone"]["shortName"])
   return {"zone": dump["zone"]["shortName"], "capturedAt": dump["capturedAt"], "placed": placed, "notPlaced": notPlaced + failed}
 
 
@@ -2110,25 +2111,30 @@ sheetQuality = 90
 calibrationPasses = ["lit", "base", "normal", "baked", "share", "pointLight", "visibility"]
 
 
-@guardedTool()
-async def calibrateShot(context: Context, screenshotPath: str, fitLight: bool = False, discardUnsavedChanges: bool = False):
-  """Calibrate the renderer against a claudelink shot of the spare RoF2 client (see the calibrate-renderer skill): screenshotPath is
-  the shot's PNG, beside its sidecar (<shot>.json), which names the zone dump taken in the same frame. Refuses a shot whose sidecar and
-  dump do not pair (paths and capture time), taken under 100 fps or with MacroQuest's frame limiter throttling, or whose PNG is not the
-  client area the sidecar records. Opens a new file (discarding unsaved changes only with discardUnsavedChanges), imports the dump's
-  zone as importZone does, sets the zone from the dump (the sky at its game time, the zone header's fog and clips, newEngineZone, short
-  name, and id, and the viewer's special ambient from its actor's share of scene light), places what stands in view as placeDump does
-  (in "<zone> dump"), and predicts the shot without fitting anything: renders the dump's camera exactly (eye, heading, pitch; a frame at
-  the viewport's aspect whose field of view the camera's half view angle and viewAngleRatio give) with the light the viewer carries
-  where the client put it. Returns a sheet of the shot cropped to the viewport beside the render, over their difference (amplified 4
-  times) and a map of the difference per 32-pixel block (black 0 through red and yellow to white at 64 of 255), with the mean
-  difference (of 255) over the zone's drawn pixels, over the sky, and over all. fitLight also fits the ambient, sun, and bounce colors
-  and sun direction that best explain the shot (least squares, the rest of the light and the fog as predicted) and reports them beside
-  the sky's prediction, a diagnostic. Each run is kept under the tooling root's calibration\\<shot>\\<run> with its pictures, the
-  conditions it was taken under (game time, weather, light, settings), and the renderer's source hash; getToolingStatus lists each
-  shot's latest run."""
+shotRefusals = (
+  " Refuses a shot whose sidecar and dump do not pair (paths and capture time), taken under 100 fps or with MacroQuest's frame limiter"
+  " throttling, or whose PNG is not the client area the sidecar records."
+)
+predictionHelp = (
+  " Sets the zone from the dump (the sky at its game time, the zone header's fog and clips, newEngineZone, short name, and id, and the"
+  " viewer's special ambient from its actor's share of scene light), places what stands in view as placeDump does (in \"<zone> dump\"),"
+  " and predicts the shot without fitting anything: renders the dump's camera exactly (eye, heading, pitch; a frame at the viewport's"
+  " aspect whose field of view the camera's half view angle and viewAngleRatio give) with the light the viewer carries where the client"
+  " put it. Returns a sheet of the shot cropped to the viewport beside the render, over their difference (amplified 4 times) and a map"
+  " of the difference per 32-pixel block (black 0 through red and yellow to white at 64 of 255), with the mean difference (of 255) over"
+  " the zone's drawn pixels, over the sky, and over all. fitLight also fits the ambient, sun, and bounce colors and sun direction that"
+  " best explain the shot (least squares, the rest of the light and the fog as predicted) and reports them beside the sky's prediction,"
+  " a diagnostic. Each run is kept under the tooling root's calibration\\<shot>\\<run> with its pictures, the conditions it was taken"
+  " under (game time, weather, light, settings), what it drew (source), and the renderer's source hash; getToolingStatus lists each"
+  " shot's latest run."
+)
+
+
+def shotInputs(screenshotPath):
+  """A claudelink shot read for a prediction (eqCalibration): its sidecar and dump, the dump's camera as a view and a frame, the viewer,
+  the zone properties the dump gives, and the light the viewer carries; what eqCalibration refuses is refused as a ToolError."""
   try:
-    sidecar, dump = await anyio.to_thread.run_sync(eqCalibration.readShot, screenshotPath)
+    sidecar, dump = eqCalibration.readShot(screenshotPath)
     view = eqCalibration.cameraView(dump["camera"])
     frame = eqCalibration.clientFrame(dump["camera"], dump["viewport"])
     viewed = eqCalibration.viewer(dump)
@@ -2136,14 +2142,22 @@ async def calibrateShot(context: Context, screenshotPath: str, fitLight: bool = 
     carried = eqCalibration.carriedLight(dump)
   except ValueError as error:
     raise ToolError(str(error)) from error
+  return {"sidecar": sidecar, "dump": dump, "view": view, "frame": frame, "viewed": viewed, "updates": updates, "carried": carried}
+
+
+async def predictShot(context, screenshotPath, shot, loadOrderZone, exportedOnly, source, fitLight):
+  """The prediction calibrateShot and compareShot share, on the open scene: the dump's zone values set (setZoneProperties), what stands
+  in view placed in "<zone> dump" (placeFromDump, its models from loadOrderZone's load order), the dump's camera rendered with its
+  passes (exportedOnly leaving out what a zone export leaves out but the dump's placements), the shot compared, and the run recorded
+  under calibration\\<shot>\\<run> with its source; returns the sheet and the summary."""
+  sidecar, dump, view, frame, viewed, updates, carried = (shot[key] for key in ("sidecar", "dump", "view", "frame", "viewed", "updates", "carried"))
   zone = dump["zone"]["shortName"]
-  await callBridge(context, "newFile", {"discardUnsavedChanges": discardUnsavedChanges})
-  imported = await importClientZone(context, zone, None)
   stored = await callBridge(context, "setZoneProperties", {"updates": updates, "clientZones": await clientZoneIDs()})
   placements, notPlaced = eqCalibration.dumpPlacements(dump)
   shown = eqCalibration.withinView([placement["position"] for placement in placements], view, frame, dump["camera"]["farClip"]).tolist() if placements else []
   outOfView = [placement for placement, inView in zip(placements, shown) if not inView]
-  placed, failed = await placeFromDump(context, dump, [placement for placement, inView in zip(placements, shown) if inView], f"{zone} dump")
+  placed, failed = await placeFromDump(context, dump, [placement for placement, inView in zip(placements, shown) if inView], f"{zone} dump", loadOrderZone)
+  keptNames = sorted(entry["name"] for entry in placed) if exportedOnly else []
   runFolder = toolingRoot / "calibration" / Path(screenshotPath).stem / datetime.datetime.now(datetime.UTC).strftime("%Y%m%d-%H%M%S")
   runFolder.mkdir(parents=True, exist_ok=True)
   sky = await zoneSky(stored["zone"])
@@ -2151,9 +2165,11 @@ async def calibrateShot(context: Context, screenshotPath: str, fitLight: bool = 
   described = await callBridge(context, "renderView", {
     "view": view, "outputPath": str(renderPath), "figureModel": None, "shading": "client", "bandHeight": 50.0, "guides": False, "sky": sky,
     "swimVolumes": False, "labels": None, "emitters": await previewEmitterAssets(), "frame": frame, "carriedLight": carried,
+    "exportedOnly": exportedOnly, "keptNames": keptNames,
   })
   passes = passArrays((await callBridge(context, "renderPasses", {
     "view": view, "outputFolder": str(runFolder), "passNames": calibrationPasses if fitLight else ["lit"], "sky": sky, "frame": frame, "carriedLight": carried,
+    "exportedOnly": exportedOnly, "keptNames": keptNames,
   }))["passes"])
 
   def compare():
@@ -2175,16 +2191,86 @@ async def calibrateShot(context: Context, screenshotPath: str, fitLight: bool = 
       (runFolder / f"{name}.npy").unlink(missing_ok=True)
   result = {
     "shot": Path(screenshotPath).name, "zone": zone, "run": runFolder.name, "screenshotPath": str(Path(screenshotPath).resolve()), "dumpPath": sidecar["dump"],
-    "capturedAt": dump["capturedAt"], "view": view, "frame": frame, "conditions": eqCalibration.conditions(dump, sidecar, stored["zone"]["sky"], carried, viewed),
+    "capturedAt": dump["capturedAt"], "source": source, "view": view, "frame": frame,
+    "conditions": eqCalibration.conditions(dump, sidecar, stored["zone"]["sky"], carried, viewed),
     "zoneProperties": updates, "rendererSource": eqCalibration.rendererSource(serverDirectory), "comparison": numbers, "fitLight": fitted,
     "placed": placed, "notPlaced": notPlaced + failed, "outOfView": [placement["name"] for placement in outOfView], "dumpProblems": dump["problems"],
     "pointLights": described["pointLights"], "emitters": described["emitters"], "sheetPath": str(runFolder / "sheet.jpg"), "runFolder": str(runFolder),
   }
   (runFolder / "result.json").write_text(json.dumps(result, indent=1), encoding="utf-8")
-  summary = {key: value for key, value in result.items() if key not in ("placed", "outOfView")} | {
-    "placed": len(placed), "outOfView": len(outOfView), "import": imported["source"],
-  }
-  return [Image(data=(runFolder / "sheet.jpg").read_bytes(), format="jpeg"), summary]
+  summary = {key: value for key, value in result.items() if key not in ("placed", "outOfView")} | {"placed": len(placed), "outOfView": len(outOfView)}
+  return Image(data=(runFolder / "sheet.jpg").read_bytes(), format="jpeg"), summary
+
+
+@guardedTool(description=(
+  "Calibrate the renderer against a claudelink shot of the spare RoF2 client (see the calibrate-renderer skill): screenshotPath is the"
+  " shot's PNG, beside its sidecar (<shot>.json), which names the zone dump taken in the same frame." + shotRefusals +
+  " Opens a new file (discarding unsaved changes only with discardUnsavedChanges), imports the dump's zone from the client's own files as"
+  " importZone does, and leaves that file open; a zone the client lacks (one only the spare holds), or an exported archive, is measured"
+  " by compareShot." + predictionHelp
+))
+async def calibrateShot(context: Context, screenshotPath: str, fitLight: bool = False, discardUnsavedChanges: bool = False):
+  shot = await anyio.to_thread.run_sync(shotInputs, screenshotPath)
+  zone = shot["dump"]["zone"]["shortName"]
+  await callBridge(context, "newFile", {"discardUnsavedChanges": discardUnsavedChanges})
+  imported = await importClientZone(context, zone, None)
+  sheet, summary = await predictShot(context, screenshotPath, shot, zone, False, {"kind": "clientZone", "path": None, "zoneDrift": None}, fitLight)
+  return [sheet, summary | {"import": imported["source"]}]
+
+
+@guardedTool(description=(
+  "Measure the preview of the open work file, or of an exported archive, against a claudelink shot of the spare RoF2 client, for a zone"
+  " the client lacks (one only the spare holds) or an export: screenshotPath is the shot's PNG, beside its sidecar (<shot>.json), which"
+  " names the zone dump taken in the same frame." + shotRefusals +
+  " Needs the open work file saved with no unsaved changes (refused when never saved or unsaved: saveFile), as verifyExport does."
+  " Without archivePath the open scene is drawn, with everything a zone export leaves out hidden (reference zones, importZoneFile"
+  " references, plot borders, placed spawns, guides), as the client never draws them, the dump's own placements kept; the dump's zone"
+  " must be the file's shortName (setZoneProperties), refused naming both otherwise. With archivePath (an absolute existing .eqg whose"
+  " stem is the dump's zone, refused otherwise) a new file holds the archive as importZoneFile brings it, and that is drawn, as"
+  " verifyExport's archive views are. The dump's values drive the render (the clock, the header's fog and clips, the sky type the"
+  " client resolved, the viewer's special ambient and carried light), never the work file's stored ones, which are never rewritten:"
+  " where the file holds a sky type, fogStart, fogEnd, fogDensity, fogOn, minClip, maxClip, newEngineZone, or zoneId unlike the"
+  " dump's, the result's source.zoneDrift reports each with both values, a report, never a refusal. The dump's models come from the"
+  " zone's own archives when the client has them, else from its startup archives. Afterwards the saved work file is opened again, so no"
+  " placement, property change, or unsaved flag survives." + predictionHelp
+))
+async def compareShot(context: Context, screenshotPath: str, archivePath: str | None = None, fitLight: bool = False):
+  shot = await anyio.to_thread.run_sync(shotInputs, screenshotPath)
+  zone = shot["dump"]["zone"]["shortName"]
+  status = await callBridge(context, "getStatus", {})
+  if status["filePath"] is None:
+    raise ToolError("compareShot measures the preview of the open work file as saved, and this scene was never saved: save it as a work file (saveFile with a path)")
+  if status["unsavedChanges"]:
+    raise ToolError("The open file has unsaved changes; compareShot measures the preview of the work file as saved: save it (saveFile) or open it again")
+  workFile = status["filePath"]
+  stored = await callBridge(context, "getZoneProperties", {})
+  if archivePath is None:
+    if "shortName" not in stored or stored["shortName"] != zone:
+      opened = f"the short name '{stored['shortName']}'" if "shortName" in stored else "no short name"
+      raise ToolError(
+        f"The shot is of zone '{zone}', but the open work file {workFile} has {opened} (setZoneProperties shortName): compareShot measures a"
+        " shot of the open file's own zone, or of an export of it (archivePath)"
+      )
+    source = {"kind": "workFile", "path": workFile}
+  else:
+    archive = Path(archivePath)
+    if not archive.is_absolute() or archive.suffix.lower() != ".eqg" or not archive.is_file():
+      raise ToolError(f"'{archivePath}' is not an absolute path to an existing .eqg file")
+    if archive.stem.lower() != zone:
+      raise ToolError(f"The shot is of zone '{zone}', but {archive.name} is zone '{archive.stem.lower()}': compareShot measures a shot of the archive's own zone")
+    source = {"kind": "archive", "path": str(archive)}
+  source["zoneDrift"] = eqCalibration.zoneDrift(stored, shot["updates"])
+  try:
+    if archivePath is not None:
+      await callBridge(context, "newFile", {"discardUnsavedChanges": True})
+      await importZoneFile(context, str(archive))
+    clientHasZone = bool(await anyio.to_thread.run_sync(zoneSources.zoneVariants, zoneSources.resolveClientRoot(), zone))
+    sheet, summary = await predictShot(context, screenshotPath, shot, zone if clientHasZone else None, archivePath is None, source, fitLight)
+  finally:
+    # A cancelled or failed call must still leave Blender on the saved work file, never on the archive or with the dump's values set.
+    with anyio.CancelScope(shield=True):
+      await openWorkFile(context, workFile, True)
+  return [sheet, summary]
 
 
 @guardedTool()

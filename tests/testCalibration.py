@@ -9,6 +9,7 @@ import pytest
 from PIL import Image
 
 from claudelinkShots import actor, spawnRecord, writeShot, zoneDump
+from conftest import serverRowValues, writePNG
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
 import clientPointLights
@@ -101,6 +102,23 @@ def testTheDumpGivesTheZoneTheViewerAndTheLightTheClientDrew():
   elf = dump | {"spawns": [dump["spawns"][0] | {"look": dump["spawns"][0]["look"] | {"race": 4}}]}
   with pytest.raises(ValueError, match="race 4"):
     eqCalibration.viewer(elf)
+
+
+def testZoneDriftListsEachValueTheFileHoldsOtherwiseThanTheDump():
+  dump = smallDump()
+  updates = eqCalibration.zoneProperties(dump, eqCalibration.viewer(dump)["specialAmbientColor"])
+  # The sky's hour is the artist's preview hour, not drift; the stored values' types are Blender's (ints where the dump holds floats).
+  alike = {
+    "sky": {"type": "highpasshold", "hour": 9, "minute": 0}, "fogStart": 200, "fogEnd": 1500, "fogDensity": 0.33, "fogOn": False, "minClip": 50,
+    "maxClip": 1500, "newEngineZone": False, "shortName": "highpasshold", "zoneId": 407, "safePoint": [0, 0, 0, 0],
+  }
+  assert eqCalibration.zoneDrift(alike, updates) == {}
+  drifted = {key: value for key, value in alike.items() if key != "fogDensity"} | {"sky": "none", "fogEnd": 2400, "minClip": 100, "zoneId": 788}
+  assert eqCalibration.zoneDrift(drifted, updates) == {
+    "skyType": {"stored": "none", "dump": "highpasshold"}, "fogEnd": {"stored": 2400, "dump": 1500.0}, "fogDensity": {"stored": None, "dump": 0.33},
+    "minClip": {"stored": 100, "dump": 50.0}, "zoneId": {"stored": 788, "dump": 407},
+  }
+  assert eqCalibration.zoneDrift({}, updates)["skyType"] == {"stored": None, "dump": "highpasshold"}
 
 
 def testWhatTheDumpPlacesStandsWhereItsActorsStand():
@@ -208,4 +226,115 @@ def testCalibrationPredictsAClaudelinkShotOfAnEQGZoneFromItsDump(stageBlenderSer
   assert fit["predicted"]["residual"] < 0.02 and fit["fitted"]["residual"] < 0.02 and fit["unclampedPixels"] < fit["pixels"]
   assert max(abs(measured - expected) for measured, expected in zip(fit["fitted"]["ambientColor"], fit["predicted"]["ambientColor"])) < 0.02
   latest = [entry for entry in status["calibration"] if entry["shot"] == "shot.png"]
-  assert [(entry["runs"], entry["meanPixelDifference"], entry["gameTime"]) for entry in latest] == [(2, fitted["comparison"]["meanPixelDifference"], "13:31")]
+  assert [(entry["runs"], entry["meanPixelDifference"], entry["gameTime"], entry["source"]) for entry in latest] == [
+    (2, fitted["comparison"]["meanPixelDifference"], "13:31", {"kind": "clientZone", "path": None}),
+  ]
+  assert predicted["source"] == {"kind": "clientZone", "path": None, "zoneDrift": None}
+
+
+# The compared zone: a short name the client does not register, so its sky type resolves to the client's default and its models come
+# from the startup archives. The file's view values differ from the dump's header in fogEnd and minClip alone.
+comparedZone = "compared"
+comparedFileValues = {
+  "sky": {"type": comparedZone, "hour": 9, "minute": 0}, "fogStart": 200.0, "fogEnd": 3000.0, "fogDensity": 0.33, "fogOn": True, "minClip": 50.0,
+  "maxClip": 4000.0, "newEngineZone": False,
+}
+comparedFogSet = {"red": 200, "green": 200, "blue": 200, "start": 200, "end": 2400}
+comparedDrift = {"fogEnd": {"stored": 3000.0, "dump": 2400.0}, "minClip": {"stored": 50.0, "dump": 500.0}}
+# From 20 up at Blender (-60, 0), looking along +X (heading 0) and 14 degrees down at the crate, the guard, and the dropped kiln.
+comparedCamera = {"y": -60.0, "x": 0.0, "z": 20.0, "heading": 0, "pitch": -20}
+guardAt, kilnAt = (15.0, 0.0, 0.0), (20.0, 10.0, 0.0)
+
+
+def comparedDump():
+  """A dump of the compared zone at noon with a fogged header: the viewer carries no light; the kiln lies dropped in view."""
+  noLight = {"type": 0, "tag": "", "position": (comparedCamera["y"], comparedCamera["x"], comparedCamera["z"] - 3.69), "radius": 0}
+  return zoneDump(
+    comparedZone, serverRowValues(comparedZone)["zoneId"], (960, 540), comparedCamera, (12, 0), noLight, 0.1, comparedFogSet, 4000,
+    groundItems=[{"dropId": 5, "name": "IT10800_ACTORDEF", "actor": "0x13"}], actors=[actor("0x13", "IT10800_ACTORDEF", kilnAt, 100, 1)],
+    fogOnOff=255, minClip=500,
+  )
+
+
+async def comparedWorkFile(session, folder):
+  """Flat ground with a crate and a placed guard spawn (the server's data, which a client draws only from its own rows), the zone row's
+  values, saved as compared.blend in folder; returns its path."""
+  await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+  await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [200, 200], "spacing": 10, "location": [0, 0, 0], "collection": "terrain"})
+  await session.expectSuccess("createMaterial", {"name": "grass", "diffuseTexture": str(writePNG(folder / "grass.png", 4, 4, (90, 120, 60, 255)))})
+  await session.expectSuccess("createMaterial", {"name": "stone", "diffuseTexture": str(writePNG(folder / "stone.png", 4, 4, (120, 110, 100, 255)))})
+  await session.expectSuccess("assignMaterial", {"objectName": "ground", "materialName": "grass"})
+  await session.expectSuccess("projectUVs", {"objectName": "ground", "method": "planar", "worldUnitsPerRepeat": 64, "direction": [0, 0, 1]})
+  await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "crate", "size": [8, 8, 8], "location": [14, -6, 0]})
+  await session.expectSuccess("assignMaterial", {"objectName": "crate", "materialName": "stone"})
+  await session.expectSuccess("projectUVs", {"objectName": "crate", "method": "box", "worldUnitsPerRepeat": 8})
+  await session.expectSuccess("setZoneProperties", comparedFileValues | serverRowValues(comparedZone))
+  await session.expectSuccess("placeSpawn", {"zone": None, "model": "HUM", "name": "guard", "height": 6, "location": list(guardAt), "headingDegrees": 270})
+  await session.expectSuccess("saveFile", {"path": str(folder / f"{comparedZone}.blend")})
+  return folder / f"{comparedZone}.blend"
+
+
+@pytest.mark.clientData("calibration")
+def testCompareShotMeasuresAShotOfTheOpenWorkFileAndOfItsExportFromItsDump(stageBlenderServer, tmp_path):
+  dump = comparedDump()
+  zone = eqCalibration.zoneProperties(dump, eqCalibration.viewer(dump)["specialAmbientColor"])
+  pitch = math.radians(comparedCamera["pitch"] * 360 / 512)
+  eye = [comparedCamera["y"], comparedCamera["x"], comparedCamera["z"]]
+  view = {"eye": eye, "target": [eye[0] + math.cos(pitch), eye[1], eye[2] + math.sin(pitch)]}
+  export = tmp_path / "export" / f"{comparedZone}.eqg"
+  export.parent.mkdir()
+
+  async def steps(session):
+    blend = await comparedWorkFile(session, tmp_path)
+    await session.expectSuccess("exportZone", {"path": str(export), "purpose": "test"})
+    # The shot is what the client would draw of the shipped zone under the dump's header, with the kiln it dropped: the scene set up by
+    # hand with the dump's values, the guard gone, and the kiln placed; then the saved file is opened again, as the artist left it.
+    await session.expectSuccess("setZoneProperties", zone)
+    await session.expectSuccess("deleteObjects", {"names": ["guard"]})
+    await session.expectSuccess("placeObject", {"zone": None, "model": "IT10800_ACTORDEF", "name": "kiln", "y": kilnAt[0], "x": kilnAt[1], "z": kilnAt[2], "heading": 100})
+    image, _ = await session.expectImage("renderView", {"view": view, "guides": False})
+    shot = writeShot(tmp_path / "shots", comparedZone, Image.open(io.BytesIO(image)).convert("RGB"), dump)
+    await session.expectSuccess("openFile", {"path": str(blend), "discardUnsavedChanges": True})
+    before = await session.expectSuccess("getSceneSummary", {})
+    predicted = await session.expectImage("compareShot", {"screenshotPath": str(shot)}, mimeType="image/jpeg")
+    after = await session.expectSuccess("getSceneSummary", {})
+    archived = await session.expectImage("compareShot", {"screenshotPath": str(shot), "archivePath": str(export)}, mimeType="image/jpeg")
+    status = await session.expectSuccess("getToolingStatus")
+    otherShot = writeShot(tmp_path / "other", "other", Image.new("RGB", (48, 27)), smallDump())
+    refusals = {
+      "otherZone": await session.expectError("compareShot", {"screenshotPath": str(otherShot)}),
+      "missingArchive": await session.expectError("compareShot", {"screenshotPath": str(shot), "archivePath": str(tmp_path / "missing" / f"{comparedZone}.eqg")}),
+    }
+    await session.expectSuccess("transformObjects", {"names": ["crate"], "translate": [0, 0, 1]})
+    refusals["unsaved"] = await session.expectError("compareShot", {"screenshotPath": str(shot)})
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    refusals["neverSaved"] = await session.expectError("compareShot", {"screenshotPath": str(shot)})
+    return blend, before, predicted[1], after, archived[1], status, refusals
+
+  blend, before, predicted, after, archived, status, refusals = stageBlenderServer.session(steps)
+  # The work file's own route: the dump's header drives the render, the file's fogEnd and minClip reported as drift, never applied; the
+  # guard (left out of the export) is hidden and the dump's kiln kept, so the render is the shot.
+  assert predicted["source"] == {"kind": "workFile", "path": str(blend), "zoneDrift": comparedDrift}
+  assert predicted["zoneProperties"] == zone and predicted["conditions"]["gameTime"] == "12:00" and predicted["conditions"]["carriedLight"] is None
+  assert predicted["placed"] == 1 and predicted["notPlaced"] == [] and predicted["outOfView"] == 0
+  assert predicted["comparison"]["meanPixelDifference"] < 0.5 and predicted["comparison"]["meanSkyDifference"] < 0.5
+  assert 0.3 < predicted["comparison"]["drawnShare"] < 1 and predicted["fitLight"] is None
+  runFolder = Path(predicted["runFolder"])
+  assert runFolder.parent == stageBlenderServer.toolingRoot / "calibration" / comparedZone and runFolder.name == predicted["run"]
+  assert sorted(path.name for path in runFolder.iterdir()) == ["blocks.npy", "blocks.png", "difference.png", "render.png", "result.json", "sheet.jpg", "shot.png"]
+  recorded = json.loads((runFolder / "result.json").read_text(encoding="utf-8"))
+  assert recorded["source"] == predicted["source"] and recorded["comparison"] == predicted["comparison"] and [entry["name"] for entry in recorded["placed"]] == ["groundItem5_IT10800_ACTORDEF"]
+  # Afterwards the saved work file is open again as it was: no dump collection, no placement, the file's own values, nothing unsaved.
+  assert after == before and after["status"] == {"filePath": str(blend), "unsavedChanges": False, "scene": "Scene"}
+  assert f"{comparedZone} dump" not in after["collections"] and "guard" in [entry["name"] for entry in after["objects"]]
+  # The archive route draws the export in a new file, as verifyExport's archive views do, and comes back to the work file too.
+  assert archived["source"] == {"kind": "archive", "path": str(export), "zoneDrift": comparedDrift}
+  assert archived["placed"] == 1 and archived["comparison"]["meanPixelDifference"] < 0.5 and archived["comparison"]["meanSkyDifference"] < 0.5
+  latest = [entry for entry in status["calibration"] if entry["shot"] == f"{comparedZone}.png"]
+  assert [(entry["zone"], entry["runs"], entry["source"], entry["meanPixelDifference"]) for entry in latest] == [
+    (comparedZone, 2, {"kind": "archive", "path": str(export)}, archived["comparison"]["meanPixelDifference"]),
+  ]
+  assert f"The shot is of zone 'highpasshold', but the open work file {blend} has the short name '{comparedZone}'" in refusals["otherZone"]
+  assert f"'{tmp_path / 'missing' / f'{comparedZone}.eqg'}' is not an absolute path to an existing .eqg file" in refusals["missingArchive"]
+  assert "The open file has unsaved changes; compareShot measures the preview of the work file as saved" in refusals["unsaved"]
+  assert "this scene was never saved: save it as a work file (saveFile with a path)" in refusals["neverSaved"]

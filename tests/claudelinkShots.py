@@ -33,9 +33,10 @@ def spawnRecord(spawnID, name, actorAddress, position, heading, race=1, actorDef
   }
 
 
-def zoneDump(shortName, zoneID, viewportSize, camera, time, light, share, fogSet, maxClip, spawns=(), doors=(), groundItems=(), actors=()):
-  """A dump of a zone with a sky (zone type 1) and its fog off, the viewer a human (spawn 1) carrying light {type, tag, position (y, x, z),
-  radius}, its camera (y, x, z, heading, pitch) looking through a viewport of viewportSize at RoF2's half view angle."""
+def zoneDump(shortName, zoneID, viewportSize, camera, time, light, share, fogSet, maxClip, spawns=(), doors=(), groundItems=(), actors=(), fogOnOff=0, minClip=50):
+  """A dump of a zone with a sky (zone type 1), its header's fog switch fogOnOff (0, off) and minClip, the viewer a human (spawn 1)
+  carrying light {type, tag, position (y, x, z), radius}, its camera (y, x, z, heading, pitch) looking through a viewport of
+  viewportSize at RoF2's half view angle."""
   width, height = viewportSize
   scaleX = 1 / math.tan(45 * 2 * math.pi / 512)
   window = {"clientLeft": 0, "clientTop": 23, "clientWidth": width + 2 * windowPadding, "clientHeight": height, "outerLeft": -8, "outerTop": -8, "outerRight": 0, "outerBottom": 0}
@@ -60,7 +61,7 @@ def zoneDump(shortName, zoneID, viewportSize, camera, time, light, share, fogSet
       "time": {"hour": time[0], "minute": time[1]},
       "sky": {"type": {"value": shortName, "kind": "string"}, "enabled": {"value": True, "kind": "bool"}, "render": {"value": True, "kind": "bool"}},
       "zoneHeader": {
-        "shortName": shortName, "fogSets": [fogSet] * 4, "fogOnOff": 0, "zoneType": 1, "sky": 1, "minClip": 50, "maxClip": maxClip, "newEngineZone": 0,
+        "shortName": shortName, "fogSets": [fogSet] * 4, "fogOnOff": fogOnOff, "zoneType": 1, "sky": 1, "minClip": minClip, "maxClip": maxClip, "newEngineZone": 0,
         "zoneId": zoneID, "fogDensity": 0.33,
       },
     },

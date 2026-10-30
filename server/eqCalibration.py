@@ -14,6 +14,7 @@ from PIL import Image
 import clientPointLights
 import eqAxes
 import previewFrame
+import skyDrawing
 import viewerLight
 
 sidecarFormat = ("claudelinkScreenshot", 1)
@@ -50,6 +51,7 @@ fitSamples = 20000
 azimuthStepDegrees = 5.0
 elevationStepDegrees = 5.0
 fitRounds = 3
+driftKeys = ("fogStart", "fogEnd", "fogDensity", "fogOn", "minClip", "maxClip", "newEngineZone", "zoneId")
 # A spawn's look values the dump writes as -1 (a non-Drakkin's tattoo) the client reads past their count, which draws 0.
 lookKeys = ("variation", "headType", "faceStyle", "hairStyle", "hairColor", "facialHair", "facialHairColor", "eyeColor1", "heritage", "tattoo", "details")
 settingsMemoryKeys = (
@@ -214,6 +216,14 @@ def zoneProperties(dump, specialAmbientColor):
     "minClip": max(float(header["minClip"]), clientMinimumClip), "maxClip": float(header["maxClip"]), "newEngineZone": bool(header["newEngineZone"]),
     "shortName": dump["zone"]["shortName"], "zoneId": header["zoneId"], "specialAmbientColor": specialAmbientColor,
   }
+
+
+def zoneDrift(stored, updates):
+  """Where a work file's stored zone values (getZoneProperties) differ from the dump's (zoneProperties): the sky type and each of
+  driftKeys, with the value the file holds (None where it holds none) and the dump's; empty when none differ."""
+  skyType = None if "sky" not in stored else stored["sky"] if stored["sky"] == skyDrawing.noSky else stored["sky"]["type"]
+  pairs = [("skyType", skyType, updates["sky"]["type"])] + [(key, stored[key] if key in stored else None, updates[key]) for key in driftKeys]
+  return {key: {"stored": storedValue, "dump": dumpValue} for key, storedValue, dumpValue in pairs if storedValue != dumpValue}
 
 
 def spawnAppearance(look):
@@ -454,14 +464,16 @@ def fitLight(screen, passes, environment):
 
 
 def latestResults(calibrationRoot):
-  """Each shot's latest calibration run: when, the game time, the mean differences, and the renderer source it drew with."""
+  """Each shot's latest run (calibrateShot's or compareShot's): when, what it drew (its source's kind and path), the game time, the mean
+  differences, and the renderer source it drew with."""
   latest = []
   for shotFolder in sorted(path for path in calibrationRoot.glob("*") if path.is_dir()) if calibrationRoot.is_dir() else []:
     runs = sorted(shotFolder.glob("*/result.json"))
     if runs:
       result = json.loads(runs[-1].read_text(encoding="utf-8"))
       latest.append({
-        "shot": result["shot"], "zone": result["zone"], "run": result["run"], "runs": len(runs), "gameTime": result["conditions"]["gameTime"],
+        "shot": result["shot"], "zone": result["zone"], "run": result["run"], "runs": len(runs),
+        "source": {key: result["source"][key] for key in ("kind", "path")}, "gameTime": result["conditions"]["gameTime"],
         "meanPixelDifference": result["comparison"]["meanPixelDifference"], "meanSkyDifference": result["comparison"]["meanSkyDifference"],
         "rendererSource": result["rendererSource"][:12],
       })
