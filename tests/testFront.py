@@ -66,17 +66,31 @@ def testCallsReachTheWorkerAndReloadServesTheNewCodeWithTheFrontsToolsHidden(sta
     reloaded = await front.call("reloadZonewright", {}, standIn.notify)
     after = await standIn.text(front, "alpha")
     gone = await standIn.text(front, "beta")
-    return before, hidden, reloaded.structured_content, after, gone, sorted(tool.name for tool in front.tools())
+    byName = await standIn.text(front, "callZonewright", {"name": "gamma", "arguments": {"text": "new"}})
+    described = await front.call("describeZonewrightTool", {"name": "gamma"}, standIn.notify)
+    ownTool = await standIn.text(front, "callZonewright", {"name": "reloadZonewright", "arguments": {}})
+    hiddenByName = await standIn.text(front, "callZonewright", {"name": "adoptBridge", "arguments": {"record": {}}})
+    unknownDescribed = await standIn.text(front, "describeZonewrightTool", {"name": "beta"})
+    return (before, hidden, reloaded.structured_content, after, gone, sorted(tool.name for tool in front.tools()), byName,
+      described.structured_content, ownTool, hiddenByName, unknownDescribed)
 
-  before, hidden, changes, after, gone, names = standIn.withFront(work)
+  before, hidden, changes, after, gone, names, byName, described, ownTool, hiddenByName, unknownDescribed = standIn.withFront(work)
   assert before == (False, "alpha 1 hi")
   assert hidden == (True, "handOverBridge is the front's own; reloadZonewright uses it")
   assert changes == {"added": ["gamma"], "removed": ["beta"], "changed": ["alpha"], "instructionsChanged": True,
     "blender": {"handedOver": False, "reason": "no Blender was running"}}
   assert after == (False, "alpha 2")
   assert gone == (True, "zonewright has no tool beta")
-  assert names == ["alpha", "gamma", "progressing", "reloadZonewright", "slow"]
+  assert names == ["alpha", "callZonewright", "describeZonewrightTool", "gamma", "progressing", "reloadZonewright", "slow"]
   assert standIn.notifications == 1
+  # A tool the reload added is callable by name before the user's reconnect shows it, with its schema to call it by.
+  assert byName == (False, "gamma 2 new")
+  assert described == {"name": "gamma", "description": "gamma of version 2", "inputSchema": {
+    "properties": {"text": {"default": "", "title": "Text", "type": "string"}}, "title": "toolArguments", "type": "object",
+  }}
+  assert ownTool == (True, "reloadZonewright is the front's own: call it directly")
+  assert hiddenByName == (True, "adoptBridge is the front's own; reloadZonewright uses it")
+  assert unknownDescribed == (True, "zonewright has no tool beta")
 
 
 def testReloadHandsBlenderFromTheOldWorkerToTheNew(standIn):

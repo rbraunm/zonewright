@@ -22,6 +22,9 @@ import toolingLog
 import toolingStatus
 
 reloadToolName = "reloadZonewright"
+callToolName = "callZonewright"
+describeToolName = "describeZonewrightTool"
+frontTools = (reloadToolName, callToolName, describeToolName)
 handOverToolName = "handOverBridge"
 adoptToolName = "adoptBridge"
 frontOnlyTools = (handOverToolName, adoptToolName)
@@ -34,7 +37,16 @@ reloadTool = types.Tool(name=reloadToolName, input_schema={"type": "object", "pr
   " was handed over. Refused while other zonewright calls are running. If the new code fails to start, the running server stays and the"
   " failure is returned. Changed Blender-side code (bridge*.py) still restarts Blender on the next call once the open file is saved."
   " Tool lists refresh; a change to zonewrightFront.py or to the server instructions reaches Claude only after the user reconnects"
-  " zonewright in /mcp."))
+  " zonewright in /mcp, and so does a tool the reload added: until then callZonewright calls it by name."))
+callTool = types.Tool(name=callToolName, input_schema={
+  "type": "object", "properties": {"name": {"type": "string"}, "arguments": {"type": "object"}}, "required": ["name", "arguments"],
+}, description=(
+  "Calls a zonewright tool by name with its arguments, exactly as calling it directly would, for a tool reloadZonewright added, which"
+  " this session's tool list shows only after the user reconnects zonewright in /mcp (describeZonewrightTool gives its description and"
+  " input schema). Refused for the front's own tools and for a tool the running zonewright lacks."))
+describeTool = types.Tool(name=describeToolName, input_schema={"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]},
+  description=("A running zonewright tool's description and input schema, for one reloadZonewright added that this session's tool list"
+    " does not show yet; callZonewright calls it."))
 log = logging.getLogger("zonewrightFront")
 
 
@@ -141,11 +153,30 @@ class Front:
       log.warning("killed Blender processes the worker left running: %s", survivors)
 
   def tools(self):
-    return [tool for name, tool in self.worker.tools.items() if name not in frontOnlyTools] + [reloadTool]
+    return [tool for name, tool in self.worker.tools.items() if name not in frontOnlyTools] + [reloadTool, callTool, describeTool]
+
+  def describe(self, name):
+    if name in frontTools or name in frontOnlyTools:
+      return failed(f"{name} is the front's own")
+    if name not in self.worker.tools:
+      return failed(f"zonewright has no tool {name}")
+    tool = self.worker.tools[name]
+    described = {"name": name, "description": tool.description, "inputSchema": tool.input_schema}
+    return types.CallToolResult(content=[types.TextContent(type="text", text=json.dumps(described))], structured_content=described)
 
   async def call(self, name, arguments, notifyToolsChanged, reportProgress=None):
     if name == reloadToolName:
       return await self.reload(notifyToolsChanged)
+    if name in (callToolName, describeToolName):
+      if not isinstance(arguments, dict) or not isinstance(arguments.get("name"), str):
+        return failed(f"{name} takes the name of a zonewright tool")
+      if name == describeToolName:
+        return self.describe(arguments["name"])
+      if arguments["name"] in frontTools:
+        return failed(f"{arguments['name']} is the front's own: call it directly")
+      if not isinstance(arguments.get("arguments"), dict):
+        return failed(f"{callToolName} takes the tool's arguments as an object")
+      return await self.call(arguments["name"], arguments["arguments"], notifyToolsChanged, reportProgress)
     if name in frontOnlyTools:
       return failed(f"{name} is the front's own; {reloadToolName} uses it")
     async with self.lock:
