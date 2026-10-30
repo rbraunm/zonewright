@@ -7,10 +7,36 @@ import numpy
 # The zone properties a sky supplies: eqgame.exe takes the light and the fog color from the sky when the zone draws one.
 suppliedZoneKeys = ("ambientColor", "fogColor", "sunColor", "bounceColor", "sunAzimuthDegrees", "sunElevationDegrees")
 noSky = "none"
+skyKeys = {"type": str, "weather": str, "hour": int, "minute": int}
+# What a render may take in place of the zone's sky: its clock time, and a weather; the type stays the zone's.
+overrideKeys = ("hour", "minute", "weather")
 # The dome's rings by angle from its pole (0x1002f110): the pole and a ring at 0.01 radians take row 0, ring r (0-28) at
 # 0.1 + r * (pi - 0.2) / 29 takes row r + 1, and the bottom row 29; colors run smoothly between rings.
 domeRingAngles = numpy.array([0.0, 0.01] + [0.1 + ring * (math.pi - 0.2) / 29 for ring in range(29)] + [math.pi])
 domeRingRows = numpy.array([0, 0] + [ring + 1 for ring in range(29)] + [29])
+
+
+def validateSky(sky):
+  if not isinstance(sky, dict) or sorted(set(sky) - set(skyKeys)) or not {"type", "hour", "minute"} <= set(sky):
+    raise ValueError(f"sky must be {{type, weather (optional), hour, minute}}, got {sky!r}")
+  for key, value in sky.items():
+    if not isinstance(value, skyKeys[key]) or isinstance(value, bool) or (isinstance(value, str) and not value):
+      raise ValueError(f"sky {key} must be a {skyKeys[key].__name__}, got {value!r}")
+  if not 0 <= sky["hour"] <= 23 or not 0 <= sky["minute"] <= 59:
+    raise ValueError(f"sky hour must be 0-23 and minute 0-59, got {sky['hour']}:{sky['minute']}")
+
+
+def skyAt(stored, override):
+  """The stored sky {type, weather, hour, minute} drawn at an override's clock time, {hour, minute} both given, and at its weather
+  when it gives one; the type stays the zone's."""
+  if not isinstance(override, dict) or not {"hour", "minute"} <= set(override):
+    raise ValueError(f"A render's sky is {{hour, minute, weather (optional)}}, hour and minute both given, got {override!r}")
+  stray = sorted(set(override) - set(overrideKeys))
+  if stray:
+    raise ValueError(f"A render's sky takes only hour, minute, and weather, not {stray}: the type stays the zone's")
+  sky = stored | override
+  validateSky(sky)
+  return sky
 
 
 def domeColors(directions, dome):

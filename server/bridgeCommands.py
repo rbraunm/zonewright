@@ -51,7 +51,6 @@ zonePropertyKeys = (
 )
 # The client raises a lower minimum clip to this (eqgame 0x4c9ee6).
 clientMinimumClip = 50.0
-skyKeys = {"type": str, "weather": str, "hour": int, "minute": int}
 fileImageSources = ("FILE", "SEQUENCE", "TILED")
 
 
@@ -220,16 +219,6 @@ def drawsSky(zone):
   return zone.get("sky", skyDrawing.noSky) != skyDrawing.noSky
 
 
-def validateSky(sky):
-  if not isinstance(sky, dict) or sorted(set(sky) - set(skyKeys)) or not {"type", "hour", "minute"} <= set(sky):
-    raise ValueError(f"sky must be {{type, weather (optional), hour, minute}}, got {sky!r}")
-  for key, value in sky.items():
-    if not isinstance(value, skyKeys[key]) or isinstance(value, bool) or (isinstance(value, str) and not value):
-      raise ValueError(f"sky {key} must be a {skyKeys[key].__name__}, got {value!r}")
-  if not 0 <= sky["hour"] <= 23 or not 0 <= sky["minute"] <= 59:
-    raise ValueError(f"sky hour must be 0-23 and minute 0-59, got {sky['hour']}:{sky['minute']}")
-
-
 def isFiniteNumber(value):
   return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
@@ -313,7 +302,7 @@ def setZoneProperties(updates, clientZones=None, clientString=None):
   zone = readZoneProperties(bpy.context.scene) | updates
   replaced = []
   if drawsSky(zone):
-    validateSky(zone["sky"])
+    skyDrawing.validateSky(zone["sky"])
     supplied = sorted(set(updates) & set(skyDrawing.suppliedZoneKeys))
     if supplied:
       raise ValueError(f"The zone's sky supplies {supplied}; state that it draws none (sky \"none\") to set them by hand")

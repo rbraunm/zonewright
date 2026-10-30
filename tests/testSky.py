@@ -1,8 +1,10 @@
 import math
+import re
 import sys
 from pathlib import Path
 
 import numpy
+import pytest
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
@@ -12,6 +14,12 @@ from conftest import everquestClient
 
 clientRoot = Path(everquestClient)
 skyFolder = clientRoot / "Resources" / "Sky"
+# A zone's view values a sky does not supply, and the light a zone drawing no sky sets by hand.
+viewValues = {"specialAmbientColor": [0, 0, 0], "fogStart": 30, "fogEnd": 2000, "fogDensity": 0.33, "fogOn": True, "maxClip": 4000, "newEngineZone": False}
+handLight = {
+  "ambientColor": [0.3, 0.3, 0.35], "bounceColor": [0, 0, 0], "sunColor": [0.6, 0.57, 0.5], "sunAzimuthDegrees": 135, "sunElevationDegrees": 45,
+  "fogColor": [0.55, 0.6, 0.7],
+}
 
 
 def colorMapPixel(fileName, row, column):
@@ -77,6 +85,27 @@ def testAnUnknownWeatherIsRefusedNamingIt(tmp_path):
     raise AssertionError("an unknown weather resolved")
 
 
+def testARendersSkyTakesAnHourAndAWeatherOverTheZonesAndRefusesTheRest():
+  stored = {"type": "highpasshold", "weather": "DefaultClear", "hour": 13, "minute": 0}
+  assert skyDrawing.skyAt(stored, {"hour": 1, "minute": 0}) == {"type": "highpasshold", "weather": "DefaultClear", "hour": 1, "minute": 0}
+  assert skyDrawing.skyAt(stored, {"hour": 21, "minute": 30, "weather": "DefaultRain"}) == {"type": "highpasshold", "weather": "DefaultRain", "hour": 21, "minute": 30}
+  assert skyDrawing.skyAt({"type": "default", "hour": 13, "minute": 0}, {"hour": 0, "minute": 59}) == {"type": "default", "hour": 0, "minute": 59}
+  refusals = {
+    "hour alone": ({"hour": 1}, "hour and minute both given, got {'hour': 1}"),
+    "a stray key": ({"hour": 1, "minute": 0, "type": "default"}, "takes only hour, minute, and weather, not ['type']"),
+    "hour 24": ({"hour": 24, "minute": 0}, "sky hour must be 0-23 and minute 0-59, got 24:0"),
+    "minute 60": ({"hour": 1, "minute": 60}, "sky hour must be 0-23 and minute 0-59, got 1:60"),
+    "a bool hour": ({"hour": True, "minute": 0}, "sky hour must be a int, got True"),
+    "an empty weather": ({"hour": 1, "minute": 0, "weather": ""}, "sky weather must be a str, got ''"),
+    "not a dict": ([1, 0], "hour and minute both given, got [1, 0]"),
+  }
+  for override, message in refusals.values():
+    with pytest.raises(ValueError, match=re.escape(message)):
+      skyDrawing.skyAt(stored, override)
+  with pytest.raises(ValueError, match=re.escape("sky must be {type, weather (optional), hour, minute}, got {'type': 'default', 'hour': 1}")):
+    skyDrawing.validateSky({"type": "default", "hour": 1})
+
+
 def flatSky():
   return {
     "environment": {"fogColor": [0.2, 0.3, 0.4]},
@@ -130,10 +159,7 @@ def renderedPixel(path, column, row):
 
 
 def testPreviewsDrawTheZonesSkyAndTakeItsLight(stageBlenderServer, tmp_path):
-  handSet = {
-    "ambientColor": [0.3, 0.3, 0.35], "bounceColor": [0, 0, 0], "sunColor": [0.6, 0.57, 0.5], "sunAzimuthDegrees": 135, "sunElevationDegrees": 45,
-    "fogColor": [0.55, 0.6, 0.7], "specialAmbientColor": [0, 0, 0], "fogStart": 30, "fogEnd": 2000, "fogDensity": 0.33, "fogOn": True, "maxClip": 4000, "newEngineZone": False,
-  }
+  handSet = handLight | viewValues
   sky = {"type": "highpasshold", "hour": 13, "minute": 0}
   views = {"towardSun": [0, 100, 100], "awayFromSun": [0, -100, 100], "level": [100, 0, 0]}
 
@@ -166,3 +192,44 @@ def testPreviewsDrawTheZonesSkyAndTakeItsLight(stageBlenderServer, tmp_path):
   assert numpy.allclose(measured[2], state["environment"]["fogColor"], atol=1 / 255)
   assert removed["zone"]["sky"] == "none" and removed["sky"] is None
   assert "Zone properties missing" in unlit and "ambientColor" in unlit
+
+
+def testARenderTakesAnotherHourWithoutChangingTheZonesSky(stageBlenderServer, tmp_path):
+  sky = {"type": "highpasshold", "hour": 13, "minute": 0}
+  night = {"hour": 1, "minute": 0}
+  view = {"eye": [0, 0, 0], "target": [0, 100, 100]}
+
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    await session.expectSuccess("setZoneProperties", viewValues | {"sky": sky})
+    before = await session.expectImage("renderView", {"view": view})
+    atNight = await session.expectImage("renderView", {"view": view, "sky": night})
+    properties = (await session.expectSuccess("getSceneSummary"))["zoneProperties"]
+    after = await session.expectImage("renderView", {"view": view})
+    refusals = [
+      await session.expectError("renderView", {"view": view, "sky": night | {"weather": "NoSuchWeather"}}),
+      await session.expectError("renderView", {"view": view, "sky": {"hour": 1}}),
+      await session.expectError("renderView", {"view": view, "sky": night, "shading": "layout"}),
+    ]
+    await session.expectSuccess("setZoneProperties", {"sky": "none"})
+    await session.expectSuccess("setZoneProperties", handLight)
+    noSky = await session.expectError("renderView", {"view": view, "sky": night})
+    return before, atNight, properties, after, refusals, noSky
+
+  before, atNight, properties, after, refusals, noSky = stageBlenderServer.session(steps)
+  # Asked for 1:00, the render draws the 1:00 sky, lit by the moon, and says so; the zone keeps 13:00, and the next render is the
+  # 13:00 one again, byte for byte.
+  state = eqSky.skyState(clientRoot, tmp_path, sky | night)
+  textures = {texture["path"]: numpy.load(texture["path"]) for satellite in state["satellites"] for texture in satellite["textures"]}
+  expected = skyDrawing.skyColors(numpy.array([direction(0, 45)], dtype=numpy.float32), state, 0.0, textures)[0]
+  nightPixel, dayPixel = renderedPixel(atNight[1]["outputPath"], 480, 270), renderedPixel(before[1]["outputPath"], 480, 270)
+  assert state["lightFrom"] == "moon" and numpy.abs(nightPixel - expected).max() <= 2 / 255
+  assert numpy.abs(nightPixel - dayPixel).max() > 20 / 255
+  assert atNight[1]["sky"] == {"hour": 1, "minute": 0, "weather": "DefaultClear", "lightFrom": "moon"}
+  assert "sky" not in before[1] and "sky" not in after[1]
+  assert properties["sky"] == sky
+  assert after[0] == before[0]
+  assert "WeatherPattern 'NoSuchWeather'" in refusals[0]
+  assert "hour and minute both given" in refusals[1]
+  assert "A sky lights only client shading, not 'layout'" in refusals[2]
+  assert "The zone draws no sky, so no hour can light it; setZoneProperties sets one" in noSky

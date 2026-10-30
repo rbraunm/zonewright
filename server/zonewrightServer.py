@@ -277,6 +277,59 @@ async def zoneSky(zone):
   return await resolveSky(zone["sky"]) if zone.get("sky", skyDrawing.noSky) != skyDrawing.noSky else None
 
 
+def skyOverride(zone, sky):
+  """The zone's stored sky drawn at a render's sky {hour, minute, weather (optional)} (skyDrawing.skyAt); the zone's property is
+  never written."""
+  if zone.get("sky", skyDrawing.noSky) == skyDrawing.noSky:
+    raise ToolError("The zone draws no sky, so no hour can light it; setZoneProperties sets one")
+  try:
+    return skyDrawing.skyAt(zone["sky"], sky)
+  except ValueError as error:
+    raise ToolError(str(error)) from error
+
+
+async def viewSky(zone, sky):
+  """The sky state a render draws: the zone's own (zoneSky) with sky None, else its sky at the override's clock time and weather."""
+  return await zoneSky(zone) if sky is None else await resolveSky(skyOverride(zone, sky))
+
+
+async def viewSkies(zone, skies):
+  """The sky state each of a sheet's views draws (viewSky), each distinct override resolved once."""
+  resolved, states = {}, []
+  for sky in skies:
+    key = None if sky is None else json.dumps(sky, sort_keys=True)
+    if key not in resolved:
+      resolved[key] = await viewSky(zone, sky)
+    states.append(resolved[key])
+  return states
+
+
+def drawnSky(state):
+  """What a render drawn at a sky override states of it: the clock hour and minute, the weather, and what lights the scene."""
+  return {key: state[key] for key in ("hour", "minute", "weather", "lightFrom")}
+
+
+def keptSky(cameras, name):
+  """The sky override a review camera keeps (saveReviewCamera sky), or None: for one keeping none, or for any other camera."""
+  return next((camera["sky"] for camera in cameras["cameras"] if camera["name"] == name), None)
+
+
+def clockLabel(sky):
+  return f"at {sky['hour']:02d}:{sky['minute']:02d}"
+
+
+async def renderedSky(context, zone, view, shading, sky):
+  """The sky state a render draws and what it states of it (drawnSky, or None at the zone's own): the sky given, else in client
+  shading the kept sky of the review camera the view names, else the zone's own; a sky given with any other shading is refused, as
+  those draw nothing from its light."""
+  if sky is not None and shading != "client":
+    raise ToolError(f"A sky lights only client shading, not '{shading}': the other shadings draw nothing from it")
+  if sky is None and shading == "client" and "camera" in view:
+    sky = keptSky(await callBridge(context, "getReviewCameras", {}), view["camera"])
+  state = await viewSky(zone, sky)
+  return state, None if sky is None else drawnSky(state)
+
+
 async def clientZoneIDs():
   """The zones the client registers, short name to id (eqClientZones), read from its eqgame.exe in place."""
   return (await clientRegistrations()).idsByShortName()
@@ -961,8 +1014,9 @@ async def setZoneProperties(
   every zone without its own does. weather defaults to the type's DefaultWeather. hour and minute place the sun, at its highest at
   12:00 (the client's own clock, which claudelink's dumps read). Previews draw the sky behind the zone and take the
   ambient, bounce, sun color and direction, and fog color from it, so those cannot be set by hand while it is set, and setting it
-  drops any set before; sky "none" states that the zone draws no sky (its zone row's sky 0, as about a third of the client's EQG
-  zones have), so previews show the fog color where nothing is drawn and the light and fog color are set by hand. safePoint [x, y, z, headingDegrees] is where players arrive in the zone (the zone
+  drops any set before (a render may take another hour or weather, renderView's sky, without changing it); sky "none" states that
+  the zone draws no sky (its zone row's sky 0, as about a third of the client's EQG zones have), so previews show the fog color
+  where nothing is drawn and the light and fog color are set by hand. safePoint [x, y, z, headingDegrees] is where players arrive in the zone (the zone
   row's safe point; heading 0 = +Y, clockwise) and underworld the height below it under which the client puts a falling player back;
   a game export needs both, with ground the zone ships under the safe point above the underworld. The zone's server row (docs/serverFiles.md,
   Zone row), which a game export needs whole: shortName, the zone's short name (1 to 31 lowercase letters and digits, which names its
@@ -1175,6 +1229,11 @@ async def scaleFigureModel(zone, view):
   " the client sets it for the player: the floor of its vision (0.08) times one less the share of scene light of the floor under it,"
   " found by the drop the client makes under the player's actor, the character taken to be a human of height 6; the result's viewer"
   " gives the share and the color, or, for an EQG or EQ terrain zone, why the zone's specialAmbientColor stands."
+  " sky {\"hour\": h, \"minute\": m, \"weather\": w (optional)} draws the view, in client shading only, at that clock time on the zone's"
+  " own sky type, the sky, its light, and its fog color as the client shows them then (a night render at 1:00 is lit by the moon);"
+  " the zone's sky property is never changed by a render, and a zone drawing no sky is refused. A review camera keeping a sky"
+  " (saveReviewCamera) renders at it when the view names it and no sky is given. The result's sky then states the hour, minute,"
+  " weather, and lightFrom drawn; at the zone's own sky the result has none."
 ))
 async def renderView(
   context: Context, view: dict, shading: str = "client", bandHeight: float = 50.0, guides: bool = True, swimVolumes: bool = False, labels: list[str] | None = None,
@@ -1183,9 +1242,11 @@ async def renderView(
   lane: bool = False,
   bodyGroup: str | None = None,
   normalMaps: bool = False,
+  sky: dict | None = None,
 ):
   outputPath = newRenderPath()
   zone = await callBridge(context, "getZoneProperties", {})
+  state, drawn = await renderedSky(context, zone, view, shading, sky)
   carried = viewersCarriedLight(zone, carriedLight)
   viewer = await viewersSpecialAmbient(context, zone, carriedLight)
   groupName = chosenGroup(bodyGroup, zone.get("builtFor"), playerScale.viewGroup)
@@ -1204,7 +1265,7 @@ async def renderView(
     laneState = {"lane": status, "seconds": seconds, "bodyGroup": groupName, "laneFile": str(reached.path)} | playerReach.laneTerms(reached, description)
   description = await callBridge(context, "renderView", {
     "view": view, "outputPath": str(outputPath), "figureModel": await scaleFigureModel(zone, view), "shading": shading, "bandHeight": bandHeight,
-    "guides": guides, "sky": await zoneSky(zone), "swimVolumes": swimVolumes, "labels": labels, "emitters": await previewEmitterAssets(),
+    "guides": guides, "sky": state, "swimVolumes": swimVolumes, "labels": labels, "emitters": await previewEmitterAssets(),
     "liquidTime": liquidTime,
     "carriedLight": carried, "viewerSpecialAmbient": viewer and viewer.get("specialAmbientColor"), "laneTint": laneTint, "normalMaps": normalMaps,
   })
@@ -1212,7 +1273,7 @@ async def renderView(
     await anyio.to_thread.run_sync(viewSheets.writeNames, outputPath, description["labels"]["shown"])
   if lane:
     await anyio.to_thread.run_sync(laneDrawing.tintLegendUnder, outputPath, description["laneTint"]["labels"])
-  result = description | ({} if carried is None else {"carriedLight": carried}) | ({} if viewer is None else {"viewer": viewer})
+  result = description | ({} if carried is None else {"carriedLight": carried}) | ({} if viewer is None else {"viewer": viewer}) | ({} if drawn is None else {"sky": drawn})
   if laneState is not None:
     result = reported("renderView", result | {"laneState": laneState}, resultReports.withoutLaneTerms)
   return [Image(data=outputPath.read_bytes(), format="png"), result]
@@ -3197,14 +3258,18 @@ sheetViews = 16
 sheetColumns = 4
 
 
-async def renderSheet(context, zone, views, labels, shading, figureModel, swimVolumes=False):
-  """Render each view (with progress; swimVolumes tints the swim boxes), lay them out on one sheet labeled under each, and return the
-  sheet and the renders' paths. figureModel stands the scale figure in a review camera's view and where a view gives figureAt, never
-  walked ahead."""
-  sky = await zoneSky(zone)
+async def renderSheet(context, zone, views, labels, shading, figureModel, swimVolumes=False, skies=None, heading=None):
+  """Render each view (with progress; swimVolumes tints the swim boxes), lay them out on one sheet labeled under each (heading, a
+  caption over them), and return the sheet, the renders' paths, and what each render states of its sky (drawnSky; None at the zone's
+  own). figureModel stands the scale figure in a review camera's view and where a view gives figureAt, never walked ahead. skies, a
+  list parallel to views of sky overrides (renderView sky) or None, draws each view at its own, each distinct override resolved
+  once; None for the whole list draws every view at the zone's sky."""
+  if skies is None:
+    skies = [None] * len(views)
+  states = await viewSkies(zone, skies)
   emitters = await previewEmitterAssets()
   cells, paths = [], []
-  for index, (view, label) in enumerate(zip(views, labels)):
+  for index, (view, label, sky) in enumerate(zip(views, labels, states)):
     await context.report_progress(index, len(views), f"rendering {index + 1} of {len(views)}")
     outputPath = newRenderPath()
     await callBridge(context, "renderView", {
@@ -3215,24 +3280,33 @@ async def renderSheet(context, zone, views, labels, shading, figureModel, swimVo
     paths.append(str(outputPath))
   await context.report_progress(len(views), len(views), "laying out the sheet")
   sheetPath = newRenderPath().with_suffix(".jpg")
-  size = viewSheets.writeGrid(cells, min(sheetColumns, len(cells)), sheetPath)
-  return Image(data=sheetPath.read_bytes(), format="jpeg"), {"outputPath": str(sheetPath)} | size, paths
+  size = viewSheets.writeGrid(cells, min(sheetColumns, len(cells)), sheetPath, heading=heading)
+  drawn = [None if sky is None else drawnSky(state) for sky, state in zip(skies, states)]
+  return Image(data=sheetPath.read_bytes(), format="jpeg"), {"outputPath": str(sheetPath)} | size, paths, drawn
 
 
 @guardedTool()
-async def saveReviewCamera(context: Context, name: str, view: dict, note: str):
+async def saveReviewCamera(context: Context, name: str, view: dict, note: str, sky: dict | None = None):
   """Keep a named review camera to look at the zone the same way again: the pose of a renderView view, {"eye", "target"},
   {"standAt", "headingDegrees", "pitchDegrees"} (figureAt optional; where the scale figure stood is kept with it), or {"frame"}, with
   `note`, what to judge from there. It is a camera guide in the reviewCameras collection, kept in the .blend, never drawn in views and
-  never exported; saved again under its name it moves to the new view. renderView {"camera": name} and renderReviewSet render it."""
+  never exported; saved again under its name it moves to the new view. renderView {"camera": name} and renderReviewSet render it.
+  sky {"hour", "minute", "weather" (optional)} keeps a clock time the camera renders at, as renderView's sky draws it, where the
+  light matters (a night camera at a landmark): renderView {"camera": name}, renderReviewSet, and compareToConcept render it then,
+  the zone's own sky untouched; refused for a zone drawing no sky."""
   zone = await callBridge(context, "getZoneProperties", {})
-  return await callBridge(context, "saveReviewCamera", {"name": name, "view": view, "note": note, "sky": await zoneSky(zone), "figureModel": await scaleFigureModel(zone, view)})
+  if sky is not None:
+    await viewSky(zone, sky)
+  return await callBridge(context, "saveReviewCamera", {
+    "name": name, "view": view, "note": note, "sky": await zoneSky(zone), "figureModel": await scaleFigureModel(zone, view), "keptSky": sky,
+  })
 
 
 @guardedTool()
 async def getReviewCameras(context: Context):
   """The review cameras by name: each one's note, the view it was saved from, its eye, heading, and pitch, where its scale figure stands,
-  and the concept art it was matched to (compareToConcept saveAs: the art's path, the frame size, and the vertical field of view)."""
+  the concept art it was matched to (compareToConcept saveAs: the art's path, the frame size, and the vertical field of view), and
+  the sky it keeps (saveReviewCamera sky: the clock time it renders at, or None at the zone's own)."""
   return await callBridge(context, "getReviewCameras", {})
 
 
@@ -3243,19 +3317,29 @@ async def deleteReviewCameras(context: Context, names: list[str]):
 
 
 @guardedTool()
-async def renderReviewSet(context: Context, names: list[str] | None = None, shading: str = "client"):
+async def renderReviewSet(context: Context, names: list[str] | None = None, shading: str = "client", sky: dict | None = None):
   """Render review cameras (all of them by name, or those named, in that order; up to 16) as renderView {"camera": name} does, in any
-  renderView shading, and lay them out on one sheet, each labeled with its name and note; the result gives each render's path."""
+  renderView shading, and lay them out on one sheet, each labeled with its name and note; the result gives each render's path. In
+  client shading a camera keeping a sky (saveReviewCamera sky) renders at its clock time, and sky {"hour", "minute", "weather"
+  (optional)} renders every camera at that time instead, the zone's own sky untouched (refused in any other shading, which draws
+  nothing from it); a camera drawn at a time not the zone's own is labeled "name at HH:MM: note", and its entry gives the sky
+  drawn (hour, minute, weather, lightFrom), None at the zone's own."""
   cameras = {camera["name"]: camera for camera in (await callBridge(context, "getReviewCameras", {}))["cameras"]}
   chosen = list(cameras) if names is None else names
   unknown = sorted(set(chosen) - set(cameras))
   if unknown or not chosen or len(chosen) > sheetViews:
     raise ToolError(f"Name up to {sheetViews} review cameras to render, each one saved (saved: {sorted(cameras)}); got {chosen}")
+  if sky is not None and shading != "client":
+    raise ToolError(f"A sky lights only client shading, not '{shading}': the other shadings draw nothing from it")
   zone = await callBridge(context, "getZoneProperties", {})
-  sheet, size, paths = await renderSheet(
-    context, zone, [{"camera": name} for name in chosen], [f"{name}: {cameras[name]['note']}" for name in chosen], shading, await zoneFigureModel(zone),
-  )
-  return [sheet, size | {"cameras": [{"name": name, "note": cameras[name]["note"], "outputPath": path} for name, path in zip(chosen, paths)]}]
+  if sky is not None:
+    skyOverride(zone, sky)
+  skies = [(cameras[name]["sky"] if sky is None else sky) if shading == "client" else None for name in chosen]
+  labels = [f"{name}: {cameras[name]['note']}" if override is None else f"{name} {clockLabel(override)}: {cameras[name]['note']}" for name, override in zip(chosen, skies)]
+  sheet, size, paths, drawn = await renderSheet(context, zone, [{"camera": name} for name in chosen], labels, shading, await zoneFigureModel(zone), skies=skies)
+  return [sheet, size | {"cameras": [
+    {"name": name, "note": cameras[name]["note"], "outputPath": path, "sky": stated} for name, path, stated in zip(chosen, paths, drawn)
+  ]}]
 
 
 async def viewedSubject(context, nodes, description, target):
@@ -3443,7 +3527,7 @@ async def viewFromLane(context: Context, target: str | list[float] | None = None
 async def compareToConcept(
   context: Context, camera: str | None = None, concept: str | None = None, view: dict | None = None,
   verticalFieldOfViewDegrees: float | None = None, saveAs: str | None = None, note: str | None = None, guides: bool = True,
-  carriedLight: dict | None = None,
+  carriedLight: dict | None = None, sky: dict | None = None,
 ):
   """Compare concept art with the zone seen as the art sees it, as an artist checks work against the art: the zone rendered at the art's
   aspect with a vertical field of view of verticalFieldOfViewDegrees (by default the RoF2 client's at the art's aspect: half its
@@ -3457,7 +3541,10 @@ async def compareToConcept(
   keep it with saveAs (a name) and note (what to judge from it): a review camera that holds the art's path (relative to the .blend once it
   is saved), its frame, and its field of view, which renderView {"camera": name}, renderReviewSet, and compareToConcept camera render as
   matched. compareToConcept camera compares a kept one with its art again. carriedLight draws the light the view's character carries
-  and sets the special ambient it stands in, as renderView's does (for art that is a client screenshot taken by a character)."""
+  and sets the special ambient it stands in, as renderView's does (for art that is a client screenshot taken by a character). sky
+  {"hour", "minute", "weather" (optional)} draws the zone at that clock time, as renderView's sky does, for art painted at an hour
+  (a night painting), and saveAs keeps it on the camera; a kept camera renders at its kept sky unless sky is given; the result's
+  sky states the time drawn when it is not the zone's own."""
   if camera is not None:
     if concept is not None or view is not None or saveAs is not None or note is not None:
       raise ToolError("compareToConcept takes a kept camera alone, or concept and view (with saveAs and note to keep the camera)")
@@ -3467,6 +3554,8 @@ async def compareToConcept(
       raise ToolError(f"'{camera}' is not a review camera matched to concept art; those are {matched}")
     kept = cameras[camera]["concept"]
     conceptPath, fieldOfView, renderedView, frame = kept["path"], kept["verticalFieldOfViewDegrees"], {"camera": camera}, None
+    if sky is None:
+      sky = cameras[camera]["sky"]
   else:
     if concept is None or view is None:
       raise ToolError("compareToConcept needs a kept camera, or concept (the art's path) and view")
@@ -3483,13 +3572,13 @@ async def compareToConcept(
     renderedView = view
     frame = {"size": size, "verticalFieldOfViewDegrees": fieldOfView}
   zone = await callBridge(context, "getZoneProperties", {})
-  sky = await zoneSky(zone)
+  state = await viewSky(zone, sky)
   carried = viewersCarriedLight(zone, carriedLight)
   viewer = await viewersSpecialAmbient(context, zone, carriedLight)
   renderPath = newRenderPath()
   described = await callBridge(context, "renderView", {
     "view": renderedView, "outputPath": str(renderPath), "figureModel": None, "shading": "client", "bandHeight": 50.0, "guides": guides,
-    "sky": sky, "swimVolumes": False, "labels": None, "emitters": await previewEmitterAssets(), "frame": frame, "carriedLight": carried,
+    "sky": state, "swimVolumes": False, "labels": None, "emitters": await previewEmitterAssets(), "frame": frame, "carriedLight": carried,
     "viewerSpecialAmbient": viewer and viewer.get("specialAmbientColor"),
   })
   sheetPath = newRenderPath().with_suffix(".jpg")
@@ -3500,7 +3589,7 @@ async def compareToConcept(
   keptCamera = None
   if saveAs is not None:
     keptCamera = await callBridge(context, "saveReviewCamera", {
-      "name": saveAs, "view": view, "note": note, "sky": sky, "figureModel": None, "concept": {"path": conceptPath} | frame,
+      "name": saveAs, "view": view, "note": note, "sky": state, "figureModel": None, "concept": {"path": conceptPath} | frame, "keptSky": sky,
     })
   forward, width, height = described["forward"], described["width"], described["height"]
   return [Image(data=sheetPath.read_bytes(), format="jpeg"), {
@@ -3510,7 +3599,7 @@ async def compareToConcept(
     "frameSize": [width, height], "verticalFieldOfViewDegrees": fieldOfView,
     "horizontalFieldOfViewDegrees": round(math.degrees(2 * math.atan(math.tan(math.radians(fieldOfView) / 2) * width / height)), 2),
     "keptCamera": keptCamera,
-  } | compared | ({} if carried is None else {"carriedLight": carried}) | ({} if viewer is None else {"viewer": viewer})]
+  } | compared | ({} if carried is None else {"carriedLight": carried}) | ({} if viewer is None else {"viewer": viewer}) | ({} if sky is None else {"sky": drawnSky(state)})]
 
 
 @guardedTool()
@@ -3560,15 +3649,20 @@ def problemText(problem):
   " it in plan (from its start) and one where each problem the walk meets starts, each standing where the walk stands there (the"
   " group's eyeHeight over the footing; no scale figure), heading along the route and pitched toward where the walk stands 30 further on, or toward the brink where it"
   " stops if sooner (a problem's frame looks past the problem: down past the brink of a drop), laid out on one sheet in order along"
-  " the route, each labeled with its distance and any problem (up to 16 frames). Places the walk cannot reach, between a stop and"
+  " the route, each labeled with its distance and any problem (up to 16 frames), under a heading \"at HH:MM\" when sky {\"hour\", \"minute\","
+  " \"weather\" (optional)} walks it at that clock time (as renderView's sky draws it; the result's sky gives the time drawn, None at the"
+  " zone's own). Places the walk cannot reach, between a stop and"
   " where it walks on, get no frame (stationsNotStoodOn); the problem's frame shows why. The result gives the walk (its body group,"
   " length in plan, walkable, problems each judged as walkRoute judges it, oneWay) and each frame's distance, view (renderView renders it, adding the scale figure), problem, and render"
   " path."
 ))
 async def renderRouteStrip(
   context: Context, spacing: float, route: str | None = None, path: list[list[float]] | None = None, cave: dict | None = None, bodyGroup: str | None = None,
+  sky: dict | None = None,
 ):
   zone = await callBridge(context, "getZoneProperties", {})
+  if sky is not None:
+    skyOverride(zone, sky)
   groupName = chosenGroup(bodyGroup, zone.get("builtFor"), playerScale.viewGroup)
   planned = await callBridge(context, "planRouteStrip", {"path": path, "route": route, "cave": cave, "spacing": spacing, "bodyGroup": groupName})
   frames, problems, length = planned["frames"], len(planned["problems"]), planned["length"]
@@ -3578,8 +3672,11 @@ async def renderRouteStrip(
     raise ToolError(f"{len(frames)} frames ({len(frames) - problems} every {spacing:g} along {length:g} and {problems} at problems) are more than {sheetViews} on a sheet; {advice}")
   views = [{key: frame[key] for key in ("standAt", "headingDegrees", "pitchDegrees", "bodyGroup")} for frame in frames]
   labels = [f"{frame['distance']:g} of {length:g}" + ("" if frame["problem"] is None else f": {problemText(frame['problem'])}") for frame in frames]
-  sheet, size, paths = await renderSheet(context, zone, views, labels, "client", None)
+  sheet, size, paths, drawn = await renderSheet(
+    context, zone, views, labels, "client", None, skies=None if sky is None else [sky] * len(views), heading=None if sky is None else clockLabel(sky),
+  )
   return [sheet, size | {key: planned[key] for key in ("route", "bodyGroup", "length", "spacing", "walkable", "problems", "oneWay", "stationsNotStoodOn")} | {
+    "sky": drawn[0],
     "frames": [{"distance": frame["distance"], "view": view, "problem": frame["problem"], "outputPath": path} for frame, view, path in zip(frames, views, paths)],
   }]
 
@@ -4288,7 +4385,7 @@ async def traceReach(context: Context, to: list[float], fromEntry: str | None = 
     if framed:
       views = [playerReach.routeFrame(nodes, chain, points, moves, legs[move["first"]], figureTall) for move in framed]
       labels = [playerReach.decisiveCaption(legs, move) for move in framed]
-      sheet, size, paths = await renderSheet(context, zone, views, labels, "client", await zoneFigureModel(zone), swimVolumes=True)
+      sheet, size, paths, _ = await renderSheet(context, zone, views, labels, "client", await zoneFigureModel(zone), swimVolumes=True)
       result["frames"] = [{"number": move["number"], "view": view, "outputPath": path} for move, view, path in zip(framed, views, paths)]
       result["frameSheet"] = size
       images.append(sheet)

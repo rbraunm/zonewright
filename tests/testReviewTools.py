@@ -19,6 +19,9 @@ medium = playerScale.groups["medium"]
 eyeHeight = medium.eyeHeight
 
 longNote = "The crate from the south, low over the ground: does it sit on the grass, and does the grass run on behind it to the edge"
+zoneSky = {"type": "default", "hour": 13, "minute": 0}
+nightSky = {"hour": 21, "minute": 0}
+nightDrawn = {"hour": 21, "minute": 0, "weather": "DefaultClear", "lightFrom": "moon"}
 
 
 def pixelsOf(image):
@@ -32,58 +35,85 @@ def excludedFor(report, reason):
 def testReviewCamerasReproduceTheirViewsAndRenderAsOneSheet(stageBlenderServer, tmp_path):
   views = {
     "high": {"eye": [0, -120, 80], "target": [40, 40, 5]},
+    "night": {"eye": [60, -60, 20], "target": [40, 40, 5]},
     "standing": {"standAt": [0, 0], "headingDegrees": 45, "pitchDegrees": 0},
     "crateFrame": {"frame": {"objects": ["crate"], "headingDegrees": 200, "pitchDegrees": -25}},
   }
+  notes = {"high": longNote, "night": "the crate by moonlight", "standing": "standing view", "crateFrame": "crateFrame view"}
+  kept = {"night": nightSky}
 
   async def steps(session):
     await crateScene(session, tmp_path)
+    await session.expectSuccess("setZoneProperties", {"sky": zoneSky})
+    pairs = {}
     for name, view in views.items():
-      await session.expectSuccess("saveReviewCamera", {"name": name, "view": view, "note": longNote if name == "high" else f"{name} view"})
-    pairs = {name: (await session.expectImage("renderView", {"view": view}), await session.expectImage("renderView", {"view": {"camera": name}})) for name, view in views.items()}
+      await session.expectSuccess("saveReviewCamera", {"name": name, "view": view, "note": notes[name], "sky": kept.get(name)})
+      byView = await session.expectImage("renderView", {"view": view, "sky": kept.get(name)})
+      pairs[name] = (byView, await session.expectImage("renderView", {"view": {"camera": name}}))
+    byDay = await session.expectImage("renderView", {"view": views["night"]})
     cameras = await session.expectSuccess("getReviewCameras")
     sheet = await session.expectImage("renderReviewSet", {}, mimeType="image/jpeg")
+    oneHour = await session.expectImage("renderReviewSet", {"names": ["standing", "night"], "sky": {"hour": 1, "minute": 0}}, mimeType="image/jpeg")
+    layout = await session.expectImage("renderReviewSet", {"names": ["night"], "shading": "layout"}, mimeType="image/jpeg")
     refusals = [
       await session.expectError("renderReviewSet", {"names": ["standing", "nope"]}),
       await session.expectError("saveReviewCamera", {"name": "plan", "view": {"map": {"center": [0, 0], "width": 100}}, "note": "a map"}),
       await session.expectError("saveReviewCamera", {"name": "blank", "view": views["high"], "note": " "}),
       await session.expectError("saveReviewCamera", {"name": "crate", "view": views["high"], "note": "taken"}),
       await session.expectError("deleteReviewCameras", {"names": ["high", "nope"]}),
+      await session.expectError("renderReviewSet", {"names": ["night"], "shading": "layout", "sky": nightSky}),
+      await session.expectError("saveReviewCamera", {"name": "late", "view": views["high"], "note": "too late", "sky": {"hour": 24, "minute": 0}}),
     ]
     moved = await session.expectSuccess("saveReviewCamera", {"name": "high", "view": {"eye": [0, -150, 90], "target": [40, 40, 5]}, "note": "farther back"})
     exported = await session.expectSuccess("checkExport", {"path": str(tmp_path / "cameras.eqg"), "purpose": "test"})
     deleted = await session.expectSuccess("deleteReviewCameras", {"names": ["high"]})
-    return pairs, cameras, sheet, refusals, moved, exported, deleted
+    return pairs, byDay, cameras, sheet, oneHour, layout, refusals, moved, exported, deleted
 
-  pairs, cameras, sheet, refusals, moved, exported, deleted = stageBlenderServer.session(steps)
-  # Each camera renders its view exactly, the scale figure standing again where she stood in the view from where a player stands.
+  pairs, byDay, cameras, sheet, oneHour, layout, refusals, moved, exported, deleted = stageBlenderServer.session(steps)
+  # Each camera renders its view exactly, the scale figure standing again where she stood in the view from where a player stands;
+  # the camera kept at 21:00 renders its view at 21:00, by moonlight, not the zone's 13:00, and says so.
   for name, ((viewImage, viewed), (cameraImage, camera)) in pairs.items():
     assert cameraImage == viewImage, name
   assert pairs["standing"][1][1]["figure"] == pairs["standing"][0][1]["figure"] and pairs["standing"][0][1]["figure"] is not None
+  assert pairs["night"][1][0] != byDay[0] and pairs["night"][1][1]["sky"] == nightDrawn and pairs["night"][0][1]["sky"] == nightDrawn
+  assert "sky" not in byDay[1] and "sky" not in pairs["high"][1][1]
   listed = {camera["name"]: camera for camera in cameras["cameras"]}
-  assert list(listed) == ["crateFrame", "high", "standing"]
+  assert list(listed) == ["crateFrame", "high", "night", "standing"]
+  assert {name: camera["sky"] for name, camera in listed.items()} == {"crateFrame": None, "high": None, "night": nightSky, "standing": None}
   assert listed["high"]["note"] == longNote and listed["high"]["view"] == views["high"]
   assert listed["high"]["headingDegrees"] == round(math.degrees(math.atan2(40, 160)), 2)
   assert listed["high"]["pitchDegrees"] == round(math.degrees(math.atan2(-75, math.hypot(40, 160))), 2)
   assert listed["standing"]["eye"] == [0.0, 0.0, round(eyeHeight, 3)] and listed["standing"]["headingDegrees"] == 45.0 and listed["standing"]["pitchDegrees"] == 0.0
   figure = listed["standing"]["figure"]
   assert figure[2] == 0.0 and 13 <= math.hypot(figure[0], figure[1]) <= 17 and figure[0] > 0 and figure[1] > 0
-  # One sheet of the three in name order, each render as renderView gives it; the long note wraps to a second line under its cell.
+  # One sheet of the four in name order, each render as renderView gives it, the night camera's at its kept hour and captioned with
+  # it; the long note wraps to a second line under its cell. The sheet is the one its renders and captions lay out again.
   image, described = sheet
   (cellWidth, cellHeight), gap = viewSheets.cellSize, viewSheets.gap
-  assert Image.open(io.BytesIO(image)).size == (gap + 3 * (cellWidth + gap), gap + cellHeight + viewSheets.labelHeight + viewSheets.lineHeight + gap)
-  assert [camera["name"] for camera in described["cameras"]] == ["crateFrame", "high", "standing"]
+  assert Image.open(io.BytesIO(image)).size == (gap + 4 * (cellWidth + gap), gap + cellHeight + viewSheets.labelHeight + viewSheets.lineHeight + gap)
+  assert [camera["name"] for camera in described["cameras"]] == ["crateFrame", "high", "night", "standing"]
+  assert [camera["sky"] for camera in described["cameras"]] == [None, None, nightDrawn, None]
   for camera in described["cameras"]:
     assert Path(camera["outputPath"]).read_bytes() == pairs[camera["name"]][1][0]
+  captions = {"crateFrame": "crateFrame: crateFrame view", "high": f"high: {longNote}", "night": "night at 21:00: the crate by moonlight", "standing": "standing: standing view"}
+  viewSheets.writeGrid([(viewSheets.openRender(camera["outputPath"]), captions[camera["name"]]) for camera in described["cameras"]], 4, tmp_path / "captioned.jpg")
+  assert (tmp_path / "captioned.jpg").read_bytes() == image
+  # One hour asked of the sheet renders every camera at it, over a kept hour; outside client shading a kept hour draws nothing.
+  atOne = {"hour": 1, "minute": 0, "weather": "DefaultClear", "lightFrom": "moon"}
+  assert [(camera["name"], camera["sky"]) for camera in oneHour[1]["cameras"]] == [("standing", atOne), ("night", atOne)]
+  assert Path(oneHour[1]["cameras"][1]["outputPath"]).read_bytes() != pairs["night"][1][0]
+  assert [(camera["name"], camera["sky"]) for camera in layout[1]["cameras"]] == [("night", None)]
   assert "nope" in refusals[0] and "{eye, target}" in refusals[1] and "note" in refusals[2] and "not a review camera" in refusals[3]
   assert "No review cameras ['nope']" in refusals[4] and "nothing deleted" in refusals[4]
+  assert "A sky lights only client shading, not 'layout'" in refusals[5] and "sky hour must be 0-23 and minute 0-59, got 24:0" in refusals[6]
   # Saved again under its name, a camera moves to the new view; export leaves the cameras out; deleting takes only the one named.
   assert moved["eye"] == [0.0, -150.0, 90.0] and moved["note"] == "farther back"
-  assert excludedFor(exported, "a camera") == ["crateFrame", "high", "standing"]
-  assert deleted == {"deleted": ["high"], "remaining": ["crateFrame", "standing"]}
+  assert excludedFor(exported, "a camera") == ["crateFrame", "high", "night", "standing"]
+  assert deleted == {"deleted": ["high"], "remaining": ["crateFrame", "night", "standing"]}
 
 
 offLedge = [[120, 0, 70], [44, 0, 70], [36, 0, 0], [-100, 0, 0]]
+flat = [[-100, 0, 0], [-20, 0, 0]]
 
 
 def testReviewRoutesWalkByNameAndRenderAsAStripOfEyeLevelFrames(stageBlenderServer, tmp_path):
@@ -100,12 +130,20 @@ def testReviewRoutesWalkByNameAndRenderAsAStripOfEyeLevelFrames(stageBlenderServ
     firstView = await session.expectImage("renderView", {"view": strip[1]["frames"][0]["view"]})
     withFigure = await session.expectImage("compareRenders", {"before": strip[1]["frames"][0]["outputPath"], "after": firstView[1]["outputPath"]}, mimeType="image/jpeg")
     tooMany = await session.expectError("renderRouteStrip", {"route": "offLedge", "spacing": 5})
+    keptOnNone = await session.expectError("saveReviewCamera", {"name": "dusk", "view": {"standAt": [0, 0], "headingDegrees": 90, "pitchDegrees": 0}, "note": "by dusk", "sky": nightSky})
+    await session.expectSuccess("setZoneProperties", {"sky": zoneSky})
+    nightStrip = await session.expectImage("renderRouteStrip", {"path": flat, "spacing": 40, "sky": nightSky}, mimeType="image/jpeg")
+    nightFrame = nightStrip[1]["frames"][0]
+    nightView = await session.expectImage("renderView", {"view": nightFrame["view"], "sky": nightSky})
+    dayView = await session.expectImage("renderView", {"view": nightFrame["view"]})
+    nightFigure = await session.expectImage("compareRenders", {"before": nightFrame["outputPath"], "after": nightView[1]["outputPath"]}, mimeType="image/jpeg")
+    nightAgainstDay = await session.expectImage("compareRenders", {"before": nightFrame["outputPath"], "after": dayView[1]["outputPath"]}, mimeType="image/jpeg")
     exported = await session.expectSuccess("checkExport", {"path": str(tmp_path / "routes.eqg"), "purpose": "test"})
     deleted = await session.expectSuccess("deleteReviewRoutes", {"names": ["offLedge"]})
     gone = await session.expectError("walkRoute", {"route": "offLedge"})
-    return saved, byName, byPath, both, strip, firstView, withFigure, tooMany, exported, deleted, gone
+    return saved, byName, byPath, both, strip, firstView, withFigure, tooMany, keptOnNone, nightStrip, nightFigure, nightAgainstDay, exported, deleted, gone
 
-  saved, byName, byPath, both, strip, firstView, withFigure, tooMany, exported, deleted, gone = stageBlenderServer.session(steps)
+  saved, byName, byPath, both, strip, firstView, withFigure, tooMany, keptOnNone, nightStrip, nightFigure, nightAgainstDay, exported, deleted, gone = stageBlenderServer.session(steps)
   assert saved == {"name": "offLedge", "path": [[float(value) for value in point] for point in offLedge], "length": 220.0}
   # Walked by name, the route is walked exactly as its points are: off the ledge's sheer side, 70 down, is a drop.
   assert byName == byPath and [problem["kind"] for problem in walkOf(byName)["problems"]] == ["drop"]
@@ -131,6 +169,19 @@ def testReviewRoutesWalkByNameAndRenderAsAStripOfEyeLevelFrames(stageBlenderServ
   left, top, right, bottom = withFigure[1]["changedBounds"]
   assert 0 < withFigure[1]["changedShare"] < 0.04 and 320 < left < right < 640 and right - left < 120 and 40 < top < bottom < 460, withFigure[1]
   assert "more than 16 on a sheet" in tooMany and "spacing of at least" in tooMany
+  # A zone drawing no sky keeps no hour on a camera. With a sky, a strip walked at 21:00 renders its frames by moonlight under a
+  # heading with the hour, its frames labeled by distance as before: the sheet is the one its frames lay out again with that heading,
+  # and a frame is the same view rendered at 21:00 but for the figure, and nothing like the day's.
+  assert "The zone draws no sky, so no hour can light it" in keptOnNone
+  assert strip[1]["sky"] is None and nightStrip[1]["sky"] == nightDrawn
+  nightFrames = nightStrip[1]["frames"]
+  assert [frame["distance"] for frame in nightFrames] == [0.0, 40.0, 80.0] and nightStrip[1]["problems"] == []
+  assert Image.open(io.BytesIO(nightStrip[0])).size == (gap + 3 * (cellWidth + gap), viewSheets.labelHeight + gap + cellHeight + viewSheets.labelHeight + gap)
+  viewSheets.writeGrid([(viewSheets.openRender(frame["outputPath"]), f"{frame['distance']:g} of 80") for frame in nightFrames], 3, tmp_path / "headed.jpg", heading="at 21:00")
+  assert (tmp_path / "headed.jpg").read_bytes() == nightStrip[0]
+  left, top, right, bottom = nightFigure[1]["changedBounds"]
+  assert 0 < nightFigure[1]["changedShare"] < 0.04 and 320 < left < right < 640 and right - left < 120 and 40 < top < bottom < 460, nightFigure[1]
+  assert nightAgainstDay[1]["changedShare"] > 0.5
   assert excludedFor(exported, "a guide") == ["offLedge"]
   assert deleted == {"deleted": ["offLedge"], "remaining": []} and "No review route named 'offLedge'" in gone
 

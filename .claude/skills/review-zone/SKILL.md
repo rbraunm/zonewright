@@ -9,8 +9,8 @@ A review judges what a player would see. Render it, look at every picture, name 
 
 ## Render the review
 
-1. **Review cameras.** Each area keeps saved review cameras (`saveReviewCamera`): its zone-in or approach at eye level, an oblique from above, each landmark, and each place the concept art shows (`compareToConcept` with `saveAs`, matched to the art). `renderReviewSet` renders them all on one sheet; give each its note, what to judge there.
-2. **Routes.** The main routes are saved review routes (`saveReviewRoute`); `renderRouteStrip` walks each and frames it at eye level, with a frame at every problem the walk meets.
+1. **Review cameras.** Each area keeps saved review cameras (`saveReviewCamera`): its zone-in or approach at eye level, an oblique from above, each landmark, and each place the concept art shows (`compareToConcept` with `saveAs`, matched to the art). A camera keeps an hour (`sky`) where the light matters, such as a night camera at a landmark, a lamp-lit street, or a pool by moonlight, and renders at that hour wherever it renders. `renderReviewSet` renders them all on one sheet, each at its own hour, or every camera at one hour with `sky` (a lit area at the zone's hour and at night); give each its note, what to judge there.
+2. **Routes.** The main routes are saved review routes (`saveReviewRoute`); `renderRouteStrip` walks each and frames it at eye level, with a frame at every problem the walk meets; a route lit for the night is walked at that hour too (`sky`).
 3. **The plan.** A `renderView` map in layout shading, and `renderSketch` over it with the regions' names, for where things are.
 4. **The concept.** `compareToConcept` with each concept camera: side by side, the overlay, the squinted masses, the edges, and the palettes, with numbers.
 5. **Diagnostics, where a question needs them.** `renderView` shadings: `curvature` (broad planes, crisp lips, one noise scale everywhere), `texelDensity` and `triangleDensity` (against a client reference zone rendered the same way), `coverage` (export status), `objects` and `labels` (naming what a view shows).
@@ -47,6 +47,12 @@ Each item says what it looks like and where it shows. Severity: **blocking** bre
 | Floating or sunk objects | Daylight under a prop, or one buried past where it would sit | Close eye-level views at the contact; `labels` to name it |
 | Intersecting objects | Props through each other, through walls, or through the ground at an angle | Close views from two sides |
 
+### Lighting
+
+| Problem | What it looks like | Where it shows |
+|---|---|---|
+| Night lighting wrong | Dark holes between lamps where a player would see nothing; the three-light seam across a floor (the client lights each terrain piece by three lights, so a fourth splits the floor at the piece's edge); a pool reading as a flat disc at night | Night renders: review cameras kept at a night hour, `renderReviewSet` with `sky` at night, and `renderRouteStrip` with `sky` along a lit route |
+
 ### Scale, routes, and composition
 
 | Problem | What it looks like | Where it shows |
@@ -72,7 +78,7 @@ After each authoring step (`author-zone`), and before showing work to the owner,
 - the layout: the plan's path, and each region's name and intent;
 - the zone's use: its housing role and intent (`getHousing`) and where its plots stand (each plot's address, centre, and size), so it can tell ground left open for players to build on from ground left bare;
 - reference screenshots of client zones of the same kind (`getZoneSurvey` interpretations' screenshots or `importZone` views), with what each shows;
-- each render's path, its view name, its note (what to judge there), and its view (the `view` renderView took), so it can `pick` what it names;
+- each render's path, its view name, its note (what to judge there), its hour when it is not the zone's (the result's `sky`: a camera kept at night, or a sheet rendered at one hour), and its view (the `view` renderView took), so it can `pick` what it names;
 - how tall the scale figure is drawn in the zone (see the checklist's scale item).
 
 Never give it your reasoning about the work, what you expect it to find, or what you already fixed. A fresh critic runs each time, so it is never anchored by its own last verdict.

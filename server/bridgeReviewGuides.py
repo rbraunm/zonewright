@@ -79,7 +79,7 @@ def describeCamera(cameraObject):
     "name": cameraObject.name, "note": saved["note"], "view": saved["view"], "eye": roundVector(location),
     "headingDegrees": round(math.degrees(math.atan2(forward.x, forward.y)) % 360, 2), "pitchDegrees": round(math.degrees(math.asin(max(-1.0, min(1.0, forward.z)))), 2),
     "figure": None if saved["figure"] is None else roundVector(saved["figure"]["at"]),
-    "concept": savedConcept(cameraObject),
+    "concept": savedConcept(cameraObject), "sky": saved["sky"],
   }
 
 
@@ -92,7 +92,9 @@ def requireSavedView(view):
     )
 
 
-def saveReviewCamera(name, view, note, sky, figureModel, concept=None):
+def saveReviewCamera(name, view, note, sky, figureModel, concept=None, keptSky=None):
+  """The camera's pose is placed with the zone's sky state (sky); keptSky, a render's sky override {hour, minute, weather}, is kept
+  in its record for the renders that take it."""
   requireName(name, "review camera")
   requireSavedView(view)
   if not isinstance(note, str) or not note.strip():
@@ -114,7 +116,7 @@ def saveReviewCamera(name, view, note, sky, figureModel, concept=None):
   cameraObject.data.angle = math.radians(bridgeViews.verticalFieldOfViewDegrees if concept is None else concept["verticalFieldOfViewDegrees"])
   figure = None if description["figure"] is None else {"at": description["figure"], "facingDegrees": description["figureFacingDegrees"]}
   kept = None if concept is None else concept | {"path": keptPath(concept["path"])}
-  cameraObject[reviewCameraProperty] = json.dumps({"note": note.strip(), "view": view, "figure": figure, "concept": kept})
+  cameraObject[reviewCameraProperty] = json.dumps({"note": note.strip(), "view": view, "figure": figure, "concept": kept, "sky": keptSky})
   bpy.context.view_layer.update()
   return describeCamera(cameraObject)
 

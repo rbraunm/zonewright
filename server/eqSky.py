@@ -194,7 +194,7 @@ def skyState(clientRoot, cachePath, sky):
   """What the client draws for a sky {type, weather (the type's DefaultWeather when left out), hour, minute} and the scene light it
   sets: ambient (raised to the floor of a character without infravision or ultravision), fog color, the directional light's color and
   direction (the sun's, or before 5:55 and after 18:20 the moon's), and its bounce. hour and minute place the sun: t = (hour * 60 +
-  minute) / 1440 of a day, the sun at its highest at 12:00."""
+  minute) / 1440 of a day, the sun at its highest at 12:00. The state names the hour, minute, and weather it was evaluated at."""
   hour, minute = sky["hour"], sky["minute"]
   files = SkyFiles(clientRoot)
   chain = []
@@ -239,7 +239,8 @@ def skyState(clientRoot, cachePath, sky):
   }
   assert set(environment) == set(skyDrawing.suppliedZoneKeys)
   return {
-    "chain": chain, "dayFraction": round(dayFraction, 6), "lightFrom": "sun" if byDay else "moon", "environment": environment,
+    "chain": chain, "hour": hour, "minute": minute, "weather": weatherName, "dayFraction": round(dayFraction, 6),
+    "lightFrom": "sun" if byDay else "moon", "environment": environment,
     "dome": {"axis": skySun.round(6).tolist(), "colors": [colorOf(pixel) for pixel in colors[:domeRows, 0]]},
     "horizon": horizon, "satellites": satellites,
   }
