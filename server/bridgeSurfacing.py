@@ -86,6 +86,14 @@ def createMaterial(name, diffuseTexture, normalTexture, cutout, alphaThreshold, 
   return {"material": name, "diffuseTexture": diffuse.image.name, "normalTexture": os.path.basename(normalTexture) if normalTexture else None, "cutout": cutout, "blockout": blockout}
 
 
+def normalMappedMaterials():
+  """The createMaterial materials holding a normal map, lit by it only in a view that asks (bridgeClientLight.selectNormalMaps)."""
+  return sorted(
+    material.name for material in bpy.data.materials
+    if material.node_tree is not None and bridgeMeshAccess.liquidProperty not in material and material.node_tree.nodes.get(normalNodeName) is not None
+  )
+
+
 def requireLiquidValues(liquid, values):
   if liquid not in liquidTextures:
     raise ValueError(f"liquid must be one of {list(liquidTextures)}, got '{liquid}'")

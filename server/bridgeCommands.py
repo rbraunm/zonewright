@@ -364,15 +364,16 @@ def previewZone(sky):
 
 def renderView(
   view, outputPath, figureModel, shading, bandHeight, guides, sky, swimVolumes, labels, emitters, frame=None, liquidTime=None, carriedLight=None,
-  viewerSpecialAmbient=None, laneTint=None, exportedOnly=False, figureOn=None,
+  viewerSpecialAmbient=None, laneTint=None, exportedOnly=False, figureOn=None, normalMaps=False,
 ):
   """A view rendered; viewerSpecialAmbient, the special ambient the client gives the view's character where it stands, replaces the
   zone's own specialAmbientColor when given; laneTint tints where the lane reached floor; exportedOnly leaves out of the render what
-  export leaves out, and figureOn stands the scale figure where given (bridgeViews.renderView)."""
+  export leaves out, figureOn stands the scale figure where given, and normalMaps lights materials by their normal maps
+  (bridgeViews.renderView)."""
   zone = previewZone(sky) | ({} if viewerSpecialAmbient is None else {"specialAmbientColor": viewerSpecialAmbient})
   return bridgeViews.renderView(
     bpy.context.scene, zone, sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes, labels, emitters, frame, liquidTime, carriedLight,
-    laneTint, exportedOnly, figureOn,
+    laneTint, exportedOnly, figureOn, normalMaps,
   )
 
 

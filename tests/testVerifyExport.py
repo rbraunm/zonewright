@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
 import buildTolerances
 import eqArchive
 import exportVerification
+import eqgFiles
 import eqgWriter
 import planDrawing
 import serverMapDrawing
@@ -82,7 +83,10 @@ async def verifiedZone(session, folder):
   reference = await referenceArchive(session, folder)
   await freshScene(session)
   await session.expectSuccess("createTerrainGrid", {"name": "ground", "size": [2 * halfLength, 2 * halfWidth], "spacing": 8, "location": [0, 0, 0], "collection": "terrain"})
-  await session.expectSuccess("createMaterial", {"name": "grass", "diffuseTexture": str(writePNG(folder / "grass.png", 4, 4, (90, 120, 60, 255)))})
+  await session.expectSuccess("createMaterial", {
+    "name": "grass", "diffuseTexture": str(writePNG(folder / "grass.png", 4, 4, (90, 120, 60, 255))),
+    "normalTexture": str(writePNG(folder / "grass_n.png", 4, 4, (192, 128, 192, 255))),
+  })
   await session.expectSuccess("createMaterial", {"name": "stone", "diffuseTexture": str(writePNG(folder / "stone.png", 4, 4, (120, 110, 100, 255)))})
   await session.expectSuccess("assignMaterial", {"objectName": "ground", "materialName": "grass"})
   await session.expectSuccess("projectUVs", {"objectName": "ground", "method": "planar", "worldUnitsPerRepeat": 64, "direction": [0, 0, 1]})
@@ -170,6 +174,11 @@ def testVerifyExportPassesAFreshGameExport(stageBlenderServer, exportedZone):
   # The kiln is a row of the object table naming the copy of its model in the archive, standing where the server stands it.
   assert checks["clientModels"]["details"] == {"copies": 1, "doors": 0, "objects": 1, "failures": []}
   assert checks["current"]["details"]["identical"] is True
+  # The ground's normal map stays in the work file: the archive's terrain draws its diffuse alone, and the looks below agree.
+  terrainName = f"ter_{short}.ter"
+  terrain = eqgFiles.parseModel(eqArchive.EQArchive(exportedZone.export / f"{short}.eqg").read(terrainName), terrainName)
+  grass = next(material for material in terrain["materials"] if material["name"] == "grass")
+  assert grass["shader"] == eqgWriter.shaderOpaque and "e_TextureNormal0" not in grass["properties"]
   assert checks["archive"]["details"]["regions"] == ["AWT_pond", "ATP_1_north", "ATP_2_loop"]
   collision = checks["map"]["details"]
   assert collision["collisionTriangles"] == collision["archiveSolidTriangles"] > 0 and collision["largestDifference"] <= 3.2e-4

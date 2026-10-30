@@ -836,7 +836,7 @@ def requireFigureOn(figureOn, view, figureModel):
 
 def renderView(
   sourceScene, zone, sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes, labels, emitters, frame=None, liquidTime=None,
-  carriedLight=None, laneTint=None, exportedOnly=False, figureOn=None,
+  carriedLight=None, laneTint=None, exportedOnly=False, figureOn=None, normalMaps=False,
 ):
   """Render a view; in client shading the zone's point lights and emitters are drawn too (emitters: the server's prepared emitter
   assets, or None without a client), its liquids as they stand at liquidTime on the effect clock (0 when it is None), and the light
@@ -844,11 +844,14 @@ def renderView(
   labels' colors by number, and the floor's reach by slope), the view is tinted where it shows floor the lane reached (laneDecal), under
   the swim volumes' tint and hidden by the guides'. exportedOnly leaves out of this render alone, objects, lights, and emitters alike,
   everything a zone export leaves out (exportLeavesOut), as the exported archive draws; figureOn ({at, facingDegrees}) stands the
-  scale figure exactly there in an eye view, as viewPose read where a view stood her."""
+  scale figure exactly there in an eye view, as viewPose read where a view stood her; normalMaps lights createMaterial materials by
+  their normal maps, which the client never does (bridgeClientLight.selectNormalMaps)."""
   if shading not in viewShadings:
     raise ValueError(f"shading must be one of {list(viewShadings)}, got '{shading}'")
   if carriedLight is not None and shading != "client":
     raise ValueError(f"A carried light draws only in client shading, not '{shading}'")
+  if normalMaps and shading != "client":
+    raise ValueError(f"Normal maps draw only in client shading, not '{shading}'")
   if frame is not None and ("map" in view or "camera" in view):
     raise ValueError("A frame is set for an eye, standAt, or frame view; a map keeps the preview's frame and a review camera its own")
   if figureOn is not None:
@@ -871,6 +874,9 @@ def renderView(
       description |= {"figure": list(figureOn["at"]), "figureFacingDegrees": figureOn["facingDegrees"]}
     if exportedOnly:
       description["leftOut"] = len(leftOut)
+    if normalMaps:
+      bridgeClientLight.selectNormalMaps(True)
+      description["normalMaps"] = {"materials": bridgeSurfacing.normalMappedMaterials()}
     if preview.camera.data.type == "PERSP":
       description["verticalFieldOfViewDegrees"] = round(math.degrees(preview.camera.data.angle), 4)
     preview.drawSky()
@@ -909,6 +915,8 @@ def renderView(
     renderSeconds = time.perf_counter() - start
     width, height = preview.frameSize()
   finally:
+    if normalMaps:
+      bridgeClientLight.selectNormalMaps(False)
     preview.remove()
   return {key: roundVector(value) if isinstance(value, list) else value for key, value in description.items()} | {
     "outputPath": outputPath,

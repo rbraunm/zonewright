@@ -33,16 +33,20 @@ def clientPixel(normal, fogVisibility=1.0):
   return [fog + fogVisibility * (value - fog) for value, fog in zip(lit, environment["fogColor"])]
 
 
-async def renderedPixel(session, view):
-  _, description = await session.expectImage("renderView", {"view": view})
+async def centerPixel(session, outputPath):
   pixel = await session.expectSuccess("runPython", {"code": f"""
-image = bpy.data.images.load(r'{description['outputPath']}')
+image = bpy.data.images.load(r'{outputPath}')
 width, height = image.size
 index = ((height // 2) * width + width // 2) * 4
 result = list(image.pixels[index:index + 3])
 bpy.data.images.remove(image)
 """})
   return pixel["result"]
+
+
+async def renderedPixel(session, view):
+  _, description = await session.expectImage("renderView", {"view": view})
+  return await centerPixel(session, description["outputPath"])
 
 
 def testPreviewLightsAndFogsAsTheClientDoes(stageBlenderServer, tmp_path):
@@ -71,6 +75,42 @@ def testPreviewLightsAndFogsAsTheClientDoes(stageBlenderServer, tmp_path):
   # Twenty units into fog that ends at 40 is half the ramp: density 0.33 times 5, squared, leaves exp(-2.7225) of the surface.
   for measured, expected in zip(fogged, clientPixel((0, 0, 1), math.exp(-(0.33 * 5) ** 2))):
     assert abs(measured - expected) <= 1.5 / 255
+
+
+def testACreateMaterialNormalMapIsNotDrawnUnlessAsked(stageBlenderServer, tmp_path):
+  texturePath = writePNG(tmp_path / "stone.png", 8, 8, texture)
+  # One tangent-space normal over the whole map, tilted half toward the texture's u axis, which runs along x on the floor: its facing
+  # to a sun along y is the same whichever way the tangent runs.
+  tilt = (192, 128, 192)
+  normalPath = writePNG(tmp_path / "stone_n.png", 8, 8, (*tilt, 255))
+  view = {"eye": [0, 0, 20], "target": [0, 0.001, 0]}
+
+  async def steps(session):
+    await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
+    await session.expectSuccess("createPrimitive", {"kind": "plane", "name": "floor", "size": [64, 64, 0], "location": [0, 0, 0]})
+    await session.expectSuccess("createMaterial", {"name": "stone", "diffuseTexture": str(texturePath), "normalTexture": str(normalPath)})
+    await session.expectSuccess("assignMaterial", {"objectName": "floor", "materialName": "stone"})
+    await session.expectSuccess("projectUVs", {"objectName": "floor", "method": "planar", "worldUnitsPerRepeat": 32, "direction": [0, 0, 1]})
+    await session.expectSuccess("setZoneProperties", environment)
+    plain = await renderedPixel(session, view)
+    _, mapped = await session.expectImage("renderView", {"view": view, "normalMaps": True})
+    mappedPixel = await centerPixel(session, mapped["outputPath"])
+    again = await renderedPixel(session, view)
+    refused = await session.expectError("renderView", {"view": view, "shading": "layout", "normalMaps": True})
+    return plain, mapped["normalMaps"], mappedPixel, again, refused
+
+  plain, lit, mappedPixel, again, refused = stageBlenderServer.session(steps)
+  # The client lights an exported material by its vertex normal, so the floor is lit as if it had no normal map, before and after a
+  # view asked for the maps.
+  for measured, expected in zip(plain, clientPixel((0, 0, 1))):
+    assert abs(measured - expected) <= 1.5 / 255
+  assert again == plain
+  assert lit == {"materials": ["stone"]}
+  tilted = [2 * channel / 255 - 1 for channel in tilt]
+  length = math.sqrt(sum(component * component for component in tilted))
+  for measured, expected in zip(mappedPixel, clientPixel(tuple(component / length for component in tilted))):
+    assert abs(measured - expected) <= 1.5 / 255
+  assert "Normal maps draw only in client shading, not 'layout'" in refused
 
 
 

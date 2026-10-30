@@ -16,11 +16,11 @@ Work from the catalog (`docs/assetCatalog.md`), not from guesses about file name
 
 ## Applying textures
 
-- `createMaterial` takes catalog ids directly (`texture/<name>@<hash>`) for the diffuse and its normal map (the diffuse's `pairsWith` or `materialRoles`).
+- `createMaterial` takes catalog ids directly (`texture/<name>@<hash>`) for the diffuse and its normal map (the diffuse's `pairsWith` or `materialRoles`); the normal map stays in the work file, since no exported material draws one, and the preview lights the material by its faces' normals unless a `renderView` asks for `normalMaps`.
 - Surface terrain by intent, region by region (the `author-zone` skill): a surfacing layer per decision (`addSurfaceLayer`), painted by region and by stroke (`paintSurface` with `{"region": ...}`, `nearPath` strokes, points), with `edgeNoise` so edges wander, and edges evened or moved with `editSurface`. A region's recipe (rock on its steep faces, a band at chosen heights) is painted with the region and a slope or height mask, as the client's ecosystems are applied; never one hard rule and one palette across the whole terrain. `assignMaterial` is for objects and blockout only.
 - Scale with `projectUVs`: the description's `worldUnitsPerRepeat`, else the measured `unitsPerRepeat` of its main use. Use `box` projection on cliffs so steep faces do not stretch.
 - Where two ground materials meet, use a transition texture (Phase 1 has no shader blending): look for `category: transition` or textures that tile one way (`seamRatios` low across, high down). Lay it as a strip: cut a contour at the strip's width from the border (`cutContours` with `distanceFrom`, and `onlyAbove` on both at a wall's foot), then `paintTransition`, which maps the texture's bottom edge onto the border and repeats it along the border; `projectUVs` would tile it down as well as across.
-- Judge in the client's light: `renderView` with the default client shading at eye height, not only in layout shading.
+- Judge in the client's light: `renderView` with the default client shading at eye height, not only in layout shading; the default draws what ships, and `normalMaps` only compares a texture pair.
 - Block out with `createMaterial` greys made with `blockout: true`, so a game export refuses any left on exported faces. Before handing work off, read `checkExport` (purpose `test`) beside `renderView` with `shading: "coverage"`: they show where the base material shows, borders lack a transition strip, textures stretch or collapse, and blockout remains.
 
 ## Placing client models

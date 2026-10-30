@@ -10,7 +10,7 @@ import bridgeMeshAccess
 
 groupName = "eqClientLight"
 # Raised whenever buildGroup changes, so a group saved in an older .blend is rebuilt in place.
-groupVersion = 13
+groupVersion = 14
 bakedAttribute = "eqColor"
 # The share of scene light a cave's lining does not take (1 less its daylight), which a preview puts on the copy it draws a terrain
 # holding daylit caves from (bridgeCaveLight); a surface without it reads none, and so takes its full share.
@@ -103,9 +103,13 @@ def buildGroup(tree):
   inputs = build.node("NodeGroupInput").outputs
   # Blender turns a surface's shading normal toward the camera on a face seen from behind, where the client's vertex shader lights a
   # face by its own normal whichever side is seen; a normal that is not a mesh's stored one (Stored 0) is turned back.
-  backfacing = build.node("ShaderNodeNewGeometry").outputs["Backfacing"]
-  turn = build.math("SUBTRACT", 1.0, build.math("MULTIPLY", build.math("MULTIPLY", backfacing, 2.0), build.math("SUBTRACT", 1.0, inputs["Stored"])))
-  normal = build.scale(inputs["Normal"], turn)
+  geometry = build.node("ShaderNodeNewGeometry")
+  turn = build.math("SUBTRACT", 1.0, build.math("MULTIPLY", build.math("MULTIPLY", geometry.outputs["Backfacing"], 2.0), build.math("SUBTRACT", 1.0, inputs["Stored"])))
+  # A material's own normal map lights nothing the client draws (Opaque_MaxC1 lights by the vertex normal), so an unlit material is lit
+  # by its face's normal unless a view asks for the normal maps (selectNormalMaps); a lit mesh (Stored 1) keeps its stored normal.
+  mapped = build.math("MAXIMUM", inputs["Stored"], build.value("normalMapsOn"))
+  chosen = build.vectorMath("ADD", build.scale(geometry.outputs["Normal"], build.math("SUBTRACT", 1.0, mapped)), build.scale(inputs["Normal"], mapped))
+  normal = build.scale(chosen, turn)
   toSun = build.node("ShaderNodeCombineXYZ", name="towardSun").outputs["Vector"]
   facing = build.vectorMath("DOT_PRODUCT", normal, toSun)
   sunTerm = build.scale(build.color("sunColor"), build.math("MAXIMUM", facing, 0.0))
@@ -180,6 +184,12 @@ def markStoredNormals(tree):
 def selectPass(name):
   for tree in groups():
     tree.nodes["passSelect"].outputs["Value"].default_value = float(passes.index(name))
+
+
+def selectNormalMaps(on):
+  """Light unlit materials by their normal maps (on), or by their faces' normals as the client lights an exported material."""
+  for tree in groups():
+    tree.nodes["normalMapsOn"].outputs["Value"].default_value = float(on)
 
 
 def group():

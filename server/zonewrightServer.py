@@ -1117,7 +1117,9 @@ async def scaleFigureModel(zone, view):
   " structures (all their parts) from that heading and pitch, standing back so they fit (its result's eye and target reproduce that"
   " camera). shading \"client\" draws the zone as the client does, its point lights and particle emitters with it (the result's"
   " pointLights counts the lights and the objects they light, and emitters the emitters drawn, their particles, and those not drawn,"
-  " grouped by why); \"relief\" is layout's drawing in quiet greys (the base renderSketch draws plans over); \"layout\" draws every"
+  " grouped by why; a createMaterial normal map is not drawn, as the client draws none on an exported material, unless `normalMaps`"
+  " is true, which lights the materials by them in client shading only, to look at a texture pair, never what ships); \"relief\" is"
+  " layout's drawing in quiet greys (the base renderSketch draws plans over); \"layout\" draws every"
   " surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in"
   " the result) in bands `bandHeight` units tall whose edges read as contours (every other band a shade darker, so they read however"
   " tall the scene's range), darker facing away from a light in the northwest, without fog and out to the whole scene: for judging"
@@ -1179,6 +1181,7 @@ async def renderView(
   carriedLight: dict | None = None,
   lane: bool = False,
   bodyGroup: str | None = None,
+  normalMaps: bool = False,
 ):
   outputPath = newRenderPath()
   zone = await callBridge(context, "getZoneProperties", {})
@@ -1202,7 +1205,7 @@ async def renderView(
     "view": view, "outputPath": str(outputPath), "figureModel": await scaleFigureModel(zone, view), "shading": shading, "bandHeight": bandHeight,
     "guides": guides, "sky": await zoneSky(zone), "swimVolumes": swimVolumes, "labels": labels, "emitters": await previewEmitterAssets(),
     "liquidTime": liquidTime,
-    "carriedLight": carried, "viewerSpecialAmbient": viewer and viewer.get("specialAmbientColor"), "laneTint": laneTint,
+    "carriedLight": carried, "viewerSpecialAmbient": viewer and viewer.get("specialAmbientColor"), "laneTint": laneTint, "normalMaps": normalMaps,
   })
   if labels is not None:
     await anyio.to_thread.run_sync(viewSheets.writeNames, outputPath, description["labels"]["shown"])
@@ -4433,10 +4436,13 @@ def catalogTexturePath(texture):
 
 @guardedTool()
 async def createMaterial(context: Context, name: str, diffuseTexture: str, normalTexture: str | None = None, cutout: bool = False, alphaThreshold: float = 0.5, blockout: bool = False):
-  """A Phase 1 material: diffuse texture, optional normal map, no shine; cutout makes the diffuse alpha a hard alpha test for foliage
-  cards. blockout marks a layout stand-in (a grey to block out with): a game export refuses it on exported faces, a test export lists
-  it, and coverage views draw it brown. A texture is an absolute path or a catalog texture id (texture/<name>@<hash>), which uses the
-  catalog's extracted file. The material is kept in the file whether or not anything uses it yet."""
+  """A Phase 1 material: diffuse texture, no shine; cutout makes the diffuse alpha a hard alpha test for foliage cards. A normal map
+  stays in the work file and never ships: export writes the material as Opaque_MaxC1, which the client lights by the vertex normal
+  alone (docs/clientRendering.md, Effects), so the preview lights the material by its faces' normals too, and draws the normal map only
+  in a renderView asked for normalMaps, to look at a texture pair; a liquid's normal map (createLiquidMaterial) does ship. blockout
+  marks a layout stand-in (a grey to block out with): a game export refuses it on exported faces, a test export lists it, and coverage
+  views draw it brown. A texture is an absolute path or a catalog texture id (texture/<name>@<hash>), which uses the catalog's
+  extracted file. The material is kept in the file whether or not anything uses it yet."""
   return await callBridge(context, "createMaterial", {
     "name": name, "diffuseTexture": catalogTexturePath(diffuseTexture), "normalTexture": catalogTexturePath(normalTexture), "cutout": cutout,
     "alphaThreshold": alphaThreshold, "blockout": blockout,
