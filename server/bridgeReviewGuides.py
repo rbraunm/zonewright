@@ -1,7 +1,8 @@
 """Review cameras and routes: guides kept in the .blend for looking at the zone the same way again, each kind in its own collection,
 never drawn in views and never exported. A review camera holds the pose of a view (an eye and a target, standing where a player stands,
-or framing objects), where the scale figure stood in it, and a note of what to judge there; a review route is a polyline that walkRoute
-walks and renderRouteStrip follows. Runs under Blender's Python."""
+framing objects, or the camera of a client shot), where the scale figure stood in it, a note of what to judge there, the frame it
+renders at where it is not the preview's own (the concept art's, a shot's), the concept art it was matched to, and the shot it was
+saved from; a review route is a polyline that walkRoute walks and renderRouteStrip follows. Runs under Blender's Python."""
 import json
 import math
 import os
@@ -53,11 +54,17 @@ def savedFigure(cameraObject):
 
 
 def savedConcept(cameraObject):
-  """The concept art a review camera was matched to ({path, size, verticalFieldOfViewDegrees}, the path absolute), or None."""
+  """The concept art a review camera was matched to ({path}, absolute), or None."""
   if reviewCameraProperty not in cameraObject:
     return None
-  concept = json.loads(cameraObject[reviewCameraProperty]).get("concept")
-  return None if concept is None else concept | {"path": os.path.normpath(bpy.path.abspath(concept["path"]))}
+  concept = json.loads(cameraObject[reviewCameraProperty])["concept"]
+  return None if concept is None else {"path": os.path.normpath(bpy.path.abspath(concept["path"]))}
+
+
+def savedFrame(cameraObject):
+  """The frame a review camera renders at ({size, verticalFieldOfViewDegrees}: the concept art's, a client shot's), or None for the
+  preview's own."""
+  return json.loads(cameraObject[reviewCameraProperty])["frame"] if reviewCameraProperty in cameraObject else None
 
 
 def keptPath(path):
@@ -79,7 +86,7 @@ def describeCamera(cameraObject):
     "name": cameraObject.name, "note": saved["note"], "view": saved["view"], "eye": roundVector(location),
     "headingDegrees": round(math.degrees(math.atan2(forward.x, forward.y)) % 360, 2), "pitchDegrees": round(math.degrees(math.asin(max(-1.0, min(1.0, forward.z)))), 2),
     "figure": None if saved["figure"] is None else roundVector(saved["figure"]["at"]),
-    "concept": savedConcept(cameraObject), "sky": saved["sky"],
+    "frame": saved["frame"], "concept": savedConcept(cameraObject), "shot": saved["shot"], "sky": saved["sky"],
   }
 
 
@@ -92,9 +99,10 @@ def requireSavedView(view):
     )
 
 
-def saveReviewCamera(name, view, note, sky, figureModel, concept=None, keptSky=None):
-  """The camera's pose is placed with the zone's sky state (sky); keptSky, a render's sky override {hour, minute, weather}, is kept
-  in its record for the renders that take it."""
+def saveReviewCamera(name, view, note, sky, figureModel, frame=None, concept=None, shot=None, keptSky=None):
+  """The camera's pose is placed with the zone's sky state (sky) in frame (bridgeViews.requireFrame; None for the preview's own), and
+  the record keeps the frame, the concept art ({path}) it was matched to, the shot ({png, dump, capturedAt, gameTime}) it was saved
+  from, and keptSky, a render's sky override {hour, minute, weather}, for the renders that take it."""
   requireName(name, "review camera")
   requireSavedView(view)
   if not isinstance(note, str) or not note.strip():
@@ -104,8 +112,8 @@ def saveReviewCamera(name, view, note, sky, figureModel, concept=None, keptSky=N
     raise ValueError(f"An object named '{name}' already exists and is not a review camera")
   preview = bridgeViews.PreviewScene(bpy.context.scene, bridgeCommands.previewZone(sky), True, None)
   try:
-    if concept is not None:
-      preview.setFrame(bridgeViews.requireFrame({key: concept[key] for key in ("size", "verticalFieldOfViewDegrees")}))
+    if frame is not None:
+      preview.setFrame(bridgeViews.requireFrame(frame))
     description = bridgeViews.placeCamera(preview, view, figureModel)
     location, rotation = preview.camera.location.copy(), preview.camera.rotation_quaternion.copy()
   finally:
@@ -113,10 +121,10 @@ def saveReviewCamera(name, view, note, sky, figureModel, concept=None, keptSky=N
   cameraObject = existing if existing is not None else newCamera(name)
   cameraObject.rotation_mode = "QUATERNION"
   cameraObject.location, cameraObject.rotation_quaternion = location, rotation
-  cameraObject.data.angle = math.radians(bridgeViews.verticalFieldOfViewDegrees if concept is None else concept["verticalFieldOfViewDegrees"])
+  cameraObject.data.angle = math.radians(bridgeViews.verticalFieldOfViewDegrees if frame is None else frame["verticalFieldOfViewDegrees"])
   figure = None if description["figure"] is None else {"at": description["figure"], "facingDegrees": description["figureFacingDegrees"]}
-  kept = None if concept is None else concept | {"path": keptPath(concept["path"])}
-  cameraObject[reviewCameraProperty] = json.dumps({"note": note.strip(), "view": view, "figure": figure, "concept": kept, "sky": keptSky})
+  kept = None if concept is None else {"path": keptPath(concept["path"])}
+  cameraObject[reviewCameraProperty] = json.dumps({"note": note.strip(), "view": view, "figure": figure, "frame": frame, "concept": kept, "shot": shot, "sky": keptSky})
   bpy.context.view_layer.update()
   return describeCamera(cameraObject)
 

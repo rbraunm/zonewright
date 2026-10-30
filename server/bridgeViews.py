@@ -425,9 +425,9 @@ def placeCamera(preview, view, figureModel):
     # again differs in the last bits and moves the picture by a fraction of a pixel.
     location, rotation = bridgeReviewGuides.reviewPose(source) or source.matrix_world.decompose()[:2]
     camera.location, camera.rotation_quaternion = location, rotation
-    concept = bridgeReviewGuides.savedConcept(source)
-    if concept is not None:
-      preview.setFrame(concept)
+    frame = bridgeReviewGuides.savedFrame(source)
+    if frame is not None:
+      preview.setFrame(frame)
     description = {"eye": list(location), "forward": list(rotation @ mathutils.Vector((0, 0, -1))), "figure": None}
     saved = bridgeReviewGuides.savedFigure(source)
     if figureModel is not None and saved is not None:

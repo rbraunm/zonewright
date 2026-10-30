@@ -13,12 +13,9 @@ Calibration takes only claudelink shots of the spare RoF2 client. Older shots (t
 
 The spare client runs through the claudelink MCP (`C:\Users\Toshiro\git\github\PhoenixCampfire\claudelink`, its README). Keep the spare's viewport as its UI file sets it; `calibrateShot` crops to it.
 
-1. `launchClient` with the spare's character, then `state` to see where it stands.
-2. `zone` to the zone, `teleport` to the spot (`/loc` order, y x z) with the heading, and `face` for the pitch.
-3. `command` `#set weather 0`: weather is not read from the client, so every calibration shot is taken clear, and runs record that condition.
-4. `time` to the hour (and minute) the shot is for.
-5. `screenshot` to a path under `%LOCALAPPDATA%\claudelink\screenshots`, with the UI hidden. It writes the PNG, its sidecar `<shot>.json`, and the zone dump read in the same frame, at 100 fps with MacroQuest's frame limiter suspended.
-6. `calibrateShot` with the PNG's path; `compareShot` for a zone the client lacks, or an export.
+1. `launchClient` with the spare's character, then `state` to see where it stands, and `zone` to the zone.
+2. The per-shot steps are the review-zone skill's "Shooting the review cameras in the client" (the first-person camera once, `#set weather 0`, then `teleport`, `face`, `time`, `state`, and `screenshot` with the UI hidden): a calibration shot is taken at a chosen spot (`/loc` order, y x z), heading, and pitch, a review shot at a review camera's `clientPose`. `screenshot` writes the PNG under `%LOCALAPPDATA%\claudelink\screenshots` with its sidecar `<shot>.json` and the zone dump read in the same frame, at 100 fps with MacroQuest's frame limiter suspended, and returns the PNG's path.
+3. `calibrateShot` with the PNG's path; `compareShot` for a zone the client lacks, or an export, with `camera` when the shot is of a review camera.
 
 Plan shots as a set before tuning anything: several zones, times, and spots per question, each settled by more than one shot.
 
@@ -41,7 +38,7 @@ From the dump it takes, with nothing fitted:
 - the viewer's special ambient, from its actor's share of scene light (a race with infravision or ultravision is refused);
 - every spawn but the viewer, visible door, ground item, and placed object that could show in the frame, at its actor's position, heading, and scale (`placeDump`).
 
-It returns a sheet: the shot cropped to the viewport beside the render, over their difference amplified 4 times and a map of the difference per 32-pixel block (black 0, through red and yellow, to white at 64 of 255). The result gives the mean difference (of 255) over the zone's drawn pixels (`meanPixelDifference`), over the sky, and over all, the block map's median and largest, what was placed and why anything was not, and with `fitLight` the fitted light and the prediction's, each with the residual it leaves. Each run is kept under `%LOCALAPPDATA%\zonewright\calibration\<shot>\<run>` with the shot crop, render, difference, block map (`blocks.npy` and `.png`), sheet, and `result.json`, which records the conditions (game time, weather, the carried light, the viewer's share, settings) and the renderer's source hash. `getToolingStatus` lists every shot's latest run.
+It returns a sheet: the shot cropped to the viewport beside the render, over their difference amplified 4 times and a map of the difference per 32-pixel block (black 0, through red and yellow, to white at 64 of 255). The result gives the mean difference (of 255) over the zone's drawn pixels (`meanPixelDifference`), over the sky, and over all, the block map's median and largest, what was placed and why anything was not, and with `fitLight` the fitted light and the prediction's, each with the residual it leaves. Each run is kept under `%LOCALAPPDATA%\zonewright\calibration\<shot>\<run>` with the shot crop, render, difference, block map (`blocks.npy` and `.png`), sheet, and `result.json`, which records the conditions (game time, weather, the carried light, the viewer's share, settings), `viewerOffsets` (how the client placed its first-person camera on the viewer: the camera's height over the player's spawn and the look angle over the camera's pitch, each beside the constant the client pose inverts, and the player's `viewHeight`; a measurement, never a refusal), and the renderer's source hash. `getToolingStatus` lists every shot's latest run.
 
 ## compareShot
 
@@ -52,6 +49,7 @@ For a zone the client lacks (one only the spare holds, such as a zone deployed t
 | `screenshotPath` | The shot's PNG, as `calibrateShot` takes it, with the same refusals |
 | `archivePath` | An exported `.eqg` to draw instead of the open scene (absolute, existing, its stem the dump's zone) |
 | `fitLight` | As `calibrateShot`'s |
+| `camera` | The review camera the shot was taken at (its `clientPose`, the review-zone skill): the dump's camera must stand within 2 of the camera's eye on each axis and within 0.5 degrees of its heading and pitch, else the shot is refused naming each axis and angle off; the run records `camera` and `poseDrift` |
 
 The work-file route hides everything a zone export leaves out (reference zones, `importZoneFile` references, plot borders, placed spawns, guides), as the client never draws them, and keeps what the dump places (in `<zone> dump`, its models from the zone's own archives when the client has them, else from its startup archives); the archive route draws the archive as `verifyExport`'s archive views do. The dump's values drive the render, as in `calibrateShot`: the clock, the header's fog and clips, the sky type the client resolved, the viewer's special ambient and carried light. The work file's stored values are never applied and never rewritten; where its sky type, `fogStart`, `fogEnd`, `fogDensity`, `fogOn`, `minClip`, `maxClip`, `newEngineZone`, or `zoneId` differ from the dump's, the result's `source.zoneDrift` lists each as `{stored, dump}` (empty when none differ), a report to read, never a refusal: a drift says the file and the deployed zone row disagree, not that the measurement is wrong. The run is kept beside `calibrateShot`'s under `calibration\<shot>\<run>`, its `result.json` carrying `source` (`kind` `workFile` or `archive`, `path`, `zoneDrift`), and `getToolingStatus` names each shot's latest run's source. When the run ends, whatever happened, the saved work file is opened again, so no placement, property change, or unsaved flag survives.
 
@@ -59,7 +57,7 @@ The work-file route hides everything a zone export leaves out (reference zones, 
 
 Look at the sheet first; the numbers only say how much.
 
-- **Shifted or scaled scene:** the camera or the frame. The dump's camera is the client's own; a shift points at how the view is built from it (`eqCalibration.cameraView`, `clientFrame`), never at a constant to nudge.
+- **Shifted or scaled scene:** the camera or the frame. The dump's camera is the client's own; a shift points at how the view is built from it (`eqCalibration.cameraView`, `clientFrame`), never at a constant to nudge. With `camera`, `poseDrift` separates a camera shift (the client put the character elsewhere, refused past the landing's tolerance) from a renderer shift, and `viewerOffsets` says whether the client's first-person camera sat where the pose assumed.
 - **Wrong overall light:** the sky at the game time, the special ambient, or the zone type's ambient rule. `fitLight` shows which way the light differs; noon light clamps on most sunlit faces, which leaves the sun and bounce colors unmeasured there.
 - **Warm light near the camera:** the viewer's carried light, drawn where the dump puts it.
 - **Local glows, sky, distant haze:** point lights and environment emitters draw with the rules `docs\clientRendering.md` lists as not settled; the sky's clouds, stars, and backdrop ring do not.

@@ -311,7 +311,8 @@ def bodyGroup(name):
     "eyeHeight": (
       f"unmeasured: the design eye of eye-level views, {designEyeHeight:g} for a body of avatarHeight {walkedAvatarHeight:g} scaled by"
       f" the {tallest.name}'s avatarHeight ({tallest.avatarHeight:g}); RoF2's first-person eye sits 3.69 over a human male's origin"
-      " (docs/clientRendering.md, Camera), which these views do not follow"
+      " (docs/clientRendering.md, Camera), which these views do not follow: a review camera's client pose (getReviewCameras) flies the"
+      " character so its first-person eye sits at the design eye"
     ),
     "swimEyeAboveSurface": (
       f"unmeasured: a unit over the water keeps a swimming view's eye clear of the surface; in {rof2Walk}, a swimming player's origin"

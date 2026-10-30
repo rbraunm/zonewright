@@ -85,3 +85,9 @@ roundTripChangedShare = 0.001
 # A trace view's scale figure stands beside its line of sight, this share of the way from the frame's middle to its edge at her
 # distance, so what lies along the line past her shows.
 figureAside = 0.5
+
+# A client shot is of a review camera (compareShot camera) when the dump's camera stands within this of the camera's eye on each axis,
+# as claudelink's teleport lands within 2 of the spot, and within this many degrees of its heading and pitch (face is sent to three
+# decimals; the camera's angles are listed to two); farther, the client put the character elsewhere, and the shot is refused.
+poseEyeTolerance = 2.0
+poseAngleToleranceDegrees = 0.5

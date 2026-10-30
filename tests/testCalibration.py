@@ -13,6 +13,7 @@ from conftest import serverRowValues, writePNG
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
 import clientPointLights
+import eqAxes
 import eqCalibration
 import previewFrame
 
@@ -80,6 +81,56 @@ def testTheCameraLooksAlongItsHeadingAndPitchInBlendersAxes():
   assert ahead(base | {"heading": 256, "pitch": -64}) == [round(-math.sqrt(0.5), 6), 0, round(-math.sqrt(0.5), 6)]
   with pytest.raises(ValueError, match="roll"):
     eqCalibration.cameraView(base | {"heading": 0, "pitch": 0, "roll": 3})
+
+
+def testTheClientPoseInvertsTheDumpsCamera():
+  # The teleport is the eye in the client's y, x order with the spawn 3.69 under it, and the face the client's counterclockwise heading
+  # (0 toward Blender +X; zonewright's 0 toward +Y is 90) and the look angle 8.5 over the pitch in 512ths: a dump camera built from
+  # the pose stands at the eye and looks the same way.
+  eye = [12.5, -7.25, 3.125]
+  faceHeadings = []
+  for headingDegrees in (0, 90, 180, 270):
+    for pitchDegrees in (-20, 0, 30):
+      pose = eqCalibration.clientPose(eye, headingDegrees, pitchDegrees)
+      teleport, face = pose["teleport"], pose["face"]
+      assert teleport == {"y": 12.5, "x": -7.25, "z": 3.125 - 3.69}
+      assert round(face["pitch"], 6) == round(pitchDegrees * 512 / 360 + 8.5, 6)
+      camera = {
+        "y": teleport["y"], "x": teleport["x"], "z": teleport["z"] + eqCalibration.firstPersonEyeAboveSpawn,
+        "heading": eqAxes.eqHeadingFromTurn(face["heading"]), "pitch": face["pitch"] - eqCalibration.lookAngleAbovePitch, "roll": 0,
+      }
+      assert eqCalibration.cameraView(camera)["eye"] == eye
+      heading, pitch = math.radians(headingDegrees), math.radians(pitchDegrees)
+      expected = [math.cos(pitch) * math.sin(heading), math.cos(pitch) * math.cos(heading), math.sin(pitch)]
+      assert [round(value, 9) for value in eqCalibration.cameraForward(camera)] == [round(value, 9) for value in expected], (headingDegrees, pitchDegrees)
+      assert tuple(round(value, 9) for value in eqCalibration.cameraAngles(camera)) == (float(headingDegrees), float(pitchDegrees))
+    faceHeadings.append(face["heading"])
+  assert faceHeadings == [90.0, 0.0, 270.0, 180.0]
+  assert eqCalibration.clientPose(eye, 0, 0)["face"]["pitch"] == 8.5 and round(eqCalibration.clientPose(eye, 0, 30)["face"]["pitch"], 3) == 51.167
+  # /look takes -128 to 128: looking up past 84 degrees needs more; straight down needs -119.5, inside it.
+  with pytest.raises(ValueError, match="A pitch of 85 degrees needs a look angle of 129.389, outside /look's -128 to 128"):
+    eqCalibration.clientPose(eye, 0, 85)
+  assert eqCalibration.clientPose(eye, 0, -90)["face"]["pitch"] == -119.5
+
+
+def testTheShotsCameraMustStandAtTheReviewCameraWithinTheLanding():
+  camera = smallDump()["camera"]
+  # The dump's camera stands at Blender (10, 20, 5) looking along +Y (heading 128), level: zonewright's heading 0, pitch 0.
+  pose = {"eye": [10.0, 20.0, 5.0], "headingDegrees": 0.0, "pitchDegrees": 0.0}
+  assert eqCalibration.requirePose(camera, pose, "spot") == {"eye": [0.0, 0.0, 0.0], "headingDegrees": 0.0, "pitchDegrees": 0.0}
+  # Within teleport's 2 units on each axis and half a degree, the drift is reported, not refused; the heading drifts the short way round.
+  near = {"eye": [11.5, 18.2, 4.0], "headingDegrees": 359.6, "pitchDegrees": 0.4}
+  assert eqCalibration.requirePose(camera, near, "spot") == {"eye": [-1.5, 1.8, 1.0], "headingDegrees": 0.4, "pitchDegrees": -0.4}
+  with pytest.raises(ValueError) as refused:
+    eqCalibration.requirePose(camera, {"eye": [13.0, 20.0, 2.5], "headingDegrees": 1.0, "pitchDegrees": 0.0}, "spot")
+  assert str(refused.value) == (
+    "The shot's camera does not stand at review camera 'spot' (the eye within 2 on each axis, the angles within 0.5 degrees): eye x 10 against"
+    " the camera's 13; eye z 5 against the camera's 2.5; heading 0.00 against the camera's 1.00"
+  )
+  # The dump's player row gives how the client placed its camera on the viewer: the eye 3.69 over the spawn, the look angle 8.5 over the pitch.
+  assert eqCalibration.viewerOffsets(smallDump()) == {
+    "eyeAboveSpawn": {"measured": 3.69, "constant": 3.69}, "lookAngleAbovePitch": {"measured": 8.5, "constant": 8.5}, "viewHeight": 7.44,
+  }
 
 
 def testTheDumpGivesTheZoneTheViewerAndTheLightTheClientDrew():
@@ -220,6 +271,11 @@ def testCalibrationPredictsAClaudelinkShotOfAnEQGZoneFromItsDump(stageBlenderSer
   assert sorted(entry["name"] for entry in predicted["notPlaced"]) == ["door3_OBJ_HIDDEN", "spawn8_unseen000"]
   assert predicted["conditions"]["gameTime"] == "13:31" and predicted["conditions"]["carriedLight"]["position"] == light["position"]
   assert predicted["fitLight"] is None and Path(predicted["sheetPath"]).is_file()
+  # A shot of no review camera records none; every run records how the client placed its camera on the viewer.
+  assert predicted["camera"] is None and predicted["poseDrift"] is None
+  assert predicted["viewerOffsets"] == {
+    "eyeAboveSpawn": {"measured": 3.69, "constant": 3.69}, "lookAngleAbovePitch": {"measured": 8.5, "constant": 8.5}, "viewHeight": 7.44,
+  }
   # The sky's own light explains the shot under the fit's formula but for the liquids' added light (water's reflection), and the fit
   # finds the sky's ambient; its noon light clamps on most sunlit faces, which leaves the sun and bounce colors unmeasured.
   fit = fitted["fitLight"]
@@ -237,20 +293,30 @@ def testCalibrationPredictsAClaudelinkShotOfAnEQGZoneFromItsDump(stageBlenderSer
 comparedZone = "compared"
 comparedFileValues = {
   "sky": {"type": comparedZone, "hour": 9, "minute": 0}, "fogStart": 200.0, "fogEnd": 3000.0, "fogDensity": 0.33, "fogOn": True, "minClip": 50.0,
-  "maxClip": 4000.0, "newEngineZone": False,
+  "maxClip": 4000.0, "newEngineZone": False, "specialAmbientColor": [0.0, 0.0, 0.0],
 }
 comparedFogSet = {"red": 200, "green": 200, "blue": 200, "start": 200, "end": 2400}
 comparedDrift = {"fogEnd": {"stored": 3000.0, "dump": 2400.0}, "minClip": {"stored": 50.0, "dump": 500.0}}
-# From 20 up at Blender (-60, 0), looking along +X (heading 0) and 14 degrees down at the crate, the guard, and the dropped kiln.
-comparedCamera = {"y": -60.0, "x": 0.0, "z": 20.0, "heading": 0, "pitch": -20}
+# From 20 up at Blender (-60, 0), looking along +X (heading 0) and 11.25 degrees down (pitch -16 of 512, which a review camera's listing
+# holds exactly) at the crate, the guard, and the dropped kiln.
+comparedCamera = {"y": -60.0, "x": 0.0, "z": 20.0, "heading": 0, "pitch": -16}
 guardAt, kilnAt = (15.0, 0.0, 0.0), (20.0, 10.0, 0.0)
+# The compared camera's pose stands under this review camera, saved in the work file.
+comparedCameraName = "shotCamera"
 
 
-def comparedDump():
+def comparedView():
+  """The compared camera as an {eye, target} view: the eye at Blender (-60, 0, 20), the target a unit along +X and down its pitch."""
+  pitch = math.radians(comparedCamera["pitch"] * 360 / 512)
+  eye = [comparedCamera["y"], comparedCamera["x"], comparedCamera["z"]]
+  return {"eye": eye, "target": [eye[0] + math.cos(pitch), eye[1], eye[2] + math.sin(pitch)]}
+
+
+def comparedDump(camera=comparedCamera):
   """A dump of the compared zone at noon with a fogged header: the viewer carries no light; the kiln lies dropped in view."""
-  noLight = {"type": 0, "tag": "", "position": (comparedCamera["y"], comparedCamera["x"], comparedCamera["z"] - 3.69), "radius": 0}
+  noLight = {"type": 0, "tag": "", "position": (camera["y"], camera["x"], camera["z"] - eqCalibration.firstPersonEyeAboveSpawn), "radius": 0}
   return zoneDump(
-    comparedZone, serverRowValues(comparedZone)["zoneId"], (960, 540), comparedCamera, (12, 0), noLight, 0.1, comparedFogSet, 4000,
+    comparedZone, serverRowValues(comparedZone)["zoneId"], (960, 540), camera, (12, 0), noLight, 0.1, comparedFogSet, 4000,
     groundItems=[{"dropId": 5, "name": "IT10800_ACTORDEF", "actor": "0x13"}], actors=[actor("0x13", "IT10800_ACTORDEF", kilnAt, 100, 1)],
     fogOnOff=255, minClip=500,
   )
@@ -270,6 +336,7 @@ async def comparedWorkFile(session, folder):
   await session.expectSuccess("projectUVs", {"objectName": "crate", "method": "box", "worldUnitsPerRepeat": 8})
   await session.expectSuccess("setZoneProperties", comparedFileValues | serverRowValues(comparedZone))
   await session.expectSuccess("placeSpawn", {"zone": None, "model": "HUM", "name": "guard", "height": 6, "location": list(guardAt), "headingDegrees": 270})
+  await session.expectSuccess("saveReviewCamera", {"name": comparedCameraName, "view": comparedView(), "note": "the crate and the kiln as the client shows them"})
   await session.expectSuccess("saveFile", {"path": str(folder / f"{comparedZone}.blend")})
   return folder / f"{comparedZone}.blend"
 
@@ -278,9 +345,7 @@ async def comparedWorkFile(session, folder):
 def testCompareShotMeasuresAShotOfTheOpenWorkFileAndOfItsExportFromItsDump(stageBlenderServer, tmp_path):
   dump = comparedDump()
   zone = eqCalibration.zoneProperties(dump, eqCalibration.viewer(dump)["specialAmbientColor"])
-  pitch = math.radians(comparedCamera["pitch"] * 360 / 512)
-  eye = [comparedCamera["y"], comparedCamera["x"], comparedCamera["z"]]
-  view = {"eye": eye, "target": [eye[0] + math.cos(pitch), eye[1], eye[2] + math.sin(pitch)]}
+  view = comparedView()
   export = tmp_path / "export" / f"{comparedZone}.eqg"
   export.parent.mkdir()
 
@@ -297,21 +362,26 @@ def testCompareShotMeasuresAShotOfTheOpenWorkFileAndOfItsExportFromItsDump(stage
     await session.expectSuccess("openFile", {"path": str(blend), "discardUnsavedChanges": True})
     before = await session.expectSuccess("getSceneSummary", {})
     predicted = await session.expectImage("compareShot", {"screenshotPath": str(shot)}, mimeType="image/jpeg")
+    posed = await session.expectImage("compareShot", {"screenshotPath": str(shot), "camera": comparedCameraName}, mimeType="image/jpeg")
     after = await session.expectSuccess("getSceneSummary", {})
     archived = await session.expectImage("compareShot", {"screenshotPath": str(shot), "archivePath": str(export)}, mimeType="image/jpeg")
     status = await session.expectSuccess("getToolingStatus")
     otherShot = writeShot(tmp_path / "other", "other", Image.new("RGB", (48, 27)), smallDump())
+    # The client put the character 3 east of the camera's eye and turned 4/512 of a turn left of its heading.
+    driftedShot = writeShot(tmp_path / "drifted", comparedZone, Image.new("RGB", (960, 540)), comparedDump(comparedCamera | {"y": -57.0, "heading": 4}))
     refusals = {
       "otherZone": await session.expectError("compareShot", {"screenshotPath": str(otherShot)}),
       "missingArchive": await session.expectError("compareShot", {"screenshotPath": str(shot), "archivePath": str(tmp_path / "missing" / f"{comparedZone}.eqg")}),
+      "drifted": await session.expectError("compareShot", {"screenshotPath": str(driftedShot), "camera": comparedCameraName}),
+      "unknownCamera": await session.expectError("compareShot", {"screenshotPath": str(shot), "camera": "nope"}),
     }
     await session.expectSuccess("transformObjects", {"names": ["crate"], "translate": [0, 0, 1]})
     refusals["unsaved"] = await session.expectError("compareShot", {"screenshotPath": str(shot)})
     await session.expectSuccess("newFile", {"discardUnsavedChanges": True})
     refusals["neverSaved"] = await session.expectError("compareShot", {"screenshotPath": str(shot)})
-    return blend, before, predicted[1], after, archived[1], status, refusals
+    return blend, before, predicted[1], posed[1], after, archived[1], status, refusals
 
-  blend, before, predicted, after, archived, status, refusals = stageBlenderServer.session(steps)
+  blend, before, predicted, posed, after, archived, status, refusals = stageBlenderServer.session(steps)
   # The work file's own route: the dump's header drives the render, the file's fogEnd and minClip reported as drift, never applied; the
   # guard (left out of the export) is hidden and the dump's kiln kept, so the render is the shot.
   assert predicted["source"] == {"kind": "workFile", "path": str(blend), "zoneDrift": comparedDrift}
@@ -324,6 +394,15 @@ def testCompareShotMeasuresAShotOfTheOpenWorkFileAndOfItsExportFromItsDump(stage
   assert sorted(path.name for path in runFolder.iterdir()) == ["blocks.npy", "blocks.png", "difference.png", "render.png", "result.json", "sheet.jpg", "shot.png"]
   recorded = json.loads((runFolder / "result.json").read_text(encoding="utf-8"))
   assert recorded["source"] == predicted["source"] and recorded["comparison"] == predicted["comparison"] and [entry["name"] for entry in recorded["placed"]] == ["groundItem5_IT10800_ACTORDEF"]
+  # A shot of a review camera: the dump's camera stands at the camera's pose, so the run records the camera and no drift; every run
+  # records how the client placed its camera on the viewer, and none a camera it was not asked about.
+  assert predicted["camera"] is None and predicted["poseDrift"] is None
+  assert posed["camera"] == comparedCameraName and posed["poseDrift"] == {"eye": [0.0, 0.0, 0.0], "headingDegrees": 0.0, "pitchDegrees": 0.0}
+  assert posed["comparison"]["meanPixelDifference"] < 0.5 and posed["source"] == predicted["source"]
+  offsets = {"eyeAboveSpawn": {"measured": 3.69, "constant": 3.69}, "lookAngleAbovePitch": {"measured": 8.5, "constant": 8.5}, "viewHeight": 7.44}
+  assert predicted["viewerOffsets"] == offsets and posed["viewerOffsets"] == offsets
+  posedRecord = json.loads((Path(posed["runFolder"]) / "result.json").read_text(encoding="utf-8"))
+  assert posedRecord["camera"] == comparedCameraName and posedRecord["poseDrift"] == posed["poseDrift"] and posedRecord["viewerOffsets"] == offsets
   # Afterwards the saved work file is open again as it was: no dump collection, no placement, the file's own values, nothing unsaved.
   assert after == before and after["status"] == {"filePath": str(blend), "unsavedChanges": False, "scene": "Scene"}
   assert f"{comparedZone} dump" not in after["collections"] and "guard" in [entry["name"] for entry in after["objects"]]
@@ -332,9 +411,13 @@ def testCompareShotMeasuresAShotOfTheOpenWorkFileAndOfItsExportFromItsDump(stage
   assert archived["placed"] == 1 and archived["comparison"]["meanPixelDifference"] < 0.5 and archived["comparison"]["meanSkyDifference"] < 0.5
   latest = [entry for entry in status["calibration"] if entry["shot"] == f"{comparedZone}.png"]
   assert [(entry["zone"], entry["runs"], entry["source"], entry["meanPixelDifference"]) for entry in latest] == [
-    (comparedZone, 2, {"kind": "archive", "path": str(export)}, archived["comparison"]["meanPixelDifference"]),
+    (comparedZone, 3, {"kind": "archive", "path": str(export)}, archived["comparison"]["meanPixelDifference"]),
   ]
   assert f"The shot is of zone 'highpasshold', but the open work file {blend} has the short name '{comparedZone}'" in refusals["otherZone"]
   assert f"'{tmp_path / 'missing' / f'{comparedZone}.eqg'}' is not an absolute path to an existing .eqg file" in refusals["missingArchive"]
+  # A shot whose camera stands off the review camera's pose is refused naming each axis and angle off, the dump's and the camera's.
+  assert f"The shot's camera does not stand at review camera '{comparedCameraName}'" in refusals["drifted"]
+  assert "eye x -57 against the camera's -60; heading 87.19 against the camera's 90.00" in refusals["drifted"]
+  assert f"No review camera named 'nope' (saved: ['{comparedCameraName}'])" in refusals["unknownCamera"]
   assert "The open file has unsaved changes; compareShot measures the preview of the work file as saved" in refusals["unsaved"]
   assert "this scene was never saved: save it as a work file (saveFile with a path)" in refusals["neverSaved"]

@@ -6,11 +6,14 @@ from pathlib import Path
 import numpy
 from PIL import Image
 
+from claudelinkShots import capturedAt, writeShot, zoneDump
 from conftest import writePNG, walkOf
 from testModelsAndDressing import freshScene
 from testReviewViews import crateScene, environment
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
+import eqCalibration
+import previewFrame
 import slopeBands
 import viewSheets
 import playerScale
@@ -67,10 +70,12 @@ def testReviewCamerasReproduceTheirViewsAndRenderAsOneSheet(stageBlenderServer, 
     ]
     moved = await session.expectSuccess("saveReviewCamera", {"name": "high", "view": {"eye": [0, -150, 90], "target": [40, 40, 5]}, "note": "farther back"})
     exported = await session.expectSuccess("checkExport", {"path": str(tmp_path / "cameras.eqg"), "purpose": "test"})
-    deleted = await session.expectSuccess("deleteReviewCameras", {"names": ["high"]})
-    return pairs, byDay, cameras, sheet, oneHour, layout, refusals, moved, exported, deleted
+    await session.expectSuccess("saveReviewCamera", {"name": "zenith", "view": {"standAt": [0, 0], "headingDegrees": 0, "pitchDegrees": 85}, "note": "straight up"})
+    withZenith = await session.expectSuccess("getReviewCameras")
+    deleted = await session.expectSuccess("deleteReviewCameras", {"names": ["high", "zenith"]})
+    return pairs, byDay, cameras, sheet, oneHour, layout, refusals, moved, exported, withZenith, deleted
 
-  pairs, byDay, cameras, sheet, oneHour, layout, refusals, moved, exported, deleted = stageBlenderServer.session(steps)
+  pairs, byDay, cameras, sheet, oneHour, layout, refusals, moved, exported, withZenith, deleted = stageBlenderServer.session(steps)
   # Each camera renders its view exactly, the scale figure standing again where she stood in the view from where a player stands;
   # the camera kept at 21:00 renders its view at 21:00, by moonlight, not the zone's 13:00, and says so.
   for name, ((viewImage, viewed), (cameraImage, camera)) in pairs.items():
@@ -87,6 +92,23 @@ def testReviewCamerasReproduceTheirViewsAndRenderAsOneSheet(stageBlenderServer, 
   assert listed["standing"]["eye"] == [0.0, 0.0, round(eyeHeight, 3)] and listed["standing"]["headingDegrees"] == 45.0 and listed["standing"]["pitchDegrees"] == 0.0
   figure = listed["standing"]["figure"]
   assert figure[2] == 0.0 and 13 <= math.hypot(figure[0], figure[1]) <= 17 and figure[0] > 0 and figure[1] > 0
+  # Each camera lists the spare's first-person pose that puts the client's camera at it: the eye in the client's y, x order (y is
+  # Blender x) with the spawn 3.69 under it, the heading counterclockwise from +X, the look angle 8.5 over the pitch in 512ths, and the
+  # hour it renders at, the kept one or the zone's. None of these renders at another frame, was matched to art, or came from a shot.
+  assert listed["high"]["clientPose"] == {
+    "teleport": {"y": 0.0, "x": -120.0, "z": 76.31}, "face": {"heading": (90 - 14.04) % 360, "pitch": -24.45 * 512 / 360 + 8.5}, "time": {"hour": 13, "minute": 0},
+  }
+  assert listed["night"]["clientPose"] == {
+    "teleport": {"y": 60.0, "x": -60.0, "z": 16.31}, "face": {"heading": (90 - 348.69) % 360, "pitch": -8.37 * 512 / 360 + 8.5}, "time": {"hour": 21, "minute": 0},
+  }
+  assert listed["standing"]["clientPose"] == {
+    "teleport": {"y": 0.0, "x": 0.0, "z": round(eyeHeight, 3) - 3.69}, "face": {"heading": 45.0, "pitch": 8.5}, "time": {"hour": 13, "minute": 0},
+  }
+  assert all(camera["clientPoseRefused"] is None and camera["frame"] is None and camera["concept"] is None and camera["shot"] is None for camera in listed.values())
+  # A camera looking up past 84 degrees needs a look angle /look does not take: no pose, and why.
+  zenith = next(camera for camera in withZenith["cameras"] if camera["name"] == "zenith")
+  assert zenith["pitchDegrees"] == 85.0 and zenith["clientPose"] is None
+  assert zenith["clientPoseRefused"] == "A pitch of 85 degrees needs a look angle of 129.389, outside /look's -128 to 128"
   # One sheet of the four in name order, each render as renderView gives it, the night camera's at its kept hour and captioned with
   # it; the long note wraps to a second line under its cell. The sheet is the one its renders and captions lay out again.
   image, described = sheet
@@ -110,7 +132,55 @@ def testReviewCamerasReproduceTheirViewsAndRenderAsOneSheet(stageBlenderServer, 
   # Saved again under its name, a camera moves to the new view; export leaves the cameras out; deleting takes only the one named.
   assert moved["eye"] == [0.0, -150.0, 90.0] and moved["note"] == "farther back"
   assert excludedFor(exported, "a camera") == ["crateFrame", "high", "night", "standing"]
-  assert deleted == {"deleted": ["high"], "remaining": ["crateFrame", "night", "standing"]}
+  assert deleted == {"deleted": ["high", "zenith"], "remaining": ["crateFrame", "night", "standing"]}
+
+
+# A claudelink shot of the crate scene's zone at 21:00: the camera 80 up at Blender (0, -120), turned 67.5 degrees counterclockwise from
+# +X (zonewright's heading 22.5) and pitched 33.75 degrees down (-48 of 512), through a 400 by 200 viewport.
+shotCamera = {"y": 0.0, "x": -120.0, "z": 80.0, "heading": 96, "pitch": -48}
+
+
+def crateShot(folder):
+  """The shot's PNG path and its dump."""
+  noLight = {"type": 0, "tag": "", "position": (0.0, -120.0, 80.0 - eqCalibration.firstPersonEyeAboveSpawn), "radius": 0}
+  dump = zoneDump("crate", 901, (400, 200), shotCamera, (21, 0), noLight, 0.1, {"red": 128, "green": 128, "blue": 128, "start": 500, "end": 3000}, 6000)
+  return writeShot(folder, "shot", Image.new("RGB", (400, 200), (90, 60, 30)), dump), dump
+
+
+def testACameraSavedFromAClientShotRendersAtTheShotsFrameAndHour(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await crateScene(session, tmp_path)
+    await session.expectSuccess("setZoneProperties", {"sky": zoneSky})
+    png, dump = crateShot(tmp_path / "shots")
+    saved = await session.expectSuccess("saveReviewCamera", {"name": "shot", "note": "the crate as the client shows it", "screenshotPath": str(png)})
+    rendered = await session.expectImage("renderView", {"view": {"camera": "shot"}})
+    listed = await session.expectSuccess("getReviewCameras")
+    refusals = [
+      await session.expectError("saveReviewCamera", {"name": "both", "note": "both", "view": {"eye": [0, -120, 80], "target": [40, 40, 5]}, "screenshotPath": str(png)}),
+      await session.expectError("saveReviewCamera", {"name": "neither", "note": "neither"}),
+      await session.expectError("saveReviewCamera", {"name": "timed", "note": "timed", "screenshotPath": str(png), "sky": nightSky}),
+      await session.expectError("saveReviewCamera", {"name": "missing", "note": "missing", "screenshotPath": str(tmp_path / "shots" / "nope.png")}),
+    ]
+    return png, dump, saved, rendered, listed, refusals
+
+  png, dump, saved, rendered, listed, refusals = stageBlenderServer.session(steps)
+  # The camera is the dump's: its view the eye and a target a unit ahead, its frame the viewport's aspect at the client's field of view,
+  # its shot the files and the game time, which it keeps as its sky; no scale figure, no art.
+  eye = [0.0, -120.0, 80.0]
+  forward = eqCalibration.cameraForward(dump["camera"])
+  assert saved["view"] == {"eye": eye, "target": [eye[axis] + forward[axis] for axis in range(3)]}
+  assert saved["frame"] == {"size": [400, 200], "verticalFieldOfViewDegrees": previewFrame.verticalFieldOfView(45, 2.0)}
+  assert saved["shot"] == {"png": str(png.resolve()), "dump": str(tmp_path / "shots" / "crate_shot.dump.json"), "capturedAt": capturedAt, "gameTime": {"hour": 21, "minute": 0}}
+  assert saved["sky"] == nightSky and saved["concept"] is None and saved["figure"] is None
+  assert saved["eye"] == eye and saved["headingDegrees"] == 22.5 and saved["pitchDegrees"] == -33.75
+  # It renders at the shot's frame and hour, and lists the pose that took the shot: the dump's own camera.
+  image, described = rendered
+  assert (described["width"], described["height"]) == (400, 200) and described["sky"] == nightDrawn and Image.open(io.BytesIO(image)).size == (400, 200)
+  camera = next(camera for camera in listed["cameras"] if camera["name"] == "shot")
+  assert camera["clientPose"] == {"teleport": {"y": 0.0, "x": -120.0, "z": 76.31}, "face": {"heading": 67.5, "pitch": -39.5}, "time": {"hour": 21, "minute": 0}}
+  assert camera["clientPoseRefused"] is None and camera["shot"] == saved["shot"] and camera["frame"] == saved["frame"]
+  assert "not both or neither" in refusals[0] and "not both or neither" in refusals[1]
+  assert "keeps the shot's game time as its sky; sky goes with a view" in refusals[2] and "No screenshot at" in refusals[3]
 
 
 offLedge = [[120, 0, 70], [44, 0, 70], [36, 0, 0], [-100, 0, 0]]
@@ -132,6 +202,8 @@ def testReviewRoutesWalkByNameAndRenderAsAStripOfEyeLevelFrames(stageBlenderServ
     withFigure = await session.expectImage("compareRenders", {"before": strip[1]["frames"][0]["outputPath"], "after": firstView[1]["outputPath"]}, mimeType="image/jpeg")
     tooMany = await session.expectError("renderRouteStrip", {"route": "offLedge", "spacing": 5})
     keptOnNone = await session.expectError("saveReviewCamera", {"name": "dusk", "view": {"standAt": [0, 0], "headingDegrees": 90, "pitchDegrees": 0}, "note": "by dusk", "sky": nightSky})
+    await session.expectSuccess("saveReviewCamera", {"name": "dusk", "view": {"standAt": [0, 0], "headingDegrees": 90, "pitchDegrees": 0}, "note": "by dusk"})
+    noSkyListed = await session.expectSuccess("getReviewCameras")
     await session.expectSuccess("setZoneProperties", {"sky": zoneSky})
     nightStrip = await session.expectImage("renderRouteStrip", {"path": flat, "spacing": 40, "sky": nightSky}, mimeType="image/jpeg")
     nightFrame = nightStrip[1]["frames"][0]
@@ -142,9 +214,9 @@ def testReviewRoutesWalkByNameAndRenderAsAStripOfEyeLevelFrames(stageBlenderServ
     exported = await session.expectSuccess("checkExport", {"path": str(tmp_path / "routes.eqg"), "purpose": "test"})
     deleted = await session.expectSuccess("deleteReviewRoutes", {"names": ["offLedge"]})
     gone = await session.expectError("walkRoute", {"route": "offLedge"})
-    return saved, byName, byPath, both, strip, firstView, withFigure, tooMany, keptOnNone, nightStrip, nightFigure, nightAgainstDay, exported, deleted, gone
+    return saved, byName, byPath, both, strip, firstView, withFigure, tooMany, keptOnNone, noSkyListed, nightStrip, nightFigure, nightAgainstDay, exported, deleted, gone
 
-  saved, byName, byPath, both, strip, firstView, withFigure, tooMany, keptOnNone, nightStrip, nightFigure, nightAgainstDay, exported, deleted, gone = stageBlenderServer.session(steps)
+  saved, byName, byPath, both, strip, firstView, withFigure, tooMany, keptOnNone, noSkyListed, nightStrip, nightFigure, nightAgainstDay, exported, deleted, gone = stageBlenderServer.session(steps)
   assert saved == {"name": "offLedge", "path": [[float(value) for value in point] for point in offLedge], "length": 220.0}
   # Walked by name, the route is walked exactly as its points are: off the ledge's sheer side, 70 down, is a drop.
   assert byName == byPath and [problem["kind"] for problem in walkOf(byName)["problems"]] == ["drop"]
@@ -174,6 +246,8 @@ def testReviewRoutesWalkByNameAndRenderAsAStripOfEyeLevelFrames(stageBlenderServ
   # heading with the hour, its frames labeled by distance as before: the sheet is the one its frames lay out again with that heading,
   # and a frame is the same view rendered at 21:00 but for the figure, and nothing like the day's.
   assert "The zone draws no sky, so no hour can light it" in keptOnNone
+  # A camera saved without one lists its client pose with no time to set.
+  assert [(camera["name"], camera["clientPose"]["time"], camera["clientPose"]["face"]["heading"]) for camera in noSkyListed["cameras"]] == [("dusk", None, 0.0)]
   assert strip[1]["sky"] is None and nightStrip[1]["sky"] == nightDrawn
   nightFrames = nightStrip[1]["frames"]
   assert [frame["distance"] for frame in nightFrames] == [0.0, 40.0, 80.0] and nightStrip[1]["problems"] == []

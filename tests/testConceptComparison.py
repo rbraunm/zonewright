@@ -107,7 +107,8 @@ def testAConceptCameraRendersAtTheArtsFrameAndKeepsItsArtWhereTheWorkMoves(stage
   # Art that is the render itself matches on every measure, and the kept camera draws that render again exactly.
   assert kept[1]["masses"] == {"sameThird": 1.0, "correlation": 1.0}
   assert kept[1]["edges"] == {"conceptEdgesMet": 1.0, "renderEdgesMet": 1.0} and kept[1]["palette"]["conceptDistance"] == 0.0
-  assert kept[1]["keptCamera"]["concept"] == {"path": str(workA / "ref" / "art.png"), "size": [960, 480], "verticalFieldOfViewDegrees": tried[1]["verticalFieldOfViewDegrees"]}
+  assert kept[1]["keptCamera"]["concept"] == {"path": str(workA / "ref" / "art.png")}
+  assert kept[1]["keptCamera"]["frame"] == {"size": [960, 480], "verticalFieldOfViewDegrees": tried[1]["verticalFieldOfViewDegrees"]} and kept[1]["keptCamera"]["shot"] is None
   assert Path(again[1]["renderPath"]).read_bytes() == Path(kept[1]["renderPath"]).read_bytes()
   assert again[1]["masses"] == kept[1]["masses"] and again[1]["keptCamera"] is None
   # A camera kept at 21:00 renders the art's frame by moonlight, kept and compared again alike, as the day camera does when asked
@@ -133,6 +134,6 @@ def testAConceptCameraRendersAtTheArtsFrameAndKeepsItsArtWhereTheWorkMoves(stage
   assert numpy.abs(pixels[8 + 180, 8 + 320] - [40, 40, 40]).max() > 20
   # Kept relative to the saved .blend, the art is found again where the work moved with it.
   listed = {camera["name"]: camera for camera in moved["cameras"]}
-  assert listed["match"]["concept"]["path"] == str(workB / "ref" / "art.png")
+  assert listed["match"]["concept"] == {"path": str(workB / "ref" / "art.png")} and listed["match"]["frame"]["size"] == [960, 480]
   assert listed["match"]["sky"] is None and listed["nightMatch"]["sky"] == nightSky and listed["nightMatch"]["concept"]["path"] == str(workB / "ref" / "art.png")
   assert movedAgain[1]["concept"] == str(workB / "ref" / "art.png") and movedAgain[1]["masses"]["sameThird"] == 1.0

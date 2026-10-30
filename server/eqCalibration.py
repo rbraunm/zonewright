@@ -11,6 +11,7 @@ from pathlib import Path
 import numpy
 from PIL import Image
 
+import buildTolerances
 import clientPointLights
 import eqAxes
 import previewFrame
@@ -38,6 +39,13 @@ skyLitZoneTypes = (1, 2, 5)
 racesWithoutNightVision = (1, 2, 3)
 # What the dump places is kept when it stands within this of the camera's view, so a model whose origin lies outside it still shows.
 placementMargin = 100.0
+# The spare's first-person camera stands this far over the player's spawn z, and its pitch reads this many 512ths of a turn under the
+# player's look angle (docs/clientRendering.md, Camera: read from dumps of a human male); clientPose inverts them, and viewerOffsets
+# reads them from every shot's dump.
+firstPersonEyeAboveSpawn = 3.69
+lookAngleAbovePitch = 8.5
+# /look, which claudelink's face sends the look angle through, takes this far either way.
+lookRange = 128
 blockSide = 32
 # The difference image is amplified by this, and the block map's color ramp tops out at this difference (of 255).
 differenceGain = 4
@@ -137,6 +145,72 @@ def cameraView(camera):
   eye = blenderPoint(camera)
   forward = cameraForward(camera)
   return {"eye": eye, "target": [eye[axis] + forward[axis] for axis in range(3)]}
+
+
+def cameraAngles(camera):
+  """A dump camera's heading (0 toward +Y, clockwise) and pitch in degrees, as a review camera's are listed."""
+  forward = cameraForward(camera)
+  return math.degrees(math.atan2(forward[0], forward[1])) % 360, math.degrees(math.asin(max(-1.0, min(1.0, forward[2]))))
+
+
+def clientPose(eye, headingDegrees, pitchDegrees):
+  """The spare's first-person pose that puts the client's camera at eye (Blender) looking along headingDegrees and pitchDegrees, as
+  claudelink's tools take it: the teleport in the client's /loc order (y is Blender x, x Blender y, as a dump's are read), its z the
+  spawn firstPersonEyeAboveSpawn under the eye, and the face: the client's counterclockwise degrees, and the look angle
+  lookAngleAbovePitch over the pitch in 512ths of a turn; refused when the look angle leaves /look's range."""
+  look = pitchDegrees * eqAxes.eqHeadingUnits / 360 + lookAngleAbovePitch
+  if not -lookRange <= look <= lookRange:
+    raise ValueError(f"A pitch of {pitchDegrees:g} degrees needs a look angle of {look:g}, outside /look's -{lookRange} to {lookRange}")
+  return {
+    "teleport": {"y": eye[0], "x": eye[1], "z": eye[2] - firstPersonEyeAboveSpawn},
+    "face": {"heading": eqAxes.turnFromHeading(headingDegrees) % 360, "pitch": look},
+  }
+
+
+def poseDrift(camera, pose):
+  """How far a dump's camera stands from a review camera's pose ({eye, headingDegrees, pitchDegrees}, as getReviewCameras lists it):
+  the dump's less the camera's on each eye axis, the heading the short way round, and the pitch."""
+  eye = blenderPoint(camera)
+  heading, pitch = cameraAngles(camera)
+  return {
+    "eye": [round(dumpAxis - poseAxis, 3) for dumpAxis, poseAxis in zip(eye, pose["eye"])],
+    "headingDegrees": round((heading - pose["headingDegrees"] + 180) % 360 - 180, 3), "pitchDegrees": round(pitch - pose["pitchDegrees"], 3),
+  }
+
+
+def requirePose(camera, pose, name):
+  """The drift (poseDrift) of a dump's camera from the review camera it was meant to stand at, refused naming each eye axis and angle
+  off when the eye is farther than buildTolerances.poseEyeTolerance on an axis or an angle farther than poseAngleToleranceDegrees."""
+  drift = poseDrift(camera, pose)
+  eye = blenderPoint(camera)
+  heading, pitch = cameraAngles(camera)
+  off = [
+    f"eye {axis} {dumpAxis:g} against the camera's {poseAxis:g}"
+    for axis, dumpAxis, poseAxis, difference in zip("xyz", eye, pose["eye"], drift["eye"]) if abs(difference) > buildTolerances.poseEyeTolerance
+  ]
+  off += [
+    f"{angle} {dumpAngle:.2f} against the camera's {poseAngle:.2f}"
+    for angle, dumpAngle, poseAngle, difference in (("heading", heading, pose["headingDegrees"], drift["headingDegrees"]), ("pitch", pitch, pose["pitchDegrees"], drift["pitchDegrees"]))
+    if abs(difference) > buildTolerances.poseAngleToleranceDegrees
+  ]
+  if off:
+    raise ValueError(
+      f"The shot's camera does not stand at review camera '{name}' (the eye within {buildTolerances.poseEyeTolerance:g} on each axis, the angles within"
+      f" {buildTolerances.poseAngleToleranceDegrees:g} degrees): " + "; ".join(off)
+    )
+  return drift
+
+
+def viewerOffsets(dump):
+  """How the client placed its first-person camera on the viewer in this dump, beside the constants clientPose inverts: the camera's
+  height over the player's spawn z against firstPersonEyeAboveSpawn, the player's look angle less the camera's pitch against
+  lookAngleAbovePitch, and the player's viewHeight; a measurement, never a refusal."""
+  camera, player = dump["camera"], dump["player"]
+  return {
+    "eyeAboveSpawn": {"measured": round(camera["z"] - player["z"], 3), "constant": firstPersonEyeAboveSpawn},
+    "lookAngleAbovePitch": {"measured": round(player["lookAngle"] - camera["pitch"], 3), "constant": lookAngleAbovePitch},
+    "viewHeight": player["viewHeight"],
+  }
 
 
 def clientFrame(camera, viewport):

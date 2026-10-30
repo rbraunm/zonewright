@@ -1159,7 +1159,8 @@ slopeBandsHelp = ", ".join(
 
 @guardedTool(description=(
   "Render the EQ preview of a view: {\"camera\": name} (a review camera saved from a standAt view stands the scale figure again where"
-  " she stood, her ground found as figureAt's is; one matched to concept art renders at the art's aspect and its own field of view),"
+  " she stood, her ground found as figureAt's is; one matched to concept art renders at the art's aspect and its own field of view, and"
+  " one saved from a client shot at the shot's frame),"
   " {\"eye\": [x,y,z], \"target\": [x,y,z]}, or {\"standAt\": [x,y] or [x,y,z], \"headingDegrees\": h, \"pitchDegrees\": p} (on the"
   " highest ground players stand on at [x,y], never what they pass through (as walkRoute), or with z on the ground found from 3 above"
   " z down to 50 below it, for caves, under overhangs, and on ledges; heading 0 = +Y, clockwise;"
@@ -2205,7 +2206,10 @@ predictionHelp = (
   " of the difference per 32-pixel block (black 0 through red and yellow to white at 64 of 255), with the mean difference (of 255) over"
   " the zone's drawn pixels, over the sky, and over all. fitLight also fits the ambient, sun, and bounce colors and sun direction that"
   " best explain the shot (least squares, the rest of the light and the fog as predicted) and reports them beside the sky's prediction,"
-  " a diagnostic. Each run is kept under the tooling root's calibration\\<shot>\\<run> with its pictures, the conditions it was taken"
+  " a diagnostic. Every run records viewerOffsets from the dump's player row, a measurement of how the client placed its first-person"
+  " camera on the viewer: the camera's height over the player's spawn z and the player's look angle less the camera's pitch, each beside"
+  " the constant the client pose inverts (getReviewCameras clientPose), and the player's viewHeight. Each run is kept under the"
+  " tooling root's calibration\\<shot>\\<run> with its pictures, the conditions it was taken"
   " under (game time, weather, light, settings), what it drew (source), and the renderer's source hash; getToolingStatus lists each"
   " shot's latest run."
 )
@@ -2226,11 +2230,12 @@ def shotInputs(screenshotPath):
   return {"sidecar": sidecar, "dump": dump, "view": view, "frame": frame, "viewed": viewed, "updates": updates, "carried": carried}
 
 
-async def predictShot(context, screenshotPath, shot, loadOrderZone, exportedOnly, source, fitLight):
+async def predictShot(context, screenshotPath, shot, loadOrderZone, exportedOnly, source, fitLight, review):
   """The prediction calibrateShot and compareShot share, on the open scene: the dump's zone values set (setZoneProperties), what stands
   in view placed in "<zone> dump" (placeFromDump, its models from loadOrderZone's load order), the dump's camera rendered with its
   passes (exportedOnly leaving out what a zone export leaves out but the dump's placements), the shot compared, and the run recorded
-  under calibration\\<shot>\\<run> with its source; returns the sheet and the summary."""
+  under calibration\\<shot>\\<run> with its source, the review camera the shot is of and the dump's drift from it (review: {camera,
+  poseDrift}, both None for a shot of no camera), and the dump's viewer offsets; returns the sheet and the summary."""
   sidecar, dump, view, frame, viewed, updates, carried = (shot[key] for key in ("sidecar", "dump", "view", "frame", "viewed", "updates", "carried"))
   zone = dump["zone"]["shortName"]
   stored = await callBridge(context, "setZoneProperties", {"updates": updates, "clientZones": await clientZoneIDs()})
@@ -2272,8 +2277,8 @@ async def predictShot(context, screenshotPath, shot, loadOrderZone, exportedOnly
       (runFolder / f"{name}.npy").unlink(missing_ok=True)
   result = {
     "shot": Path(screenshotPath).name, "zone": zone, "run": runFolder.name, "screenshotPath": str(Path(screenshotPath).resolve()), "dumpPath": sidecar["dump"],
-    "capturedAt": dump["capturedAt"], "source": source, "view": view, "frame": frame,
-    "conditions": eqCalibration.conditions(dump, sidecar, stored["zone"]["sky"], carried, viewed),
+    "capturedAt": dump["capturedAt"], "source": source, "camera": review["camera"], "poseDrift": review["poseDrift"], "view": view, "frame": frame,
+    "viewerOffsets": eqCalibration.viewerOffsets(dump), "conditions": eqCalibration.conditions(dump, sidecar, stored["zone"]["sky"], carried, viewed),
     "zoneProperties": updates, "rendererSource": eqCalibration.rendererSource(serverDirectory), "comparison": numbers, "fitLight": fitted,
     "placed": placed, "notPlaced": notPlaced + failed, "outOfView": [placement["name"] for placement in outOfView], "dumpProblems": dump["problems"],
     "pointLights": described["pointLights"], "emitters": described["emitters"], "sheetPath": str(runFolder / "sheet.jpg"), "runFolder": str(runFolder),
@@ -2295,7 +2300,7 @@ async def calibrateShot(context: Context, screenshotPath: str, fitLight: bool = 
   zone = shot["dump"]["zone"]["shortName"]
   await callBridge(context, "newFile", {"discardUnsavedChanges": discardUnsavedChanges})
   imported = await importClientZone(context, zone, None)
-  sheet, summary = await predictShot(context, screenshotPath, shot, zone, False, {"kind": "clientZone", "path": None, "zoneDrift": None}, fitLight)
+  sheet, summary = await predictShot(context, screenshotPath, shot, zone, False, {"kind": "clientZone", "path": None, "zoneDrift": None}, fitLight, {"camera": None, "poseDrift": None})
   return [sheet, summary | {"import": imported["source"]}]
 
 
@@ -2312,10 +2317,15 @@ async def calibrateShot(context: Context, screenshotPath: str, fitLight: bool = 
   " client resolved, the viewer's special ambient and carried light), never the work file's stored ones, which are never rewritten:"
   " where the file holds a sky type, fogStart, fogEnd, fogDensity, fogOn, minClip, maxClip, newEngineZone, or zoneId unlike the"
   " dump's, the result's source.zoneDrift reports each with both values, a report, never a refusal. The dump's models come from the"
-  " zone's own archives when the client has them, else from its startup archives. Afterwards the saved work file is opened again, so no"
-  " placement, property change, or unsaved flag survives." + predictionHelp
+  " zone's own archives when the client has them, else from its startup archives. camera (a review camera's name) says the shot was"
+  " taken at that camera's client pose (getReviewCameras clientPose, the review-zone skill): the dump's camera must stand within"
+  f" {buildTolerances.poseEyeTolerance:g} of the camera's eye on each axis and within {buildTolerances.poseAngleToleranceDegrees:g} degrees"
+  " of its heading and pitch, as teleport and face land it; farther, the client put the character elsewhere (on the ground, in water,"
+  " against a wall) and the shot is refused naming each axis and angle off, the dump's value and the camera's. The run records camera"
+  " and poseDrift (the dump's less the camera's: each eye axis, the heading, the pitch), both None without camera. Afterwards the saved"
+  " work file is opened again, so no placement, property change, or unsaved flag survives." + predictionHelp
 ))
-async def compareShot(context: Context, screenshotPath: str, archivePath: str | None = None, fitLight: bool = False):
+async def compareShot(context: Context, screenshotPath: str, archivePath: str | None = None, fitLight: bool = False, camera: str | None = None):
   shot = await anyio.to_thread.run_sync(shotInputs, screenshotPath)
   zone = shot["dump"]["zone"]["shortName"]
   status = await callBridge(context, "getStatus", {})
@@ -2325,6 +2335,15 @@ async def compareShot(context: Context, screenshotPath: str, archivePath: str | 
     raise ToolError("The open file has unsaved changes; compareShot measures the preview of the work file as saved: save it (saveFile) or open it again")
   workFile = status["filePath"]
   stored = await callBridge(context, "getZoneProperties", {})
+  review = {"camera": None, "poseDrift": None}
+  if camera is not None:
+    cameras = {entry["name"]: entry for entry in (await callBridge(context, "getReviewCameras", {}))["cameras"]}
+    if camera not in cameras:
+      raise ToolError(f"No review camera named '{camera}' (saved: {sorted(cameras)})")
+    try:
+      review = {"camera": camera, "poseDrift": eqCalibration.requirePose(shot["dump"]["camera"], cameras[camera], camera)}
+    except ValueError as error:
+      raise ToolError(str(error)) from error
   if archivePath is None:
     if "shortName" not in stored or stored["shortName"] != zone:
       opened = f"the short name '{stored['shortName']}'" if "shortName" in stored else "no short name"
@@ -2346,7 +2365,7 @@ async def compareShot(context: Context, screenshotPath: str, archivePath: str | 
       await callBridge(context, "newFile", {"discardUnsavedChanges": True})
       await importZoneFile(context, str(archive))
     clientHasZone = bool(await anyio.to_thread.run_sync(zoneSources.zoneVariants, zoneSources.resolveClientRoot(), zone))
-    sheet, summary = await predictShot(context, screenshotPath, shot, zone if clientHasZone else None, archivePath is None, source, fitLight)
+    sheet, summary = await predictShot(context, screenshotPath, shot, zone if clientHasZone else None, archivePath is None, source, fitLight, review)
   finally:
     # A cancelled or failed call must still leave Blender on the saved work file, never on the archive or with the dump's values set.
     with anyio.CancelScope(shield=True):
@@ -3335,28 +3354,66 @@ async def renderSheet(context, zone, views, labels, shading, figureModel, swimVo
 
 
 @guardedTool()
-async def saveReviewCamera(context: Context, name: str, view: dict, note: str, sky: dict | None = None):
+async def saveReviewCamera(context: Context, name: str, note: str, view: dict | None = None, sky: dict | None = None, screenshotPath: str | None = None):
   """Keep a named review camera to look at the zone the same way again: the pose of a renderView view, {"eye", "target"},
-  {"standAt", "headingDegrees", "pitchDegrees"} (figureAt optional; where the scale figure stood is kept with it), or {"frame"}, with
-  `note`, what to judge from there. It is a camera guide in the reviewCameras collection, kept in the .blend, never drawn in views and
-  never exported; saved again under its name it moves to the new view. renderView {"camera": name} and renderReviewSet render it.
-  sky {"hour", "minute", "weather" (optional)} keeps a clock time the camera renders at, as renderView's sky draws it, where the
-  light matters (a night camera at a landmark): renderView {"camera": name}, renderReviewSet, and compareToConcept render it then,
-  the zone's own sky untouched; refused for a zone drawing no sky."""
+  {"standAt", "headingDegrees", "pitchDegrees"} (figureAt optional; where the scale figure stood is kept with it), or {"frame"}, or of
+  a claudelink shot of the spare client (screenshotPath, the shot's PNG beside its sidecar, read as compareShot reads it, with its
+  refusals): the dump's camera is the view, the camera renders at the shot's frame (the viewport's aspect at the client's field of
+  view), and the shot's game time is the camera's kept sky, so it renders at the shot's hour; the record keeps the shot (its PNG and
+  dump paths, capture time, and game time). view and screenshotPath exclude each other, and sky goes with a view. `note` is what to
+  judge from there. It is a camera guide in the reviewCameras collection, kept in the .blend, never drawn in views and never
+  exported; saved again under its name it moves to the new view. renderView {"camera": name} and renderReviewSet render it, and
+  getReviewCameras lists its client pose, the place to shoot it in the client. sky {"hour", "minute", "weather" (optional)} keeps a
+  clock time the camera renders at, as renderView's sky draws it, where the light matters (a night camera at a landmark): renderView
+  {"camera": name}, renderReviewSet, and compareToConcept render it then, the zone's own sky untouched; refused for a zone drawing no
+  sky."""
+  if (view is None) == (screenshotPath is None):
+    raise ToolError("A review camera is saved from a view or from a claudelink shot (screenshotPath), not both or neither")
   zone = await callBridge(context, "getZoneProperties", {})
+  frame = shot = None
+  if screenshotPath is not None:
+    if sky is not None:
+      raise ToolError("A camera saved from a shot keeps the shot's game time as its sky; sky goes with a view")
+    try:
+      sidecar, dump = await anyio.to_thread.run_sync(eqCalibration.readShot, screenshotPath)
+      view = eqCalibration.cameraView(dump["camera"])
+      frame = eqCalibration.clientFrame(dump["camera"], dump["viewport"])
+    except ValueError as error:
+      raise ToolError(str(error)) from error
+    gameTime = {"hour": dump["world"]["time"]["hour"], "minute": dump["world"]["time"]["minute"]}
+    shot = {"png": str(Path(screenshotPath).resolve()), "dump": sidecar["dump"], "capturedAt": dump["capturedAt"], "gameTime": gameTime}
+    sky = gameTime
   if sky is not None:
     await viewSky(zone, sky)
   return await callBridge(context, "saveReviewCamera", {
-    "name": name, "view": view, "note": note, "sky": await zoneSky(zone), "figureModel": await scaleFigureModel(zone, view), "keptSky": sky,
+    "name": name, "view": view, "note": note, "sky": await zoneSky(zone), "figureModel": await scaleFigureModel(zone, view), "frame": frame,
+    "concept": None, "shot": shot, "keptSky": sky,
   })
 
 
 @guardedTool()
 async def getReviewCameras(context: Context):
   """The review cameras by name: each one's note, the view it was saved from, its eye, heading, and pitch, where its scale figure stands,
-  the concept art it was matched to (compareToConcept saveAs: the art's path, the frame size, and the vertical field of view), and
-  the sky it keeps (saveReviewCamera sky: the clock time it renders at, or None at the zone's own)."""
-  return await callBridge(context, "getReviewCameras", {})
+  the frame it renders at ({size, verticalFieldOfViewDegrees}, None for the preview's own), the concept art it was matched to
+  (compareToConcept saveAs: {path}), the shot it was saved from (saveReviewCamera screenshotPath: {png, dump, capturedAt, gameTime}),
+  the sky it keeps (saveReviewCamera sky: the clock time it renders at, or None at the zone's own), and its clientPose: the spare's
+  first-person pose that puts the client's camera where the review camera stands, as claudelink's tools take it (the review-zone skill
+  drives them): teleport {y, x, z} in the client's /loc order (y is Blender x, x Blender y), its z the spawn 3.69 under the eye, since
+  the client's first-person camera stands that far over the player's spawn; face {heading (the client's counterclockwise degrees),
+  pitch (the look angle, 8.5 over the camera's pitch in 512ths of a turn)}; and time {hour, minute}, the camera's kept sky's, else the
+  zone's sky's, or None when the zone draws no sky. teleport flies, so a standAt camera, whose design eye stands lower than the
+  client's eye on foot, is reached in the air. A camera whose pitch needs a look angle outside /look's -128 to 128 lists clientPose
+  None and why in clientPoseRefused."""
+  zone = await callBridge(context, "getZoneProperties", {})
+  zoneTime = None if zone.get("sky", skyDrawing.noSky) == skyDrawing.noSky else {"hour": zone["sky"]["hour"], "minute": zone["sky"]["minute"]}
+  listed = await callBridge(context, "getReviewCameras", {})
+  for camera in listed["cameras"]:
+    time = zoneTime if camera["sky"] is None else {"hour": camera["sky"]["hour"], "minute": camera["sky"]["minute"]}
+    try:
+      camera["clientPose"], camera["clientPoseRefused"] = eqCalibration.clientPose(camera["eye"], camera["headingDegrees"], camera["pitchDegrees"]) | {"time": time}, None
+    except ValueError as error:
+      camera["clientPose"], camera["clientPoseRefused"] = None, str(error)
+  return listed
 
 
 @guardedTool()
@@ -3601,8 +3658,8 @@ async def compareToConcept(
     if camera not in cameras or cameras[camera]["concept"] is None:
       matched = sorted(name for name, entry in cameras.items() if entry["concept"] is not None)
       raise ToolError(f"'{camera}' is not a review camera matched to concept art; those are {matched}")
-    kept = cameras[camera]["concept"]
-    conceptPath, fieldOfView, renderedView, frame = kept["path"], kept["verticalFieldOfViewDegrees"], {"camera": camera}, None
+    kept = cameras[camera]
+    conceptPath, fieldOfView, renderedView, frame = kept["concept"]["path"], kept["frame"]["verticalFieldOfViewDegrees"], {"camera": camera}, None
     if sky is None:
       sky = cameras[camera]["sky"]
   else:
@@ -3638,7 +3695,7 @@ async def compareToConcept(
   keptCamera = None
   if saveAs is not None:
     keptCamera = await callBridge(context, "saveReviewCamera", {
-      "name": saveAs, "view": view, "note": note, "sky": state, "figureModel": None, "concept": {"path": conceptPath} | frame, "keptSky": sky,
+      "name": saveAs, "view": view, "note": note, "sky": state, "figureModel": None, "frame": frame, "concept": {"path": conceptPath}, "shot": None, "keptSky": sky,
     })
   forward, width, height = described["forward"], described["width"], described["height"]
   return [Image(data=sheetPath.read_bytes(), format="jpeg"), {

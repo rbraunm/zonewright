@@ -2,10 +2,17 @@
 same frame (claudelinkZoneDump 1), laid out as claudelink's screenshot writes them (its README, The screenshot and The dump)."""
 import json
 import math
+import sys
+from pathlib import Path
 
 from PIL import Image
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
+import eqCalibration
+
 capturedAt = "2026-10-12T00:55:09.082Z"
+# The viewer's eye over its feet, as the spare's dumps of a human read it (the spawn's avatarHeight 3.75 under the eye's 3.69 over it).
+viewHeight = 7.44
 windowPadding = 70
 graphicsMemory = {
   "gamma": 7, "gammaScale": 0.1, "sky": 2, "lod": True, "pcNames": 1, "npcNames": 1, "realism": 1, "mipMapping": 1, "filterOff": 0, "clipPlane": 20,
@@ -36,13 +43,15 @@ def spawnRecord(spawnID, name, actorAddress, position, heading, race=1, actorDef
 def zoneDump(shortName, zoneID, viewportSize, camera, time, light, share, fogSet, maxClip, spawns=(), doors=(), groundItems=(), actors=(), fogOnOff=0, minClip=50):
   """A dump of a zone with a sky (zone type 1), its header's fog switch fogOnOff (0, off) and minClip, the viewer a human (spawn 1)
   carrying light {type, tag, position (y, x, z), radius}, its camera (y, x, z, heading, pitch) looking through a viewport of
-  viewportSize at RoF2's half view angle."""
+  viewportSize at RoF2's half view angle, the player's spawn firstPersonEyeAboveSpawn under the camera with its look angle
+  lookAngleAbovePitch over the camera's pitch, as the spare's first-person camera stands."""
   width, height = viewportSize
+  spawnZ = camera["z"] - eqCalibration.firstPersonEyeAboveSpawn
   scaleX = 1 / math.tan(45 * 2 * math.pi / 512)
   window = {"clientLeft": 0, "clientTop": 23, "clientWidth": width + 2 * windowPadding, "clientHeight": height, "outerLeft": -8, "outerTop": -8, "outerRight": 0, "outerBottom": 0}
   viewport = {"minX": windowPadding, "minY": 0, "maxX": windowPadding + width, "maxY": height, "xScale": 0, "yScale": 0, "widthScale": 100, "heightScale": 100}
   lightY, lightX, lightZ = light["position"]
-  viewerActor = actor("0x2", "HUM_ACTORDEF", (camera["y"], camera["x"], camera["z"] - 3.69), camera["heading"], 1.2)
+  viewerActor = actor("0x2", "HUM_ACTORDEF", (camera["y"], camera["x"], spawnZ), camera["heading"], 1.2)
   return {
     "format": "claudelinkZoneDump", "version": 1, "capturedAt": capturedAt, "origin": {"command": "screenshot"},
     "client": {"build": "May 10 2013 23:30:08", "layout": "May 10 2013 23:30:08", "processId": 1, "folder": "", "plugin": "MQClaudeLink test"},
@@ -53,7 +62,8 @@ def zoneDump(shortName, zoneID, viewportSize, camera, time, light, share, fogSet
       "renderHeight": height, "projectionScaleX": scaleX, "projectionScaleY": scaleX * width / height,
     },
     "player": {
-      "spawnId": 1, "y": camera["y"], "x": camera["x"], "z": camera["z"] - 3.69, "heading": camera["heading"],
+      "spawnId": 1, "y": camera["y"], "x": camera["x"], "z": spawnZ, "heading": camera["heading"], "lookAngle": camera["pitch"] + eqCalibration.lookAngleAbovePitch,
+      "height": 6.0, "avatarHeight": 3.75, "viewHeight": viewHeight,
       "light": {"type": light["type"], "class": "CPointLight", "y": lightY, "x": lightX, "z": lightZ, "radius": light["radius"], "definition": {"class": "CLightDefinition", "tag": light["tag"]}},
       "actor": {"address": "0x2", "class": "CHierarchicalActor", "sceneLightShare": share},
     },
@@ -66,7 +76,7 @@ def zoneDump(shortName, zoneID, viewportSize, camera, time, light, share, fogSet
       },
     },
     "graphicsSettings": {"memory": graphicsMemory, "eqclientIni": {"path": "", "defaults": {"PostEffects": "1", "Bloom": "1", "Shadows": "0"}}},
-    "spawns": [spawnRecord(1, "Viewer000", "0x2", (camera["y"], camera["x"], camera["z"] - 3.69), camera["heading"])] + list(spawns),
+    "spawns": [spawnRecord(1, "Viewer000", "0x2", (camera["y"], camera["x"], spawnZ), camera["heading"])] + list(spawns),
     "doors": list(doors), "groundItems": list(groundItems), "placedObjects": [],
     "engine": {"actors": {"list": [viewerActor] + list(actors), "sceneGraphCount": 1 + len(actors)}},
     "problems": [],

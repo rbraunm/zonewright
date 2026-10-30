@@ -9,11 +9,24 @@ A review judges what a player would see. Render it, look at every picture, name 
 
 ## Render the review
 
-1. **Review cameras.** Each area keeps saved review cameras (`saveReviewCamera`): its zone-in or approach at eye level, an oblique from above, each landmark, and each place the concept art shows (`compareToConcept` with `saveAs`, matched to the art). A camera keeps an hour (`sky`) where the light matters, such as a night camera at a landmark, a lamp-lit street, or a pool by moonlight, and renders at that hour wherever it renders. `renderReviewSet` renders them all on one sheet, each at its own hour, or every camera at one hour with `sky` (a lit area at the zone's hour and at night); give each its note, what to judge there.
+1. **Review cameras.** Each area keeps saved review cameras (`saveReviewCamera`): its zone-in or approach at eye level, an oblique from above, each landmark, and each place the concept art shows (`compareToConcept` with `saveAs`, matched to the art). A camera keeps an hour (`sky`) where the light matters, such as a night camera at a landmark, a lamp-lit street, or a pool by moonlight, and renders at that hour wherever it renders. `renderReviewSet` renders them all on one sheet, each at its own hour, or every camera at one hour with `sky` (a lit area at the zone's hour and at night); give each its note, what to judge there. Once the zone is deployed, the same cameras are shot in the client (below).
 2. **Routes.** The main routes are saved review routes (`saveReviewRoute`); `renderRouteStrip` walks each and frames it at eye level, with a frame at every problem the walk meets; a route lit for the night is walked at that hour too (`sky`).
 3. **The plan.** A `renderView` map in layout shading, and `renderSketch` over it with the regions' names, for where things are; the same map in `slope` shading, or `renderSketch` with the `slope` layer, for what is level, what is a bank, and what is a wall.
 4. **The concept.** `compareToConcept` with each concept camera: side by side, the overlay, the squinted masses, the edges, and the palettes, with numbers.
 5. **Diagnostics, where a question needs them.** `renderView` shadings: `curvature` (broad planes, crisp lips, one noise scale everywhere), `texelDensity` and `triangleDensity` (against a client reference zone rendered the same way), `coverage` (export status), `slope` (ground reached only at the client's limit, banks over the design grade on routes; a `lane` view tints such floor climb, violet beside walk green), `objects` and `labels` (naming what a view shows).
+
+## Shooting the review cameras in the client
+
+Once the zone is deployed (`deployZone`) and the spare client holds the zone's files, every review camera is shot in the client from the same place and set beside its render, so the critic judges what the client draws, not only the preview. Which side holds what: the pose, the comparison, and the record are zonewright tools (`getReviewCameras` lists each camera's `clientPose`, `compareShot` compares a shot with its camera, `saveReviewCamera` keeps a shot as a camera); the client is driven through the claudelink MCP's own tools (`launchClient`, `zone`, `command`, `teleport`, `face`, `time`, `state`, `screenshot`), called from this procedure, since the two servers never call each other.
+
+1. `launchClient` with the spare's character, then `zone` to the zone.
+2. `command` `/keypress FIRST_PERSON_CAMERA` once, so the camera is the eye, and `command` `#set weather 0`, since the client's weather is not read.
+3. `getReviewCameras`: each camera's `clientPose` is the spare's first-person pose that puts the client's camera where the review camera stands: `teleport` {y, x, z} in the client's /loc order, `face` {heading, pitch}, and `time` {hour, minute} (None for a zone drawing no sky). A camera with `clientPose` None cannot be shot; `clientPoseRefused` says why.
+4. Per camera, from its `clientPose`: `teleport` (y, x, z, with `face.heading`), which flies, so a standAt camera's eye, lower than the client's eye on foot, is reached in the air; `face` (heading, pitch); `time` (hour, minute) when `time` is not None; `state`, and check the landing against the pose before the shot (the position within 2 of the teleport on each axis, the heading and look angle as sent); then `screenshot` with `hideUI` true. The PNG's path comes back in the result.
+5. `compareShot` with `camera` and that path: the shot cropped to the viewport beside the render from the dump's own camera, the pose drift, and the numbers. A refusal naming an axis or angle off means the client put the character elsewhere (the ground, water, a wall): teleport and shoot again.
+6. The critic gets each camera's shot beside its render.
+
+A shot worth looking at again becomes a camera of its own: `saveReviewCamera` with `screenshotPath` keeps the dump's camera, renders at the shot's frame and hour, and lists the pose that took it.
 
 ## The checklist
 
