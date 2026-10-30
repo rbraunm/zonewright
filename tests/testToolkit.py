@@ -490,9 +490,11 @@ def testTransformDuplicateOrganizeAndMeasure(stageBlenderServer):
     await session.expectSuccess("organize", {"collections": {"lid": "props"}})
     lid = await session.expectSuccess("getObjectDetail", {"name": "lid"})
     measured = await session.expectSuccess("measure", {"points": [[0, 0, 0], [3, 4, 0], [7, 4, 3]]})
-    return moved, conflicting, copies, beforeParenting, lid, measured
+    dropped = await session.expectSuccess("measure", {"points": [[5, 0], [15, 0, 30]], "snapToSurface": True})
+    noHeight = await session.expectError("measure", {"points": [[5, 0]]})
+    return moved, conflicting, copies, beforeParenting, lid, measured, dropped, noHeight
 
-  moved, conflicting, copies, beforeParenting, lid, measured = stageBlenderServer.session(steps)
+  moved, conflicting, copies, beforeParenting, lid, measured, dropped, noHeight = stageBlenderServer.session(steps)
   assert moved["objects"][0]["location"] == [5.0, 0.0, 0.0]
   assert moved["objects"][0]["rotationDegrees"][2] == 90.0
   assert "Pass translate or location, not both" in conflicting
@@ -505,6 +507,10 @@ def testTransformDuplicateOrganizeAndMeasure(stageBlenderServer):
   assert [segment["distance"] for segment in measured["segments"]] == [5.0, 5.0]
   assert measured["segments"][1] == {"distance": 5.0, "horizontalDistance": 4.0, "heightChange": 3.0, "slopeDegrees": 36.87}
   assert measured["totalDistance"] == 10.0
+  # A point without z drops from above the whole scene onto the crate's top, one with z from there: both land on the tops at 2.
+  assert dropped["points"] == [[5.0, 0.0, 2.0], [15.0, 0.0, 2.0]]
+  assert dropped["segments"] == [{"distance": 10.0, "horizontalDistance": 10.0, "heightChange": 0.0, "slopeDegrees": 0.0}]
+  assert "A point without z needs snapToSurface, got [5.0, 0.0]" in noHeight
 
 
 def testPlaceOnSurfaceAndScatter(stageBlenderServer):

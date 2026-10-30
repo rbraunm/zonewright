@@ -554,12 +554,17 @@ def measure(points, snapToSurface):
   measured = []
   surfaces = bridgeMeshAccess.PlayerSurfaces() if snapToSurface else None
   for point in points:
+    if len(point) not in (2, 3):
+      raise ValueError(f"A point is [x, y, z], or [x, y] with snapToSurface, got {point!r}")
     if snapToSurface:
-      hit = surfaces.footingBelow(mathutils.Vector(point), measureCastDistance)
+      origin = mathutils.Vector(point) if len(point) == 3 else mathutils.Vector((*point, measureCastDistance / 2))
+      hit = surfaces.footingBelow(origin, measureCastDistance)
       if hit is None:
         raise ValueError(f"No surface players stand on below {point}")
       measured.append(hit)
     else:
+      if len(point) != 3:
+        raise ValueError(f"A point without z needs snapToSurface, got {point!r}")
       measured.append(mathutils.Vector(point))
   segments = []
   for start, end in zip(measured, measured[1:]):

@@ -2507,7 +2507,8 @@ async def measure(context: Context, points: list[list[float]], snapToSurface: bo
   """Points and the distances, horizontal distances, height changes, and slopes between consecutive ones; snapToSurface drops each
   point first onto the surface players stand on below it, as walkRoute does (rendered meshes and collection instances; not water,
   faces players pass through, guides, regions, spawns, or doors; undersides, and ground inside a solid such as a rock sunk into it, are passed through, while ground
-  under one-sided cover such as a roof plane or leaf cards is stood on). One point gives a surface height."""
+  under one-sided cover such as a roof plane or leaf cards is stood on): a point [x, y, z] from z down, a point [x, y] from above the
+  whole scene, the highest surface there (refused without snapToSurface). One point gives a surface height."""
   return await callBridge(context, "measure", {"points": points, "snapToSurface": snapToSurface})
 
 
