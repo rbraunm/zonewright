@@ -2,7 +2,8 @@
 part of a collection instance as placed, and the scale figure) is replaced by a copy of its evaluated mesh carrying its values. An object
 pass draws each pixel's object, which tells what the view shows, and a value pass each pixel's density, for the range it shows; then
 each object draws in a color of its own, or its curvature (convex warm, concave cool, flat neutral), triangle density, or texel density
-on a color ramp, lit softly from the northwest so the form still reads. Runs under Blender's Python."""
+on a color ramp, lit softly from the northwest so the form still reads. The slope shading, every face in the color of its steepness
+band, is a material override in bridgeViews as the layout and relief shadings are, not a value shading. Runs under Blender's Python."""
 import math
 import os
 

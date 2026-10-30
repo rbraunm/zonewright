@@ -9,6 +9,7 @@ import mathutils
 import mathutils.kdtree
 import numpy
 
+import bridgeBodyGroups
 import bridgeCaveData
 import bridgeEnvironment
 import bridgeExport
@@ -84,8 +85,9 @@ def describeRegion(regionObject):
   x, y = outline[:, 0], outline[:, 1]
   area = abs(float(numpy.dot(x, numpy.roll(y, -1)) - numpy.dot(y, numpy.roll(x, -1)))) / 2
   builtFor = regionObject.get(bridgeMeshAccess.regionBuiltForProperty)
+  grade = regionObject.get(bridgeMeshAccess.regionGradeProperty)
   return {"name": regionObject.name, "intent": regionObject[bridgeMeshAccess.regionIntentProperty], "access": regionObject.get(bridgeMeshAccess.regionAccessProperty),
-    "builtFor": None if builtFor is None else list(builtFor),
+    "builtFor": None if builtFor is None else list(builtFor), "gradeDegrees": None if grade is None else float(grade),
     "outline": [[round(float(a), 2), round(float(b), 2)] for a, b in outline], "bottom": round(bottom, 2), "top": round(top, 2), "area": round(area)}
 
 
@@ -106,29 +108,50 @@ def ownBuiltFor(builtFor):
   return list(playerScale.checkedGroupNames(builtFor))
 
 
-def createRegion(name, outline, bottom, top, intent, access, builtFor=None):
+def checkedGrade(gradeDegrees, own):
+  """A region's design grade as given: degrees from level, above 0 and at most the steepest face every body group the region is built
+  for (own, else its zone's) walks."""
+  cap = playerScale.strictest(playerScale.builtForAt(bridgeBodyGroups.zoneBuiltFor(), own))
+  if not isinstance(gradeDegrees, (int, float)) or not 0 < gradeDegrees <= cap.steepestWalkableDegrees:
+    raise ValueError(
+      f"gradeDegrees is above 0 and at most {cap.steepestWalkableDegrees:.1f} (the steepest face every body group the region is built for"
+      f" walks, {list(cap.groups)}, playerScale), got {gradeDegrees!r}"
+    )
+  return float(gradeDegrees)
+
+
+def createRegion(name, outline, bottom, top, intent, access, builtFor=None, gradeDegrees=None):
   bridgeObjects.requireNewName(name)
   requireIntent(intent)
   requireAccess(access)
   groups = None if builtFor is None else ownBuiltFor(builtFor)
+  grade = None if gradeDegrees is None else checkedGrade(gradeDegrees, groups)
   regionObject = bpy.data.objects.new(name, regionMesh(name, outline, bottom, top))
   regionObject[bridgeMeshAccess.regionIntentProperty] = intent.strip()
   regionObject[bridgeMeshAccess.regionAccessProperty] = access
   if groups is not None:
     regionObject[bridgeMeshAccess.regionBuiltForProperty] = groups
+  if grade is not None:
+    regionObject[bridgeMeshAccess.regionGradeProperty] = grade
   regionObject.display_type = "WIRE"
   regionObject.hide_render = True
   bridgeObjects.targetCollection(regionCollectionName).objects.link(regionObject)
   return describeRegion(regionObject)
 
 
-def editRegion(name, outline, bottom, top, intent, access, builtFor=None):
+def editRegion(name, outline, bottom, top, intent, access, builtFor=None, gradeDegrees=None):
   regionObject = bridgeMeshAccess.requireRegion(name)
-  if outline is None and bottom is None and top is None and intent is None and access is None and builtFor is None:
-    raise ValueError("editRegion needs an outline, bottom, top, intent, access, or builtFor")
+  if outline is None and bottom is None and top is None and intent is None and access is None and builtFor is None and gradeDegrees is None:
+    raise ValueError("editRegion needs an outline, bottom, top, intent, access, builtFor, or gradeDegrees")
   if access is not None:
     requireAccess(access)
   groups = None if builtFor is None else ownBuiltFor(builtFor)
+  grade = None
+  if builtFor is not None or gradeDegrees is not None:
+    # The grade, given or kept, is checked against the groups the region is built for after the edit, so neither can leave it over the cap.
+    own = groups if builtFor is not None else regionObject.get(bridgeMeshAccess.regionBuiltForProperty)
+    chosen = regionObject.get(bridgeMeshAccess.regionGradeProperty) if gradeDegrees is None else None if gradeDegrees == followZone else gradeDegrees
+    grade = None if chosen is None else checkedGrade(chosen, None if own is None else tuple(own))
   if intent is not None:
     requireIntent(intent)
   mesh = None
@@ -148,6 +171,10 @@ def editRegion(name, outline, bottom, top, intent, access, builtFor=None):
     del regionObject[bridgeMeshAccess.regionBuiltForProperty]
   elif groups is not None:
     regionObject[bridgeMeshAccess.regionBuiltForProperty] = groups
+  if gradeDegrees == followZone and bridgeMeshAccess.regionGradeProperty in regionObject:
+    del regionObject[bridgeMeshAccess.regionGradeProperty]
+  elif grade is not None:
+    regionObject[bridgeMeshAccess.regionGradeProperty] = grade
   return describeRegion(regionObject)
 
 

@@ -14,6 +14,7 @@ import laneDrawing
 import planDrawing
 import playerReach
 import playerScale
+import slopeBands
 
 # The medium body group, which holds the walked human male, is the one these tests size their courses by.
 medium = playerScale.groups["medium"]
@@ -241,13 +242,13 @@ def testUnreachedFloorIsDimmedAloneAndShowsTheLevelReachedUnderIt(stageBlenderSe
     assert numpy.abs(laned[place][~crossing] - composited(plain[place], color, alpha)[~crossing]).max() <= 2, name
 
 
-def testALanePlansLegendNamesThePlansOwnLayersInItsFrame():
+def testALanePlansLegendNamesThePlansOwnLayersInItsFrameAndTheSlopeLayersBands():
   """A plan 100 across about the origin holding a view region, a cave run with its floor heights and a branch's junction, a safe point's
   entry, a plot, and spot heights; a none region, a zone line, and a boundary lie outside it."""
   frame = planDrawing.PlanFrame([0, 0], 100, (960, 540))
   outside = [[400, 400], [420, 400], [420, 420], [400, 420]]
   overlays = {
-    "sheets": [], "water": [], "swim": [], "spots": [{"at": [0, 0], "height": 0.0}],
+    "sheets": [], "water": [], "swim": [], "spots": [{"at": [0, 0], "height": 0.0}], "slope": False,
     "regions": [{"name": "hill", "outline": [[-10, -10], [10, -10], [10, 10], [-10, 10]], "access": "view"}, {"name": "rim", "outline": outside, "access": "none"}],
     "caves": [{
       "label": "hall", "left": [[-20, -2], [20, -2]], "right": [[-20, 2], [20, 2]], "middle": [[-20, 0], [20, 0]], "endCap": [], "startCap": [],
@@ -263,6 +264,13 @@ def testALanePlansLegendNamesThePlansOwnLayersInItsFrame():
     "cave run: walls at its floor's height, middle dashed, over its pale floor", "cave floor height at a path point",
     "where a cave branch meets its parent", "plot, by address, its mark out of the entrance side", "entry: where players arrive, toward their heading",
   ]
+  # With the slope layer on, its five bands follow the spot heights, each filled as it shows over the relief.
+  withSlope = laneDrawing.planLayerLegend(overlays | {"slope": True}, frame)
+  assert [text for _, _, text in withSlope[:8]] == [
+    "relief: lighter is higher", "the ground's height at a grid crossing", "level: 0 to 10 degrees", "gentle: 10 to 25 degrees",
+    "steep: 25 to 45 degrees", "scramble: 45 to 80 degrees", "wall or overhang: 80 degrees and steeper", "region, named",
+  ]
+  assert [(kind, color) for kind, color, _ in withSlope[2:7]] == [("fill", laneDrawing.overRelief(color, planDrawing.slopeAlpha)) for color in slopeBands.colors]
 
 
 def testSeedAndIsolatedSeedSwatchesDiffer():

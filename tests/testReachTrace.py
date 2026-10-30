@@ -23,6 +23,7 @@ from testCaves import caveCanyon, hall
 from testModelsAndDressing import freshScene
 from testReach import cellHeight, cellSize, containmentHeadroom, cube, heightMargin, otherZone, probes, rampAlongY, reachCourse, steepDegrees
 from testReachPictures import colorShare, pixelsAround, planFrame
+from testWalkRoute import rampArguments
 from testWater import environment
 
 # The trace course: a corridor along +y between boundary walls, its ground slabs 20 thick. Players arrive at its south end, step up two
@@ -386,7 +387,9 @@ def testRenderViewTintsReachedFloor(stageBlenderServer, tmp_path):
   Image.open(io.BytesIO(lanedImage)).save(tmp_path / "laneTintMap.png")
   assert "laneState" not in plain and laned["laneState"]["lane"] in ("computed", "reused")
   # The lane's state comes back without the lane's terms, which the report holds.
-  assert sorted(laned.inline["laneState"]) == ["bodyGroup", "lane", "laneFile", "seconds"] and laned["laneState"]["notModeled"] == playerReach.notModeled
+  assert sorted(laned.inline["laneState"]) == ["bodyGroup", "designGradeDegrees", "lane", "laneFile", "seconds"] and laned["laneState"]["notModeled"] == playerReach.notModeled
+  # The course's reached floors are level and its walls upright, so under the design grade of 35 nothing is tinted climb.
+  assert laned["laneState"]["designGradeDegrees"] == 35.0 and laned["laneTint"]["climbShare"] == 0
   # The lane's view carries a legend band under the render, naming the labels it tints.
   lanedPicture, plainPicture = Image.open(io.BytesIO(lanedImage)), Image.open(io.BytesIO(plainImage))
   assert lanedPicture.width == plainPicture.width and lanedPicture.height > plainPicture.height == laned["height"]
@@ -430,6 +433,49 @@ def testRenderViewTintsReachedFloor(stageBlenderServer, tmp_path):
     inner[1:-1, 1:-1] = numpy.logical_and.reduce([figure[1 + down:height - 1 + down, 1 + across:figure.shape[1] - 1 + across] for down in (-1, 0, 1) for across in (-1, 0, 1)])
     figure = inner
   assert figure.sum() > 500 and numpy.abs(laneView - plainView).max(axis=2)[figure].max() <= 1
+
+
+def testLaneTintTellsClimbFromWalkByTheDesignGrade(stageBlenderServer, tmp_path):
+  # A map 40 across about testReach's climbable ramp, 2 degrees under the medium group's steepest walkable face, rising toward +x from
+  # x 20 and reached walking; the level ground before it at (10, 0) is walked too.
+  overhead = {"map": {"center": [20, 0], "width": 40}}
+  cap = playerScale.strictest(playerScale.groupNames).steepestWalkableDegrees
+  scramble = {"name": "scramble", "outline": [[15, -15], [30, -15], [30, 15], [15, 15]], "bottom": -5, "top": 20, "intent": "a scramble up the bank", "access": "play"}
+
+  async def steps(session):
+    await freshScene(session)
+    await session.expectSuccess("createTerrainGrid", {"name": "course", "size": [200, 120], "spacing": 4, "location": [0, 0, 0], "collection": "terrain"})
+    await session.expectSuccess("setZoneProperties", environment | {"safePoint": [-90, 0, 0, 90]})
+    await session.expectSuccess("createPrimitive", rampArguments("climbable", medium.steepestWalkableDegrees - 2, 0))
+    plain = await session.expectImage("renderView", {"view": overhead})
+    zoneGrade = await session.expectImage("renderView", {"view": overhead, "lane": True})
+    await session.expectSuccess("createRegion", scramble | {"gradeDegrees": cap})
+    regionGrade = await session.expectImage("renderView", {"view": overhead, "lane": True})
+    overCap = await session.expectError("createRegion", scramble | {"name": "tooSteep", "gradeDegrees": cap + 1})
+    return plain, zoneGrade, regionGrade, overCap
+
+  (plainImage, _), (zoneImage, zoneGrade), (regionImage, regionGrade), overCap = stageBlenderServer.session(steps)
+  Image.open(io.BytesIO(zoneImage)).save(tmp_path / "climbTint.png")
+  bare = pixelsOf(Image.open(io.BytesIO(plainImage))).astype(float)
+  ramp, ground = [20.5, 0], [10, 0]
+
+  def moved(image, description, point, label):
+    tinted = pixelsOf(Image.open(io.BytesIO(image))).astype(float)
+    return tintShare(tinted, bare, *mapPixel(description, point), label)
+
+  # Under the zone's design grade of 35, the ramp, reached walking, is tinted climb and the level ground walk (the ground under the
+  # ramp's plane, which only a smaller body fits under, is squeeze either way).
+  assert zoneGrade["laneState"]["designGradeDegrees"] == buildTolerances.designGradeDegrees == 35.0
+  assert zoneGrade["laneTint"]["labels"] == [playerReach.walkLabel, playerReach.squeezeLabel, laneDrawing.climbTint] and zoneGrade["laneTint"]["climbShare"] > 0
+  for point, label in ((ramp, laneDrawing.climbTint), (ground, playerReach.walkLabel)):
+    share, stray = moved(zoneImage, zoneGrade, point, label)
+    assert (numpy.abs(share - laneDrawing.tintAlpha) <= stray).all(), (point, share, stray)
+  # A region over the ramp designed to be walked at the groups' steepest face tints it walk again.
+  assert regionGrade["laneTint"]["labels"] == [playerReach.walkLabel, playerReach.squeezeLabel] and regionGrade["laneTint"]["climbShare"] == 0
+  share, stray = moved(regionImage, regionGrade, ramp, playerReach.walkLabel)
+  assert (numpy.abs(share - laneDrawing.tintAlpha) <= stray).all(), (share, stray)
+  # A grade past what every group the region is built for walks is refused, naming the cap.
+  assert f"gradeDegrees is above 0 and at most {cap:.1f} (the steepest face every body group the region is built for walks, ['small', 'medium', 'large'], playerScale), got {cap + 1}" in overCap
 
 
 def sectionPixel(summary, s, z):

@@ -26,6 +26,7 @@ import bridgeSurfacing
 import bridgeSwim
 import playerScale
 import skyDrawing
+import slopeBands
 from buildTolerances import groundSearchAbove, groundSearchDistance, laneTintNormalZ
 from previewFrame import renderHeight, renderWidth, verticalFieldOfViewDegrees
 
@@ -51,7 +52,7 @@ figureMinimumDistance = 3.0
 figureSideOffset = 1.5
 mapClearance = 100.0
 valueShadings = ("objects", "curvature", "triangleDensity", "texelDensity")
-viewShadings = ("client", "layout", "relief", "coverage") + valueShadings
+viewShadings = ("client", "layout", "relief", "coverage", "slope") + valueShadings
 # The sky is soft everywhere, so an equirectangular image at about a fifth of a degree a pixel draws it.
 skyImageHeight = 1024
 # Layout shading lights from the game's northwest (+X north, +Y west), the top left of a map, as relief maps do, so slopes read the same
@@ -521,6 +522,43 @@ def sceneHeightRange(preview):
   return min(heights), max(heights)
 
 
+def overrideMaterial(name):
+  """A new node material with an empty tree, to draw every surface of a preview with: (material, nodes, links)."""
+  material = bpy.data.materials.new(previewName + name)
+  material.use_nodes = True
+  nodes, links = material.node_tree.nodes, material.node_tree.links
+  nodes.clear()
+  return material, nodes, links
+
+
+def layoutShade(nodes, links, geometry):
+  """The node whose Value shades a surface by the layout light: full facing it, layoutAmbient facing away."""
+  facing = nodes.new("ShaderNodeVectorMath")
+  facing.operation = "DOT_PRODUCT"
+  links.new(geometry.outputs["Normal"], facing.inputs[0])
+  facing.inputs[1].default_value = layoutLightDirection
+  lit = nodes.new("ShaderNodeMath")
+  lit.operation = "MAXIMUM"
+  links.new(facing.outputs["Value"], lit.inputs[0])
+  lit.inputs[1].default_value = 0.0
+  shade = nodes.new("ShaderNodeMath")
+  shade.operation = "MULTIPLY_ADD"
+  links.new(lit.outputs["Value"], shade.inputs[0])
+  shade.inputs[1].default_value = 1 - layoutAmbient
+  shade.inputs[2].default_value = layoutAmbient
+  return shade
+
+
+def emitOverride(preview, material, color):
+  """Finish an override material to emit the color socket as it is, and draw every surface of the preview with it."""
+  nodes, links = material.node_tree.nodes, material.node_tree.links
+  emission = nodes.new("ShaderNodeEmission")
+  links.new(color, emission.inputs["Color"])
+  output = nodes.new("ShaderNodeOutputMaterial")
+  links.new(emission.outputs["Emission"], output.inputs["Surface"])
+  preview.scene.view_layers[0].material_override = material
+
+
 def applyLayoutShading(preview, bandHeight, heightColors, stripes):
   """Draw every surface unlit in a color for its height across the scene's height range (heightColors: (fraction, RGB) stops),
   banded every bandHeight units so the band edges read as contours (with stripes, every other band a shade darker, so they read where
@@ -529,10 +567,7 @@ def applyLayoutShading(preview, bandHeight, heightColors, stripes):
   if bandHeight <= 0:
     raise ValueError(f"bandHeight must be positive, got {bandHeight}")
   bottom, top = sceneHeightRange(preview)
-  material = bpy.data.materials.new(previewName + "Layout")
-  material.use_nodes = True
-  nodes, links = material.node_tree.nodes, material.node_tree.links
-  nodes.clear()
+  material, nodes, links = overrideMaterial("Layout")
   geometry = nodes.new("ShaderNodeNewGeometry")
   height = nodes.new("ShaderNodeSeparateXYZ")
   links.new(geometry.outputs["Position"], height.inputs["Vector"])
@@ -557,19 +592,7 @@ def applyLayoutShading(preview, bandHeight, heightColors, stripes):
   for element, (position, color) in zip(elements, heightColors):
     element.position, element.color = position, (*color, 1.0)
   links.new(fraction.outputs["Result"], ramp.inputs["Fac"])
-  facing = nodes.new("ShaderNodeVectorMath")
-  facing.operation = "DOT_PRODUCT"
-  links.new(geometry.outputs["Normal"], facing.inputs[0])
-  facing.inputs[1].default_value = layoutLightDirection
-  lit = nodes.new("ShaderNodeMath")
-  lit.operation = "MAXIMUM"
-  links.new(facing.outputs["Value"], lit.inputs[0])
-  lit.inputs[1].default_value = 0.0
-  shade = nodes.new("ShaderNodeMath")
-  shade.operation = "MULTIPLY_ADD"
-  links.new(lit.outputs["Value"], shade.inputs[0])
-  shade.inputs[1].default_value = 1 - layoutAmbient
-  shade.inputs[2].default_value = layoutAmbient
+  shade = layoutShade(nodes, links, geometry)
   if stripes:
     bandIndex = nodes.new("ShaderNodeMath")
     bandIndex.operation = "DIVIDE"
@@ -596,12 +619,41 @@ def applyLayoutShading(preview, bandHeight, heightColors, stripes):
   shaded.operation = "SCALE"
   links.new(ramp.outputs["Color"], shaded.inputs[0])
   links.new(shade.outputs["Value"], shaded.inputs["Scale"])
-  emission = nodes.new("ShaderNodeEmission")
-  links.new(shaded.outputs["Vector"], emission.inputs["Color"])
-  output = nodes.new("ShaderNodeOutputMaterial")
-  links.new(emission.outputs["Emission"], output.inputs["Surface"])
-  preview.scene.view_layers[0].material_override = material
+  emitOverride(preview, material, shaded.outputs["Vector"])
   return bottom, top
+
+
+def applySlopeShading(preview, lit):
+  """Draw every surface in the color of its slope band (slopeBands): the degrees from level of its face's own flat normal (the Geometry
+  node's True Normal, so a smooth-shaded mesh still bands face by face, and an overhang past 90 degrees falls in the last band with the
+  walls), darker facing away from the layout light so the form reads, or unlit in the flat band colors for a plan's slope layer."""
+  material, nodes, links = overrideMaterial("Slope")
+  geometry = nodes.new("ShaderNodeNewGeometry")
+  normal = nodes.new("ShaderNodeSeparateXYZ")
+  links.new(geometry.outputs["True Normal"], normal.inputs["Vector"])
+  angle = nodes.new("ShaderNodeMath")
+  angle.operation = "ARCCOSINE"
+  links.new(normal.outputs["Z"], angle.inputs[0])
+  turn = nodes.new("ShaderNodeMath")
+  turn.operation = "DIVIDE"
+  links.new(angle.outputs["Value"], turn.inputs[0])
+  turn.inputs[1].default_value = math.pi
+  ramp = nodes.new("ShaderNodeValToRGB")
+  ramp.color_ramp.interpolation = "CONSTANT"
+  elements = ramp.color_ramp.elements
+  while len(elements) < len(slopeBands.bands):
+    elements.new(0.5)
+  for element, (low, _), color in zip(elements, slopeBands.bands, slopeBands.colors):
+    element.position, element.color = low / 180, (*[channel / 255 for channel in color], 1.0)
+  links.new(turn.outputs["Value"], ramp.inputs["Fac"])
+  color = ramp.outputs["Color"]
+  if lit:
+    shaded = nodes.new("ShaderNodeVectorMath")
+    shaded.operation = "SCALE"
+    links.new(color, shaded.inputs[0])
+    links.new(layoutShade(nodes, links, geometry).outputs["Value"], shaded.inputs["Scale"])
+    color = shaded.outputs["Vector"]
+  emitOverride(preview, material, color)
 
 
 def subjectCorners(preview, names):
@@ -772,13 +824,31 @@ def laneTintColumns(preview, tint):
   return key[order], low[order], shown["label"][order].astype(numpy.int64)
 
 
+def gradeThresholds(points, designGradeDegrees):
+  """The normal z under which a reached floor at each world point [x, y, z] is climb rather than walk: the cosine of the design grade
+  of the smallest region holding the point (regionsByPrecedence, as the lane judges regions; one without a grade of its own follows the
+  zone's), else of the zone's."""
+  threshold = numpy.full(len(points), math.cos(math.radians(designGradeDegrees)))
+  unclaimed = numpy.ones(len(points), dtype=bool)
+  for name, _, _, _, _ in bridgeBodyGroups.regionsByPrecedence():
+    regionObject = bpy.data.objects[name]
+    inside = unclaimed & bridgeMeshAccess.insideRegion(regionObject, points)
+    grade = regionObject.get(bridgeMeshAccess.regionGradeProperty)
+    if grade is not None:
+      threshold[inside] = math.cos(math.radians(grade))
+    unclaimed &= ~inside
+  return threshold
+
+
 def laneDecal(preview, tint, columns, dataPath):
   """Where a view shows the lane's reached floor, pixel by pixel (columns: laneTintColumns): the view's surface data (surfaceData)
   places each pixel's point from its depth by the camera's projection, and a pixel showing the zone on a face whose normal z is at
-  least laneTintNormalZ takes its column's reached floor that it lies on: within a cell height of the floor, which the lane knows to a
-  cell height, and down the floor's reach at the pixel's slope under it besides (tint's slopeReach: the column's floor is the highest
-  ground in it). Returns the cover (tint's alpha where tinted) and colors over the frame, rows bottom to top as readImagePixels gives
-  them, and the labels tinted."""
+  least laneTintNormalZ (the floor-or-wall gate) takes its column's reached floor that it lies on: within a cell height of the floor,
+  which the lane knows to a cell height, and down the floor's reach at the pixel's slope under it besides (tint's slopeReach: the
+  column's floor is the highest ground in it). Floor reached walking (tint's walkLabel) whose normal z lies under its point's grade
+  threshold (gradeThresholds, from tint's designGradeDegrees and the regions' own) is climb (tint's climbLabel), not walk. Returns the
+  cover (tint's alpha where tinted) and colors over the frame, rows bottom to top as readImagePixels gives them, the labels tinted, and
+  the share of the frame tinted climb."""
   depth, normalZ, covered = preview.surfaceData(dataPath)
   height, width = depth.shape
   camera = preview.camera
@@ -809,11 +879,19 @@ def laneDecal(preview, tint, columns, dataPath):
     lies = pending & (world[..., 2] <= floor + cellHeight) & (world[..., 2] >= floor - reach - cellHeight)
     chosen[lies] = candidate[lies]
   tinted = chosen >= 0
+  pixelLabels = numpy.full(depth.shape, -1, dtype=numpy.int64)
+  pixelLabels[tinted] = labels[chosen[tinted]]
+  walked = pixelLabels == tint["walkLabel"]
+  climb = numpy.zeros(depth.shape, dtype=bool)
+  if walked.any():
+    climb[walked] = normalZ[walked] < gradeThresholds(world[walked][:, :3], tint["designGradeDegrees"])
   colors = numpy.zeros((height, width, 3), dtype=numpy.float32)
-  shownLabels = sorted({int(label) for label in numpy.unique(labels[chosen[tinted]])})
-  for label in shownLabels:
-    colors[tinted & (labels[numpy.maximum(chosen, 0)] == label)] = tint["colors"][str(label)]
-  return numpy.where(tinted, tint["alpha"], 0.0).astype(numpy.float32), colors, shownLabels
+  laneLabels = sorted({int(label) for label in numpy.unique(pixelLabels[tinted & ~climb])})
+  for label in laneLabels:
+    colors[(pixelLabels == label) & ~climb] = tint["colors"][str(label)]
+  colors[climb] = tint["colors"][str(tint["climbLabel"])]
+  shownLabels = laneLabels + ([tint["climbLabel"]] if climb.any() else [])
+  return numpy.where(tinted, tint["alpha"], 0.0).astype(numpy.float32), colors, shownLabels, round(float(climb.mean()), 4)
 
 
 def exportLeavesOut():
@@ -844,22 +922,26 @@ def requireFigureOn(figureOn, view, figureModel):
 
 def renderView(
   sourceScene, zone, sky, view, outputPath, figureModel, shading, bandHeight, guides, swimVolumes, labels, emitters, frame=None, liquidTime=None,
-  carriedLight=None, laneTint=None, exportedOnly=False, figureOn=None, keptNames=(), normalMaps=False,
+  carriedLight=None, laneTint=None, exportedOnly=False, figureOn=None, keptNames=(), normalMaps=False, unlit=False,
 ):
   """Render a view; in client shading the zone's point lights and emitters are drawn too (emitters: the server's prepared emitter
   assets, or None without a client), its liquids as they stand at liquidTime on the effect clock (0 when it is None), and the light
   the view's character carries (a clientPointLights.carriedLight record, or None); with laneTint (a lane's tint file and grid, its
-  labels' colors by number, and the floor's reach by slope), the view is tinted where it shows floor the lane reached (laneDecal), under
-  the swim volumes' tint and hidden by the guides'. exportedOnly leaves out of this render alone, objects, lights, and emitters alike,
-  everything a zone export leaves out (exportLeavesOut) but the objects named in keptNames, as the exported archive draws; figureOn
-  ({at, facingDegrees}) stands the scale figure exactly there in an eye view, as viewPose read where a view stood her; normalMaps
-  lights createMaterial materials by their normal maps, which the client never does (bridgeClientLight.selectNormalMaps)."""
+  labels' colors by number, its walk and climb labels, the design grade that tells them apart, and the floor's reach by slope), the
+  view is tinted where it shows floor the lane reached (laneDecal), under the swim volumes' tint and hidden by the guides'.
+  exportedOnly leaves out of this render alone, objects, lights, and emitters alike, everything a zone export leaves out
+  (exportLeavesOut) but the objects named in keptNames, as the exported archive draws; figureOn ({at, facingDegrees}) stands the scale
+  figure exactly there in an eye view, as viewPose read where a view stood her; normalMaps lights createMaterial materials by their
+  normal maps, which the client never does (bridgeClientLight.selectNormalMaps); unlit draws the slope shading in its flat band
+  colors, for a plan's slope layer."""
   if shading not in viewShadings:
     raise ValueError(f"shading must be one of {list(viewShadings)}, got '{shading}'")
   if carriedLight is not None and shading != "client":
     raise ValueError(f"A carried light draws only in client shading, not '{shading}'")
   if normalMaps and shading != "client":
     raise ValueError(f"Normal maps draw only in client shading, not '{shading}'")
+  if unlit and shading != "slope":
+    raise ValueError(f"unlit draws the slope shading alone in its flat band colors, not '{shading}'")
   if frame is not None and ("map" in view or "camera" in view):
     raise ValueError("A frame is set for an eye, standAt, or frame view; a map keeps the preview's frame and a review camera its own")
   if figureOn is not None:
@@ -903,15 +985,18 @@ def renderView(
     elif shading in ("layout", "relief"):
       description["heightRange"] = list(applyLayoutShading(preview, bandHeight, layoutHeightColors if shading == "layout" else reliefHeightColors, shading == "layout"))
       description["bandHeight"] = bandHeight
+    elif shading == "slope":
+      applySlopeShading(preview, not unlit)
     preview.scene.render.filepath = outputPath
     start = time.perf_counter()
     bpy.ops.render.render(write_still=True, scene=preview.scene.name)
     decal = None
     if laneTint is not None:
-      cover, colors, shownLabels = laneDecal(preview, laneTint, laneColumns, os.path.splitext(outputPath)[0] + "_surface.exr")
+      cover, colors, shownLabels, climbShare = laneDecal(preview, laneTint, laneColumns, os.path.splitext(outputPath)[0] + "_surface.exr")
       decal = (cover, colors)
       description["laneTint"] = {
-        "columns": len(laneColumns[0]), "tintedShare": round(float((cover > 0).mean()), 4), "labels": shownLabels, "farClip": round(preview.camera.data.clip_end, 2),
+        "columns": len(laneColumns[0]), "tintedShare": round(float((cover > 0).mean()), 4), "climbShare": climbShare, "labels": shownLabels,
+        "farClip": round(preview.camera.data.clip_end, 2),
       }
     overlays = []
     if swimVolumes and bridgeSwim.swimBoxes():

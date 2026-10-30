@@ -63,6 +63,7 @@ import ledgerRun
 import serverNav
 import serverRows
 import skyDrawing
+import slopeBands
 import toolingLog
 import viewerLight
 import viewSheets
@@ -1151,6 +1152,11 @@ async def scaleFigureModel(zone, view):
   return await zoneFigureModel(zone) if {"standAt", "standOn", "camera"} & set(view) else None
 
 
+slopeBandsHelp = ", ".join(
+  f"{word} {low} and steeper" if high == 180 else f"{word} {low} to {high}" for (low, high), word in zip(slopeBands.bands, slopeBands.words)
+)
+
+
 @guardedTool(description=(
   "Render the EQ preview of a view: {\"camera\": name} (a review camera saved from a standAt view stands the scale figure again where"
   " she stood, her ground found as figureAt's is; one matched to concept art renders at the art's aspect and its own field of view),"
@@ -1178,7 +1184,11 @@ async def scaleFigureModel(zone, view):
   " surface unlit in a color for its height (green low through tan and brown to white high, across the scene's height range given in"
   " the result) in bands `bandHeight` units tall whose edges read as contours (every other band a shade darker, so they read however"
   " tall the scene's range), darker facing away from a light in the northwest, without fog and out to the whole scene: for judging"
-  " shape and layout; \"coverage\" draws only what exportZone would export, each"
+  " shape and layout; \"slope\" draws every face in the color of its slope band, the degrees from level of its own flat normal"
+  f" ({slopeBandsHelp}; overhangs past 90 degrees fall in the last band with the walls), lit from the northwest as layout is and"
+  " without fog, for seeing at a glance what is level, what is a bank, and what is a wall against the design grade"
+  f" ({buildTolerances.designGradeDegrees:g} degrees, or a region's gradeDegrees), the result's slope giving the bands and the grade;"
+  " \"coverage\" draws only what exportZone would export, each"
   " face in the color of its export check status (checkExport): black where it cannot export, red for zero texture area, brown for a"
   " blockout material, yellow for texture stretched or squeezed, orange where the base material shows, magenta along a ground border"
   " without a transition strip, grey when fine, and blue wherever a face is seen from its back (a face with a reversed twin on its"
@@ -1207,14 +1217,19 @@ async def scaleFigureModel(zone, view):
   " where the swim volumes stand (cyan water, magenta lava), each box seen through the water, so its top shows evenly under a surface"
   " it meets or lies just below, but hidden behind and under the ground; with lane, the view is tinted where it shows floor the body"
   f" group (bodyGroup, as for the eye) reaches, {round(laneDrawing.tintAlpha * 100)}% toward the color mapReach's lane of that group gives it (walk green, swim blue for a floor in a"
-  " swim box, slide orange, squeeze pink, taken by a zone line yellow), pixel by pixel: each pixel's point is placed from the view's"
-  " depth, and one on a face no steeper than"
-  f" {math.degrees(math.acos(buildTolerances.laneTintNormalZ)):.0f} degrees that lies on a reached floor of its column"
+  " swim box, slide orange, squeeze pink, taken by a zone line yellow; walk green only on floor no steeper than the design grade,"
+  f" {buildTolerances.designGradeDegrees:g} degrees unless the region holding the pixel's point sets gradeDegrees, the smallest first,"
+  " and climb violet on reached floor steeper than it, up to the group's steepest walkable face, which players pass only because the"
+  " client allows it: the lane file holds no slope, so mapReach's plan draws such floor as walk), pixel by pixel: each pixel's point"
+  " is placed from the view's depth, and one on a face no steeper than"
+  f" {math.degrees(math.acos(buildTolerances.laneTintNormalZ)):.0f} degrees (the tint's floor-or-wall gate, no judgment of what is"
+  " walkable) that lies on a reached floor of its column"
   " (within a cell height of it, and down the face's slope across the column under it) is tinted, the floor under the water through"
   " it, never the scale figure, the walls, or what stands on the floor, nor what the guides' tint covers, under the swim volumes'"
-  " tint; a band under the render names the labels it tints. The result's laneState gives whether the lane was computed or reused,"
-  " its body group and lane file, and laneTint how many of the lane's columns the view holds within its far clip and field, the share"
-  " of its pixels tinted, and the labels; the report file it names (report) holds the whole result, laneState with the constants, what"
+  " tint; a band under the render names the labels it tints and the grade. The result's laneState gives whether the lane was computed"
+  " or reused, its body group, lane file, and design grade, and laneTint how many of the lane's columns the view holds within its far"
+  " clip and field, the share of its pixels tinted, the share tinted climb, and the labels; the report file it names (report) holds"
+  " the whole result, laneState with the constants, what"
   " is not modelled, and the limits as mapReach gives them. A perspective view's result gives"
   " its vertical field of view. Liquids draw as they"
   " stand at effect time 0, or at"
@@ -1260,9 +1275,12 @@ async def renderView(
       "path": str(await anyio.to_thread.run_sync(playerReach.laneTint, reached)), "origin": reached.origin.tolist(), "cellSize": reached.cellSize,
       "cellHeight": reached.cellHeight, "columnsX": reached.columnsX, "alpha": laneDrawing.tintAlpha,
       "colors": {str(label): [channel / 255 for channel in color] for label, color in laneDrawing.labelColors.items()},
+      "walkLabel": playerReach.walkLabel, "climbLabel": laneDrawing.climbTint, "designGradeDegrees": buildTolerances.designGradeDegrees,
       "slopeReach": [[normalZ, playerReach.seedTolerance(normalZ)] for normalZ in numpy.linspace(0.0, 1.0, laneSlopeSamples).tolist()],
     }
-    laneState = {"lane": status, "seconds": seconds, "bodyGroup": groupName, "laneFile": str(reached.path)} | playerReach.laneTerms(reached, description)
+    laneState = {
+      "lane": status, "seconds": seconds, "bodyGroup": groupName, "laneFile": str(reached.path), "designGradeDegrees": buildTolerances.designGradeDegrees,
+    } | playerReach.laneTerms(reached, description)
   description = await callBridge(context, "renderView", {
     "view": view, "outputPath": str(outputPath), "figureModel": await scaleFigureModel(zone, view), "shading": shading, "bandHeight": bandHeight,
     "guides": guides, "sky": state, "swimVolumes": swimVolumes, "labels": labels, "emitters": await previewEmitterAssets(),
@@ -1272,8 +1290,10 @@ async def renderView(
   if labels is not None:
     await anyio.to_thread.run_sync(viewSheets.writeNames, outputPath, description["labels"]["shown"])
   if lane:
-    await anyio.to_thread.run_sync(laneDrawing.tintLegendUnder, outputPath, description["laneTint"]["labels"])
+    await anyio.to_thread.run_sync(laneDrawing.tintLegendUnder, outputPath, description["laneTint"]["labels"], buildTolerances.designGradeDegrees)
   result = description | ({} if carried is None else {"carriedLight": carried}) | ({} if viewer is None else {"viewer": viewer}) | ({} if drawn is None else {"sky": drawn})
+  if shading == "slope":
+    result = result | {"slope": {"bands": slopeBands.described(), "designGradeDegrees": buildTolerances.designGradeDegrees}}
   if laneState is not None:
     result = reported("renderView", result | {"laneState": laneState}, resultReports.withoutLaneTerms)
   return [Image(data=outputPath.read_bytes(), format="png"), result]
@@ -3082,31 +3102,42 @@ async def placeEmitters(context: Context, emitters: list[dict], collection: str 
   return await callBridge(context, "placeEmitters", {"emitters": [emitter | {"alwaysVisible": None} for emitter in emitters], "collection": collection, "clientContent": None})
 
 
-@guardedTool()
+@guardedTool(description=(
+  "Mark an area of the zone for what it is to become: a vertical prism over `outline` ([[x, y], ...], in order) from `bottom` to"
+  " `top`, kept in the regions collection (seen in Blender, never rendered or exported) with its `intent` (\"north guild terrace: packed"
+  " earth, dwellings carved into the back wall\") and its `access`, whether players reach it: \"play\" (they walk or swim there; walking"
+  " against swimming is the swim volumes' decision), \"view\" (seen but never entered: a backdrop slope, a far shore), or \"none\" (never"
+  " reached: behind the rim, rock interiors, under the world). `builtFor`, the body groups (playerScale: small, medium, large) the area"
+  " is built for when it differs from the zone's (setZoneProperties builtFor, every group unless set): a gnome quarter in a human town"
+  " [\"small\"], a giants' hall in a gnome town [\"large\"]; left out, the region follows the zone. Every check judges a spot by its region's"
+  " groups, else its zone's: a group it is built for that cannot pass is a failure, any other a finding. `gradeDegrees`, the grade the"
+  " region's ground is designed to be walked at, in degrees from level, when it differs from the zone's design grade"
+  f" (buildTolerances.designGradeDegrees, {buildTolerances.designGradeDegrees:g}): a scramble up a bank steeper, a paved terrace"
+  " gentler; above 0 and at most the steepest face every group the region is built for walks (playerScale's steepestWalkableDegrees,"
+  " the client's limit, which no design grade passes); left out, the region follows the zone. renderView's lane tint shows reached"
+  " floor no steeper than the grade as walk and steeper floor as climb. A zone is planned as regions first and each is shaped,"
+  " surfaced, and dressed for its own intent; the {\"region\": name} selector confines any tool to one."
+))
 async def createRegion(
   context: Context, name: str, outline: list[list[float]], bottom: float, top: float, intent: str, access: str, builtFor: list[str] | None = None,
+  gradeDegrees: float | None = None,
 ):
-  """Mark an area of the zone for what it is to become: a vertical prism over `outline` ([[x, y], ...], in order) from `bottom` to
-  `top`, kept in the regions collection (seen in Blender, never rendered or exported) with its `intent` ("north guild terrace: packed
-  earth, dwellings carved into the back wall") and its `access`, whether players reach it: "play" (they walk or swim there; walking
-  against swimming is the swim volumes' decision), "view" (seen but never entered: a backdrop slope, a far shore), or "none" (never
-  reached: behind the rim, rock interiors, under the world). `builtFor`, the body groups (playerScale: small, medium, large) the area
-  is built for when it differs from the zone's (setZoneProperties builtFor, every group unless set): a gnome quarter in a human town
-  ["small"], a giants' hall in a gnome town ["large"]; left out, the region follows the zone. Every check judges a spot by its region's
-  groups, else its zone's: a group it is built for that cannot pass is a failure, any other a finding. A zone is planned as regions
-  first and each is shaped, surfaced, and dressed for its own intent; the {"region": name} selector confines any tool to one."""
-  return await callBridge(context, "createRegion", {"name": name, "outline": outline, "bottom": bottom, "top": top, "intent": intent, "access": access, "builtFor": builtFor})
+  return await callBridge(context, "createRegion", {
+    "name": name, "outline": outline, "bottom": bottom, "top": top, "intent": intent, "access": access, "builtFor": builtFor, "gradeDegrees": gradeDegrees,
+  })
 
 
 @guardedTool()
 async def editRegion(
   context: Context, name: str, outline: list[list[float]] | None = None, bottom: float | None = None, top: float | None = None, intent: str | None = None,
-  access: str | None = None, builtFor: list[str] | str | None = None,
+  access: str | None = None, builtFor: list[str] | str | None = None, gradeDegrees: float | str | None = None,
 ):
-  """Change a region's outline, bottom, top, intent, access (play, view, or none), or builtFor (the body groups it is built for, or
-  "zone" to follow the zone's again) as the plan changes. Refused, changing nothing, when any of them is invalid."""
+  """Change a region's outline, bottom, top, intent, access (play, view, or none), builtFor (the body groups it is built for, or
+  "zone" to follow the zone's again), or gradeDegrees (its design grade, or "zone" to follow the zone's again; a grade kept or given
+  is checked against the groups the region is then built for, so a builtFor change cannot leave it over their steepest walkable face)
+  as the plan changes. Refused, changing nothing, when any of them is invalid."""
   return await callBridge(context, "editRegion", {
-    "name": name, "outline": outline, "bottom": bottom, "top": top, "intent": intent, "access": access, "builtFor": builtFor,
+    "name": name, "outline": outline, "bottom": bottom, "top": top, "intent": intent, "access": access, "builtFor": builtFor, "gradeDegrees": gradeDegrees,
   })
 
 
@@ -3167,7 +3198,11 @@ async def renderSketch(
   surface runs on tucked under its banks: blue, lava orange), swim (the swim volumes, dashed, cyan water and magenta lava, each
   named inside itself where its name fits clear of the other labels, else by its number; `unnamedSwimVolumes` lists the first twenty
   in the drawing left unnamed, to see closer, and moreUnnamedSwimVolumes counts the rest), boundaries (red, named: walls as lines along
-  their foot, lids and floors faintly filled), zoneLines (their boxes faintly green, named), and, asked for, lane (where the body group bodyGroup reaches (else the group with the
+  their foot, lids and floors faintly filled), zoneLines (their boxes faintly green, named), and, asked for, slope (the ground's
+  steepness in bands laid lightly over the relief, under every fill, line, and label: renderView's slope shading unlit, each face in
+  the color of its band, level, gentle, steep, scramble, and wall or overhang, so a plan shows at a glance what is meant to be walked
+  and what is a bank; the legend band names the bands, under the lane's entries or on its own when no lane is drawn, and the result's
+  slopeBands lists them; the lane's fill draws reached floor by its label whatever its slope, since the lane holds none) and lane (where the body group bodyGroup reaches (else the group with the
   most clearance of those the zone is built for), as mapReach draws it without its problems
   and regions, over the regions' fills and the caves' pale floors and under the caves' walls: walk green, swim blue, water waded lined
   blue, slide orange, squeeze pink, taken by a zone line yellow, traps hatched orange, walkable floor never reached cross-hatched (alone,
@@ -3183,11 +3218,20 @@ async def renderSketch(
   if len(center) != 2 or width <= 0:
     raise ToolError(f"center is [x, y] and width positive, got {center} and {width}")
   zone = await callBridge(context, "getZoneProperties", {})
+  sky = await zoneSky(zone)
+  mapView = {"map": {"center": center, "width": width}}
   basePath = newRenderPath()
   base = await callBridge(context, "renderView", {
-    "view": {"map": {"center": center, "width": width}}, "outputPath": str(basePath), "figureModel": None, "shading": "relief",
-    "bandHeight": bandHeight, "guides": False, "sky": await zoneSky(zone), "swimVolumes": False, "labels": None, "emitters": None,
+    "view": mapView, "outputPath": str(basePath), "figureModel": None, "shading": "relief",
+    "bandHeight": bandHeight, "guides": False, "sky": sky, "swimVolumes": False, "labels": None, "emitters": None,
   })
+  slopePath = None
+  if "slope" in layers:
+    slopePath = newRenderPath()
+    await callBridge(context, "renderView", {
+      "view": mapView, "outputPath": str(slopePath), "figureModel": None, "shading": "slope", "bandHeight": bandHeight, "guides": False, "sky": sky,
+      "swimVolumes": False, "labels": None, "emitters": None, "unlit": True,
+    })
   spots = planDrawing.gridCrossings(center, width, base["height"] / base["width"]) if spotHeights else []
   overlays = await callBridge(context, "planOverlays", {"sheets": sheets, "layers": [layer for layer in layers if layer != "lane"], "spots": spots})
   lanePlan, laneState = None, None
@@ -3196,17 +3240,21 @@ async def renderSketch(
     lanePlan = laneDrawing.LanePlan(analysis, description, None, False)
     laneState = {"lane": status, "seconds": seconds, "bodyGroup": analysis["group"]} | playerReach.laneTerms(lanes[analysis["group"]], description)
   outputPath = newRenderPath()
-  drawn = await anyio.to_thread.run_sync(planDrawing.drawPlan, basePath, outputPath, center, width, overlays, lanePlan)
+  drawn = await anyio.to_thread.run_sync(planDrawing.drawPlan, basePath, outputPath, center, width, overlays, lanePlan, slopePath)
   basePath.unlink()
+  if slopePath is not None:
+    slopePath.unlink()
+  frame = planDrawing.PlanFrame(center, width, drawn["size"])
   if lanePlan is not None:
-    frame = planDrawing.PlanFrame(center, width, drawn["size"])
     await anyio.to_thread.run_sync(laneDrawing.legendUnder, outputPath, lanePlan.legend(frame, laneDrawing.planLayerLegend(overlays, frame)))
+  elif overlays["slope"]:
+    await anyio.to_thread.run_sync(laneDrawing.legendUnder, outputPath, laneDrawing.planLayerLegend(overlays, frame))
   result = {
     "outputPath": str(outputPath), "center": center, "width": width, "unitsPerPixel": round(width / drawn["size"][0], 4), "heightRange": base["heightRange"],
     "bandHeight": bandHeight, "gridStep": drawn["gridStep"], "sheetColors": drawn["sheetColors"],
     "shapes": {sheet["sheet"]: len(sheet["shapes"]) for sheet in overlays["sheets"]}, **unnamedSwimVolumes(drawn["unnamedSwimVolumes"]),
     "frameSize": drawn["size"], "caveEndsUnknown": sorted({cave["label"] for cave in overlays["caves"] if not cave["endsKnown"]}),
-  }
+  } | ({"slopeBands": slopeBands.described()} if overlays["slope"] else {})
   if laneState is not None:
     result = reported("renderSketch", result | {"laneState": laneState}, resultReports.withoutLaneTerms)
   return [Image(data=outputPath.read_bytes(), format="png"), result]
@@ -4443,9 +4491,10 @@ async def traceReach(context: Context, to: list[float], fromEntry: str | None = 
 
 @guardedTool()
 async def getRegions(context: Context):
-  """Every region with its intent, access, builtFor (its own body groups, or null where it follows the zone's), outline, height span,
-  and area: the zone's plan; and under `undecided` the regions made before access was decided, which a game export refuses until
-  editRegion gives each its access."""
+  """Every region with its intent, access, builtFor (its own body groups, or null where it follows the zone's), gradeDegrees (its own
+  design grade, or null where it follows the zone's, buildTolerances.designGradeDegrees), outline, height span, and area: the zone's
+  plan; and under `undecided` the regions made before access was decided, which a game export refuses until editRegion gives each its
+  access."""
   return await callBridge(context, "getRegions", {})
 
 

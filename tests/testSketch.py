@@ -8,6 +8,7 @@ from PIL import Image, ImageDraw
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
 import planDrawing
+import slopeBands
 from testModelsAndDressing import freshScene
 from testWater import basin, liquidMaterials
 
@@ -103,6 +104,44 @@ def testAPlanDrawsSketchesOverAReliefMap(stageBlenderServer, tmp_path):
   assert tavern[0] > tavern[1] + 40 and tavern[0] > tavern[2] + 40
   assert pool[2] > pool[0] + 30
   assert abs(ground[0] - ground[1]) < 12 and abs(ground[1] - ground[2]) < 12
+
+
+def testASlopeLayerBandsThePlanBySteepnessUnderItsLinesWithALegend(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await campScene(session, tmp_path)
+    await session.expectSuccess("sketch", {"sheet": "camp", "shapes": campShapes})
+    # A bank 30 degrees from level north of the pool, clear of the sketch, the basin, and the grid's lines.
+    await session.expectSuccess("createPrimitive", {"kind": "plane", "name": "bank", "size": [40, 40, 0], "location": [40, 100, 10], "rotationDegrees": [0, -30, 0]})
+    plain = await session.expectImage("renderSketch", {"center": [0, 0], "width": 600})
+    sloped = await session.expectImage("renderSketch", {"center": [0, 0], "width": 600, "layers": ["slope"]})
+    return plain, sloped
+
+  (plainImage, plain), (slopedImage, sloped) = stageBlenderServer.session(steps)
+  plainPicture, slopedPicture = Image.open(io.BytesIO(plainImage)), Image.open(io.BytesIO(slopedImage))
+  slopedPicture.save(tmp_path / "slopePlan.png")
+  plainPixels, slopedPixels = (numpy.asarray(picture.convert("RGB"), dtype=numpy.int64) for picture in (plainPicture, slopedPicture))
+  scale = 1440 / 600
+
+  def at(pixels, x, y):
+    return pixels[round(405 - x * scale), round(720 - y * scale)]
+
+  def overRelief(relief, color):
+    return relief + (numpy.array(color) - relief) * planDrawing.slopeAlpha / 255
+
+  # Open ground and the bank's middle, between the grid's lines (every 50) and clear of the spot heights at their crossings, and a
+  # point on the grid's line along y = -150, between its crossings and clear of the note's name.
+  ground, bank, line = (-125, -175), (40, 108), (-125, -150)
+  # Without the layer the plan is as it was: no legend band, the ground grey, no bands in the result.
+  assert plainPicture.size == (1440, 810) and plain["frameSize"] == [1440, 810] and "slopeBands" not in plain
+  assert abs(at(plainPixels, *ground)[0] - at(plainPixels, *ground)[1]) < 12
+  # With it, flat ground moves toward the level band's color by the layer's alpha over the relief and the bank toward the steep band's,
+  # a legend band lies under the frame, and the result lists the bands.
+  assert numpy.abs(at(slopedPixels, *ground) - overRelief(at(plainPixels, *ground), slopeBands.colors[0])).max() <= 3, (at(slopedPixels, *ground), at(plainPixels, *ground))
+  assert numpy.abs(at(slopedPixels, *bank) - overRelief(at(plainPixels, *bank), slopeBands.colors[slopeBands.bandOf(30)])).max() <= 3, (at(slopedPixels, *bank), at(plainPixels, *bank))
+  # The grid draws over the layer: its line's pixel is the grid's color in both plans.
+  assert tuple(at(slopedPixels, *line)) == tuple(at(plainPixels, *line)) == planDrawing.gridColor
+  assert slopedPicture.width == 1440 and slopedPicture.height > sloped["frameSize"][1] == 810
+  assert [band["word"] for band in sloped["slopeBands"]] == ["level", "gentle", "steep", "scramble", "wall or overhang"]
 
 
 def testPlanNamesSitBesideTheSpotHeightsNotOnThem():

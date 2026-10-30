@@ -33,6 +33,9 @@ regionIntentProperty = "zonewrightRegionIntent"
 regionAccessProperty = "zonewrightRegionAccess"
 # The body groups a region is built for (playerScale), when it overrides its zone's.
 regionBuiltForProperty = "zonewrightRegionBuiltFor"
+# The grade a region's ground is designed to be walked at (degrees from level), when it overrides its zone's
+# (buildTolerances.designGradeDegrees).
+regionGradeProperty = "zonewrightRegionGradeDegrees"
 # An entry (bridgeEntries) is an arrow empty where players arrive, its kind and where they come from kept in this property.
 entryProperty = "zonewrightEntry"
 # A mesh surfaced by layers keeps their order in this property; its face materials are composed from them.

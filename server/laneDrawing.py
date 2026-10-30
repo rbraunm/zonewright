@@ -7,7 +7,10 @@ the underworld) magenta, the edges where a zone line catches a fall green, zone 
 swim boxes dashed over the fill, seeds as white arrows (hollow when isolated), plot entrances as ticks (a red X when unreached), region
 outlines in their access colors, and the problems ringed black (round the mark they lie on) and numbered over their rings or led to
 them by a line; with a legend band below naming what the drawing shows. LanePlan lays it over planDrawing.drawPlan's plan;
-drawLaneBesideNav draws a lane from server files over the floors it reaches beside the server's NPC nav."""
+drawLaneBesideNav draws a lane from server files over the floors it reaches beside the server's NPC nav. A view's lane tint
+(renderView lane) takes the same colors, its walk split by the design grade (buildTolerances.designGradeDegrees, or the region's
+gradeDegrees) into walk and climb (violet: reached floor steeper than the grade, passable only because the client allows it), a label of
+the tint's own that the lane file never holds; tintLegendUnder names them under the view."""
 import math
 
 import numpy
@@ -17,16 +20,22 @@ import planDrawing
 import playerReach
 import playerScale
 import serverMapDrawing
+import slopeBands
 
+# A view's lane tint splits the lane's walk label by the design grade into walk and climb under this label of the tint's own, outside
+# playerReach.labelNames: the lane file holds no slope, so a plan's lane fill draws such floor as walk, and the label is mapped only
+# through labelColors and labelWords, never through labelNames.
+climbTint = 6
 # Each label's hue stands apart from the others' and from what plans and sections draw beside them: the caves' purple, the zone lines'
-# green, the leak edges' magenta.
+# green, the leak edges' magenta, the plan's amber view access, and the swim volumes' cyan.
 labelColors = {
   playerReach.walkLabel: (35, 165, 60), playerReach.swimLabel: (25, 105, 225), playerReach.slideLabel: (240, 140, 20),
-  playerReach.squeezeLabel: (230, 90, 150), playerReach.zoneLineLabel: (235, 205, 25),
+  playerReach.squeezeLabel: (230, 90, 150), playerReach.zoneLineLabel: (235, 205, 25), climbTint: (150, 60, 220),
 }
 labelWords = {
   playerReach.walkLabel: "walk", playerReach.swimLabel: "swim (a floor in a swim box)", playerReach.slideLabel: "slide (too steep to stand)",
   playerReach.squeezeLabel: "squeeze (only a smaller player)", playerReach.zoneLineLabel: "taken by a zone line",
+  climbTint: "climb (reached walking, steeper than the design grade: passable only because the client allows it)",
 }
 # What a section's water bands are, by label: water the lane's group swims, water only a smaller body passes through (under too little
 # open space for the group), and water a zone line takes.
@@ -683,9 +692,10 @@ def sectionLayerLegend(cuts):
 
 def planLayerLegend(overlays, frame):
   """A plan's own layers the frame shows under a lane, as legend entries, each fill as it shows over the relief: the relief, the
-  ground's spot heights, water by liquid, regions (their outlines and the fills of those players do not simply play in, by access),
-  caves (runs, floor heights, junctions, floor strokes by kind), plots, entries (filled, isolated, or keeping the heading), zone lines,
-  boundaries' walls and their lids and floors, and sketch shapes (the lane draws the swim volumes and names them in its own entries)."""
+  ground's spot heights, the slope layer's bands when it is on, water by liquid, regions (their outlines and the fills of those players
+  do not simply play in, by access), caves (runs, floor heights, junctions, floor strokes by kind), plots, entries (filled, isolated, or
+  keeping the heading), zone lines, boundaries' walls and their lids and floors, and sketch shapes (the lane draws the swim volumes and
+  names them in its own entries)."""
   def shows(points):
     pixels = [frame.pixel(point) for point in points]
     xs, ys = [x for x, _ in pixels], [y for _, y in pixels]
@@ -694,6 +704,8 @@ def planLayerLegend(overlays, frame):
   items = [("relief", None, "relief: lighter is higher")]
   if any(shows([spot["at"]]) for spot in overlays["spots"]):
     items.append(("spot", planDrawing.spotColor, "the ground's height at a grid crossing"))
+  if overlays["slope"]:
+    items += [("fill", overRelief(color, planDrawing.slopeAlpha), slopeBands.legendText(index)) for index, color in enumerate(slopeBands.colors)]
   liquids = sorted({body["liquid"] for body in overlays["water"] if shows([point for x0, y0, x1, y1 in body["runs"] for point in ((x0, y0), (x1, y1))] + [point for loop in body["loops"] for point in loop])})
   items += [("fill", overRelief(planDrawing.liquidColors[liquid], planDrawing.waterAlpha), f"{liquid} surface") for liquid in liquids]
   regions = [region for region in overlays["regions"] if shows(region["outline"])]
@@ -730,12 +742,16 @@ def planLayerLegend(overlays, frame):
   return items
 
 
-def tintLegendUnder(path, labels):
-  """Add a legend band under a view the lane tints (renderView lane): each label it tints, and what is left untinted."""
+def tintLegendUnder(path, labels, designGradeDegrees):
+  """Add a legend band under a view the lane tints (renderView lane): each label it tints, the design grade walk and climb are told
+  apart by, and what is left untinted."""
   with Image.open(path) as opened:
     view = opened.convert("RGB")
   items = [("fill", labelColors[label], labelWords[label]) for label in labels]
-  withLegend(view, items + [("text", legendTextColor, "floor tinted toward how players reach it; untinted: never reached, or not floor")]).save(path)
+  withLegend(view, items + [
+    ("text", legendTextColor, "floor tinted toward how players reach it; untinted: never reached, or not floor"),
+    ("text", legendTextColor, f"the design grade is {designGradeDegrees:g} degrees, or the region's gradeDegrees: walk no steeper than it, climb steeper"),
+  ]).save(path)
 
 
 def numberRuns(numbers):

@@ -33,7 +33,7 @@ massingColor = (0.82, 0.8, 0.76)
 massingShade = {"base": 0.45, "up": 0.4, "northSouth": 0.25, "eastWest": 0.1}
 # A boundary face whose plan covers less than this share of its own area stands upright: a wall, drawn in plan as a line.
 uprightPlanShare = 0.01
-planLayers = ("regions", "plots", "water", "swim", "boundaries", "zoneLines", "entries", "caves")
+planLayers = ("regions", "plots", "water", "swim", "boundaries", "zoneLines", "entries", "caves", "slope")
 # Ground under a shape is sampled on a grid at least this fine, and no finer than this many samples.
 groundSampleSpacing = 4.0
 groundSampleLimit = 2500
@@ -472,8 +472,9 @@ def getSketch(sheet):
 
 def planOverlays(sheets, layers, spots):
   """What a plan drawing lays over the base: the sheets' shapes, the plan's own regions (with their access), plots, water, swim
-  volumes, boundaries, zone lines, entries (bridgeEntries.getEntries, labelled), and caves' runs (planCaves), and the ground's height
-  at each of spots ([x, y]; those over no ground are left out), in plan coordinates."""
+  volumes, boundaries, zone lines, entries (bridgeEntries.getEntries, labelled), and caves' runs (planCaves), the ground's height
+  at each of spots ([x, y]; those over no ground are left out), in plan coordinates, and whether the slope layer is on (slope: the
+  server renders and lays it, the legend names its bands)."""
   known = {readSpec(shape)["sheet"] for shape in sketchObjects()}
   if sheets is not None:
     missing = sorted(set(sheets) - known)
@@ -484,7 +485,10 @@ def planOverlays(sheets, layers, spots):
   if unknownLayers:
     raise ValueError(f"layers are {list(planLayers)}; got {unknownLayers}")
   bpy.context.view_layer.update()
-  overlays = {"sheets": [], "regions": [], "plots": [], "water": [], "swim": [], "boundaries": [], "zoneLines": [], "entries": [], "caves": [], "spots": []}
+  overlays = {
+    "sheets": [], "regions": [], "plots": [], "water": [], "swim": [], "boundaries": [], "zoneLines": [], "entries": [], "caves": [], "spots": [],
+    "slope": "slope" in layers,
+  }
   if spots:
     probe = GroundProbe()
     for x, y in spots:

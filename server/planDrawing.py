@@ -44,6 +44,9 @@ entryMarkWidth = 16
 accessColors = {"view": (235, 160, 0), "none": (210, 30, 30), None: (130, 130, 130)}
 accessFillAlpha = 45
 accessHatchAlpha = 190
+# A plan's slope layer (the unlit slope shading's band colors, slopeBands) is laid over the relief at this alpha, so the relief's
+# shading still reads through it and the fills, lines, and labels draw over it.
+slopeAlpha = 120
 hatchSpacing = 10
 hatchWidth = 2
 
@@ -538,8 +541,9 @@ def labelShape(board, frame, shape, color):
 labelOrder = ("point", "footprint", "note", "path", "area")
 
 
-def drawPlan(basePath, outputPath, center, width, overlays, lane=None):
-  """Lay the overlays over the base render, scaled up so lines and labels stay crisp, and save the drawing: water, swim volumes, the
+def drawPlan(basePath, outputPath, center, width, overlays, lane=None, slope=None):
+  """Lay the overlays over the base render, scaled up so lines and labels stay crisp, and save the drawing: the slope layer (slope, the
+  unlit slope shading rendered over the same frame, when given) at slopeAlpha over the relief, then the grid, water, swim volumes, the
   regions' access fills, the caves' pale floors, the lane's fill (lane, a laneDrawing.LanePlan, when given) over them, boundaries, zone
   lines, the regions' outlines, the caves' runs, then every sheet's area fills, footprint fills and path widths each composited in turn,
   then every line and mark (the entries' arrows, then the lane's marks last), then the labels, clear of the lane's marks: swim volumes'
@@ -550,6 +554,12 @@ def drawPlan(basePath, outputPath, center, width, overlays, lane=None):
   with Image.open(basePath) as base:
     size = (round(base.width * planScale), round(base.height * planScale))
     image = base.convert("RGB").resize(size, Image.Resampling.BICUBIC).convert("RGBA")
+  if slope is not None:
+    with Image.open(slope) as opened:
+      # Nearest keeps every pixel one band's color; a smoother resize would blend colors of no band along the band edges.
+      bands = opened.convert("RGB").resize(size, Image.Resampling.NEAREST).convert("RGBA")
+    bands.putalpha(slopeAlpha)
+    image = Image.alpha_composite(image, bands)
   frame = PlanFrame(center, width, size)
 
   def overlay(paint):

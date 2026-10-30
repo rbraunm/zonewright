@@ -37,9 +37,14 @@ transitionGroundNormalZ = 0.5
 # triangles and 7,177 vertices (a river's part). The limit lies between the triangle counts. A mesh of more is split into parts
 # (bridgeSplit) and export refuses one that is not.
 maxModelTriangles = 3600
-# A view's lane tint covers a face whose normal z is at least this, a floor players stand or slide on; a steeper face is a wall beside
-# the lane's floors, or something standing on them, and stays untinted.
+# A view's lane tint tells floor from wall by this: a face whose normal z is at least this is floor the tint covers, and a steeper face
+# is a wall beside the lane's floors, or something standing on them, and stays untinted. It is neither what is walkable (the client's
+# limit, playerScale's walkableNormalZ) nor what is meant to be walked (designGradeDegrees).
 laneTintNormalZ = 0.1
+# The grade a zone's ground is designed to be walked at, in degrees from level, unless a region sets its own (createRegion
+# gradeDegrees): the lane tint shows reached floor no steeper than it as walk and steeper floor as climb, passable only because the
+# client allows it.
+designGradeDegrees = 35.0
 
 # Footing and ground under a structure's part are looked for from this far over where the part is wanted, so ground a little higher
 # (an end sunk into it) is found.

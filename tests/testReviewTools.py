@@ -11,6 +11,7 @@ from testModelsAndDressing import freshScene
 from testReviewViews import crateScene, environment
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
+import slopeBands
 import viewSheets
 import playerScale
 
@@ -235,10 +236,23 @@ diagnosticMap = {"map": {"center": [8, 0], "width": 480}}
 pixelsPerUnit = 960 / 480
 # Ground facing up takes the shading's ambient 0.6 and 0.4 of the northwest light, which is 45 degrees up.
 upShade = 0.6 + 0.4 * math.sqrt(0.5)
+# The slope shading's map, 480 across about (40, 0), holds the fine grid's middle at (-80, 0) and a plane 60 degrees from level at
+# (160, 0), turned toward the layout light, which the diagnostic map does not hold (its two triangles would change the density range).
+slopeMap = {"map": {"center": [40, 0], "width": 480}}
+rampNormal = [math.sin(math.radians(60)), 0, math.cos(math.radians(60))]
+
+
+def layoutShadeOf(normal):
+  """The slope shading's light on a face: the layout light's ambient 0.3 and 0.7 of the northwest light, 45 degrees up."""
+  return 0.3 + 0.7 * max(0.0, float(numpy.dot(normal, [0.5, 0.5, math.sqrt(0.5)])))
 
 
 def mapPixel(x, y):
   return int((240 - y) * pixelsPerUnit), int(540 / 2 - (x - 8) * pixelsPerUnit)
+
+
+def slopeMapPixel(x, y):
+  return int((240 - y) * pixelsPerUnit), int(540 / 2 - (x - 40) * pixelsPerUnit)
 
 
 def rampColor(fraction):
@@ -249,7 +263,7 @@ def rampColor(fraction):
   return numpy.array(stops[low]) + (numpy.array(stops[low + 1]) - numpy.array(stops[low])) * share
 
 
-def testDiagnosticShadingsDrawCurvatureAndDensitiesAtTheirScales(stageBlenderServer, tmp_path):
+def testDiagnosticShadingsDrawCurvatureDensitiesAndSlopeBandsAtTheirScales(stageBlenderServer, tmp_path):
   async def steps(session):
     await freshScene(session)
     for name, size, spacing, location, side in (("fine", 64, 8, [-80, 0, 0], 64), ("coarse", 64, 16, [0, 0, 0], 256)):
@@ -259,8 +273,10 @@ def testDiagnosticShadingsDrawCurvatureAndDensitiesAtTheirScales(stageBlenderSer
       await session.expectSuccess("projectUVs", {"objectName": name, "method": "planar", "worldUnitsPerRepeat": 32, "direction": [0, 0, 1]})
     await session.expectSuccess("createTerrainGrid", {"name": "mound", "size": [96, 96], "spacing": 8, "location": [80, 0, 0], "collection": "terrain"})
     await session.expectSuccess("sculptAtPoint", {"objectName": "mound", "mode": "raise", "center": [80, 0, 0], "radius": 40, "strength": 20})
+    await session.expectSuccess("createPrimitive", {"kind": "plane", "name": "ramp", "size": [20, 20, 0], "location": [160, 0, 0], "rotationDegrees": [0, 60, 0]})
     await session.expectSuccess("setZoneProperties", environment)
-    return {shading: await session.expectImage("renderView", {"view": diagnosticMap, "shading": shading}) for shading in ("curvature", "triangleDensity", "texelDensity")}
+    rendered = {shading: await session.expectImage("renderView", {"view": diagnosticMap, "shading": shading}) for shading in ("curvature", "triangleDensity", "texelDensity")}
+    return rendered | {"slope": await session.expectImage("renderView", {"view": slopeMap, "shading": "slope"})}
 
   rendered = stageBlenderServer.session(steps)
   curvature, curvatureScale = pixelsOf(rendered["curvature"][0]), rendered["curvature"][1]["curvature"]
@@ -287,3 +303,14 @@ def testDiagnosticShadingsDrawCurvatureAndDensitiesAtTheirScales(stageBlenderSer
     assert numpy.abs(texels[row, column] - rampColor(fraction) * upShade).max() <= 2, (x, texels[row, column])
   column, row = mapPixel(116, 20)
   assert texelScale["untexturedShare"] > 0 and numpy.abs(texels[row, column] - numpy.array([60, 60, 60]) * upShade).max() <= 6
+  # Flat ground draws the level band lit from above, the 60-degree ramp the scramble band lit facing the light, and the result lists
+  # the bands with the design grade.
+  slope, slopeScale = pixelsOf(rendered["slope"][0]), rendered["slope"][1]["slope"]
+  column, row = slopeMapPixel(-80, 0)
+  assert numpy.abs(slope[row, column] - numpy.array(slopeBands.colors[0]) * layoutShadeOf([0, 0, 1])).max() <= 2, slope[row, column]
+  column, row = slopeMapPixel(160, 0)
+  assert numpy.abs(slope[row, column] - numpy.array(slopeBands.colors[slopeBands.bandOf(60)]) * layoutShadeOf(rampNormal)).max() <= 2, slope[row, column]
+  assert [(band["low"], band["high"], band["word"]) for band in slopeScale["bands"]] == [
+    (0, 10, "level"), (10, 25, "gentle"), (25, 45, "steep"), (45, 80, "scramble"), (80, 180, "wall or overhang"),
+  ]
+  assert [band["hex"] for band in slopeScale["bands"]] == ["#%02x%02x%02x" % color for color in slopeBands.colors] and slopeScale["designGradeDegrees"] == 35.0

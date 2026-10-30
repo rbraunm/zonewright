@@ -25,7 +25,7 @@ async def makeMaterials(session, folder, names):
     await session.expectSuccess("createMaterial", {"name": name, "diffuseTexture": str(folder / f"{name}.png")})
 
 
-def testRegionsConfineToolsAndKeepTheirIntent(stageBlenderServer):
+def testRegionsConfineToolsAndKeepTheirIntentAndGrade(stageBlenderServer):
   async def steps(session):
     await newGround(session, 64, 8)
     created = await session.expectSuccess("createRegion", {"name": "plaza", "outline": [[-20, -20], [20, -20], [20, 20], [-20, 20]], "bottom": -10, "top": 10, "intent": "packed earth plaza", "access": "play"})
@@ -33,13 +33,24 @@ def testRegionsConfineToolsAndKeepTheirIntent(stageBlenderServer):
     await session.expectSuccess("editRegion", {"name": "plaza", "top": 3})
     above = await session.expectError("moveVertices", {"objectName": "ground", "selector": {"region": "plaza"}, "offset": [0, 0, 1]})
     notRegion = await session.expectError("moveVertices", {"objectName": "ground", "selector": {"region": "ground"}, "offset": [0, 0, 1]})
+    graded = await session.expectSuccess("editRegion", {"name": "plaza", "gradeDegrees": 20})
+    followed = await session.expectSuccess("editRegion", {"name": "plaza", "gradeDegrees": "zone"})
+    followedAgain = await session.expectSuccess("editRegion", {"name": "plaza", "gradeDegrees": "zone"})
+    properties = (await session.expectSuccess("runPython", {"code": "result = sorted(key for key in bpy.data.objects['plaza'].keys() if key.startswith('zonewrightRegion'))"}))["result"]
     regions = await session.expectSuccess("getRegions")
     summary = await session.expectSuccess("getSceneSummary")
-    return created, moved, above, notRegion, regions, summary
+    return created, moved, above, notRegion, graded, followed, followedAgain, properties, regions, summary
 
-  created, moved, above, notRegion, regions, summary = stageBlenderServer.session(steps)
-  # A region made without builtFor follows its zone's.
-  assert created == {"name": "plaza", "intent": "packed earth plaza", "access": "play", "builtFor": None, "outline": [[-20, -20], [20, -20], [20, 20], [-20, 20]], "bottom": -10, "top": 10, "area": 1600}
+  created, moved, above, notRegion, graded, followed, followedAgain, properties, regions, summary = stageBlenderServer.session(steps)
+  # A region made without builtFor or gradeDegrees follows its zone's.
+  assert created == {
+    "name": "plaza", "intent": "packed earth plaza", "access": "play", "builtFor": None, "gradeDegrees": None,
+    "outline": [[-20, -20], [20, -20], [20, 20], [-20, 20]], "bottom": -10, "top": 10, "area": 1600,
+  }
+  # A design grade given is kept with the region, and "zone" takes it back to the zone's.
+  assert graded == created | {"top": 3, "gradeDegrees": 20.0} and followed == created | {"top": 3}
+  # "zone" on a region already following the zone leaves it so: the region carries no grade property, only its intent and access.
+  assert followedAgain == followed and properties == ["zonewrightRegionAccess", "zonewrightRegionIntent"]
   # The 5 by 5 grid vertices from -16 to 16 lie inside; raised to 5, they are above the edited top of 3.
   assert moved["movedVertices"] == 25 and "matches no vertices" in above and "is not a region" in notRegion
   assert regions == {"regions": [created | {"top": 3}], "undecided": []}

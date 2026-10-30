@@ -11,9 +11,9 @@ A review judges what a player would see. Render it, look at every picture, name 
 
 1. **Review cameras.** Each area keeps saved review cameras (`saveReviewCamera`): its zone-in or approach at eye level, an oblique from above, each landmark, and each place the concept art shows (`compareToConcept` with `saveAs`, matched to the art). A camera keeps an hour (`sky`) where the light matters, such as a night camera at a landmark, a lamp-lit street, or a pool by moonlight, and renders at that hour wherever it renders. `renderReviewSet` renders them all on one sheet, each at its own hour, or every camera at one hour with `sky` (a lit area at the zone's hour and at night); give each its note, what to judge there.
 2. **Routes.** The main routes are saved review routes (`saveReviewRoute`); `renderRouteStrip` walks each and frames it at eye level, with a frame at every problem the walk meets; a route lit for the night is walked at that hour too (`sky`).
-3. **The plan.** A `renderView` map in layout shading, and `renderSketch` over it with the regions' names, for where things are.
+3. **The plan.** A `renderView` map in layout shading, and `renderSketch` over it with the regions' names, for where things are; the same map in `slope` shading, or `renderSketch` with the `slope` layer, for what is level, what is a bank, and what is a wall.
 4. **The concept.** `compareToConcept` with each concept camera: side by side, the overlay, the squinted masses, the edges, and the palettes, with numbers.
-5. **Diagnostics, where a question needs them.** `renderView` shadings: `curvature` (broad planes, crisp lips, one noise scale everywhere), `texelDensity` and `triangleDensity` (against a client reference zone rendered the same way), `coverage` (export status), `objects` and `labels` (naming what a view shows).
+5. **Diagnostics, where a question needs them.** `renderView` shadings: `curvature` (broad planes, crisp lips, one noise scale everywhere), `texelDensity` and `triangleDensity` (against a client reference zone rendered the same way), `coverage` (export status), `slope` (ground reached only at the client's limit, banks over the design grade on routes; a `lane` view tints such floor climb, violet beside walk green), `objects` and `labels` (naming what a view shows).
 
 ## The checklist
 
