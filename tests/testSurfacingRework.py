@@ -598,7 +598,7 @@ def testRegionEditsAreValidated(stageBlenderServer):
 
   before, (empty, inverted, blankIntent, twoPoints, badAccess, duplicate, blank, unknownGroup, noGroup), after = stageBlenderServer.session(steps)
   assert "builtFor names no body group ['giant']" in unknownGroup and "builtFor is a list of one or more of" in noGroup
-  assert "editRegion needs an outline, bottom, top, intent, access, or builtFor" in empty
+  assert "editRegion needs an outline, bottom, top, intent, access, builtFor, or gradeDegrees" in empty
   assert "A region's bottom must lie below its top, got 10.0 and 10.0" in inverted
   assert "A region needs its intent" in blankIntent
   assert "A region outline is at least three [x, y] points" in twoPoints
