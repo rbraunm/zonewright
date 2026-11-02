@@ -270,6 +270,31 @@ def surfaceHeightAt(surface, point, top):
   return None if location is None else location.z
 
 
+def endHeight(sceneObject, surface, ground, point, name):
+  """An end given without z stands on the highest footing at its [x, y]: the route's own ground as it stands under the route, or what
+  else players stand on there (a placed stone, a deck, another rock mass), whichever is higher; a way under something takes its z."""
+  top, bottom = float(ground[:, 2].max()) + 1, float(ground[:, 2].min()) - 1
+  height = surfaceHeightAt(surface, point, top)
+  others = bridgeMeshAccess.playerSolidObjects(excluding=(sceneObject.name,))
+  depsgraph = bpy.context.evaluated_depsgraph_get()
+  standing, corners = [], []
+  for other in others:
+    box = bridgeMeshAccess.worldBoundsCorners(other, depsgraph)
+    if box and min(corner.x for corner in box) <= point[0] <= max(corner.x for corner in box) and min(corner.y for corner in box) <= point[1] <= max(corner.y for corner in box):
+      standing.append(other)
+      corners += box
+  trees = bridgeMeshAccess.solidTrees(standing) if standing else []
+  if trees:
+    above = max([top] + [corner.z for corner in corners]) + 1
+    below = min([bottom] + [corner.z for corner in corners]) - 1
+    footing = bridgeMeshAccess.PlayerSurfaces(trees=trees).footingOn(mathutils.Vector((point[0], point[1], above)), above - below)
+    if footing is not None and (height is None or footing.point.z > height):
+      height = footing.point.z
+  if height is None:
+    raise ValueError(f"No footing under the end of route '{name}' at {point}")
+  return height
+
+
 def otherRock(sceneObject):
   """What else in the terrain collection could stand over a route on sceneObject: rock masses, arches."""
   collection = bpy.data.collections.get(bridgeExport.terrainCollectionName)
@@ -283,16 +308,12 @@ def planRoute(sceneObject, name, definition, ground, faces, edgeLength):
   the grading did."""
   centerline = Centerline(name, definition["points"], definition["widths"], definition["landingLength"])
   surface = mathutils.bvhtree.BVHTree.FromPolygons(ground.tolist(), faces)
-  top = float(ground[:, 2].max()) + 1
   fixed = []
   for index, point in enumerate(definition["points"]):
     if len(point) == 3:
       fixed.append(point[2])
     elif index in (0, len(definition["points"]) - 1):
-      height = surfaceHeightAt(surface, point, top)
-      if height is None:
-        raise ValueError(f"No ground under the end of route '{name}' at {point}")
-      fixed.append(height)
+      fixed.append(endHeight(sceneObject, surface, ground, point, name))
     else:
       fixed.append(None)
   centerline.grade(fixed, definition["maximumGradeDegrees"])

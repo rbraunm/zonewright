@@ -623,16 +623,21 @@ def testVerifyExportCancelledOpensTheWorkFileAgain(stageBlenderServer, exportedZ
     async with anyio.create_task_group() as group:
       group.start_soon(functools.partial(session.client.call_tool, "verifyExport", {"path": str(exportedZone.export / f"{short}.eqg")}, progress_callback=cancelOnArchiveRenders))
       await rendering.wait()
+      # While it runs, the archive's file is open: another call that would read the scene is refused, naming the run and its step.
+      refused = await session.expectError("getSceneSummary", {"objectLimit": 0})
       group.cancel_scope.cancel()
-    # The cancelled call opens the work file again after the render it was in; until then the archive's new file is open, never saved.
+    # The cancelled call opens the work file again after the render it was in, holding the scene until it has; then the work file is open.
     for _ in range(reopenPolls):
-      status = (await session.expectSuccess("getSceneSummary", {"objectLimit": 0}))["status"]
-      if status["filePath"] is not None:
-        return status
+      result, _ = await session.call("getSceneSummary", {"objectLimit": 0})
+      if not result.is_error:
+        return refused, wholeResult(result.content[0].text)["status"]
+      assert "verifyExport is " in result.content[0].text and "holds the scene until it ends" in result.content[0].text, result.content[0].text
       await anyio.sleep(0.25)
-    return status
+    raise AssertionError("verifyExport held the scene after its cancel")
 
-  status = stageBlenderServer.session(steps)
+  refused, status = stageBlenderServer.session(steps)
+  assert "verifyExport is rendering archive view " in refused
+  assert "and holds the scene until it ends, when it opens the saved work file again; getSceneSummary waits for it" in refused
   assert status == {"filePath": str(exportedZone.blend), "unsavedChanges": False, "scene": "Scene"}
 
 

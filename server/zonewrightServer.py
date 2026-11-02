@@ -1,4 +1,5 @@
 import atexit
+import contextvars
 import datetime
 import functools
 import hashlib
@@ -119,6 +120,41 @@ def requireCurrentServerCode():
 
 # Saving runs on outdated server code too, so unsaved work can be kept before a reload.
 staleSafeTools = ("saveFile",)
+# The guarded tool call running in this context, so a tool's own bridge calls are told from another call's.
+currentCall = contextvars.ContextVar("currentCall")
+# The call whose run replaces the open scene (verifyExport, compareShot, calibrateShot), until it ends.
+sceneHold = None
+
+
+class Call:
+  def __init__(self, name):
+    self.name = name
+
+
+class SceneHold:
+  """A tool's hold on the scene while its run replaces what is open: until it ends, every other call's bridge access is refused,
+  naming the holder and its step, since the scene they would read or change is the holder's, not the work file's."""
+
+  def __init__(self, tool):
+    self.tool, self.call, self.step, self.since = tool, currentCall.get(None), None, datetime.datetime.now(datetime.UTC)
+
+  def __enter__(self):
+    global sceneHold
+    if sceneHold is not None:
+      raise ToolError(sceneHold.refusal(self.tool))
+    sceneHold = self
+    return self
+
+  def __exit__(self, *_):
+    global sceneHold
+    sceneHold = None
+
+  def at(self, step):
+    self.step = step
+
+  def refusal(self, tool):
+    doing = "is running" if self.step is None else f"is {self.step}"
+    return f"{self.tool} {doing} (since {self.since:%H:%M:%S} UTC) and holds the scene until it ends, when it opens the saved work file again; {tool} waits for it"
 
 
 def refuseUnknownArguments(tool):
@@ -137,17 +173,29 @@ def guardedTool(**options):
     def guard():
       if name not in staleSafeTools:
         requireCurrentServerCode()
+      # A tool a running call uses (verifyExport's importZoneFile) is that call's own work, not a call of its own.
+      return None if currentCall.get(None) is not None else currentCall.set(Call(name))
+
+    def release(token):
+      if token is not None:
+        currentCall.reset(token)
 
     if inspect.iscoroutinefunction(function):
       @functools.wraps(function)
       async def guarded(*arguments, **keywordArguments):
-        guard()
-        return resultReports.compactJSON(await function(*arguments, **keywordArguments))
+        token = guard()
+        try:
+          return resultReports.compactJSON(await function(*arguments, **keywordArguments))
+        finally:
+          release(token)
     else:
       @functools.wraps(function)
       def guarded(*arguments, **keywordArguments):
-        guard()
-        return resultReports.compactJSON(function(*arguments, **keywordArguments))
+        token = guard()
+        try:
+          return resultReports.compactJSON(function(*arguments, **keywordArguments))
+        finally:
+          release(token)
     server.tool(**options)(guarded)
     refuseUnknownArguments(server._tool_manager.get_tool(name))
     return guarded
@@ -173,6 +221,9 @@ async def runSync(context):
 
 
 async def callBridge(context, command, arguments):
+  call = currentCall.get(None)
+  if sceneHold is not None and sceneHold.call is not call:
+    raise ToolError(sceneHold.refusal("this call" if call is None else call.name))
   return await anyio.to_thread.run_sync(bridge.call, command, arguments, progressReporter(context))
 
 
@@ -2009,7 +2060,8 @@ async def renderPoses(context, poses, folder, prefix, exportedOnly, sky, figureM
   f" and the others up to {exportVerification.sheetRows} rows, {exportVerification.sheetRows} rows to a sheet, each sheet captioned"
   " with how many of the views are shown and when a view draws alike; every view's numbers and its three files on disk are in the"
   " JSON, in that order."
-  " Nothing done in Blender survives it: the saved work file is opened again, so its unsaved flag and scene are as before."
+  " Nothing done in Blender survives it: the saved work file is opened again, so its unsaved flag and scene are as before. It holds"
+  " the scene while it runs: until it ends, any other call that would read or change the scene is refused, naming it and its step."
 ))
 async def verifyExport(context: Context, path: str):
   archivePath, short, manifest = exportVerification.exportedGame(path)
@@ -2020,13 +2072,19 @@ async def verifyExport(context: Context, path: str):
   if status["filePath"] is None or not checkpoints.samePath(status["filePath"], manifest["blend"]):
     opened = "never saved" if status["filePath"] is None else f"'{status['filePath']}'"
     raise ToolError(f"{archivePath.name} was exported from '{manifest['blend']}', but the open file is {opened}: open that file (openFile) to verify its export")
-  workFile = status["filePath"]
+  with SceneHold("verifyExport") as hold:
+    return await verifiedExport(context, archivePath, short, manifest, status["filePath"], hold)
+
+
+async def verifiedExport(context, archivePath, short, manifest, workFile, hold):
+  """verifyExport's checks and pictures, the scene held for the run."""
   folder = archivePath.parent
   files = exportVerification.exportedFiles(folder, short)
   done = [0]
 
   async def step(message):
     done[0] += 1
+    hold.at(message)
     await context.report_progress(done[0], None, message)
 
   await step("reading the scene's inputs")
@@ -2293,14 +2351,16 @@ async def predictShot(context, screenshotPath, shot, loadOrderZone, exportedOnly
   " shot's PNG, beside its sidecar (<shot>.json), which names the zone dump taken in the same frame." + shotRefusals +
   " Opens a new file (discarding unsaved changes only with discardUnsavedChanges), imports the dump's zone from the client's own files as"
   " importZone does, and leaves that file open; a zone the client lacks (one only the spare holds), or an exported archive, is measured"
-  " by compareShot." + predictionHelp
+  " by compareShot. It holds the scene while it runs: until it ends, any other call that would read or change the scene is refused,"
+  " naming it." + predictionHelp
 ))
 async def calibrateShot(context: Context, screenshotPath: str, fitLight: bool = False, discardUnsavedChanges: bool = False):
   shot = await anyio.to_thread.run_sync(shotInputs, screenshotPath)
   zone = shot["dump"]["zone"]["shortName"]
-  await callBridge(context, "newFile", {"discardUnsavedChanges": discardUnsavedChanges})
-  imported = await importClientZone(context, zone, None)
-  sheet, summary = await predictShot(context, screenshotPath, shot, zone, False, {"kind": "clientZone", "path": None, "zoneDrift": None}, fitLight, {"camera": None, "poseDrift": None})
+  with SceneHold("calibrateShot"):
+    await callBridge(context, "newFile", {"discardUnsavedChanges": discardUnsavedChanges})
+    imported = await importClientZone(context, zone, None)
+    sheet, summary = await predictShot(context, screenshotPath, shot, zone, False, {"kind": "clientZone", "path": None, "zoneDrift": None}, fitLight, {"camera": None, "poseDrift": None})
   return [sheet, summary | {"import": imported["source"]}]
 
 
@@ -2323,7 +2383,8 @@ async def calibrateShot(context: Context, screenshotPath: str, fitLight: bool = 
   " of its heading and pitch, as teleport and face land it; farther, the client put the character elsewhere (on the ground, in water,"
   " against a wall) and the shot is refused naming each axis and angle off, the dump's value and the camera's. The run records camera"
   " and poseDrift (the dump's less the camera's: each eye axis, the heading, the pitch), both None without camera. Afterwards the saved"
-  " work file is opened again, so no placement, property change, or unsaved flag survives." + predictionHelp
+  " work file is opened again, so no placement, property change, or unsaved flag survives. It holds the scene while it runs: until it"
+  " ends, any other call that would read or change the scene is refused, naming it." + predictionHelp
 ))
 async def compareShot(context: Context, screenshotPath: str, archivePath: str | None = None, fitLight: bool = False, camera: str | None = None):
   shot = await anyio.to_thread.run_sync(shotInputs, screenshotPath)
@@ -2360,16 +2421,17 @@ async def compareShot(context: Context, screenshotPath: str, archivePath: str | 
       raise ToolError(f"The shot is of zone '{zone}', but {archive.name} is zone '{archive.stem.lower()}': compareShot measures a shot of the archive's own zone")
     source = {"kind": "archive", "path": str(archive)}
   source["zoneDrift"] = eqCalibration.zoneDrift(stored, shot["updates"])
-  try:
-    if archivePath is not None:
-      await callBridge(context, "newFile", {"discardUnsavedChanges": True})
-      await importZoneFile(context, str(archive))
-    clientHasZone = bool(await anyio.to_thread.run_sync(zoneSources.zoneVariants, zoneSources.resolveClientRoot(), zone))
-    sheet, summary = await predictShot(context, screenshotPath, shot, zone if clientHasZone else None, archivePath is None, source, fitLight, review)
-  finally:
-    # A cancelled or failed call must still leave Blender on the saved work file, never on the archive or with the dump's values set.
-    with anyio.CancelScope(shield=True):
-      await openWorkFile(context, workFile, True)
+  with SceneHold("compareShot"):
+    try:
+      if archivePath is not None:
+        await callBridge(context, "newFile", {"discardUnsavedChanges": True})
+        await importZoneFile(context, str(archive))
+      clientHasZone = bool(await anyio.to_thread.run_sync(zoneSources.zoneVariants, zoneSources.resolveClientRoot(), zone))
+      sheet, summary = await predictShot(context, screenshotPath, shot, zone if clientHasZone else None, archivePath is None, source, fitLight, review)
+    finally:
+      # A cancelled or failed call must still leave Blender on the saved work file, never on the archive or with the dump's values set.
+      with anyio.CancelScope(shield=True):
+        await openWorkFile(context, workFile, True)
   return [sheet, summary]
 
 
@@ -2665,7 +2727,9 @@ async def gradeRoute(
 ):
   """Grade a route into the ground (objectName) as a builder benches a path into a hillside: a bench `width` wide (or `widths`, one per
   point, changing evenly between them), level across, along `points` [[x, y] or [x, y, z], ...]. A point's z fixes its height; the
-  points between fixed heights take an even grade by plan length, and an end given without z takes the ground there. A stretch steeper
+  points between fixed heights take an even grade by plan length, and an end given without z stands on the highest footing at its
+  [x, y], as measure finds it: the ground, or a placed stone, deck, or rock mass standing over it; a way under something there takes
+  its z. A stretch steeper
   than maximumGradeDegrees is refused, naming it and the run it needs: the tool never adds a switchback, so place the hairpins' points.
   A bend turns on an arc the route's width in radius, so the bench stays level across it; a turn over 90 degrees (a hairpin) turns on
   an arc of half the width and is a flat landing, at least `landingLength` long (by default the width) and at least the arc, centered

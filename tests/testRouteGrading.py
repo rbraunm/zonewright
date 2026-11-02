@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 import numpy
+import pytest
 
 from conftest import writePNG, walkOf
 from testModelsAndDressing import readShapedMesh
@@ -71,6 +72,22 @@ async def surfaceUnder(session, samples):
 
 def largestMiss(samples, heights):
   return max(abs(height - sample[2]) for sample, height in zip(samples, heights))
+
+
+def testAnEndWithoutZStandsOnTheHighestFootingThere(stageBlenderServer, tmp_path):
+  async def steps(session):
+    await caveCanyon(session, tmp_path)
+    # A stone 6 high on the flat south ground, its top over the roughened ground there, and bare ground 40 south of it.
+    await session.expectSuccess("createPrimitive", {"kind": "cube", "name": "stone", "size": [24, 24, 6], "location": [-200, -260, -1], "collection": "structures"})
+    measured = await session.expectSuccess("measure", {"points": [[-200, -260], [-200, -300]], "snapToSurface": True})
+    onStone = await session.expectSuccess("gradeRoute", {"objectName": "ground", "name": "fromStone", "width": 20, "points": [[-200, -260], [-100, -260, 0]]})
+    bare = await session.expectSuccess("gradeRoute", {"objectName": "ground", "name": "bare", "width": 20, "points": [[-200, -300], [-100, -300, 0]]})
+    return measured["points"], onStone["centerline"][0], bare["centerline"][0]
+
+  (stoneTop, bareGround), fromStone, fromGround = stageBlenderServer.session(steps)
+  # The start on the stone takes the stone's top, as measure finds it, not the ground face buried under the stone; the bare start the ground.
+  assert stoneTop[2] == 5 and fromStone[2] == 5
+  assert fromGround[2] == pytest.approx(bareGround[2], abs=0.01) and abs(fromGround[2]) < 3
 
 
 def testASwitchbackUpTheHillsideIsBenchedOnItsGradeAndWalked(stageBlenderServer, tmp_path):
