@@ -377,14 +377,15 @@ def planRoute(sceneObject, name, definition, ground, faces, edgeLength):
     bench[rows[onBench]] = True
     # A vertex slid past a neighbour turns a face over: it goes back where it stood, at the bench's height there, so the bench widens
     # a little rather than a face from beyond its edge reaching under the path. A wrinkle of the ground the bench levels (an overhang
-    # roughened into a slope) was turned over already: its corners on the bench move toward their neighbours. Each is graded where it
-    # then stands.
+    # roughened into a slope) was turned over already: its corners on the bench move toward their neighbours, and keep the bench's
+    # height wherever that lands them (a corner relaxed to a hair past the edge would otherwise take the batter's height or the
+    # bench's by float noise, and the pass would read stale after every replay).
     turned = bridgeShaping.overturnedFaces(sceneObject, result, affected)
     returning, relaxing = corners(turned & ~turnedBefore) & slid, corners(turned & turnedBefore) & bench
     if not returning.any() and not relaxing.any():
       break
     positions[returning, :2] = ground[returning, :2]
-    widened |= returning
+    widened |= returning | relaxing
     positions[relaxing, :2] = bridgeShaping.vertexNeighbourAverages(sceneObject, result)[relaxing, :2]
   offsets, left = bridgeCaveData.guardedOffsets(sceneObject, heldUnderCaves(sceneObject, name, result - ground))
   result = ground + offsets
