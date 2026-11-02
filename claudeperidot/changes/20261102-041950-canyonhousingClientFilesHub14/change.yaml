@@ -1,0 +1,65 @@
+title: The spare client holds canyonhousing.eqg, canyonhousing_EnvironmentEmitters.txt and canyonhousing_assets.txt, Canyon Neighborhood's
+  client files
+why: 'Canyon Neighborhood''s client files with the hub''s ways made walkable (Hub14): the quay ramp''s top no longer humps
+  3 above Ferry Row''s street with stretched near-vertical slivers (the ramp ends in a level landing on the street, its top leg moved
+  12 north so its cut no longer takes the street''s north half), Palm Walk''s four plots and 101 Narrows Road stand on new paved
+  streets at 116 along their fronts instead of 3 to 5 above the bank, 102 Ferry Row''s entrance meets a widened street with no notch,
+  and the river''s swim boxes rebuilt on the new banks. Replaces 20261024-125347, reverted.
+  zonewright''s game export of it (staging\canyonhousing), verified by verifyExport except its known looks finding (the scene draws
+  normal maps; the export writes diffuse only). The step refuses when the spare runs, a file already exists, or a source is not
+  the verified export.'
+kind: client
+scope:
+- S:\Research\EverQuest\housingclient\canyonhousing.eqg
+- S:\Research\EverQuest\housingclient\canyonhousing_EnvironmentEmitters.txt
+- S:\Research\EverQuest\housingclient\canyonhousing_assets.txt
+disposition: fixture
+significance: minor
+ownerClearance:
+  ownerMessage: '2026-11-01, the owner: "continue" (the standing ask of 2026-10-23: "i''m more worried about all the really bad
+    artifacts that make the zone basically unusable still")'
+activation: the spare's next zoning into canyonhousing
+production: none
+commits: []
+steps:
+- |-
+  $ErrorActionPreference = 'Stop'
+  $source = Join-Path $env:LOCALAPPDATA 'zonewright\staging\canyonhousing'
+  $spare = 'S:\Research\EverQuest\housingclient'
+  $files = @{
+    'canyonhousing.eqg' = '1210E4B296B301F4939EFCC176E74F9A4C5867AAE908840D40855AEAE5B09B2C'
+    'canyonhousing_EnvironmentEmitters.txt' = '4BFC79738B62CD8C878C61B0579B0C97C5579FA73B3B5220DE07C351B70441E8'
+    'canyonhousing_assets.txt' = 'A104F8414208FE05B3C8178A2C40164A0F2B39A07A005DCDC4C950D0CFEECFFC'
+  }
+  if (Get-Process -Name eqgame -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$spare\*" }) { throw 'the spare client is running' }
+  foreach ($name in $files.Keys) {
+    if (Test-Path -LiteralPath "$spare\$name") { throw "$spare\$name already exists" }
+    if ((Get-FileHash -LiteralPath "$source\$name" -Algorithm SHA256).Hash -ne $files[$name]) { throw "$source\$name is not the verified export" }
+  }
+  foreach ($name in $files.Keys) {
+    Copy-Item -LiteralPath "$source\$name" -Destination "$spare\$name"
+    if ((Get-FileHash -LiteralPath "$spare\$name" -Algorithm SHA256).Hash -ne $files[$name]) { throw "$spare\$name does not match the export" }
+  }
+undo:
+- |-
+  $ErrorActionPreference = 'Stop'
+  $spare = 'S:\Research\EverQuest\housingclient'
+  $files = @{
+    'canyonhousing.eqg' = '1210E4B296B301F4939EFCC176E74F9A4C5867AAE908840D40855AEAE5B09B2C'
+    'canyonhousing_EnvironmentEmitters.txt' = '4BFC79738B62CD8C878C61B0579B0C97C5579FA73B3B5220DE07C351B70441E8'
+    'canyonhousing_assets.txt' = 'A104F8414208FE05B3C8178A2C40164A0F2B39A07A005DCDC4C950D0CFEECFFC'
+  }
+  if (Get-Process -Name eqgame -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$spare\*" }) { throw 'the spare client is running' }
+  foreach ($name in $files.Keys) {
+    if ((Get-FileHash -LiteralPath "$spare\$name" -Algorithm SHA256).Hash -ne $files[$name]) { throw "$spare\$name is not this change's file; nothing removed" }
+  }
+  foreach ($name in $files.Keys) { Remove-Item -LiteralPath "$spare\$name" -Confirm:$false }
+checks:
+- path: S:\Research\EverQuest\housingclient\canyonhousing.eqg
+  sha256: 1210e4b296b301f4939efcc176e74f9a4c5867aae908840d40855aeae5b09b2c
+- path: S:\Research\EverQuest\housingclient\canyonhousing_EnvironmentEmitters.txt
+  sha256: 4bfc79738b62cd8c878c61b0579b0c97c5579fa73b3b5220de07c351b70441e8
+- path: S:\Research\EverQuest\housingclient\canyonhousing_assets.txt
+  sha256: a104f8414208fe05b3c8178a2c40164a0f2b39a07a005dcdc4c950d0cfeecffc
+author:
+  session: session_0121Qm1vvZgAKaiV6dKmANxe
